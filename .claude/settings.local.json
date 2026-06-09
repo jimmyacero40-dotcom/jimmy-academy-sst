@@ -1,0 +1,32 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npm run *)",
+      "Bash(vercel --version)",
+      "Bash(vercel whoami *)",
+      "Bash(vercel --yes --prod)",
+      "Bash(vercel project *)",
+      "Bash(vercel env *)",
+      "Read(//c/Users/COOAGROMIN AT/.local/share/com.vercel.cli/**)",
+      "Read(//c/Users/COOAGROMIN AT/.config/vercel/**)",
+      "Read(//c/Users/COOAGROMIN AT/**)",
+      "Bash(vercel tokens *)",
+      "Bash(rm -rf .vercel)",
+      "Bash(vercel link *)",
+      "Bash(vercel deploy *)",
+      "Bash(vercel inspect *)",
+      "Bash(xargs grep -l \"token\")",
+      "Bash(curl -s -X PATCH https://api.vercel.com/v9/projects/jimmy-academy-sst?teamId=team_FU0wPGlIAX4nBCKijqHzbHKe -H 'Authorization: Bearer vca_2hACMy1gg4RiklNO8gq6c5Dd4LBtqcvYtzZaUty6zyca6VS5NB1xfxeR' -H 'Content-Type: application/json' -d '{\"rootDirectory\": null}')",
+      "Bash(npm install *)",
+      "Bash(node -e ' *)",
+      "Bash(git init *)",
+      "Bash(git add *)",
+      "Bash(git commit -m 'Jimmy Academy SST - App completa con tema TERRA, módulos SST, IA generadora de capacitaciones *)",
+      "Bash(gh auth *)",
+      "Bash(echo \"---exists: $?\")",
+      "Bash(echo 'node_modules *)",
+      "Bash(git commit -m ' *)",
+      "Bash(git config *)"
+    ]
+  }
+}

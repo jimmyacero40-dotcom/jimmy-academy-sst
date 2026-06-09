@@ -1,0 +1,23 @@
+{
+  "/_not-found/page": "app/_not-found/page.js",
+  "/api/generate-training/route": "app/api/generate-training/route.js",
+  "/api/auth/[...nextauth]/route": "app/api/auth/[...nextauth]/route.js",
+  "/design-preview/page": "app/design-preview/page.js",
+  "/page": "app/page.js",
+  "/forgot-password/page": "app/forgot-password/page.js",
+  "/login/page": "app/login/page.js",
+  "/register/page": "app/register/page.js",
+  "/dashboard/audit/page": "app/dashboard/audit/page.js",
+  "/dashboard/evaluations/page": "app/dashboard/evaluations/page.js",
+  "/dashboard/notifications/page": "app/dashboard/notifications/page.js",
+  "/dashboard/ai/page": "app/dashboard/ai/page.js",
+  "/dashboard/page": "app/dashboard/page.js",
+  "/dashboard/settings/page": "app/dashboard/settings/page.js",
+  "/dashboard/trainings/[id]/page": "app/dashboard/trainings/[id]/page.js",
+  "/dashboard/trainings/page": "app/dashboard/trainings/page.js",
+  "/dashboard/trainings/create/page": "app/dashboard/trainings/create/page.js",
+  "/dashboard/users/page": "app/dashboard/users/page.js",
+  "/dashboard/certificates/page": "app/dashboard/certificates/page.js",
+  "/dashboard/reports/page": "app/dashboard/reports/page.js",
+  "/dashboard/signatures/page": "app/dashboard/signatures/page.js"
+}
