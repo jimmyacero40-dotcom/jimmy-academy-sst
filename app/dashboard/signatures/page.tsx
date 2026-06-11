@@ -98,7 +98,7 @@ function SignatureCanvas({ onSave, onCancel }: { onSave: (data: string) => void;
 
   return (
     <div className="space-y-3">
-      <div className="relative border border-white/15 rounded-xl overflow-hidden bg-white/[0.02]">
+      <div className="relative border border-[var(--border-strong)] rounded-xl overflow-hidden bg-white/[0.02]">
         <canvas
           ref={canvasRef}
           width={600}
@@ -115,28 +115,28 @@ function SignatureCanvas({ onSave, onCancel }: { onSave: (data: string) => void;
         />
         {isEmpty && (
           <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-            <div className="flex flex-col items-center gap-2 text-slate-600">
+            <div className="flex flex-col items-center gap-2 text-[var(--text-faint)]">
               <PenTool size={24} />
               <p className="text-sm">Dibuja tu firma aquí</p>
               <p className="text-xs">Con el dedo o el mouse</p>
             </div>
           </div>
         )}
-        <div className="absolute bottom-2 left-0 right-0 border-b border-dashed border-white/10 mx-4" />
+        <div className="absolute bottom-2 left-0 right-0 border-b border-dashed border-[var(--border)] mx-4" />
       </div>
 
       <div className="flex gap-2">
         <button onClick={clear}
-          className="flex items-center gap-1.5 px-3 py-2 rounded-lg border border-white/8 text-slate-400 hover:text-white text-xs font-semibold transition-all">
+          className="flex items-center gap-1.5 px-3 py-2 rounded-lg border border-[var(--border)] text-[var(--text-dim)] hover:text-[var(--text)] text-xs font-semibold transition-all">
           <RotateCcw size={13} /> Borrar
         </button>
         <div className="flex-1" />
         <button onClick={onCancel}
-          className="px-4 py-2 rounded-lg border border-white/8 text-slate-400 hover:text-white text-sm font-semibold transition-all">
+          className="px-4 py-2 rounded-lg border border-[var(--border)] text-[var(--text-dim)] hover:text-[var(--text)] text-sm font-semibold transition-all">
           Cancelar
         </button>
         <button onClick={save} disabled={isEmpty}
-          className="flex items-center gap-2 px-4 py-2 rounded-lg bg-blue-600 hover:bg-blue-500 disabled:opacity-40 disabled:cursor-not-allowed text-white text-sm font-semibold transition-all">
+          className="flex items-center gap-2 px-4 py-2 rounded-lg bg-[var(--amber)] hover:bg-amber-500 disabled:opacity-40 disabled:cursor-not-allowed text-[var(--text)] text-sm font-semibold transition-all">
           <CheckCircle size={14} /> Confirmar firma
         </button>
       </div>
@@ -170,21 +170,21 @@ function SignModal({
   return (
     <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-4">
       <motion.div initial={{ opacity: 0, scale: 0.95, y: 16 }} animate={{ opacity: 1, scale: 1, y: 0 }}
-        className="bg-[#0D1629] border border-white/12 rounded-2xl w-full max-w-lg max-h-[90vh] overflow-y-auto">
+        className="bg-[var(--bg-surface)] border border-[var(--border-strong)] rounded-2xl w-full max-w-lg max-h-[90vh] overflow-y-auto">
 
         {/* Header */}
-        <div className="flex items-center justify-between px-6 py-4 border-b border-white/8 sticky top-0 bg-[#0D1629] z-10">
+        <div className="flex items-center justify-between px-6 py-4 border-b border-[var(--border)] sticky top-0 bg-[var(--bg-surface)] z-10">
           <div className="flex items-center gap-2.5">
-            <div className="w-8 h-8 rounded-lg bg-blue-500/10 border border-blue-500/20 flex items-center justify-center">
-              <PenTool size={15} className="text-blue-400" />
+            <div className="w-8 h-8 rounded-lg bg-amber-500/10 border border-amber-500/20 flex items-center justify-center">
+              <PenTool size={15} className="text-amber-400" />
             </div>
             <div>
-              <h2 className="text-white font-bold text-sm">Firma de Documento</h2>
-              <p className="text-slate-500 text-xs">{person.name}</p>
+              <h2 className="text-[var(--text)] font-bold text-sm">Firma de Documento</h2>
+              <p className="text-[var(--text-faint)] text-xs">{person.name}</p>
             </div>
           </div>
           {step !== 'done' && (
-            <button onClick={onClose} className="text-slate-400 hover:text-white transition-colors">
+            <button onClick={onClose} className="text-[var(--text-dim)] hover:text-[var(--text)] transition-colors">
               <X size={18} />
             </button>
           )}
@@ -197,35 +197,35 @@ function SignModal({
               <div className="w-16 h-16 rounded-full bg-emerald-500/15 border border-emerald-500/30 flex items-center justify-center mx-auto mb-4">
                 <CheckCircle size={32} className="text-emerald-400" />
               </div>
-              <h3 className="text-white font-black text-lg mb-1">¡Documento firmado!</h3>
-              <p className="text-slate-400 text-sm">La firma de <span className="text-white font-semibold">{person.name}</span> fue registrada exitosamente.</p>
+              <h3 className="text-[var(--text)] font-black text-lg mb-1">¡Documento firmado!</h3>
+              <p className="text-[var(--text-dim)] text-sm">La firma de <span className="text-[var(--text)] font-semibold">{person.name}</span> fue registrada exitosamente.</p>
               {signatureImg && (
-                <div className="mt-4 bg-white/5 rounded-xl p-3 border border-white/8 inline-block">
+                <div className="mt-4 bg-[var(--bg-card)] rounded-xl p-3 border border-[var(--border)] inline-block">
                   <img src={signatureImg} alt="Firma" className="h-12 mx-auto opacity-80" />
                 </div>
               )}
-              <p className="text-slate-600 text-xs mt-3">Cerrando automáticamente...</p>
+              <p className="text-[var(--text-faint)] text-xs mt-3">Cerrando automáticamente...</p>
             </motion.div>
           ) : step === 'preview' ? (
             <>
               {/* Document preview */}
-              <div className="bg-white/[0.03] border border-white/8 rounded-xl p-5 mb-5">
+              <div className="bg-white/[0.03] border border-[var(--border)] rounded-xl p-5 mb-5">
                 <div className="flex items-start gap-3 mb-4">
-                  <div className="w-10 h-10 rounded-lg bg-blue-500/10 border border-blue-500/20 flex items-center justify-center flex-shrink-0">
-                    <FileText size={18} className="text-blue-400" />
+                  <div className="w-10 h-10 rounded-lg bg-amber-500/10 border border-amber-500/20 flex items-center justify-center flex-shrink-0">
+                    <FileText size={18} className="text-amber-400" />
                   </div>
                   <div>
-                    <h3 className="text-white font-semibold text-sm leading-snug">{person.doc}</h3>
-                    <p className="text-slate-500 text-xs mt-0.5">Documento SST · Fecha límite: {person.due}</p>
+                    <h3 className="text-[var(--text)] font-semibold text-sm leading-snug">{person.doc}</h3>
+                    <p className="text-[var(--text-faint)] text-xs mt-0.5">Documento SST · Fecha límite: {person.due}</p>
                   </div>
                 </div>
 
-                <div className="space-y-2 text-xs text-slate-400 leading-relaxed">
-                  <p>Al firmar este documento, <span className="text-white font-semibold">{person.name}</span> declara haber leído, entendido y aceptado el contenido del presente documento en cumplimiento con el SG-SST de la empresa.</p>
-                  <p>Esta firma tiene validez legal según la <span className="text-slate-300">Ley 527 de 1999</span> (Comercio Electrónico) y el <span className="text-slate-300">Decreto 1072 de 2015</span>.</p>
+                <div className="space-y-2 text-xs text-[var(--text-dim)] leading-relaxed">
+                  <p>Al firmar este documento, <span className="text-[var(--text)] font-semibold">{person.name}</span> declara haber leído, entendido y aceptado el contenido del presente documento en cumplimiento con el SG-SST de la empresa.</p>
+                  <p>Esta firma tiene validez legal según la <span className="text-[var(--text-dim)]">Ley 527 de 1999</span> (Comercio Electrónico) y el <span className="text-[var(--text-dim)]">Decreto 1072 de 2015</span>.</p>
                 </div>
 
-                <div className="mt-4 pt-3 border-t border-white/8 flex items-center justify-between text-xs text-slate-500">
+                <div className="mt-4 pt-3 border-t border-[var(--border)] flex items-center justify-between text-xs text-[var(--text-faint)]">
                   <div className="flex items-center gap-1.5"><User size={11} /> {person.name}</div>
                   <div className="flex items-center gap-1.5"><Shield size={11} /> Firma con validez jurídica</div>
                 </div>
@@ -233,25 +233,25 @@ function SignModal({
 
               {/* Agreement checkbox */}
               <label className="flex items-start gap-3 cursor-pointer mb-5 group">
-                <div className={`w-5 h-5 rounded flex items-center justify-center flex-shrink-0 mt-0.5 border transition-all ${agreed ? 'bg-blue-600 border-blue-600' : 'bg-white/5 border-white/15 group-hover:border-white/25'}`}
+                <div className={`w-5 h-5 rounded flex items-center justify-center flex-shrink-0 mt-0.5 border transition-all ${agreed ? 'bg-[var(--amber)] border-blue-600' : 'bg-[var(--bg-card)] border-[var(--border-strong)] group-hover:border-white/25'}`}
                   onClick={() => setAgreed(!agreed)}>
-                  {agreed && <CheckCircle size={13} className="text-white" />}
+                  {agreed && <CheckCircle size={13} className="text-[var(--text)]" />}
                 </div>
-                <span className="text-slate-400 text-xs leading-relaxed">
+                <span className="text-[var(--text-dim)] text-xs leading-relaxed">
                   He leído y comprendo el contenido del documento. Acepto firmarlo digitalmente como señal de mi conformidad y compromiso con el SG-SST.
                 </span>
               </label>
 
               <button onClick={() => setStep('sign')} disabled={!agreed}
-                className="w-full flex items-center justify-center gap-2 py-3 rounded-xl bg-blue-600 hover:bg-blue-500 disabled:opacity-40 disabled:cursor-not-allowed text-white font-bold text-sm transition-all">
+                className="w-full flex items-center justify-center gap-2 py-3 rounded-xl bg-[var(--amber)] hover:bg-amber-500 disabled:opacity-40 disabled:cursor-not-allowed text-[var(--text)] font-bold text-sm transition-all">
                 <PenTool size={15} /> Continuar para firmar
               </button>
             </>
           ) : (
             <>
               <div className="mb-4">
-                <h3 className="text-white font-semibold text-sm mb-1">Dibuja tu firma</h3>
-                <p className="text-slate-500 text-xs">Usa el dedo (móvil) o el mouse (PC) para dibujar tu firma en el recuadro</p>
+                <h3 className="text-[var(--text)] font-semibold text-sm mb-1">Dibuja tu firma</h3>
+                <p className="text-[var(--text-faint)] text-xs">Usa el dedo (móvil) o el mouse (PC) para dibujar tu firma en el recuadro</p>
               </div>
               <SignatureCanvas onSave={handleSave} onCancel={() => setStep('preview')} />
             </>
@@ -288,11 +288,11 @@ export default function SignaturesPage() {
       <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} className="mb-6">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div>
-            <h1 className="text-2xl font-black text-white mb-1">Firmas Digitales</h1>
-            <p className="text-slate-400 text-sm">{docs.length} documentos · {pending.length} firmas pendientes</p>
+            <h1 className="text-2xl font-black text-[var(--text)] mb-1">Firmas Digitales</h1>
+            <p className="text-[var(--text-dim)] text-sm">{docs.length} documentos · {pending.length} firmas pendientes</p>
           </div>
           <button onClick={() => setShowNewDoc(true)}
-            className="flex items-center gap-2 bg-blue-600 hover:bg-blue-500 text-white px-4 py-2.5 rounded-xl font-semibold text-sm transition-all self-start sm:self-auto">
+            className="flex items-center gap-2 bg-[var(--amber)] hover:bg-amber-500 text-[var(--text)] px-4 py-2.5 rounded-xl font-semibold text-sm transition-all self-start sm:self-auto">
             <Plus size={16} /> Nuevo Documento
           </button>
         </div>
@@ -301,15 +301,15 @@ export default function SignaturesPage() {
       {/* Stats */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-6">
         {[
-          { label: 'Documentos', value: docs.length, color: 'text-blue-400' },
+          { label: 'Documentos', value: docs.length, color: 'text-amber-400' },
           { label: 'Firmas totales', value: docs.reduce((a, d) => a + d.signed, 0) + signed.length, color: 'text-emerald-400' },
           { label: 'Pendientes', value: pending.length, color: 'text-orange-400' },
           { label: 'Completados', value: docs.filter(d => d.status === 'completado').length, color: 'text-violet-400' },
         ].map(({ label, value, color }, i) => (
           <motion.div key={label} initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.05 }}
-            className="bg-[#0D1629] border border-white/8 rounded-xl p-4">
+            className="bg-[var(--bg-surface)] border border-[var(--border)] rounded-xl p-4">
             <div className={`text-2xl font-black ${color}`}>{value}</div>
-            <div className="text-slate-400 text-xs mt-0.5">{label}</div>
+            <div className="text-[var(--text-dim)] text-xs mt-0.5">{label}</div>
           </motion.div>
         ))}
       </div>
@@ -320,9 +320,9 @@ export default function SignaturesPage() {
         <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }}
           className="lg:col-span-2">
           <div className="relative mb-4">
-            <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" />
+            <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--text-faint)]" />
             <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Buscar documento..."
-              className="w-full bg-white/5 border border-white/8 rounded-xl pl-9 pr-4 py-2.5 text-sm text-white placeholder:text-slate-500 focus:outline-none focus:border-blue-500/50 transition-all" />
+              className="w-full bg-[var(--bg-card)] border border-[var(--border)] rounded-xl pl-9 pr-4 py-2.5 text-sm text-[var(--text)] placeholder:text-[var(--text-faint)] focus:outline-none focus:border-amber-500/40 transition-all" />
           </div>
 
           <div className="space-y-3">
@@ -332,25 +332,25 @@ export default function SignaturesPage() {
               const progress = Math.round((doc.signed / doc.total) * 100)
               return (
                 <motion.div key={doc.id} initial={{ opacity: 0, x: -16 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: i * 0.05 }}
-                  className="bg-[#0D1629] border border-white/8 rounded-xl p-4 hover:border-white/15 transition-all cursor-pointer"
+                  className="bg-[var(--bg-surface)] border border-[var(--border)] rounded-xl p-4 hover:border-[var(--border-strong)] transition-all cursor-pointer"
                   onClick={() => setSelectedDoc(doc)}>
                   <div className="flex items-start gap-3">
-                    <div className="w-9 h-9 rounded-lg bg-blue-500/10 border border-blue-500/20 flex items-center justify-center flex-shrink-0">
-                      <FileText size={16} className="text-blue-400" />
+                    <div className="w-9 h-9 rounded-lg bg-amber-500/10 border border-amber-500/20 flex items-center justify-center flex-shrink-0">
+                      <FileText size={16} className="text-amber-400" />
                     </div>
                     <div className="flex-1 min-w-0">
                       <div className="flex items-start justify-between gap-2 mb-1">
-                        <h3 className="text-white text-sm font-semibold leading-snug line-clamp-1">{doc.title}</h3>
+                        <h3 className="text-[var(--text)] text-sm font-semibold leading-snug line-clamp-1">{doc.title}</h3>
                         <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-lg text-xs font-semibold border flex-shrink-0 ${st.bg} ${st.color}`}>
                           <StIcon size={10} /> {st.label}
                         </span>
                       </div>
-                      <p className="text-slate-500 text-xs mb-2">{doc.type} · {doc.created}</p>
+                      <p className="text-[var(--text-faint)] text-xs mb-2">{doc.type} · {doc.created}</p>
                       <div className="flex items-center gap-3">
                         <div className="flex-1 h-1.5 bg-white/8 rounded-full overflow-hidden">
-                          <div className="h-full bg-blue-500 rounded-full transition-all" style={{ width: `${progress}%` }} />
+                          <div className="h-full bg-amber-500 rounded-full transition-all" style={{ width: `${progress}%` }} />
                         </div>
-                        <span className="text-xs text-slate-400 flex-shrink-0">{doc.signed}/{doc.total} firmas</span>
+                        <span className="text-xs text-[var(--text-dim)] flex-shrink-0">{doc.signed}/{doc.total} firmas</span>
                       </div>
                     </div>
                   </div>
@@ -362,14 +362,14 @@ export default function SignaturesPage() {
 
         {/* Pending signatures panel */}
         <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2 }}
-          className="bg-[#0D1629] border border-white/8 rounded-2xl overflow-hidden h-fit">
-          <div className="px-5 py-4 border-b border-white/8 flex items-center justify-between">
+          className="bg-[var(--bg-surface)] border border-[var(--border)] rounded-2xl overflow-hidden h-fit">
+          <div className="px-5 py-4 border-b border-[var(--border)] flex items-center justify-between">
             <div>
-              <h3 className="font-bold text-white text-sm">Firmas Pendientes</h3>
-              <p className="text-slate-500 text-xs mt-0.5">{pending.length} empleados sin firmar</p>
+              <h3 className="font-bold text-[var(--text)] text-sm">Firmas Pendientes</h3>
+              <p className="text-[var(--text-faint)] text-xs mt-0.5">{pending.length} empleados sin firmar</p>
             </div>
             {pending.length > 0 && (
-              <div className="w-5 h-5 rounded-full bg-orange-500 flex items-center justify-center text-white text-[10px] font-bold">
+              <div className="w-5 h-5 rounded-full bg-orange-500 flex items-center justify-center text-[var(--text)] text-[10px] font-bold">
                 {pending.length}
               </div>
             )}
@@ -379,12 +379,12 @@ export default function SignaturesPage() {
             <AnimatePresence>
               {pending.map((p) => (
                 <motion.div key={p.id} initial={{ opacity: 1 }} exit={{ opacity: 0, x: 20 }}
-                  className="px-5 py-3.5 hover:bg-white/2 transition-colors">
+                  className="px-5 py-3.5 hover:bg-[var(--bg-card-hover)] transition-colors">
                   <div className="flex items-start justify-between gap-2 mb-2">
                     <div>
-                      <div className="text-white text-sm font-semibold">{p.name}</div>
-                      <div className="text-slate-500 text-xs mt-0.5">{p.area}</div>
-                      <div className="text-slate-600 text-xs mt-0.5 line-clamp-1">{p.doc}</div>
+                      <div className="text-[var(--text)] text-sm font-semibold">{p.name}</div>
+                      <div className="text-[var(--text-faint)] text-xs mt-0.5">{p.area}</div>
+                      <div className="text-[var(--text-faint)] text-xs mt-0.5 line-clamp-1">{p.doc}</div>
                     </div>
                     <div className={`text-xs font-bold flex-shrink-0 ${p.days <= 3 ? 'text-rose-400' : 'text-orange-400'}`}>
                       {p.days}d
@@ -392,7 +392,7 @@ export default function SignaturesPage() {
                   </div>
                   <button
                     onClick={() => setSignPerson(p)}
-                    className="w-full flex items-center justify-center gap-1.5 py-2 rounded-lg bg-blue-600/15 border border-blue-500/25 text-blue-400 hover:bg-blue-600/25 text-xs font-semibold transition-all">
+                    className="w-full flex items-center justify-center gap-1.5 py-2 rounded-lg bg-[var(--amber)]/15 border border-amber-500/25 text-amber-400 hover:bg-[var(--amber)]/25 text-xs font-semibold transition-all">
                     <PenTool size={12} /> Firmar ahora
                   </button>
                 </motion.div>
@@ -404,12 +404,12 @@ export default function SignaturesPage() {
             <div className="px-5 py-8 text-center">
               <CheckCircle size={28} className="mx-auto text-emerald-400 mb-2" />
               <p className="text-emerald-400 text-sm font-semibold">¡Todo firmado!</p>
-              <p className="text-slate-600 text-xs mt-0.5">No hay firmas pendientes</p>
+              <p className="text-[var(--text-faint)] text-xs mt-0.5">No hay firmas pendientes</p>
             </div>
           )}
 
           {pending.length > 0 && (
-            <div className="p-4 border-t border-white/8">
+            <div className="p-4 border-t border-[var(--border)]">
               <button className="w-full py-2.5 rounded-xl bg-orange-500/10 border border-orange-500/20 text-orange-400 text-sm font-semibold hover:bg-orange-500/20 transition-all flex items-center justify-center gap-2">
                 <Send size={13} /> Enviar recordatorios
               </button>
@@ -431,35 +431,35 @@ export default function SignaturesPage() {
       {selectedDoc && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4" onClick={() => setSelectedDoc(null)}>
           <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }}
-            className="bg-[#0D1629] border border-white/12 rounded-2xl w-full max-w-md" onClick={e => e.stopPropagation()}>
-            <div className="flex items-center justify-between px-6 py-4 border-b border-white/8">
-              <h2 className="text-white font-bold text-sm">Detalle del Documento</h2>
-              <button onClick={() => setSelectedDoc(null)} className="text-slate-400 hover:text-white"><X size={18} /></button>
+            className="bg-[var(--bg-surface)] border border-[var(--border-strong)] rounded-2xl w-full max-w-md" onClick={e => e.stopPropagation()}>
+            <div className="flex items-center justify-between px-6 py-4 border-b border-[var(--border)]">
+              <h2 className="text-[var(--text)] font-bold text-sm">Detalle del Documento</h2>
+              <button onClick={() => setSelectedDoc(null)} className="text-[var(--text-dim)] hover:text-[var(--text)]"><X size={18} /></button>
             </div>
             <div className="p-6">
-              <div className="w-12 h-12 rounded-xl bg-blue-500/10 border border-blue-500/20 flex items-center justify-center mb-4">
-                <FileText size={22} className="text-blue-400" />
+              <div className="w-12 h-12 rounded-xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-center mb-4">
+                <FileText size={22} className="text-amber-400" />
               </div>
-              <h3 className="text-white font-bold mb-1">{selectedDoc.title}</h3>
-              <p className="text-slate-400 text-sm mb-4">{selectedDoc.type}</p>
+              <h3 className="text-[var(--text)] font-bold mb-1">{selectedDoc.title}</h3>
+              <p className="text-[var(--text-dim)] text-sm mb-4">{selectedDoc.type}</p>
               <div className="space-y-3 mb-6">
                 <div className="flex justify-between text-sm">
-                  <span className="text-slate-400">Firmas recolectadas</span>
-                  <span className="text-white font-semibold">{selectedDoc.signed} / {selectedDoc.total}</span>
+                  <span className="text-[var(--text-dim)]">Firmas recolectadas</span>
+                  <span className="text-[var(--text)] font-semibold">{selectedDoc.signed} / {selectedDoc.total}</span>
                 </div>
                 <div className="h-2 bg-white/8 rounded-full overflow-hidden">
-                  <div className="h-full bg-blue-500 rounded-full" style={{ width: `${Math.round((selectedDoc.signed / selectedDoc.total) * 100)}%` }} />
+                  <div className="h-full bg-amber-500 rounded-full" style={{ width: `${Math.round((selectedDoc.signed / selectedDoc.total) * 100)}%` }} />
                 </div>
                 <div className="flex justify-between text-sm">
-                  <span className="text-slate-400">Fecha creación</span>
-                  <span className="text-white">{selectedDoc.created}</span>
+                  <span className="text-[var(--text-dim)]">Fecha creación</span>
+                  <span className="text-[var(--text)]">{selectedDoc.created}</span>
                 </div>
               </div>
               <div className="flex gap-3">
-                <button className="flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl border border-white/8 text-slate-300 hover:text-white text-sm font-semibold transition-all">
+                <button className="flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl border border-[var(--border)] text-[var(--text-dim)] hover:text-[var(--text)] text-sm font-semibold transition-all">
                   <Eye size={14} /> Ver
                 </button>
-                <button className="flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-white text-sm font-semibold transition-all">
+                <button className="flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl bg-[var(--amber)] hover:bg-amber-500 text-[var(--text)] text-sm font-semibold transition-all">
                   <Download size={14} /> Descargar
                 </button>
               </div>
@@ -472,42 +472,42 @@ export default function SignaturesPage() {
       {showNewDoc && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
           <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }}
-            className="bg-[#0D1629] border border-white/12 rounded-2xl w-full max-w-md">
-            <div className="flex items-center justify-between px-6 py-4 border-b border-white/8">
-              <h2 className="text-white font-bold">Nuevo Documento</h2>
-              <button onClick={() => setShowNewDoc(false)} className="text-slate-400 hover:text-white"><X size={18} /></button>
+            className="bg-[var(--bg-surface)] border border-[var(--border-strong)] rounded-2xl w-full max-w-md">
+            <div className="flex items-center justify-between px-6 py-4 border-b border-[var(--border)]">
+              <h2 className="text-[var(--text)] font-bold">Nuevo Documento</h2>
+              <button onClick={() => setShowNewDoc(false)} className="text-[var(--text-dim)] hover:text-[var(--text)]"><X size={18} /></button>
             </div>
             <div className="p-6 space-y-4">
               <div>
-                <label className="text-slate-400 text-xs font-semibold mb-1.5 block">Título del documento</label>
+                <label className="text-[var(--text-dim)] text-xs font-semibold mb-1.5 block">Título del documento</label>
                 <input placeholder="Política de Seguridad..."
-                  className="w-full bg-white/5 border border-white/8 rounded-xl px-4 py-2.5 text-sm text-white placeholder:text-slate-600 focus:outline-none focus:border-blue-500/50 transition-all" />
+                  className="w-full bg-[var(--bg-card)] border border-[var(--border)] rounded-xl px-4 py-2.5 text-sm text-[var(--text)] placeholder:text-[var(--text-faint)] focus:outline-none focus:border-amber-500/40 transition-all" />
               </div>
               <div>
-                <label className="text-slate-400 text-xs font-semibold mb-1.5 block">Tipo</label>
-                <select className="w-full bg-white/5 border border-white/8 rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none focus:border-blue-500/50 transition-all">
+                <label className="text-[var(--text-dim)] text-xs font-semibold mb-1.5 block">Tipo</label>
+                <select className="w-full bg-[var(--bg-card)] border border-[var(--border)] rounded-xl px-4 py-2.5 text-sm text-[var(--text)] focus:outline-none focus:border-amber-500/40 transition-all">
                   {['Política SST', 'Reglamento', 'Compromiso', 'Acta', 'Plan', 'Inducción'].map(c => (
-                    <option key={c} className="bg-[#0D1629]">{c}</option>
+                    <option key={c} className="bg-[var(--bg-surface)]">{c}</option>
                   ))}
                 </select>
               </div>
               <div>
-                <label className="text-slate-400 text-xs font-semibold mb-1.5 block">Fecha límite de firma</label>
-                <input type="date" className="w-full bg-white/5 border border-white/8 rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none focus:border-blue-500/50 transition-all" />
+                <label className="text-[var(--text-dim)] text-xs font-semibold mb-1.5 block">Fecha límite de firma</label>
+                <input type="date" className="w-full bg-[var(--bg-card)] border border-[var(--border)] rounded-xl px-4 py-2.5 text-sm text-[var(--text)] focus:outline-none focus:border-amber-500/40 transition-all" />
               </div>
               <div>
-                <label className="text-slate-400 text-xs font-semibold mb-1.5 block">Subir documento (PDF)</label>
-                <div className="border-2 border-dashed border-white/10 rounded-xl p-6 text-center hover:border-blue-500/30 transition-all cursor-pointer">
-                  <FileText size={24} className="mx-auto text-slate-500 mb-2" />
-                  <p className="text-slate-500 text-xs">Arrastra o haz clic para subir</p>
+                <label className="text-[var(--text-dim)] text-xs font-semibold mb-1.5 block">Subir documento (PDF)</label>
+                <div className="border-2 border-dashed border-[var(--border)] rounded-xl p-6 text-center hover:border-amber-500/30 transition-all cursor-pointer">
+                  <FileText size={24} className="mx-auto text-[var(--text-faint)] mb-2" />
+                  <p className="text-[var(--text-faint)] text-xs">Arrastra o haz clic para subir</p>
                 </div>
               </div>
             </div>
             <div className="px-6 pb-6 flex gap-3">
               <button onClick={() => setShowNewDoc(false)}
-                className="flex-1 py-2.5 rounded-xl border border-white/8 text-slate-400 hover:text-white text-sm font-semibold transition-all">Cancelar</button>
+                className="flex-1 py-2.5 rounded-xl border border-[var(--border)] text-[var(--text-dim)] hover:text-[var(--text)] text-sm font-semibold transition-all">Cancelar</button>
               <button onClick={() => setShowNewDoc(false)}
-                className="flex-1 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-white text-sm font-semibold transition-all">Crear Documento</button>
+                className="flex-1 py-2.5 rounded-xl bg-[var(--amber)] hover:bg-amber-500 text-[var(--text)] text-sm font-semibold transition-all">Crear Documento</button>
             </div>
           </motion.div>
         </div>

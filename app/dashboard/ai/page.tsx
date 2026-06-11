@@ -36,7 +36,7 @@ function getAIResponse(msg: string): string {
 const INSIGHTS = [
   { icon: AlertCircle, color: 'text-orange-400', bg: 'bg-orange-400/10 border-orange-400/20', title: 'Alerta de vencimiento', desc: '2 certificados vencen en los próximos 30 días', action: 'Ver certificados' },
   { icon: TrendingUp, color: 'text-emerald-400', bg: 'bg-emerald-400/10 border-emerald-400/20', title: 'Tendencia positiva', desc: 'Cumplimiento SST aumentó 6% en los últimos 3 meses', action: 'Ver reportes' },
-  { icon: Users, color: 'text-blue-400', bg: 'bg-blue-400/10 border-blue-400/20', title: 'Capacitación urgente', desc: '12 empleados de Primeros Auxilios pendientes de recertificación', action: 'Ver usuarios' },
+  { icon: Users, color: 'text-amber-400', bg: 'bg-blue-400/10 border-blue-400/20', title: 'Capacitación urgente', desc: '12 empleados de Primeros Auxilios pendientes de recertificación', action: 'Ver usuarios' },
   { icon: Lightbulb, color: 'text-yellow-400', bg: 'bg-yellow-400/10 border-yellow-400/20', title: 'Sugerencia IA', desc: 'Agrupa las 3 capacitaciones pendientes en un solo taller para ahorrar 40%', action: 'Ver plan' },
 ]
 
@@ -76,12 +76,12 @@ export default function AIPage() {
 
       <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} className="mb-5">
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-cyan-500 to-blue-600 flex items-center justify-center">
-            <Brain size={20} className="text-white" />
+          <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-amber-500 to-red-500 flex items-center justify-center">
+            <Brain size={20} className="text-[var(--text)]" />
           </div>
           <div>
-            <h1 className="text-2xl font-black text-white">IA SST</h1>
-            <p className="text-slate-400 text-sm">Asistente inteligente para gestión de seguridad y salud en el trabajo</p>
+            <h1 className="text-2xl font-black text-[var(--text)]">IA SST</h1>
+            <p className="text-[var(--text-dim)] text-sm">Asistente inteligente para gestión de seguridad y salud en el trabajo</p>
           </div>
         </div>
       </motion.div>
@@ -90,7 +90,7 @@ export default function AIPage() {
 
         {/* Chat */}
         <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }}
-          className="lg:col-span-2 flex flex-col bg-[#0D1629] border border-white/8 rounded-2xl overflow-hidden" style={{ minHeight: 400 }}>
+          className="lg:col-span-2 flex flex-col bg-[var(--bg-surface)] border border-[var(--border)] rounded-2xl overflow-hidden" style={{ minHeight: 400 }}>
 
           {/* Messages */}
           <div className="flex-1 overflow-y-auto p-4 space-y-4">
@@ -99,18 +99,18 @@ export default function AIPage() {
                 <motion.div key={i} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}
                   className={`flex gap-3 ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
                   {msg.role === 'ai' && (
-                    <div className="w-8 h-8 rounded-full bg-gradient-to-br from-cyan-500 to-blue-600 flex items-center justify-center flex-shrink-0 mt-1">
-                      <Brain size={14} className="text-white" />
+                    <div className="w-8 h-8 rounded-full bg-gradient-to-br from-amber-500 to-red-500 flex items-center justify-center flex-shrink-0 mt-1">
+                      <Brain size={14} className="text-[var(--text)]" />
                     </div>
                   )}
                   <div className={`max-w-[80%] ${msg.role === 'user'
-                    ? 'bg-blue-600/20 border border-blue-500/30 rounded-2xl rounded-tr-sm'
-                    : 'bg-white/5 border border-white/8 rounded-2xl rounded-tl-sm'
+                    ? 'bg-amber-500/15 border border-amber-500/30 rounded-2xl rounded-tr-sm'
+                    : 'bg-[var(--bg-card)] border border-[var(--border)] rounded-2xl rounded-tl-sm'
                   } px-4 py-3`}>
-                    <div className={`text-sm space-y-1 ${msg.role === 'ai' ? 'text-slate-200' : 'text-white'}`}>
+                    <div className={`text-sm space-y-1 ${msg.role === 'ai' ? 'text-slate-200' : 'text-[var(--text)]'}`}>
                       {renderText(msg.text)}
                     </div>
-                    <div className="text-slate-600 text-[10px] mt-1.5">{msg.time}</div>
+                    <div className="text-[var(--text-faint)] text-[10px] mt-1.5">{msg.time}</div>
                   </div>
                 </motion.div>
               ))}
@@ -118,10 +118,10 @@ export default function AIPage() {
 
             {loading && (
               <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="flex gap-3">
-                <div className="w-8 h-8 rounded-full bg-gradient-to-br from-cyan-500 to-blue-600 flex items-center justify-center flex-shrink-0">
-                  <Brain size={14} className="text-white" />
+                <div className="w-8 h-8 rounded-full bg-gradient-to-br from-amber-500 to-red-500 flex items-center justify-center flex-shrink-0">
+                  <Brain size={14} className="text-[var(--text)]" />
                 </div>
-                <div className="bg-white/5 border border-white/8 rounded-2xl rounded-tl-sm px-4 py-3">
+                <div className="bg-[var(--bg-card)] border border-[var(--border)] rounded-2xl rounded-tl-sm px-4 py-3">
                   <div className="flex gap-1.5 items-center h-5">
                     {[0, 1, 2].map(j => (
                       <motion.div key={j} animate={{ y: [0, -4, 0] }} transition={{ duration: 0.6, repeat: Infinity, delay: j * 0.15 }}
@@ -138,22 +138,22 @@ export default function AIPage() {
           <div className="px-4 pb-2 flex gap-2 overflow-x-auto scrollbar-none">
             {SUGGESTIONS.map(s => (
               <button key={s} onClick={() => send(s)}
-                className="flex-shrink-0 text-xs text-cyan-400 border border-cyan-400/20 bg-cyan-400/5 hover:bg-cyan-400/10 px-3 py-1.5 rounded-lg transition-all">
+                className="flex-shrink-0 text-xs text-amber-300 border border-amber-500/20 bg-amber-500/5 hover:bg-amber-500/10 px-3 py-1.5 rounded-lg transition-all">
                 {s}
               </button>
             ))}
           </div>
 
           {/* Input */}
-          <div className="border-t border-white/8 p-4">
+          <div className="border-t border-[var(--border)] p-4">
             <div className="flex gap-2">
               <input value={input} onChange={e => setInput(e.target.value)}
                 onKeyDown={e => e.key === 'Enter' && send(input)}
                 placeholder="Pregunta sobre SST, capacitaciones, cumplimiento..."
-                className="flex-1 bg-white/5 border border-white/8 rounded-xl px-4 py-2.5 text-sm text-white placeholder:text-slate-500 focus:outline-none focus:border-blue-500/50 transition-all" />
+                className="flex-1 bg-[var(--bg-card)] border border-[var(--border)] rounded-xl px-4 py-2.5 text-sm text-[var(--text)] placeholder:text-[var(--text-faint)] focus:outline-none focus:border-amber-500/40 transition-all" />
               <button onClick={() => send(input)} disabled={!input.trim() || loading}
-                className="w-10 h-10 rounded-xl bg-blue-600 hover:bg-blue-500 disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center transition-all">
-                <Send size={16} className="text-white" />
+                className="w-10 h-10 rounded-xl bg-[var(--amber)] hover:bg-amber-500 disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center transition-all">
+                <Send size={16} className="text-[var(--text)]" />
               </button>
             </div>
           </div>
@@ -164,18 +164,18 @@ export default function AIPage() {
           className="space-y-3">
           <div className="flex items-center gap-2 mb-1">
             <Sparkles size={15} className="text-yellow-400" />
-            <h3 className="text-white font-bold text-sm">Insights Automáticos</h3>
+            <h3 className="text-[var(--text)] font-bold text-sm">Insights Automáticos</h3>
           </div>
           {INSIGHTS.map(({ icon: Icon, color, bg, title, desc, action }, i) => (
             <motion.div key={i} initial={{ opacity: 0, x: 16 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: 0.3 + i * 0.07 }}
-              className="bg-[#0D1629] border border-white/8 rounded-xl p-4 hover:border-white/15 transition-all">
+              className="bg-[var(--bg-surface)] border border-[var(--border)] rounded-xl p-4 hover:border-[var(--border-strong)] transition-all">
               <div className="flex items-start gap-3">
                 <div className={`w-8 h-8 rounded-lg flex items-center justify-center border flex-shrink-0 ${bg}`}>
                   <Icon size={15} className={color} />
                 </div>
                 <div>
-                  <div className="text-white text-sm font-semibold">{title}</div>
-                  <p className="text-slate-400 text-xs mt-0.5 leading-snug">{desc}</p>
+                  <div className="text-[var(--text)] text-sm font-semibold">{title}</div>
+                  <p className="text-[var(--text-dim)] text-xs mt-0.5 leading-snug">{desc}</p>
                   <button onClick={() => send(desc)}
                     className={`text-xs font-semibold mt-2 ${color} hover:opacity-80 transition-opacity`}>
                     Analizar →
@@ -186,7 +186,7 @@ export default function AIPage() {
           ))}
 
           <button onClick={() => setMessages([{ role: 'ai', text: AI_RESPONSES.default, time: 'Ahora' }])}
-            className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl border border-white/8 text-slate-400 hover:text-white text-xs font-semibold transition-all">
+            className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl border border-[var(--border)] text-[var(--text-dim)] hover:text-[var(--text)] text-xs font-semibold transition-all">
             <RotateCcw size={13} /> Limpiar conversación
           </button>
         </motion.div>
