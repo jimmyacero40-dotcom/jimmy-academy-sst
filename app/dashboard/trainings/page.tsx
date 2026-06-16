@@ -149,7 +149,7 @@ export default function TrainingsPage() {
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div>
             <h1 className="text-2xl font-black mb-1" style={{ color: 'var(--text)', fontFamily: 'var(--font-display)' }}>Capacitaciones</h1>
-            <p className="text-sm" style={{ color: 'var(--text-dim)' }}>{TRAININGS_DATA.length} cursos disponibles · evaluacion y certificado automatico</p>
+            <p className="text-sm" style={{ color: 'var(--text-dim)' }}>{trainings.length} cursos disponibles · evaluacion y certificado automatico</p>
           </div>
           <div className="flex gap-2 flex-wrap">
             <button onClick={() => router.push('/dashboard/trainings/create')} className="terra-btn text-sm py-2.5 px-4">
@@ -165,10 +165,10 @@ export default function TrainingsPage() {
       {/* Stats */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-6">
         {[
-          { label: 'Total cursos', value: TRAININGS_DATA.length, icon: BookOpen, color: 'var(--amber)' },
-          { label: 'Completados', value: TRAININGS_DATA.filter(t => t.status === 'completado').length, icon: CheckCircle, color: '#10B981' },
-          { label: 'En curso', value: TRAININGS_DATA.filter(t => t.status === 'activo').length, icon: Clock, color: '#60A5FA' },
-          { label: 'Vencidos', value: TRAININGS_DATA.filter(t => t.status === 'vencido').length, icon: AlertCircle, color: '#FCA5A5' },
+          { label: 'Total cursos', value: trainings.length, icon: BookOpen, color: 'var(--amber)' },
+          { label: 'Completados', value: trainings.filter(t => t.status === 'completado').length, icon: CheckCircle, color: '#10B981' },
+          { label: 'En curso', value: trainings.filter(t => t.status === 'activo').length, icon: Clock, color: '#60A5FA' },
+          { label: 'Vencidos', value: trainings.filter(t => t.status === 'vencido').length, icon: AlertCircle, color: '#FCA5A5' },
         ].map(({ label, value, icon: Icon, color }, i) => (
           <motion.div key={label} initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.05 }}
             className="terra-card p-4">
