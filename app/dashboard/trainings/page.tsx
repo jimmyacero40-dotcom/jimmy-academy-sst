@@ -262,17 +262,18 @@ export default function TrainingsPage() {
                 <select
                   value={newCourse.duration}
                   onChange={e => setNewCourse({ ...newCourse, duration: e.target.value })}
-                  className="terra-input">
-                  <option value="">Seleccionar duración</option>
-                  <option value="2h">2 horas</option>
-                  <option value="4h">4 horas</option>
-                  <option value="6h">6 horas</option>
-                  <option value="8h">8 horas</option>
-                  <option value="12h">12 horas</option>
-                  <option value="16h">16 horas</option>
-                  <option value="20h">20 horas</option>
-                  <option value="24h">24 horas</option>
-                  <option value="40h">40 horas</option>
+                  className="terra-input"
+                  style={{ backgroundColor: '#1a1207', color: '#e8d5b5' }}>
+                  <option value="" style={{ backgroundColor: '#1a1207', color: '#e8d5b5' }}>Seleccionar duración</option>
+                  <option value="2h" style={{ backgroundColor: '#1a1207', color: '#e8d5b5' }}>2 horas</option>
+                  <option value="4h" style={{ backgroundColor: '#1a1207', color: '#e8d5b5' }}>4 horas</option>
+                  <option value="6h" style={{ backgroundColor: '#1a1207', color: '#e8d5b5' }}>6 horas</option>
+                  <option value="8h" style={{ backgroundColor: '#1a1207', color: '#e8d5b5' }}>8 horas</option>
+                  <option value="12h" style={{ backgroundColor: '#1a1207', color: '#e8d5b5' }}>12 horas</option>
+                  <option value="16h" style={{ backgroundColor: '#1a1207', color: '#e8d5b5' }}>16 horas</option>
+                  <option value="20h" style={{ backgroundColor: '#1a1207', color: '#e8d5b5' }}>20 horas</option>
+                  <option value="24h" style={{ backgroundColor: '#1a1207', color: '#e8d5b5' }}>24 horas</option>
+                  <option value="40h" style={{ backgroundColor: '#1a1207', color: '#e8d5b5' }}>40 horas</option>
                 </select>
               </div>
               <div>
