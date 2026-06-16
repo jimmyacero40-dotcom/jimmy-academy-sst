@@ -108,7 +108,7 @@ export default function TrainingsPage() {
 
   const handleCreateCourse = () => {
     if (!newCourse.name.trim()) return
-    const newId = trainings.length > 0 ? Math.max(...trainings.map(t => t.id)) + 1 : 1
+    const newId = trainings.length > 0 ? Math.max(...trainings.map((t: any) => t.id)) + 1 : 1
     const newTraining = {
       id: newId,
       title: newCourse.name,
