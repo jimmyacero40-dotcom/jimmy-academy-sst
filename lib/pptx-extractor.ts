@@ -14,6 +14,35 @@ function openDB(): Promise<IDBDatabase> {
   })
 }
 
+export async function saveCourseData(courseId: number, data: { images: string[]; texts: string[] }): Promise<void> {
+  const db = await openDB()
+  const tx = db.transaction(STORE_NAME, 'readwrite')
+  tx.objectStore(STORE_NAME).put(data, `course-${courseId}`)
+  return new Promise((resolve, reject) => {
+    tx.oncomplete = () => resolve()
+    tx.onerror = () => reject(tx.error)
+  })
+}
+
+export async function getCourseData(courseId: number): Promise<{ images: string[]; texts: string[] }> {
+  const db = await openDB()
+  const tx = db.transaction(STORE_NAME, 'readonly')
+  const req = tx.objectStore(STORE_NAME).get(`course-${courseId}`)
+  return new Promise((resolve, reject) => {
+    req.onsuccess = () => {
+      const result = req.result
+      if (Array.isArray(result)) {
+        resolve({ images: result, texts: [] })
+      } else if (result && result.images) {
+        resolve(result)
+      } else {
+        resolve({ images: [], texts: [] })
+      }
+    }
+    req.onerror = () => reject(req.error)
+  })
+}
+
 export async function saveSlides(courseId: number, images: string[]): Promise<void> {
   const db = await openDB()
   const tx = db.transaction(STORE_NAME, 'readwrite')
@@ -124,6 +153,32 @@ export async function extractPPTXImages(file: File): Promise<string[]> {
 
   images.sort((a, b) => a.index - b.index)
   return images.map(img => img.data)
+}
+
+export async function extractPPTXTexts(file: File): Promise<string[]> {
+  const zip = await JSZip.loadAsync(file)
+  const slideFiles: string[] = []
+  zip.forEach((path) => {
+    if (/^ppt\/slides\/slide\d+\.xml$/.test(path)) slideFiles.push(path)
+  })
+  slideFiles.sort((a, b) => {
+    const na = parseInt(a.match(/slide(\d+)/)?.[1] || '0')
+    const nb = parseInt(b.match(/slide(\d+)/)?.[1] || '0')
+    return na - nb
+  })
+
+  const texts: string[] = []
+  for (const slidePath of slideFiles) {
+    const slideFile = zip.file(slidePath)
+    if (slideFile) {
+      const xml = await slideFile.async('text')
+      // Extract all text content from <a:t> tags
+      const textMatches = [...xml.matchAll(/<a:t>([^<]*)<\/a:t>/g)]
+      const slideText = textMatches.map(m => m[1].trim()).filter(t => t.length > 0).join(' ')
+      if (slideText) texts.push(slideText)
+    }
+  }
+  return texts
 }
 
 function blobToDataURL(blob: Blob, mime: string): Promise<string> {

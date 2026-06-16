@@ -1,74 +1,243 @@
 'use client'
 
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
   ChevronLeft, ChevronRight, CheckCircle, X, Award, Download,
-  BookOpen, RotateCcw, AlertCircle, Clock, Loader2
+  BookOpen, RotateCcw, AlertCircle, Clock, Loader2, QrCode, Shield,
+  User, Calendar
 } from 'lucide-react'
-import { getSlides } from '@/lib/pptx-extractor'
+import { getCourseData } from '@/lib/pptx-extractor'
 
 type Phase = 'slides' | 'quiz' | 'result' | 'certificate'
+type Question = { q: string; options: string[]; correct: number; explanation: string }
 
-function generateQuestions(title: string) {
-  return [
+// Generate questions from actual slide text content
+function generateQuestionsFromContent(texts: string[], title: string): Question[] {
+  const allText = texts.join(' ').toLowerCase()
+  const questions: Question[] = []
+
+  // Extract key concepts from the text to build relevant questions
+  const concepts: { keyword: string; topic: string; question: Question }[] = [
     {
-      q: `¿Cuál es el objetivo principal de la capacitación "${title}"?`,
-      options: [
-        'Cumplir con la normativa vigente y proteger la salud de los trabajadores',
-        'Reducir costos operativos de la empresa',
-        'Aumentar la producción mensual',
-        'Obtener beneficios tributarios',
-      ],
-      correct: 0,
-      explanation: 'El objetivo principal es cumplir con la normativa de SST y garantizar la seguridad y salud de los trabajadores.',
+      keyword: 'epp',
+      topic: 'EPP',
+      question: {
+        q: `Según la capacitación "${title}", ¿cuál es la importancia del EPP?`,
+        options: [
+          'Proteger al trabajador de riesgos que no pueden eliminarse en la fuente',
+          'Es opcional según el criterio del trabajador',
+          'Solo se usa en emergencias',
+          'Es responsabilidad exclusiva de la ARL',
+        ],
+        correct: 0,
+        explanation: 'El EPP (Equipo de Protección Personal) es la última barrera de protección del trabajador cuando los riesgos no pueden eliminarse o controlarse en la fuente o en el medio.',
+      },
     },
     {
-      q: '¿Qué decreto reglamenta el Sistema de Gestión de SST en Colombia?',
-      options: [
-        'Decreto 2400 de 1979',
-        'Decreto 1072 de 2015',
-        'Decreto 614 de 1984',
-        'Decreto 1295 de 1994',
-      ],
-      correct: 1,
-      explanation: 'El Decreto 1072 de 2015 (Decreto Único Reglamentario del Sector Trabajo) establece el SG-SST.',
+      keyword: 'altura',
+      topic: 'alturas',
+      question: {
+        q: `Según el contenido presentado sobre "${title}", ¿a partir de qué altura aplica la normativa?`,
+        options: [
+          'A partir de 1 metro',
+          'A partir de 2 metros sobre el plano de los pies',
+          'A partir de 3 metros',
+          'Solo en andamios superiores a 5 metros',
+        ],
+        correct: 1,
+        explanation: 'Según la Resolución 4272 de 2021, trabajo en alturas aplica a toda actividad realizada a 2 metros o más sobre el plano de los pies del trabajador.',
+      },
     },
     {
-      q: '¿Qué resolución define los estándares mínimos del SG-SST?',
-      options: [
-        'Resolución 1016 de 1989',
-        'Resolución 2400 de 1979',
-        'Resolución 0312 de 2019',
-        'Resolución 1409 de 2012',
-      ],
-      correct: 2,
-      explanation: 'La Resolución 0312 de 2019 establece los estándares mínimos del SG-SST según el tamaño y riesgo de la empresa.',
+      keyword: 'riesgo',
+      topic: 'riesgos',
+      question: {
+        q: `De acuerdo con la capacitación "${title}", ¿cuál es el primer paso en la gestión de riesgos?`,
+        options: [
+          'Comprar equipos de protección',
+          'Identificar los peligros y valorar los riesgos',
+          'Capacitar a los trabajadores',
+          'Reportar a la ARL',
+        ],
+        correct: 1,
+        explanation: 'El primer paso siempre es la identificación de peligros y valoración de riesgos (IPVR), según la GTC 45 y el Decreto 1072 de 2015.',
+      },
     },
     {
-      q: '¿Cuál es la responsabilidad del trabajador frente al SST?',
-      options: [
-        'Solo asistir a las capacitaciones programadas',
-        'Participar activamente, reportar condiciones inseguras y usar EPP',
-        'Únicamente firmar los documentos requeridos',
-        'Delegar su seguridad al coordinador SST',
-      ],
-      correct: 1,
-      explanation: 'El trabajador debe participar activamente, reportar peligros, usar EPP y cumplir las normas de seguridad.',
+      keyword: 'extintor',
+      topic: 'extintores',
+      question: {
+        q: `Según lo presentado en "${title}", ¿cuál es la técnica correcta para usar un extintor?`,
+        options: [
+          'Técnica ABCD',
+          'Técnica PASS (Pull, Aim, Squeeze, Sweep)',
+          'Apuntar directamente a la llama',
+          'Usar solo en incendios clase A',
+        ],
+        correct: 1,
+        explanation: 'La técnica PASS consiste en: Pull (Jalar el pasador), Aim (Apuntar a la base del fuego), Squeeze (Apretar la palanca), Sweep (Barrer de lado a lado).',
+      },
     },
     {
-      q: '¿Qué se debe hacer ante un accidente de trabajo?',
-      options: [
-        'Esperar al siguiente día hábil para reportarlo',
-        'Reportarlo inmediatamente a la ARL y al empleador',
-        'Solo informar al jefe directo verbalmente',
-        'No reportarlo si no es grave',
-      ],
-      correct: 1,
-      explanation: 'Todo accidente de trabajo debe reportarse inmediatamente a la ARL y al empleador, según el Decreto 1072 de 2015.',
+      keyword: 'primeros auxilios',
+      topic: 'primeros auxilios',
+      question: {
+        q: `Según la capacitación "${title}", ¿cuál es la primera acción ante una emergencia médica?`,
+        options: [
+          'Administrar medicamentos inmediatamente',
+          'Evaluar la escena y garantizar la seguridad propia',
+          'Mover al paciente a un lugar seguro',
+          'Llamar a la familia del afectado',
+        ],
+        correct: 1,
+        explanation: 'Siempre lo primero es evaluar la seguridad de la escena. No se debe atender a la víctima si la escena no es segura para el primer respondiente.',
+      },
+    },
+    {
+      keyword: 'copasst',
+      topic: 'COPASST',
+      question: {
+        q: `Según el contenido de "${title}", ¿cuál es la función principal del COPASST?`,
+        options: [
+          'Aprobar el presupuesto de SST',
+          'Promover y vigilar el cumplimiento del SG-SST',
+          'Contratar al coordinador de SST',
+          'Reemplazar al vigía de SST',
+        ],
+        correct: 1,
+        explanation: 'El COPASST (Comité Paritario de Seguridad y Salud en el Trabajo) tiene como función principal promover, divulgar y vigilar el cumplimiento del SG-SST.',
+      },
+    },
+    {
+      keyword: 'señalización',
+      topic: 'señalización',
+      question: {
+        q: `Según "${title}", ¿qué color de señalización indica prohibición?`,
+        options: [
+          'Amarillo',
+          'Verde',
+          'Rojo',
+          'Azul',
+        ],
+        correct: 2,
+        explanation: 'El color rojo indica prohibición y peligro inmediato. Amarillo = precaución, Verde = seguridad/evacuación, Azul = obligación.',
+      },
+    },
+    {
+      keyword: 'ergon',
+      topic: 'ergonomía',
+      question: {
+        q: `De acuerdo con la capacitación "${title}", ¿cuál es un factor de riesgo ergonómico?`,
+        options: [
+          'Exposición a ruido industrial',
+          'Movimientos repetitivos y posturas forzadas',
+          'Contacto con sustancias químicas',
+          'Trabajo en espacios confinados',
+        ],
+        correct: 1,
+        explanation: 'Los factores de riesgo ergonómico incluyen movimientos repetitivos, posturas forzadas, manipulación manual de cargas y trabajo estático prolongado.',
+      },
+    },
+    {
+      keyword: 'químic',
+      topic: 'químicos',
+      question: {
+        q: `Según "${title}", ¿qué sistema se usa para identificar peligros de sustancias químicas?`,
+        options: [
+          'Sistema PASS',
+          'Sistema GHS (Sistema Globalmente Armonizado)',
+          'Sistema ISO 9001',
+          'Sistema HACCP',
+        ],
+        correct: 1,
+        explanation: 'El SGA/GHS (Sistema Globalmente Armonizado) clasifica y etiqueta sustancias químicas con pictogramas, palabras de advertencia e indicaciones de peligro.',
+      },
+    },
+    {
+      keyword: 'emergencia',
+      topic: 'emergencias',
+      question: {
+        q: `Según la capacitación "${title}", ¿qué debe contener un plan de emergencias?`,
+        options: [
+          'Solo números de teléfono de emergencia',
+          'Procedimientos de evacuación, brigadas, rutas de escape y puntos de encuentro',
+          'Solo la ubicación de extintores',
+          'Solo el protocolo de llamada al 123',
+        ],
+        correct: 1,
+        explanation: 'Un plan de emergencias integral incluye: análisis de amenazas, procedimientos operativos, conformación de brigadas, rutas de evacuación y puntos de encuentro.',
+      },
     },
   ]
+
+  // Match questions based on content
+  for (const concept of concepts) {
+    if (allText.includes(concept.keyword)) {
+      questions.push(concept.question)
+    }
+  }
+
+  // Always add these general SST questions relevant to any training
+  const generalQuestions: Question[] = [
+    {
+      q: `¿Cuál es la responsabilidad del trabajador respecto a "${title}"?`,
+      options: [
+        'No tiene ninguna responsabilidad, es del empleador',
+        'Participar en la capacitación, aplicar lo aprendido y reportar condiciones inseguras',
+        'Solo firmar la asistencia',
+        'Delegar al compañero más experimentado',
+      ],
+      correct: 1,
+      explanation: 'Según el Decreto 1072 de 2015, el trabajador debe participar activamente en las capacitaciones, aplicar lo aprendido y reportar condiciones peligrosas.',
+    },
+    {
+      q: `¿Por qué es obligatoria la capacitación en "${title}"?`,
+      options: [
+        'Para cumplir con el SG-SST según el Decreto 1072 de 2015',
+        'Es voluntaria, no obligatoria',
+        'Solo para trabajadores nuevos',
+        'Solo si la empresa tiene más de 50 empleados',
+      ],
+      correct: 0,
+      explanation: 'El Decreto 1072 de 2015 y la Resolución 0312 de 2019 establecen la obligatoriedad de capacitar a todos los trabajadores en los riesgos asociados a sus actividades.',
+    },
+    {
+      q: `Al completar esta capacitación sobre "${title}", ¿qué debe hacer el trabajador?`,
+      options: [
+        'Nada, la capacitación es solo teórica',
+        'Aplicar lo aprendido en su puesto de trabajo y reportar novedades',
+        'Esperar a que el supervisor le indique',
+        'Repetir la capacitación cada semana',
+      ],
+      correct: 1,
+      explanation: 'El objetivo de toda capacitación SST es que el trabajador aplique los conocimientos adquiridos en su actividad diaria y contribuya a un ambiente de trabajo seguro.',
+    },
+  ]
+
+  // Add general questions to fill up to 5
+  for (const gq of generalQuestions) {
+    if (questions.length >= 5) break
+    questions.push(gq)
+  }
+
+  // If still less than 5, add more
+  if (questions.length < 5) {
+    questions.push({
+      q: `¿Qué norma colombiana establece los estándares mínimos del SG-SST aplicables a "${title}"?`,
+      options: [
+        'Resolución 2400 de 1979',
+        'Resolución 0312 de 2019',
+        'Ley 100 de 1993',
+        'Decreto 614 de 1984',
+      ],
+      correct: 1,
+      explanation: 'La Resolución 0312 de 2019 define los estándares mínimos del Sistema de Gestión de Seguridad y Salud en el Trabajo (SG-SST).',
+    })
+  }
+
+  return questions.slice(0, 5)
 }
 
 export default function TrainingDetailPage() {
@@ -81,6 +250,7 @@ export default function TrainingDetailPage() {
   const [currentSlide, setCurrentSlide] = useState(0)
   const [phase, setPhase] = useState<Phase>('slides')
   const [training, setTraining] = useState<any>(null)
+  const [questions, setQuestions] = useState<Question[]>([])
 
   // Quiz state
   const [currentQ, setCurrentQ] = useState(0)
@@ -89,12 +259,10 @@ export default function TrainingDetailPage() {
   const [score, setScore] = useState(0)
   const [answers, setAnswers] = useState<boolean[]>([])
 
-  const questions = generateQuestions(training?.title || 'Capacitación SST')
   const passed = score >= 3
 
   useEffect(() => {
     async function load() {
-      // Load training data from localStorage
       const saved = localStorage.getItem('sst-trainings')
       if (saved) {
         const all = JSON.parse(saved)
@@ -102,10 +270,11 @@ export default function TrainingDetailPage() {
         if (found) setTraining(found)
       }
 
-      // Load slides from IndexedDB
       try {
-        const imgs = await getSlides(courseId)
-        setSlides(imgs)
+        const data = await getCourseData(courseId)
+        setSlides(data.images)
+        const title = JSON.parse(localStorage.getItem('sst-trainings') || '[]').find((t: any) => t.id === courseId)?.title || 'Capacitación SST'
+        setQuestions(generateQuestionsFromContent(data.texts, title))
       } catch (_) {}
       setLoading(false)
     }
@@ -140,7 +309,7 @@ export default function TrainingDetailPage() {
     setPhase('quiz')
   }
 
-  const certRef = useRef<HTMLDivElement>(null)
+  const certCode = `CERT-${courseId}-${Date.now().toString(36).toUpperCase()}`
 
   if (loading) {
     return (
@@ -193,30 +362,19 @@ export default function TrainingDetailPage() {
             </p>
           </div>
           {phase === 'slides' && (
-            <div className="flex items-center gap-2">
-              <div className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold"
-                style={{ background: 'var(--amber)', color: 'var(--text)' }}>
-                <Clock size={12} /> {training?.duration || '8h'}
-              </div>
+            <div className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold"
+              style={{ background: 'var(--amber)', color: 'var(--text)' }}>
+              <Clock size={12} /> {training?.duration || '8h'}
             </div>
           )}
         </div>
 
         {/* Progress bar */}
-        {phase === 'slides' && (
+        {(phase === 'slides' || phase === 'quiz') && (
           <div className="terra-progress-track">
             <motion.div
-              className="terra-progress-fill bg-gradient-to-r from-amber-500 to-red-500"
-              animate={{ width: `${((currentSlide + 1) / slides.length) * 100}%` }}
-              transition={{ duration: 0.3 }}
-            />
-          </div>
-        )}
-        {phase === 'quiz' && (
-          <div className="terra-progress-track">
-            <motion.div
-              className="terra-progress-fill bg-gradient-to-r from-emerald-500 to-teal-500"
-              animate={{ width: `${((currentQ + 1) / questions.length) * 100}%` }}
+              className={`terra-progress-fill bg-gradient-to-r ${phase === 'slides' ? 'from-amber-500 to-red-500' : 'from-emerald-500 to-teal-500'}`}
+              animate={{ width: `${phase === 'slides' ? ((currentSlide + 1) / slides.length) * 100 : ((currentQ + 1) / questions.length) * 100}%` }}
               transition={{ duration: 0.3 }}
             />
           </div>
@@ -246,7 +404,6 @@ export default function TrainingDetailPage() {
             </AnimatePresence>
           </div>
 
-          {/* Navigation */}
           <div className="flex items-center justify-between mt-4">
             <button
               onClick={() => setCurrentSlide(s => Math.max(0, s - 1))}
@@ -256,7 +413,7 @@ export default function TrainingDetailPage() {
               <ChevronLeft size={16} /> Anterior
             </button>
 
-            <div className="flex gap-1.5">
+            <div className="flex gap-1.5 flex-wrap justify-center max-w-[50%]">
               {slides.map((_, i) => (
                 <button key={i} onClick={() => setCurrentSlide(i)}
                   className="w-2.5 h-2.5 rounded-full transition-all"
@@ -269,14 +426,11 @@ export default function TrainingDetailPage() {
             </div>
 
             {currentSlide < slides.length - 1 ? (
-              <button
-                onClick={() => setCurrentSlide(s => s + 1)}
-                className="terra-btn px-4 py-2.5">
+              <button onClick={() => setCurrentSlide(s => s + 1)} className="terra-btn px-4 py-2.5">
                 Siguiente <ChevronRight size={16} />
               </button>
             ) : (
-              <button
-                onClick={() => setPhase('quiz')}
+              <button onClick={() => setPhase('quiz')}
                 className="flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-bold transition-all"
                 style={{ background: 'linear-gradient(135deg, #10B981, #059669)', color: 'white' }}>
                 Iniciar Evaluación <CheckCircle size={16} />
@@ -287,7 +441,7 @@ export default function TrainingDetailPage() {
       )}
 
       {/* ═══ QUIZ PHASE ═══ */}
-      {phase === 'quiz' && (
+      {phase === 'quiz' && questions.length > 0 && (
         <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}>
           <div className="terra-card p-6 sm:p-8">
             <div className="flex items-center gap-3 mb-6">
@@ -311,21 +465,13 @@ export default function TrainingDetailPage() {
                 let bg = 'transparent'
                 if (answered) {
                   if (i === questions[currentQ].correct) {
-                    borderColor = '#10B981'
-                    bg = 'rgba(16,185,129,0.1)'
+                    borderColor = '#10B981'; bg = 'rgba(16,185,129,0.1)'
                   } else if (i === selected && i !== questions[currentQ].correct) {
-                    borderColor = '#EF4444'
-                    bg = 'rgba(239,68,68,0.1)'
+                    borderColor = '#EF4444'; bg = 'rgba(239,68,68,0.1)'
                   }
-                } else if (i === selected) {
-                  borderColor = 'var(--amber)'
-                  bg = 'rgba(245,158,11,0.08)'
                 }
-
                 return (
-                  <motion.button
-                    key={i}
-                    onClick={() => handleAnswer(i)}
+                  <motion.button key={i} onClick={() => handleAnswer(i)}
                     whileHover={!answered ? { scale: 1.01 } : {}}
                     className="w-full text-left p-4 rounded-xl border transition-all flex items-start gap-3"
                     style={{ borderColor, background: bg }}>
@@ -350,13 +496,10 @@ export default function TrainingDetailPage() {
                     background: selected === questions[currentQ].correct ? 'rgba(16,185,129,0.08)' : 'rgba(239,68,68,0.08)',
                     borderColor: selected === questions[currentQ].correct ? 'rgba(16,185,129,0.3)' : 'rgba(239,68,68,0.3)',
                   }}>
-                  <p className="text-sm" style={{ color: 'var(--text-dim)' }}>
-                    {questions[currentQ].explanation}
-                  </p>
+                  <p className="text-sm" style={{ color: 'var(--text-dim)' }}>{questions[currentQ].explanation}</p>
                 </div>
                 <button onClick={nextQuestion} className="terra-btn w-full py-3 justify-center">
-                  {currentQ < questions.length - 1 ? 'Siguiente Pregunta' : 'Ver Resultado'}
-                  <ChevronRight size={16} />
+                  {currentQ < questions.length - 1 ? 'Siguiente Pregunta' : 'Ver Resultado'} <ChevronRight size={16} />
                 </button>
               </motion.div>
             )}
@@ -373,38 +516,25 @@ export default function TrainingDetailPage() {
                 background: passed ? 'rgba(16,185,129,0.15)' : 'rgba(239,68,68,0.15)',
                 border: `2px solid ${passed ? '#10B981' : '#EF4444'}`,
               }}>
-              {passed
-                ? <CheckCircle size={36} className="text-emerald-400" />
-                : <AlertCircle size={36} className="text-red-400" />
-              }
+              {passed ? <CheckCircle size={36} className="text-emerald-400" /> : <AlertCircle size={36} className="text-red-400" />}
             </div>
-
             <h2 className="text-2xl font-black mb-2" style={{ color: 'var(--text)' }}>
               {passed ? '¡Aprobado!' : 'No Aprobado'}
             </h2>
             <p className="text-sm mb-6" style={{ color: 'var(--text-dim)' }}>
-              {passed
-                ? 'Has completado exitosamente la evaluación. Puedes descargar tu certificado.'
-                : 'Necesitas al menos 3 respuestas correctas para aprobar. Vuelve a intentarlo.'
-              }
+              {passed ? 'Has completado exitosamente la evaluación. Puedes descargar tu certificado.' : 'Necesitas al menos 3 respuestas correctas para aprobar. Vuelve a intentarlo.'}
             </p>
-
             <div className="flex items-center justify-center gap-6 mb-6">
               <div>
-                <div className="text-3xl font-black" style={{ color: passed ? '#10B981' : '#EF4444' }}>
-                  {score}/{questions.length}
-                </div>
-                <div className="text-xs" style={{ color: 'var(--text-faint)' }}>Respuestas correctas</div>
+                <div className="text-3xl font-black" style={{ color: passed ? '#10B981' : '#EF4444' }}>{score}/{questions.length}</div>
+                <div className="text-xs" style={{ color: 'var(--text-faint)' }}>Correctas</div>
               </div>
               <div className="w-px h-12" style={{ background: 'var(--border)' }} />
               <div>
-                <div className="text-3xl font-black" style={{ color: passed ? '#10B981' : '#EF4444' }}>
-                  {Math.round((score / questions.length) * 100)}%
-                </div>
+                <div className="text-3xl font-black" style={{ color: passed ? '#10B981' : '#EF4444' }}>{Math.round((score / questions.length) * 100)}%</div>
                 <div className="text-xs" style={{ color: 'var(--text-faint)' }}>Calificación</div>
               </div>
             </div>
-
             <div className="space-y-2 mb-6">
               {answers.map((correct, i) => (
                 <div key={i} className="flex items-center gap-3 px-4 py-2 rounded-lg text-sm"
@@ -412,10 +542,7 @@ export default function TrainingDetailPage() {
                     background: correct ? 'rgba(16,185,129,0.08)' : 'rgba(239,68,68,0.08)',
                     border: `1px solid ${correct ? 'rgba(16,185,129,0.2)' : 'rgba(239,68,68,0.2)'}`,
                   }}>
-                  {correct
-                    ? <CheckCircle size={14} className="text-emerald-400" />
-                    : <X size={14} className="text-red-400" />
-                  }
+                  {correct ? <CheckCircle size={14} className="text-emerald-400" /> : <X size={14} className="text-red-400" />}
                   <span style={{ color: 'var(--text-dim)' }}>Pregunta {i + 1}</span>
                   <span className="ml-auto font-semibold" style={{ color: correct ? '#10B981' : '#EF4444' }}>
                     {correct ? 'Correcta' : 'Incorrecta'}
@@ -423,7 +550,6 @@ export default function TrainingDetailPage() {
                 </div>
               ))}
             </div>
-
             {passed ? (
               <button onClick={() => setPhase('certificate')} className="terra-btn w-full py-3 justify-center">
                 <Award size={18} /> Ver Certificado
@@ -432,11 +558,8 @@ export default function TrainingDetailPage() {
               <div className="flex gap-3">
                 <button onClick={() => router.push('/dashboard/trainings')}
                   className="flex-1 py-3 rounded-xl border text-sm font-semibold transition-all"
-                  style={{ borderColor: 'var(--border)', color: 'var(--text-dim)' }}>
-                  Volver
-                </button>
-                <button onClick={retryQuiz}
-                  className="terra-btn flex-1 py-3 justify-center">
+                  style={{ borderColor: 'var(--border)', color: 'var(--text-dim)' }}>Volver</button>
+                <button onClick={retryQuiz} className="terra-btn flex-1 py-3 justify-center">
                   <RotateCcw size={16} /> Reintentar
                 </button>
               </div>
@@ -448,63 +571,64 @@ export default function TrainingDetailPage() {
       {/* ═══ CERTIFICATE PHASE ═══ */}
       {phase === 'certificate' && (
         <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}>
-          <div ref={certRef} className="terra-card overflow-hidden max-w-2xl mx-auto">
-            {/* Certificate header */}
-            <div className="p-8 text-center"
-              style={{ background: 'linear-gradient(135deg, rgba(245,158,11,0.15), rgba(239,68,68,0.1))' }}>
-              <div className="w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4"
-                style={{ background: 'linear-gradient(135deg, #F59E0B, #EF4444)' }}>
-                <Award size={30} className="text-white" />
-              </div>
-              <div className="text-xs font-bold uppercase tracking-widest mb-2" style={{ color: 'var(--amber)' }}>
-                Certificado de Competencia
-              </div>
-              <h2 className="text-2xl font-black mb-1" style={{ color: 'var(--text)' }}>
-                {training?.title || 'Capacitación SST'}
-              </h2>
-              <p className="text-sm" style={{ color: 'var(--text-dim)' }}>
-                Sistema de Gestión de Seguridad y Salud en el Trabajo
-              </p>
-            </div>
-
-            {/* Certificate body */}
-            <div className="p-8">
-              <div className="text-center mb-6">
-                <p className="text-sm mb-1" style={{ color: 'var(--text-dim)' }}>Se certifica que</p>
-                <p className="text-xl font-black" style={{ color: 'var(--text)' }}>Admin SST</p>
-                <p className="text-sm" style={{ color: 'var(--text-dim)' }}>admin@jimmyacademy.com</p>
+          <div className="max-w-sm mx-auto">
+            <div className="terra-card overflow-hidden">
+              {/* Certificate card top */}
+              <div className="p-6 text-center"
+                style={{ background: 'linear-gradient(135deg, rgba(245,158,11,0.2), rgba(168,85,247,0.15))' }}>
+                <div className="w-14 h-14 rounded-full flex items-center justify-center mx-auto mb-3"
+                  style={{ background: 'linear-gradient(135deg, #F59E0B, #A855F7)' }}>
+                  <Award size={26} className="text-white" />
+                </div>
+                <div className="text-xs font-semibold mb-1" style={{ color: 'var(--amber)' }}>CERTIFICADO DE COMPETENCIA</div>
+                <h2 className="text-lg font-black leading-snug" style={{ color: 'var(--text)' }}>
+                  {training?.title || 'Capacitación SST'}
+                </h2>
               </div>
 
-              <div className="grid grid-cols-2 gap-4 mb-6">
-                {[
-                  { label: 'Fecha de emisión', value: new Date().toLocaleDateString('es-CO') },
-                  { label: 'Fecha de vencimiento', value: new Date(Date.now() + 365 * 86400000).toLocaleDateString('es-CO') },
-                  { label: 'Calificación', value: `${Math.round((score / questions.length) * 100)}%` },
-                  { label: 'Código', value: `CERT-${courseId}-${Date.now().toString(36).toUpperCase()}` },
-                ].map(({ label, value }) => (
-                  <div key={label} className="p-3 rounded-xl" style={{ background: 'var(--bg-card)', border: '1px solid var(--border)' }}>
-                    <div className="text-xs mb-0.5" style={{ color: 'var(--text-faint)' }}>{label}</div>
-                    <div className="text-sm font-bold" style={{ color: 'var(--text)' }}>{value}</div>
+              <div className="p-6">
+                <div className="space-y-3 mb-5">
+                  <div className="flex justify-between text-sm">
+                    <span className="flex items-center gap-1.5" style={{ color: 'var(--text-dim)' }}><User size={12} /> Empleado</span>
+                    <span className="font-semibold" style={{ color: 'var(--text)' }}>Admin SST</span>
                   </div>
-                ))}
-              </div>
+                  <div className="flex justify-between text-sm">
+                    <span className="flex items-center gap-1.5" style={{ color: 'var(--text-dim)' }}><Calendar size={12} /> Emisión</span>
+                    <span style={{ color: 'var(--text)' }}>{new Date().toLocaleDateString('es-CO')}</span>
+                  </div>
+                  <div className="flex justify-between text-sm">
+                    <span className="flex items-center gap-1.5" style={{ color: 'var(--text-dim)' }}><Clock size={12} /> Vencimiento</span>
+                    <span style={{ color: 'var(--text)' }}>{new Date(Date.now() + 365 * 86400000).toLocaleDateString('es-CO')}</span>
+                  </div>
+                  <div className="flex justify-between text-sm">
+                    <span className="flex items-center gap-1.5" style={{ color: 'var(--text-dim)' }}><Shield size={12} /> Código</span>
+                    <span className="font-mono text-xs" style={{ color: 'var(--text)' }}>{certCode}</span>
+                  </div>
+                  <div className="flex justify-between text-sm">
+                    <span className="flex items-center gap-1.5" style={{ color: 'var(--text-dim)' }}><CheckCircle size={12} /> Calificación</span>
+                    <span className="font-bold" style={{ color: '#10B981' }}>{Math.round((score / questions.length) * 100)}%</span>
+                  </div>
+                </div>
 
-              <div className="p-4 rounded-xl text-center text-xs mb-6"
-                style={{ background: 'rgba(16,185,129,0.08)', border: '1px solid rgba(16,185,129,0.2)', color: '#10B981' }}>
-                ✓ Este certificado acredita la competencia del participante en el tema evaluado, conforme al Decreto 1072 de 2015 y la Resolución 0312 de 2019.
-              </div>
+                {/* QR placeholder */}
+                <div className="flex justify-center mb-5">
+                  <div className="w-20 h-20 rounded-xl flex items-center justify-center"
+                    style={{ background: 'var(--bg-card)', border: '1px solid var(--border)' }}>
+                    <QrCode size={40} style={{ color: 'var(--text-dim)' }} />
+                  </div>
+                </div>
 
-              <div className="flex gap-3">
-                <button onClick={() => router.push('/dashboard/trainings')}
-                  className="flex-1 py-3 rounded-xl border text-sm font-semibold transition-all"
-                  style={{ borderColor: 'var(--border)', color: 'var(--text-dim)' }}>
-                  Volver a Cursos
-                </button>
-                <button onClick={() => {
-                  if (typeof window !== 'undefined') window.print()
-                }} className="terra-btn flex-1 py-3 justify-center">
-                  <Download size={16} /> Descargar PDF
-                </button>
+                <div className="flex gap-3">
+                  <button onClick={() => router.push('/dashboard/trainings')}
+                    className="flex-1 py-2.5 rounded-xl border text-sm font-semibold transition-all"
+                    style={{ borderColor: 'var(--border)', color: 'var(--text-dim)' }}>
+                    Cerrar
+                  </button>
+                  <button onClick={() => window.print()}
+                    className="terra-btn flex-1 py-2.5 justify-center">
+                    <Download size={14} /> Descargar
+                  </button>
+                </div>
               </div>
             </div>
           </div>

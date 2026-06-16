@@ -3,7 +3,7 @@
 import { useState, useRef, useEffect } from 'react'
 import { motion } from 'framer-motion'
 import { useRouter } from 'next/navigation'
-import { extractPPTXImages, saveSlides, deleteSlides } from '@/lib/pptx-extractor'
+import { extractPPTXImages, extractPPTXTexts, saveCourseData, deleteSlides } from '@/lib/pptx-extractor'
 import {
   BookOpen, Plus, Search, Clock, CheckCircle, AlertCircle,
   Users, Star, Play, Upload, ChevronRight, X, Award, Zap,
@@ -118,7 +118,8 @@ export default function TrainingsPage() {
     if (uploadedFile && /\.pptx$/i.test(uploadedFile.name)) {
       try {
         const images = await extractPPTXImages(uploadedFile)
-        await saveSlides(newId, images)
+        const texts = await extractPPTXTexts(uploadedFile)
+        await saveCourseData(newId, { images, texts })
         slideCount = images.length
       } catch (e) {
         console.error('Error extracting PPTX:', e)
