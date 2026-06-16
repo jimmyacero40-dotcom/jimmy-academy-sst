@@ -9,6 +9,7 @@ import {
   User, Calendar
 } from 'lucide-react'
 import { getCourseData } from '@/lib/pptx-extractor'
+import { generateCertificatePNG } from '@/lib/generate-certificate'
 
 type Phase = 'slides' | 'quiz' | 'result' | 'certificate'
 type Question = { q: string; options: string[]; correct: number; explanation: string }
@@ -309,7 +310,33 @@ export default function TrainingDetailPage() {
     setPhase('quiz')
   }
 
+  const [certImage, setCertImage] = useState<string | null>(null)
+  const [generatingCert, setGeneratingCert] = useState(false)
   const certCode = `CERT-${courseId}-${Date.now().toString(36).toUpperCase()}`
+
+  const handleGenerateCert = async () => {
+    setGeneratingCert(true)
+    const img = await generateCertificatePNG({
+      name: 'Admin SST',
+      course: training?.title || 'Capacitación SST',
+      date: new Date().toLocaleDateString('es-CO'),
+      expiry: new Date(Date.now() + 365 * 86400000).toLocaleDateString('es-CO'),
+      score: `${Math.round((score / questions.length) * 100)}%`,
+      code: certCode,
+      duration: training?.duration || '8h',
+    })
+    setCertImage(img)
+    setGeneratingCert(false)
+    setPhase('certificate')
+  }
+
+  const downloadCert = () => {
+    if (!certImage) return
+    const link = document.createElement('a')
+    link.download = `Certificado_${(training?.title || 'SST').replace(/\s+/g, '_')}_${certCode}.png`
+    link.href = certImage
+    link.click()
+  }
 
   if (loading) {
     return (
@@ -551,8 +578,8 @@ export default function TrainingDetailPage() {
               ))}
             </div>
             {passed ? (
-              <button onClick={() => setPhase('certificate')} className="terra-btn w-full py-3 justify-center">
-                <Award size={18} /> Ver Certificado
+              <button onClick={handleGenerateCert} disabled={generatingCert} className="terra-btn w-full py-3 justify-center">
+                {generatingCert ? <><Loader2 size={18} className="animate-spin" /> Generando Certificado...</> : <><Award size={18} /> Generar Certificado</>}
               </button>
             ) : (
               <div className="flex gap-3">
@@ -569,67 +596,21 @@ export default function TrainingDetailPage() {
       )}
 
       {/* ═══ CERTIFICATE PHASE ═══ */}
-      {phase === 'certificate' && (
+      {phase === 'certificate' && certImage && (
         <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}>
-          <div className="max-w-sm mx-auto">
-            <div className="terra-card overflow-hidden">
-              {/* Certificate card top */}
-              <div className="p-6 text-center"
-                style={{ background: 'linear-gradient(135deg, rgba(245,158,11,0.2), rgba(168,85,247,0.15))' }}>
-                <div className="w-14 h-14 rounded-full flex items-center justify-center mx-auto mb-3"
-                  style={{ background: 'linear-gradient(135deg, #F59E0B, #A855F7)' }}>
-                  <Award size={26} className="text-white" />
-                </div>
-                <div className="text-xs font-semibold mb-1" style={{ color: 'var(--amber)' }}>CERTIFICADO DE COMPETENCIA</div>
-                <h2 className="text-lg font-black leading-snug" style={{ color: 'var(--text)' }}>
-                  {training?.title || 'Capacitación SST'}
-                </h2>
-              </div>
-
-              <div className="p-6">
-                <div className="space-y-3 mb-5">
-                  <div className="flex justify-between text-sm">
-                    <span className="flex items-center gap-1.5" style={{ color: 'var(--text-dim)' }}><User size={12} /> Empleado</span>
-                    <span className="font-semibold" style={{ color: 'var(--text)' }}>Admin SST</span>
-                  </div>
-                  <div className="flex justify-between text-sm">
-                    <span className="flex items-center gap-1.5" style={{ color: 'var(--text-dim)' }}><Calendar size={12} /> Emisión</span>
-                    <span style={{ color: 'var(--text)' }}>{new Date().toLocaleDateString('es-CO')}</span>
-                  </div>
-                  <div className="flex justify-between text-sm">
-                    <span className="flex items-center gap-1.5" style={{ color: 'var(--text-dim)' }}><Clock size={12} /> Vencimiento</span>
-                    <span style={{ color: 'var(--text)' }}>{new Date(Date.now() + 365 * 86400000).toLocaleDateString('es-CO')}</span>
-                  </div>
-                  <div className="flex justify-between text-sm">
-                    <span className="flex items-center gap-1.5" style={{ color: 'var(--text-dim)' }}><Shield size={12} /> Código</span>
-                    <span className="font-mono text-xs" style={{ color: 'var(--text)' }}>{certCode}</span>
-                  </div>
-                  <div className="flex justify-between text-sm">
-                    <span className="flex items-center gap-1.5" style={{ color: 'var(--text-dim)' }}><CheckCircle size={12} /> Calificación</span>
-                    <span className="font-bold" style={{ color: '#10B981' }}>{Math.round((score / questions.length) * 100)}%</span>
-                  </div>
-                </div>
-
-                {/* QR placeholder */}
-                <div className="flex justify-center mb-5">
-                  <div className="w-20 h-20 rounded-xl flex items-center justify-center"
-                    style={{ background: 'var(--bg-card)', border: '1px solid var(--border)' }}>
-                    <QrCode size={40} style={{ color: 'var(--text-dim)' }} />
-                  </div>
-                </div>
-
-                <div className="flex gap-3">
-                  <button onClick={() => router.push('/dashboard/trainings')}
-                    className="flex-1 py-2.5 rounded-xl border text-sm font-semibold transition-all"
-                    style={{ borderColor: 'var(--border)', color: 'var(--text-dim)' }}>
-                    Cerrar
-                  </button>
-                  <button onClick={() => window.print()}
-                    className="terra-btn flex-1 py-2.5 justify-center">
-                    <Download size={14} /> Descargar
-                  </button>
-                </div>
-              </div>
+          <div className="max-w-4xl mx-auto">
+            <div className="terra-card overflow-hidden p-4">
+              <img src={certImage} alt="Certificado" className="w-full rounded-lg" />
+            </div>
+            <div className="flex gap-3 mt-4 max-w-md mx-auto">
+              <button onClick={() => router.push('/dashboard/trainings')}
+                className="flex-1 py-3 rounded-xl border text-sm font-semibold transition-all"
+                style={{ borderColor: 'var(--border)', color: 'var(--text-dim)' }}>
+                Volver a Cursos
+              </button>
+              <button onClick={downloadCert} className="terra-btn flex-1 py-3 justify-center">
+                <Download size={16} /> Descargar Certificado
+              </button>
             </div>
           </div>
         </motion.div>
