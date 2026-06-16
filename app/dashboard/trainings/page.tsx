@@ -1,12 +1,12 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useRef } from 'react'
 import { motion } from 'framer-motion'
 import { useRouter } from 'next/navigation'
 import {
   BookOpen, Plus, Search, Clock, CheckCircle, AlertCircle,
   Users, Star, Play, Upload, ChevronRight, X, Award, Zap,
-  FileText, Video, Layers
+  FileText, Video, Layers, Trash2
 } from 'lucide-react'
 
 const TRAININGS_DATA = [
@@ -71,6 +71,23 @@ export default function TrainingsPage() {
   const [search, setSearch] = useState('')
   const [filter, setFilter] = useState('todos')
   const [showModal, setShowModal] = useState(false)
+  const [newCourse, setNewCourse] = useState({ name: '', duration: '', description: '', category: 'Obligatorio' })
+  const [uploadedFile, setUploadedFile] = useState<File | null>(null)
+  const fileInputRef = useRef<HTMLInputElement>(null)
+
+  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (file) setUploadedFile(file)
+    e.target.value = ''
+  }
+
+  const handleCreateCourse = () => {
+    if (!newCourse.name.trim()) return
+    alert(`Curso "${newCourse.name}" creado exitosamente${uploadedFile ? ` con archivo: ${uploadedFile.name}` : ''}`)
+    setShowModal(false)
+    setNewCourse({ name: '', duration: '', description: '', category: 'Obligatorio' })
+    setUploadedFile(null)
+  }
 
   const filtered = TRAININGS_DATA.filter(t => {
     const matchSearch = t.title.toLowerCase().includes(search.toLowerCase()) || t.category.toLowerCase().includes(search.toLowerCase())
@@ -229,31 +246,86 @@ export default function TrainingsPage() {
                 </div>
                 <h2 className="font-bold" style={{ color: 'var(--text)' }}>Subir Capacitacion</h2>
               </div>
-              <button onClick={() => setShowModal(false)} style={{ color: 'var(--text-dim)' }}><X size={18} /></button>
+              <button onClick={() => { setShowModal(false); setUploadedFile(null); setNewCourse({ name: '', duration: '', description: '', category: 'Obligatorio' }) }}
+                style={{ color: 'var(--text-dim)' }}><X size={18} /></button>
             </div>
             <div className="p-6 space-y-4">
-              {[{ label: 'Nombre del curso', ph: 'Trabajo en Alturas...' }, { label: 'Duracion estimada', ph: 'Ej: 8 horas' }].map(({ label, ph }) => (
-                <div key={label}>
-                  <label className="text-xs font-semibold mb-1.5 block" style={{ color: 'var(--text-dim)' }}>{label}</label>
-                  <input placeholder={ph} className="terra-input" />
-                </div>
-              ))}
+              <div>
+                <label className="text-xs font-semibold mb-1.5 block" style={{ color: 'var(--text-dim)' }}>Nombre del curso *</label>
+                <input placeholder="Ej: Trabajo en Alturas, Uso de EPP..."
+                  value={newCourse.name}
+                  onChange={e => setNewCourse({ ...newCourse, name: e.target.value })}
+                  className="terra-input" />
+              </div>
+              <div>
+                <label className="text-xs font-semibold mb-1.5 block" style={{ color: 'var(--text-dim)' }}>Duracion estimada</label>
+                <input placeholder="Ej: 8 horas"
+                  value={newCourse.duration}
+                  onChange={e => setNewCourse({ ...newCourse, duration: e.target.value })}
+                  className="terra-input" />
+              </div>
+              <div>
+                <label className="text-xs font-semibold mb-1.5 block" style={{ color: 'var(--text-dim)' }}>Categoria</label>
+                <select className="terra-input"
+                  value={newCourse.category}
+                  onChange={e => setNewCourse({ ...newCourse, category: e.target.value })}>
+                  {['Obligatorio', 'Especializado', 'Induccion', 'Reinduccion'].map(c => (
+                    <option key={c} style={{ background: 'var(--bg-surface)' }}>{c}</option>
+                  ))}
+                </select>
+              </div>
               <div>
                 <label className="text-xs font-semibold mb-1.5 block" style={{ color: 'var(--text-dim)' }}>Descripcion</label>
-                <textarea rows={3} placeholder="Describe el contenido del curso..." className="terra-input resize-none" />
+                <textarea rows={3} placeholder="Describe el contenido del curso..."
+                  value={newCourse.description}
+                  onChange={e => setNewCourse({ ...newCourse, description: e.target.value })}
+                  className="terra-input resize-none" />
               </div>
               <div>
                 <label className="text-xs font-semibold mb-1.5 block" style={{ color: 'var(--text-dim)' }}>Material del curso</label>
-                <div className="rounded-xl p-6 text-center cursor-pointer transition-all"
-                  style={{ border: '2px dashed var(--border)', background: 'var(--bg-card)' }}>
-                  <FileText size={24} className="mx-auto mb-2" style={{ color: 'var(--text-faint)' }} />
-                  <p className="text-xs" style={{ color: 'var(--text-faint)' }}>PDF, PPTX, MP4 hasta 500 MB</p>
-                </div>
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept=".pdf,.pptx,.ppt,.mp4,.doc,.docx"
+                  className="hidden"
+                  onChange={handleFileUpload}
+                />
+                {uploadedFile ? (
+                  <div className="rounded-xl p-4 flex items-center justify-between"
+                    style={{ background: 'rgba(16,185,129,0.08)', border: '1px solid rgba(16,185,129,0.25)' }}>
+                    <div className="flex items-center gap-3">
+                      <FileText size={20} style={{ color: '#6EE7B7' }} />
+                      <div>
+                        <div className="text-sm font-semibold" style={{ color: 'var(--text)' }}>{uploadedFile.name}</div>
+                        <div className="text-xs" style={{ color: 'var(--text-faint)' }}>
+                          {(uploadedFile.size / 1024 / 1024).toFixed(2)} MB
+                        </div>
+                      </div>
+                    </div>
+                    <button onClick={() => setUploadedFile(null)}
+                      className="p-1.5 rounded-lg transition-all"
+                      style={{ color: '#FCA5A5' }}>
+                      <Trash2 size={16} />
+                    </button>
+                  </div>
+                ) : (
+                  <div
+                    onClick={() => fileInputRef.current?.click()}
+                    className="rounded-xl p-6 text-center cursor-pointer transition-all hover:opacity-80"
+                    style={{ border: '2px dashed var(--border-strong)', background: 'var(--bg-card)' }}>
+                    <Upload size={24} className="mx-auto mb-2" style={{ color: 'var(--amber)' }} />
+                    <p className="text-sm font-semibold mb-1" style={{ color: 'var(--text-dim)' }}>Haz clic para subir archivo</p>
+                    <p className="text-xs" style={{ color: 'var(--text-faint)' }}>PDF, PPTX, DOC, MP4 hasta 500 MB</p>
+                  </div>
+                )}
               </div>
             </div>
             <div className="px-6 pb-6 flex gap-3">
-              <button onClick={() => setShowModal(false)} className="terra-btn-outline flex-1 py-2.5 justify-center">Cancelar</button>
-              <button onClick={() => setShowModal(false)} className="terra-btn flex-1 py-2.5 justify-center">Crear Curso</button>
+              <button onClick={() => { setShowModal(false); setUploadedFile(null); setNewCourse({ name: '', duration: '', description: '', category: 'Obligatorio' }) }}
+                className="terra-btn-outline flex-1 py-2.5 justify-center">Cancelar</button>
+              <button onClick={handleCreateCourse}
+                disabled={!newCourse.name.trim()}
+                className="terra-btn flex-1 py-2.5 justify-center">Crear Curso</button>
             </div>
           </motion.div>
         </div>
