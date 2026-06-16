@@ -258,11 +258,22 @@ export default function TrainingsPage() {
                   className="terra-input" />
               </div>
               <div>
-                <label className="text-xs font-semibold mb-1.5 block" style={{ color: 'var(--text-dim)' }}>Duracion estimada</label>
-                <input placeholder="Ej: 8 horas"
+                <label className="text-xs font-semibold mb-1.5 block" style={{ color: 'var(--text-dim)' }}>Duración estimada</label>
+                <select
                   value={newCourse.duration}
                   onChange={e => setNewCourse({ ...newCourse, duration: e.target.value })}
-                  className="terra-input" />
+                  className="terra-input">
+                  <option value="">Seleccionar duración</option>
+                  <option value="2h">2 horas</option>
+                  <option value="4h">4 horas</option>
+                  <option value="6h">6 horas</option>
+                  <option value="8h">8 horas</option>
+                  <option value="12h">12 horas</option>
+                  <option value="16h">16 horas</option>
+                  <option value="20h">20 horas</option>
+                  <option value="24h">24 horas</option>
+                  <option value="40h">40 horas</option>
+                </select>
               </div>
               <div>
                 <label className="text-xs font-semibold mb-1.5 block" style={{ color: 'var(--text-dim)' }}>Categoria</label>
