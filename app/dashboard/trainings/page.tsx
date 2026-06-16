@@ -82,7 +82,7 @@ const COVERS = [
 
 export default function TrainingsPage() {
   const router = useRouter()
-  const [trainings, setTrainings] = useState(() => {
+  const [trainings, setTrainings] = useState<typeof TRAININGS_DATA>(() => {
     if (typeof window !== 'undefined') {
       const saved = localStorage.getItem('sst-trainings')
       if (saved) return JSON.parse(saved)
