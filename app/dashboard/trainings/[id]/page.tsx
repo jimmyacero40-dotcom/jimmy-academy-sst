@@ -332,6 +332,8 @@ export default function TrainingDetailPage() {
       score: `${Math.round((score / questions.length) * 100)}%`,
       code: certCode,
       employeeSignature: employeeSignature,
+      logoUrl: '/images/LOGO.png',
+      instructorSignatureUrl: '/images/FIRMA FIRMA.png',
     })
     setCertImage(img)
     setGeneratingCert(false)
