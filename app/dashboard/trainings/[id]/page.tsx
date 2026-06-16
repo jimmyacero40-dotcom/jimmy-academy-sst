@@ -10,8 +10,9 @@ import {
 } from 'lucide-react'
 import { getCourseData } from '@/lib/pptx-extractor'
 import { generateCertificatePNG } from '@/lib/generate-certificate'
+import SignaturePad from '@/components/SignaturePad'
 
-type Phase = 'slides' | 'quiz' | 'result' | 'certificate'
+type Phase = 'slides' | 'quiz' | 'result' | 'signing' | 'certificate'
 type Question = { q: string; options: string[]; correct: number; explanation: string }
 
 // Generate questions from actual slide text content
@@ -312,18 +313,25 @@ export default function TrainingDetailPage() {
 
   const [certImage, setCertImage] = useState<string | null>(null)
   const [generatingCert, setGeneratingCert] = useState(false)
-  const certCode = `CERT-${courseId}-${Date.now().toString(36).toUpperCase()}`
+  const [employeeName, setEmployeeName] = useState('')
+  const [employeeCedula, setEmployeeCedula] = useState('')
+  const [employeeSignature, setEmployeeSignature] = useState<string | null>(null)
+  const certCode = `AVC-${new Date().getFullYear()}-${String(new Date().getMonth() + 1).padStart(2, '0')}${String(new Date().getDate()).padStart(2, '0')}-${String(courseId).padStart(3, '0')}`
 
   const handleGenerateCert = async () => {
+    if (!employeeName.trim() || !employeeCedula.trim() || !employeeSignature) return
     setGeneratingCert(true)
+    const durationMap: Record<string, string> = { '2h': '2 horas', '4h': '4 horas', '6h': '6 horas', '8h': '8 horas', '12h': '12 horas', '16h': '16 horas', '20h': '20 horas', '24h': '24 horas', '40h': '40 horas' }
+    const dur = training?.duration || '8h'
     const img = await generateCertificatePNG({
-      name: 'Admin SST',
+      employeeName: employeeName.trim(),
+      employeeCedula: employeeCedula.trim(),
       course: training?.title || 'Capacitación SST',
-      date: new Date().toLocaleDateString('es-CO'),
-      expiry: new Date(Date.now() + 365 * 86400000).toLocaleDateString('es-CO'),
+      date: new Date().toLocaleDateString('es-CO', { day: 'numeric', month: 'long', year: 'numeric' }),
+      duration: durationMap[dur] || dur,
       score: `${Math.round((score / questions.length) * 100)}%`,
       code: certCode,
-      duration: training?.duration || '8h',
+      employeeSignature: employeeSignature,
     })
     setCertImage(img)
     setGeneratingCert(false)
@@ -385,7 +393,8 @@ export default function TrainingDetailPage() {
               {phase === 'slides' && `Diapositiva ${currentSlide + 1} de ${slides.length}`}
               {phase === 'quiz' && `Evaluación — Pregunta ${currentQ + 1} de ${questions.length}`}
               {phase === 'result' && 'Resultado de la Evaluación'}
-              {phase === 'certificate' && 'Certificado de Competencia'}
+              {phase === 'signing' && 'Constancia de Capacitación — Firma del Participante'}
+              {phase === 'certificate' && 'Certificado de Capacitación'}
             </p>
           </div>
           {phase === 'slides' && (
@@ -578,8 +587,8 @@ export default function TrainingDetailPage() {
               ))}
             </div>
             {passed ? (
-              <button onClick={handleGenerateCert} disabled={generatingCert} className="terra-btn w-full py-3 justify-center">
-                {generatingCert ? <><Loader2 size={18} className="animate-spin" /> Generando Certificado...</> : <><Award size={18} /> Generar Certificado</>}
+              <button onClick={() => setPhase('signing')} className="terra-btn w-full py-3 justify-center">
+                <Award size={18} /> Firmar y Generar Certificado
               </button>
             ) : (
               <div className="flex gap-3">
@@ -591,6 +600,71 @@ export default function TrainingDetailPage() {
                 </button>
               </div>
             )}
+          </div>
+        </motion.div>
+      )}
+
+      {/* ═══ SIGNING PHASE ═══ */}
+      {phase === 'signing' && (
+        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}>
+          <div className="terra-card p-6 sm:p-8 max-w-lg mx-auto">
+            <div className="flex items-center gap-3 mb-6">
+              <div className="w-10 h-10 rounded-xl flex items-center justify-center"
+                style={{ background: 'rgba(245,158,11,0.15)', border: '1px solid rgba(245,158,11,0.3)' }}>
+                <Award size={18} style={{ color: 'var(--amber)' }} />
+              </div>
+              <div>
+                <h2 className="text-lg font-bold" style={{ color: 'var(--text)' }}>Constancia de Capacitación</h2>
+                <p className="text-xs" style={{ color: 'var(--text-dim)' }}>Completa tus datos y firma para generar el certificado</p>
+              </div>
+            </div>
+
+            <div className="space-y-4 mb-6">
+              <div>
+                <label className="text-xs font-semibold mb-1.5 block" style={{ color: 'var(--text-dim)' }}>Nombre completo *</label>
+                <input value={employeeName} onChange={e => setEmployeeName(e.target.value)}
+                  placeholder="Ej: Carlos Andrés Pérez López"
+                  className="terra-input" />
+              </div>
+              <div>
+                <label className="text-xs font-semibold mb-1.5 block" style={{ color: 'var(--text-dim)' }}>Número de cédula *</label>
+                <input value={employeeCedula} onChange={e => setEmployeeCedula(e.target.value)}
+                  placeholder="Ej: 1.234.567.890"
+                  className="terra-input" />
+              </div>
+            </div>
+
+            <div className="mb-6">
+              <label className="text-xs font-semibold mb-2 block" style={{ color: 'var(--text-dim)' }}>Firma del participante *</label>
+              {employeeSignature ? (
+                <div>
+                  <div className="p-3 rounded-xl bg-white border" style={{ borderColor: 'var(--border)' }}>
+                    <img src={employeeSignature} alt="Firma" className="h-20 mx-auto" />
+                  </div>
+                  <button onClick={() => setEmployeeSignature(null)}
+                    className="text-xs mt-2 font-semibold transition-colors" style={{ color: 'var(--amber)' }}>
+                    Volver a firmar
+                  </button>
+                </div>
+              ) : (
+                <SignaturePad onSave={(sig) => setEmployeeSignature(sig)} />
+              )}
+            </div>
+
+            <div className="p-3 rounded-xl mb-6 text-xs"
+              style={{ background: 'rgba(245,158,11,0.08)', border: '1px solid rgba(245,158,11,0.2)', color: 'var(--text-dim)' }}>
+              📋 Al firmar, confirmas tu asistencia y participación en la capacitación <strong style={{ color: 'var(--text)' }}>{training?.title}</strong>.
+              Esta constancia se registra para los indicadores del SG-SST conforme al Decreto 1072 de 2015.
+            </div>
+
+            <button onClick={handleGenerateCert}
+              disabled={!employeeName.trim() || !employeeCedula.trim() || !employeeSignature || generatingCert}
+              className="terra-btn w-full py-3 justify-center disabled:opacity-40">
+              {generatingCert
+                ? <><Loader2 size={18} className="animate-spin" /> Generando Certificado...</>
+                : <><Award size={18} /> Generar Certificado</>
+              }
+            </button>
           </div>
         </motion.div>
       )}

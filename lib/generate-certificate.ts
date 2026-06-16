@@ -1,240 +1,393 @@
-export function generateCertificatePNG(data: {
-  name: string
+export async function generateCertificatePNG(data: {
+  employeeName: string
+  employeeCedula: string
   course: string
   date: string
-  expiry: string
+  duration: string
   score: string
   code: string
-  duration: string
+  employeeSignature?: string
+  logoUrl?: string
+  instructorSignatureUrl?: string
 }): Promise<string> {
-  return new Promise((resolve) => {
-    const canvas = document.createElement('canvas')
-    const W = 1400
-    const H = 1000
-    canvas.width = W
-    canvas.height = H
-    const ctx = canvas.getContext('2d')!
+  const canvas = document.createElement('canvas')
+  const W = 1600
+  const H = 1200
+  canvas.width = W
+  canvas.height = H
+  const ctx = canvas.getContext('2d')!
 
-    // Background
-    const bg = ctx.createLinearGradient(0, 0, W, H)
-    bg.addColorStop(0, '#1a0f04')
-    bg.addColorStop(0.5, '#1f1108')
-    bg.addColorStop(1, '#0f0a02')
-    ctx.fillStyle = bg
-    ctx.fillRect(0, 0, W, H)
+  // ─── WHITE BACKGROUND ───
+  ctx.fillStyle = '#FFFFFF'
+  ctx.fillRect(0, 0, W, H)
 
-    // Decorative border
-    ctx.strokeStyle = '#F59E0B'
-    ctx.lineWidth = 3
-    ctx.strokeRect(30, 30, W - 60, H - 60)
-    ctx.strokeStyle = 'rgba(245,158,11,0.3)'
-    ctx.lineWidth = 1
-    ctx.strokeRect(40, 40, W - 80, H - 80)
+  // ─── GREEN/GOLD CORNER ACCENTS ───
+  // Top-right green diagonal
+  ctx.beginPath()
+  ctx.moveTo(W - 350, 0)
+  ctx.lineTo(W, 0)
+  ctx.lineTo(W, 350)
+  ctx.closePath()
+  ctx.fillStyle = '#5B8C3E'
+  ctx.fill()
 
-    // Corner ornaments
-    const corners = [[50, 50], [W - 50, 50], [50, H - 50], [W - 50, H - 50]]
-    corners.forEach(([x, y]) => {
-      ctx.beginPath()
-      ctx.arc(x, y, 8, 0, Math.PI * 2)
-      ctx.fillStyle = '#F59E0B'
-      ctx.fill()
-    })
+  ctx.beginPath()
+  ctx.moveTo(W - 280, 0)
+  ctx.lineTo(W, 0)
+  ctx.lineTo(W, 280)
+  ctx.closePath()
+  ctx.fillStyle = '#C8922A'
+  ctx.fill()
 
-    // Top accent line
-    const topGrad = ctx.createLinearGradient(200, 0, W - 200, 0)
-    topGrad.addColorStop(0, 'transparent')
-    topGrad.addColorStop(0.3, '#F59E0B')
-    topGrad.addColorStop(0.7, '#EF4444')
-    topGrad.addColorStop(1, 'transparent')
-    ctx.fillStyle = topGrad
-    ctx.fillRect(200, 80, W - 400, 2)
+  ctx.beginPath()
+  ctx.moveTo(W - 200, 0)
+  ctx.lineTo(W, 0)
+  ctx.lineTo(W, 200)
+  ctx.closePath()
+  ctx.fillStyle = '#FFFFFF'
+  ctx.fill()
 
-    // Logo circle
-    ctx.beginPath()
-    ctx.arc(W / 2, 150, 40, 0, Math.PI * 2)
-    const logoGrad = ctx.createLinearGradient(W / 2 - 40, 110, W / 2 + 40, 190)
-    logoGrad.addColorStop(0, '#F59E0B')
-    logoGrad.addColorStop(1, '#EF4444')
-    ctx.fillStyle = logoGrad
-    ctx.fill()
+  ctx.beginPath()
+  ctx.moveTo(W - 160, 0)
+  ctx.lineTo(W, 0)
+  ctx.lineTo(W, 160)
+  ctx.closePath()
+  ctx.fillStyle = '#5B8C3E'
+  ctx.fill()
 
-    // Award icon (star shape)
-    ctx.fillStyle = '#FFFFFF'
-    ctx.font = 'bold 36px Arial'
-    ctx.textAlign = 'center'
-    ctx.fillText('★', W / 2, 162)
+  // Bottom-left green diagonal
+  ctx.beginPath()
+  ctx.moveTo(0, H - 350)
+  ctx.lineTo(0, H)
+  ctx.lineTo(350, H)
+  ctx.closePath()
+  ctx.fillStyle = '#5B8C3E'
+  ctx.fill()
 
-    // "CERTIFICADO"
-    ctx.fillStyle = '#F59E0B'
-    ctx.font = '600 14px Arial'
-    ctx.letterSpacing = '8px'
-    ctx.textAlign = 'center'
-    ctx.fillText('C E R T I F I C A D O   D E   C O M P E T E N C I A', W / 2, 220)
+  ctx.beginPath()
+  ctx.moveTo(0, H - 280)
+  ctx.lineTo(0, H)
+  ctx.lineTo(280, H)
+  ctx.closePath()
+  ctx.fillStyle = '#C8922A'
+  ctx.fill()
 
-    // Institution
-    ctx.fillStyle = 'rgba(232,213,181,0.6)'
-    ctx.font = '13px Arial'
-    ctx.fillText('Jimmy Academy — Sistema de Gestión de Seguridad y Salud en el Trabajo', W / 2, 248)
+  ctx.beginPath()
+  ctx.moveTo(0, H - 200)
+  ctx.lineTo(0, H)
+  ctx.lineTo(200, H)
+  ctx.closePath()
+  ctx.fillStyle = '#FFFFFF'
+  ctx.fill()
 
-    // Divider
-    ctx.fillStyle = 'rgba(245,158,11,0.3)'
-    ctx.fillRect(300, 270, W - 600, 1)
+  ctx.beginPath()
+  ctx.moveTo(0, H - 160)
+  ctx.lineTo(0, H)
+  ctx.lineTo(160, H)
+  ctx.closePath()
+  ctx.fillStyle = '#5B8C3E'
+  ctx.fill()
 
-    // "Se certifica que"
-    ctx.fillStyle = 'rgba(232,213,181,0.7)'
-    ctx.font = '16px Arial'
-    ctx.fillText('Se otorga el presente certificado a', W / 2, 310)
+  // Bottom-right accent
+  ctx.beginPath()
+  ctx.moveTo(W, H - 200)
+  ctx.lineTo(W, H)
+  ctx.lineTo(W - 200, H)
+  ctx.closePath()
+  ctx.fillStyle = '#5B8C3E'
+  ctx.fill()
 
-    // Name
-    ctx.fillStyle = '#E8D5B5'
-    ctx.font = 'bold 42px Georgia, serif'
-    ctx.fillText(data.name, W / 2, 365)
+  // ─── THIN GOLD BORDER ───
+  ctx.strokeStyle = '#C8922A'
+  ctx.lineWidth = 3
+  ctx.strokeRect(25, 25, W - 50, H - 50)
 
-    // Underline under name
-    const nameWidth = ctx.measureText(data.name).width
-    ctx.fillStyle = 'rgba(245,158,11,0.4)'
-    ctx.fillRect(W / 2 - nameWidth / 2 - 20, 380, nameWidth + 40, 1)
+  ctx.textAlign = 'center'
 
-    // "Por haber completado..."
-    ctx.fillStyle = 'rgba(232,213,181,0.7)'
-    ctx.font = '15px Arial'
-    ctx.fillText('Por haber completado satisfactoriamente la capacitación en:', W / 2, 420)
-
-    // Course name
-    ctx.fillStyle = '#F59E0B'
-    ctx.font = 'bold 30px Georgia, serif'
-    // Word wrap if needed
-    const maxCourseWidth = W - 200
-    if (ctx.measureText(data.course).width > maxCourseWidth) {
-      const words = data.course.split(' ')
-      let line1 = ''
-      let line2 = ''
-      let onLine1 = true
-      for (const word of words) {
-        const test = line1 + (line1 ? ' ' : '') + word
-        if (onLine1 && ctx.measureText(test).width > maxCourseWidth) {
-          onLine1 = false
-        }
-        if (onLine1) line1 = test
-        else line2 += (line2 ? ' ' : '') + word
-      }
-      ctx.fillText(line1, W / 2, 465)
-      if (line2) ctx.fillText(line2, W / 2, 500)
-    } else {
-      ctx.fillText(data.course, W / 2, 470)
+  // ─── LOGO ───
+  if (data.logoUrl) {
+    try {
+      const logo = await loadImage(data.logoUrl)
+      const logoH = 140
+      const logoW = logoH * (logo.width / logo.height)
+      ctx.drawImage(logo, W / 2 - logoW / 2, 50, logoW, logoH)
+    } catch (_) {
+      drawTextLogo(ctx, W / 2, 120)
     }
+  } else {
+    drawTextLogo(ctx, W / 2, 120)
+  }
 
-    // Duration + Score box
-    ctx.fillStyle = 'rgba(245,158,11,0.08)'
-    ctx.strokeStyle = 'rgba(245,158,11,0.2)'
-    ctx.lineWidth = 1
-    const boxY = 520
-    const boxW = 180
-    const boxH = 70
-    const gap = 30
+  // ─── "CERTIFICADO" ───
+  ctx.fillStyle = '#5B8C3E'
+  ctx.font = 'bold 72px Georgia, "Times New Roman", serif'
+  ctx.fillText('CERTIFICADO', W / 2, 280)
 
-    // Duration box
-    const box1X = W / 2 - boxW - gap / 2 - boxW / 2 - gap / 2
-    roundRect(ctx, box1X, boxY, boxW, boxH, 10)
+  ctx.fillStyle = '#333333'
+  ctx.font = '28px Georgia, "Times New Roman", serif'
+  ctx.fillText('DE CAPACITACIÓN', W / 2, 320)
+
+  // ─── Horizontal lines ───
+  ctx.strokeStyle = '#5B8C3E'
+  ctx.lineWidth = 2
+  ctx.beginPath()
+  ctx.moveTo(W / 2 - 200, 345)
+  ctx.lineTo(W / 2 + 200, 345)
+  ctx.stroke()
+
+  // ─── "Se certifica que:" ───
+  ctx.fillStyle = '#666666'
+  ctx.font = 'italic 22px Georgia, "Times New Roman", serif'
+  ctx.fillText('Se certifica que:', W / 2, 390)
+
+  // ─── EMPLOYEE NAME ───
+  ctx.fillStyle = '#1a1a1a'
+  ctx.font = 'bold 48px Georgia, "Times New Roman", serif'
+  ctx.fillText(data.employeeName, W / 2, 450)
+
+  // ─── Cédula ───
+  ctx.fillStyle = '#555555'
+  ctx.font = '20px Arial, sans-serif'
+  ctx.fillText(`Con cédula de ciudadanía N° ${data.employeeCedula}`, W / 2, 490)
+
+  // ─── "Participó y aprobó..." ───
+  ctx.fillStyle = '#555555'
+  ctx.font = '20px Arial, sans-serif'
+  ctx.fillText('Participó y aprobó satisfactoriamente la capacitación:', W / 2, 540)
+
+  // ─── COURSE NAME ───
+  ctx.fillStyle = '#1a1a1a'
+  ctx.font = 'bold 36px Georgia, "Times New Roman", serif'
+  const maxCourseW = W - 300
+  const courseLines = wrapText(ctx, data.course.toUpperCase(), maxCourseW)
+  let courseY = 590
+  for (const line of courseLines) {
+    ctx.fillText(line, W / 2, courseY)
+    courseY += 42
+  }
+
+  // ─── Date and duration ───
+  ctx.fillStyle = '#555555'
+  ctx.font = 'italic 20px Georgia, "Times New Roman", serif'
+  ctx.fillText(`Realizada el ${data.date},`, W / 2, courseY + 20)
+  ctx.fillText(`con una duración de ${data.duration}.`, W / 2, courseY + 48)
+
+  // ─── GOLD SEAL / BADGE (right side) ───
+  const sealX = W - 250
+  const sealY = 450
+  drawSeal(ctx, sealX, sealY, 110)
+
+  // ─── Info boxes (right side) ───
+  const boxX = W - 350
+  const boxW = 220
+  const boxes = [
+    { label: 'Fecha:', value: data.date },
+    { label: 'Calificación:', value: data.score },
+    { label: 'Código de verificación:', value: data.code },
+  ]
+  let boxY = sealY + 140
+  for (const box of boxes) {
+    ctx.fillStyle = '#F0EDE8'
+    roundRect(ctx, boxX, boxY, boxW, 55, 8)
     ctx.fill()
-    ctx.stroke()
+    ctx.fillStyle = '#888888'
+    ctx.font = '12px Arial, sans-serif'
+    ctx.textAlign = 'left'
+    ctx.fillText(box.label, boxX + 15, boxY + 22)
+    ctx.fillStyle = '#1a1a1a'
+    ctx.font = 'bold 14px Arial, sans-serif'
+    ctx.fillText(box.value, boxX + 15, boxY + 42)
+    ctx.textAlign = 'center'
+    boxY += 65
+  }
 
-    // Score box
-    const box2X = W / 2 - boxW / 2
-    roundRect(ctx, box2X, boxY, boxW, boxH, 10)
-    ctx.fill()
-    ctx.stroke()
+  // ─── INSTRUCTOR SIGNATURE ───
+  const sigY = courseY + 100
+  if (data.instructorSignatureUrl) {
+    try {
+      const sig = await loadImage(data.instructorSignatureUrl)
+      const sigH = 80
+      const sigW = sigH * (sig.width / sig.height)
+      ctx.drawImage(sig, W / 2 - sigW / 2, sigY - 40, sigW, sigH)
+    } catch (_) {}
+  }
 
-    // Code box
-    const box3X = W / 2 + boxW / 2 + gap
-    roundRect(ctx, box3X, boxY, boxW, boxH, 10)
-    ctx.fill()
-    ctx.stroke()
+  // Signature line
+  ctx.strokeStyle = '#AAAAAA'
+  ctx.lineWidth = 1
+  ctx.beginPath()
+  ctx.moveTo(W / 2 - 180, sigY + 50)
+  ctx.lineTo(W / 2 + 180, sigY + 50)
+  ctx.stroke()
 
-    // Duration text
-    ctx.fillStyle = 'rgba(232,213,181,0.5)'
-    ctx.font = '11px Arial'
-    ctx.fillText('Duración', box1X + boxW / 2, boxY + 25)
-    ctx.fillStyle = '#E8D5B5'
-    ctx.font = 'bold 22px Arial'
-    ctx.fillText(data.duration, box1X + boxW / 2, boxY + 52)
+  ctx.fillStyle = '#1a1a1a'
+  ctx.font = 'bold 16px Arial, sans-serif'
+  ctx.fillText('JIMMY JOANNY ACERO CHAPETÓN', W / 2, sigY + 75)
 
-    // Score text
-    ctx.fillStyle = 'rgba(232,213,181,0.5)'
-    ctx.font = '11px Arial'
-    ctx.fillText('Calificación', box2X + boxW / 2, boxY + 25)
-    ctx.fillStyle = '#10B981'
-    ctx.font = 'bold 22px Arial'
-    ctx.fillText(data.score, box2X + boxW / 2, boxY + 52)
+  ctx.fillStyle = '#555555'
+  ctx.font = '13px Arial, sans-serif'
+  ctx.fillText('Cédula: 1052392965', W / 2, sigY + 95)
+  ctx.fillText('Profesional en Seguridad y Salud en el Trabajo', W / 2, sigY + 113)
+  ctx.fillText('Instructor – Responsable de la Capacitación', W / 2, sigY + 131)
 
-    // Code text
-    ctx.fillStyle = 'rgba(232,213,181,0.5)'
-    ctx.font = '11px Arial'
-    ctx.fillText('Código', box3X + boxW / 2, boxY + 25)
-    ctx.fillStyle = '#E8D5B5'
-    ctx.font = 'bold 14px Courier New, monospace'
-    ctx.fillText(data.code, box3X + boxW / 2, boxY + 52)
+  // ─── EMPLOYEE SIGNATURE (left side) ───
+  if (data.employeeSignature) {
+    try {
+      const empSig = await loadImage(data.employeeSignature)
+      const empSigH = 70
+      const empSigW = empSigH * (empSig.width / empSig.height)
+      ctx.drawImage(empSig, 200 - empSigW / 2, sigY - 30, empSigW, empSigH)
+    } catch (_) {}
+  }
 
-    // Dates
-    ctx.fillStyle = 'rgba(232,213,181,0.5)'
-    ctx.font = '13px Arial'
-    ctx.fillText(`Fecha de emisión: ${data.date}  ·  Válido hasta: ${data.expiry}`, W / 2, 630)
+  ctx.strokeStyle = '#AAAAAA'
+  ctx.lineWidth = 1
+  ctx.beginPath()
+  ctx.moveTo(80, sigY + 50)
+  ctx.lineTo(320, sigY + 50)
+  ctx.stroke()
 
-    // Normative reference
-    ctx.fillStyle = 'rgba(16,185,129,0.7)'
-    ctx.font = '12px Arial'
-    ctx.fillText('Este certificado acredita la competencia del participante conforme al', W / 2, 670)
-    ctx.fillText('Decreto 1072 de 2015 y la Resolución 0312 de 2019 del Ministerio de Trabajo de Colombia.', W / 2, 688)
+  ctx.fillStyle = '#1a1a1a'
+  ctx.font = 'bold 14px Arial, sans-serif'
+  ctx.fillText('FIRMA DEL PARTICIPANTE', 200, sigY + 75)
 
-    // Signature lines
-    ctx.strokeStyle = 'rgba(232,213,181,0.3)'
-    ctx.lineWidth = 1
+  ctx.fillStyle = '#555555'
+  ctx.font = '13px Arial, sans-serif'
+  ctx.fillText(data.employeeName, 200, sigY + 95)
+  ctx.fillText(`C.C. ${data.employeeCedula}`, 200, sigY + 113)
 
-    // Left signature
-    ctx.beginPath()
-    ctx.moveTo(250, 790)
-    ctx.lineTo(550, 790)
-    ctx.stroke()
-    ctx.fillStyle = 'rgba(232,213,181,0.6)'
-    ctx.font = '13px Arial'
-    ctx.fillText('Coordinador(a) SST', 400, 812)
-    ctx.fillStyle = '#E8D5B5'
-    ctx.font = 'bold 14px Arial'
-    ctx.fillText('Diana Ruiz Morales', 400, 835)
-    ctx.fillStyle = 'rgba(232,213,181,0.4)'
-    ctx.font = '11px Arial'
-    ctx.fillText('Lic. SST No. 12345-COL', 400, 855)
+  // ─── FOOTER ───
+  // Shield icon + text
+  ctx.fillStyle = '#5B8C3E'
+  ctx.font = '13px Arial, sans-serif'
+  const footY = H - 60
+  ctx.fillText('Capacitar hoy, prevenir siempre.', 180, footY)
 
-    // Right signature
-    ctx.beginPath()
-    ctx.moveTo(850, 790)
-    ctx.lineTo(1150, 790)
-    ctx.stroke()
-    ctx.fillStyle = 'rgba(232,213,181,0.6)'
-    ctx.font = '13px Arial'
-    ctx.fillText('Representante Legal', 1000, 812)
-    ctx.fillStyle = '#E8D5B5'
-    ctx.font = 'bold 14px Arial'
-    ctx.fillText('Jimmy Academy S.A.S', 1000, 835)
-    ctx.fillStyle = 'rgba(232,213,181,0.4)'
-    ctx.font = '11px Arial'
-    ctx.fillText('NIT: 900.123.456-7', 1000, 855)
+  ctx.fillStyle = '#888888'
+  ctx.font = '11px Arial, sans-serif'
+  ctx.fillText('Conforme al Decreto 1072 de 2015 y la Resolución 0312 de 2019 – Ministerio de Trabajo de Colombia', W / 2, H - 35)
 
-    // Bottom accent
-    const botGrad = ctx.createLinearGradient(200, 0, W - 200, 0)
-    botGrad.addColorStop(0, 'transparent')
-    botGrad.addColorStop(0.3, '#F59E0B')
-    botGrad.addColorStop(0.7, '#EF4444')
-    botGrad.addColorStop(1, 'transparent')
-    ctx.fillStyle = botGrad
-    ctx.fillRect(200, H - 80, W - 400, 2)
+  return canvas.toDataURL('image/png', 1.0)
+}
 
-    // Footer
-    ctx.fillStyle = 'rgba(232,213,181,0.3)'
-    ctx.font = '10px Arial'
-    ctx.fillText('Jimmy Academy SG-SST · www.jimmyacademy.co · Bogotá D.C., Colombia', W / 2, H - 50)
+function drawTextLogo(ctx: CanvasRenderingContext2D, x: number, y: number) {
+  ctx.font = 'bold 40px Arial, sans-serif'
+  ctx.fillStyle = '#5B8C3E'
+  ctx.fillText('AGRO', x - 80, y)
+  ctx.fillStyle = '#C8922A'
+  ctx.fillText('VENTURE', x + 60, y)
 
-    resolve(canvas.toDataURL('image/png', 1.0))
+  ctx.fillStyle = '#FFFFFF'
+  roundRect(ctx, x - 55, y + 10, 110, 28, 4)
+  ctx.fillStyle = '#5B8C3E'
+  ctx.fill()
+  ctx.fillStyle = '#FFFFFF'
+  ctx.font = 'bold 14px Arial, sans-serif'
+  ctx.fillText('C A P I T A L', x, y + 30)
+}
+
+function drawSeal(ctx: CanvasRenderingContext2D, x: number, y: number, r: number) {
+  // Outer gold ring with teeth
+  const teeth = 24
+  ctx.beginPath()
+  for (let i = 0; i < teeth * 2; i++) {
+    const angle = (i * Math.PI) / teeth
+    const radius = i % 2 === 0 ? r + 12 : r - 2
+    const px = x + Math.cos(angle) * radius
+    const py = y + Math.sin(angle) * radius
+    if (i === 0) ctx.moveTo(px, py)
+    else ctx.lineTo(px, py)
+  }
+  ctx.closePath()
+  const goldGrad = ctx.createRadialGradient(x, y, r - 20, x, y, r + 15)
+  goldGrad.addColorStop(0, '#D4A843')
+  goldGrad.addColorStop(0.5, '#C8922A')
+  goldGrad.addColorStop(1, '#A07520')
+  ctx.fillStyle = goldGrad
+  ctx.fill()
+
+  // Inner green circle
+  ctx.beginPath()
+  ctx.arc(x, y, r - 18, 0, Math.PI * 2)
+  ctx.fillStyle = '#4A7A2E'
+  ctx.fill()
+
+  // Inner dark green circle
+  ctx.beginPath()
+  ctx.arc(x, y, r - 30, 0, Math.PI * 2)
+  ctx.fillStyle = '#3D6B25'
+  ctx.fill()
+
+  // Shield icon (simplified)
+  ctx.fillStyle = '#FFFFFF'
+  ctx.font = '36px Arial'
+  ctx.textAlign = 'center'
+  ctx.fillText('🛡️', x, y - 10)
+
+  // Star
+  ctx.fillStyle = '#D4A843'
+  ctx.font = '24px Arial'
+  ctx.fillText('★', x, y + 25)
+
+  // Text around seal
+  ctx.fillStyle = '#FFFFFF'
+  ctx.font = 'bold 9px Arial, sans-serif'
+  const sealText = 'COMPROMETIDOS CON LA SEGURIDAD, LA PREVENCIÓN Y EL BIENESTAR'
+  const arcRadius = r - 6
+  ctx.save()
+  ctx.translate(x, y)
+  const startAngle = -Math.PI * 0.75
+  const arcLen = Math.PI * 1.5
+  for (let i = 0; i < sealText.length; i++) {
+    const angle = startAngle + (i / sealText.length) * arcLen
+    ctx.save()
+    ctx.rotate(angle)
+    ctx.translate(0, -arcRadius)
+    ctx.rotate(Math.PI / 2)
+    ctx.fillText(sealText[i], 0, 0)
+    ctx.restore()
+  }
+  ctx.restore()
+
+  // Laurel wreath (simplified with leaf shapes)
+  ctx.strokeStyle = '#5B8C3E'
+  ctx.lineWidth = 2
+  for (let side = -1; side <= 1; side += 2) {
+    for (let j = 0; j < 6; j++) {
+      const a = (side === -1 ? Math.PI * 0.6 : Math.PI * 0.4) - side * j * 0.18
+      const lx = x + Math.cos(a) * (r + 20) * 0.85
+      const ly = y + Math.sin(a) * (r + 20) * 0.85
+      ctx.beginPath()
+      ctx.ellipse(lx, ly, 8, 4, a + Math.PI / 2, 0, Math.PI * 2)
+      ctx.fillStyle = '#5B8C3E'
+      ctx.fill()
+    }
+  }
+
+  // Green ribbon
+  ctx.fillStyle = '#5B8C3E'
+  ctx.beginPath()
+  ctx.moveTo(x - 25, y + r + 5)
+  ctx.lineTo(x - 35, y + r + 40)
+  ctx.lineTo(x - 15, y + r + 30)
+  ctx.closePath()
+  ctx.fill()
+
+  ctx.beginPath()
+  ctx.moveTo(x + 25, y + r + 5)
+  ctx.lineTo(x + 35, y + r + 40)
+  ctx.lineTo(x + 15, y + r + 30)
+  ctx.closePath()
+  ctx.fill()
+}
+
+function loadImage(src: string): Promise<HTMLImageElement> {
+  return new Promise((resolve, reject) => {
+    const img = new Image()
+    img.crossOrigin = 'anonymous'
+    img.onload = () => resolve(img)
+    img.onerror = reject
+    img.src = src
   })
 }
 
@@ -250,4 +403,21 @@ function roundRect(ctx: CanvasRenderingContext2D, x: number, y: number, w: numbe
   ctx.lineTo(x, y + r)
   ctx.quadraticCurveTo(x, y, x + r, y)
   ctx.closePath()
+}
+
+function wrapText(ctx: CanvasRenderingContext2D, text: string, maxWidth: number): string[] {
+  const words = text.split(' ')
+  const lines: string[] = []
+  let current = ''
+  for (const word of words) {
+    const test = current ? `${current} ${word}` : word
+    if (ctx.measureText(test).width > maxWidth && current) {
+      lines.push(current)
+      current = word
+    } else {
+      current = test
+    }
+  }
+  if (current) lines.push(current)
+  return lines
 }
