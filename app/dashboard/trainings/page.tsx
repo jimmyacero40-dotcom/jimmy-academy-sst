@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useRef } from 'react'
+import { useState, useRef, useEffect } from 'react'
 import { motion } from 'framer-motion'
 import { useRouter } from 'next/navigation'
 import {
@@ -82,7 +82,17 @@ const COVERS = [
 
 export default function TrainingsPage() {
   const router = useRouter()
-  const [trainings, setTrainings] = useState(TRAININGS_DATA)
+  const [trainings, setTrainings] = useState(() => {
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem('sst-trainings')
+      if (saved) return JSON.parse(saved)
+    }
+    return TRAININGS_DATA
+  })
+
+  useEffect(() => {
+    localStorage.setItem('sst-trainings', JSON.stringify(trainings))
+  }, [trainings])
   const [search, setSearch] = useState('')
   const [filter, setFilter] = useState('todos')
   const [showModal, setShowModal] = useState(false)
