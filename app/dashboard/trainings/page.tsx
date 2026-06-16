@@ -3,6 +3,7 @@
 import { useState, useRef, useEffect } from 'react'
 import { motion } from 'framer-motion'
 import { useRouter } from 'next/navigation'
+import { extractPPTXImages, saveSlides, deleteSlides } from '@/lib/pptx-extractor'
 import {
   BookOpen, Plus, Search, Clock, CheckCircle, AlertCircle,
   Users, Star, Play, Upload, ChevronRight, X, Award, Zap,
@@ -106,9 +107,24 @@ export default function TrainingsPage() {
     e.target.value = ''
   }
 
-  const handleCreateCourse = () => {
+  const [creating, setCreating] = useState(false)
+
+  const handleCreateCourse = async () => {
     if (!newCourse.name.trim()) return
+    setCreating(true)
     const newId = trainings.length > 0 ? Math.max(...trainings.map((t: any) => t.id)) + 1 : 1
+
+    let slideCount = 0
+    if (uploadedFile && /\.pptx$/i.test(uploadedFile.name)) {
+      try {
+        const images = await extractPPTXImages(uploadedFile)
+        await saveSlides(newId, images)
+        slideCount = images.length
+      } catch (e) {
+        console.error('Error extracting PPTX:', e)
+      }
+    }
+
     const newTraining = {
       id: newId,
       title: newCourse.name,
@@ -122,18 +138,21 @@ export default function TrainingsPage() {
       cover: COVERS[newId % COVERS.length],
       color: GRADIENTS[newId % GRADIENTS.length],
       description: newCourse.description || `Capacitación: ${newCourse.name}`,
-      slides: 0,
-      questions: 0,
+      slides: slideCount,
+      questions: 5,
       fileName: uploadedFile?.name || undefined,
+      hasCustomSlides: slideCount > 0,
     }
     setTrainings(prev => [newTraining, ...prev])
     setShowModal(false)
     setNewCourse({ name: '', duration: '', description: '', category: 'Obligatorio' })
     setUploadedFile(null)
+    setCreating(false)
   }
 
-  const handleDeleteCourse = (id: number) => {
+  const handleDeleteCourse = async (id: number) => {
     setTrainings(prev => prev.filter(t => t.id !== id))
+    try { await deleteSlides(id) } catch (_) {}
   }
 
   const filtered = trainings.filter(t => {
@@ -389,8 +408,8 @@ export default function TrainingsPage() {
               <button onClick={() => { setShowModal(false); setUploadedFile(null); setNewCourse({ name: '', duration: '', description: '', category: 'Obligatorio' }) }}
                 className="terra-btn-outline flex-1 py-2.5 justify-center">Cancelar</button>
               <button onClick={handleCreateCourse}
-                disabled={!newCourse.name.trim()}
-                className="terra-btn flex-1 py-2.5 justify-center">Crear Curso</button>
+                disabled={!newCourse.name.trim() || creating}
+                className="terra-btn flex-1 py-2.5 justify-center">{creating ? 'Procesando archivo...' : 'Crear Curso'}</button>
             </div>
           </motion.div>
         </div>
