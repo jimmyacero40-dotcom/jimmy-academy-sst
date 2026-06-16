@@ -66,8 +66,23 @@ const statusStyles: Record<string, { label: string; color: string; bg: string; b
   vencido:    { label: 'Vencido',     color: '#FCA5A5', bg: 'rgba(239,68,68,0.1)',  border: 'rgba(239,68,68,0.25)' },
 }
 
+const GRADIENTS = [
+  'from-amber-500 to-red-500', 'from-red-500 to-rose-500', 'from-orange-500 to-amber-500',
+  'from-amber-600 to-orange-500', 'from-emerald-500 to-teal-500', 'from-yellow-500 to-amber-500',
+  'from-violet-500 to-purple-500', 'from-cyan-500 to-blue-500',
+]
+const COVERS = [
+  'https://images.unsplash.com/photo-1504307651254-35680f356dfd?w=800&q=80',
+  'https://images.unsplash.com/photo-1559757148-5c350d0d3c56?w=800&q=80',
+  'https://images.unsplash.com/photo-1578328819058-b69f3a3b0f6b?w=800&q=80',
+  'https://images.unsplash.com/photo-1581092335397-9583eb92d232?w=800&q=80',
+  'https://images.unsplash.com/photo-1552664730-d307ca884978?w=800&q=80',
+  'https://images.unsplash.com/photo-1555664424-778a1e5e1b48?w=800&q=80',
+]
+
 export default function TrainingsPage() {
   const router = useRouter()
+  const [trainings, setTrainings] = useState(TRAININGS_DATA)
   const [search, setSearch] = useState('')
   const [filter, setFilter] = useState('todos')
   const [showModal, setShowModal] = useState(false)
@@ -83,13 +98,35 @@ export default function TrainingsPage() {
 
   const handleCreateCourse = () => {
     if (!newCourse.name.trim()) return
-    alert(`Curso "${newCourse.name}" creado exitosamente${uploadedFile ? ` con archivo: ${uploadedFile.name}` : ''}`)
+    const newId = trainings.length > 0 ? Math.max(...trainings.map(t => t.id)) + 1 : 1
+    const newTraining = {
+      id: newId,
+      title: newCourse.name,
+      category: newCourse.category,
+      duration: newCourse.duration || '8h',
+      enrolled: 0,
+      completed: 0,
+      due: new Date(Date.now() + 90 * 86400000).toISOString().split('T')[0],
+      status: 'activo',
+      rating: 0,
+      cover: COVERS[newId % COVERS.length],
+      color: GRADIENTS[newId % GRADIENTS.length],
+      description: newCourse.description || `Capacitación: ${newCourse.name}`,
+      slides: 0,
+      questions: 0,
+      fileName: uploadedFile?.name || undefined,
+    }
+    setTrainings(prev => [newTraining, ...prev])
     setShowModal(false)
     setNewCourse({ name: '', duration: '', description: '', category: 'Obligatorio' })
     setUploadedFile(null)
   }
 
-  const filtered = TRAININGS_DATA.filter(t => {
+  const handleDeleteCourse = (id: number) => {
+    setTrainings(prev => prev.filter(t => t.id !== id))
+  }
+
+  const filtered = trainings.filter(t => {
     const matchSearch = t.title.toLowerCase().includes(search.toLowerCase()) || t.category.toLowerCase().includes(search.toLowerCase())
     return matchSearch && (filter === 'todos' || t.status === filter)
   })
@@ -222,9 +259,15 @@ export default function TrainingsPage() {
                     <Award size={13} style={{ color: 'var(--amber)' }} />
                     <span className="text-xs" style={{ color: 'var(--text-faint)' }}>Certificado al completar</span>
                   </div>
-                  <button className="flex items-center gap-1 text-xs font-bold transition-colors" style={{ color: 'var(--amber)' }}>
-                    Iniciar <ChevronRight size={13} />
-                  </button>
+                  <div className="flex items-center gap-2">
+                    <button onClick={(e) => { e.stopPropagation(); handleDeleteCourse(t.id) }}
+                      className="p-1.5 rounded-lg hover:bg-red-500/15 transition-colors" title="Eliminar curso">
+                      <Trash2 size={13} className="text-red-400" />
+                    </button>
+                    <button className="flex items-center gap-1 text-xs font-bold transition-colors" style={{ color: 'var(--amber)' }}>
+                      Iniciar <ChevronRight size={13} />
+                    </button>
+                  </div>
                 </div>
               </div>
             </motion.div>
