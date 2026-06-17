@@ -3,7 +3,7 @@
 import { useState, useRef, useEffect } from 'react'
 import { motion } from 'framer-motion'
 import { useRouter } from 'next/navigation'
-import { extractPPTXImages, extractPPTXTexts } from '@/lib/pptx-extractor'
+import { extractPPTXImages, extractPPTXTexts, getCourseData, getCustomQuestions } from '@/lib/pptx-extractor'
 import {
   BookOpen, Plus, Search, Clock, CheckCircle, AlertCircle,
   Users, Star, Play, Upload, ChevronRight, X, Award, Zap,
@@ -42,14 +42,74 @@ export default function TrainingsPage() {
   const [creating, setCreating] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
+  const [migrating, setMigrating] = useState(false)
+
   useEffect(() => {
-    fetch('/api/trainings')
-      .then(r => r.json())
-      .then(data => {
-        if (Array.isArray(data)) setTrainings(data)
-      })
-      .catch(() => {})
-      .finally(() => setLoading(false))
+    async function loadAndMigrate() {
+      // 1. Load from API
+      let apiTrainings: any[] = []
+      try {
+        const res = await fetch('/api/trainings')
+        const data = await res.json()
+        if (Array.isArray(data)) apiTrainings = data
+      } catch (_) {}
+
+      // 2. Check if there's local data to migrate
+      try {
+        const saved = localStorage.getItem('sst-trainings')
+        if (saved) {
+          const localTrainings = JSON.parse(saved)
+          if (Array.isArray(localTrainings) && localTrainings.length > 0 && apiTrainings.length === 0) {
+            setMigrating(true)
+            for (const t of localTrainings) {
+              let slides: string[] = []
+              let texts: string[] = []
+              try {
+                const courseData = await getCourseData(t.id)
+                slides = courseData.images || []
+                texts = courseData.texts || []
+              } catch (_) {}
+
+              let questions: any[] = []
+              try {
+                const customQ = await getCustomQuestions(t.id)
+                if (customQ.length > 0) questions = customQ
+              } catch (_) {}
+
+              try {
+                const res = await fetch('/api/trainings', {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({
+                    title: t.title,
+                    category: t.category || 'Obligatorio',
+                    duration: t.duration || '8h',
+                    description: t.description || '',
+                    status: t.status || 'activo',
+                    slides_count: slides.length || t.slides || 0,
+                    questions_count: t.questions || 5,
+                    cover_url: slides[0] || t.cover || null,
+                    color: t.color || null,
+                    file_name: t.fileName || null,
+                    slides,
+                    texts,
+                    questions,
+                  }),
+                })
+                const created = await res.json()
+                if (res.ok) apiTrainings.push(created)
+              } catch (_) {}
+            }
+            localStorage.removeItem('sst-trainings')
+            setMigrating(false)
+          }
+        }
+      } catch (_) {}
+
+      setTrainings(apiTrainings)
+      setLoading(false)
+    }
+    loadAndMigrate()
   }, [])
 
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -179,8 +239,20 @@ export default function TrainingsPage() {
         </div>
       </div>
 
+      {/* Migrating */}
+      {migrating && (
+        <div className="mb-6 rounded-xl p-4 flex items-center gap-3"
+          style={{ background: 'rgba(245,158,11,0.1)', border: '1px solid rgba(245,158,11,0.3)' }}>
+          <Loader2 size={20} className="animate-spin" style={{ color: 'var(--amber)' }} />
+          <div>
+            <p className="text-sm font-semibold" style={{ color: 'var(--text)' }}>Migrando capacitaciones al servidor...</p>
+            <p className="text-xs" style={{ color: 'var(--text-dim)' }}>Esto solo ocurre una vez. Después podrás verlas desde cualquier dispositivo.</p>
+          </div>
+        </div>
+      )}
+
       {/* Loading */}
-      {loading && (
+      {loading && !migrating && (
         <div className="py-16 text-center">
           <Loader2 size={32} className="mx-auto mb-3 animate-spin" style={{ color: 'var(--amber)' }} />
           <p style={{ color: 'var(--text-dim)' }}>Cargando capacitaciones...</p>
