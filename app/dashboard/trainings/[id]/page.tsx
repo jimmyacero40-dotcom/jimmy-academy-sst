@@ -1,248 +1,273 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import { useSession } from 'next-auth/react'
 import { useParams, useRouter } from 'next/navigation'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
   ChevronLeft, ChevronRight, CheckCircle, X, Award, Download,
   BookOpen, RotateCcw, AlertCircle, Clock, Loader2, QrCode, Shield,
-  User, Calendar
+  User, Calendar, Plus, Trash2, Save, Edit3, FileText
 } from 'lucide-react'
-import { getCourseData } from '@/lib/pptx-extractor'
+import { getCustomQuestions, saveCustomQuestions, type CustomQuestion } from '@/lib/pptx-extractor'
 import { generateCertificatePNG } from '@/lib/generate-certificate'
 import SignaturePad from '@/components/SignaturePad'
 
-type Phase = 'slides' | 'quiz' | 'result' | 'signing' | 'certificate'
+type Phase = 'slides' | 'edit-questions' | 'quiz' | 'result' | 'signing' | 'certificate'
 type Question = { q: string; options: string[]; correct: number; explanation: string }
 
-// Generate questions from actual slide text content
 function generateQuestionsFromContent(texts: string[], title: string): Question[] {
-  const allText = texts.join(' ').toLowerCase()
+  const allText = texts.join(' ').replace(/\s+/g, ' ')
   const questions: Question[] = []
+  const used = new Set<number>()
 
-  // Extract key concepts from the text to build relevant questions
-  const concepts: { keyword: string; topic: string; question: Question }[] = [
-    {
-      keyword: 'epp',
-      topic: 'EPP',
-      question: {
-        q: `Según la capacitación "${title}", ¿cuál es la importancia del EPP?`,
+  const sentences = allText
+    .replace(/\n/g, '. ')
+    .split(/[.;:!?]+/)
+    .map(s => s.trim())
+    .filter(s => s.length > 20 && s.length < 250 && !/^[\d\s]+$/.test(s))
+
+  const keyFacts = sentences.filter(s =>
+    /\b(debe|deben|es|son|se debe|hay que|importante|obligatori|necesari|siempre|nunca|prohibi|requiere|incluye|consiste|significa|permite|evita|previene|protege|garantiza|asegura|según|conforme|establece)\b/i.test(s)
+  )
+
+  const definitions = sentences.filter(s =>
+    /\b(es un|es una|es el|es la|son los|son las|se define|se entiende|se refiere|se denomina|consiste en|se conoce|significa)\b/i.test(s)
+  )
+
+  const procedures = sentences.filter(s =>
+    /\b(paso|primero|segundo|antes de|después de|procedimiento|proceso|método|técnica|forma correcta|se realiza|se aplica|se ejecuta|pasos)\b/i.test(s)
+  )
+
+  const prohibitions = sentences.filter(s =>
+    /\b(no se debe|nunca|prohibi|evitar|no usar|no hacer|no permit|está prohibido|no tocar|no manipular|riesgo|peligro)\b/i.test(s)
+  )
+
+  const numbers = sentences.filter(s =>
+    /\b(\d+\s*(metros|cm|kg|horas|minutos|segundos|grados|%|por ciento|personas|veces|días|años|resolución|decreto|ley|norma|artículo|NTC))\b/i.test(s)
+  )
+
+  function pickUnique(arr: string[]): string | null {
+    for (let i = 0; i < arr.length; i++) {
+      if (!used.has(i)) { used.add(i); return arr[i] }
+    }
+    return null
+  }
+
+  function truncate(s: string, max: number): string {
+    if (s.length <= max) return s
+    return s.substring(0, max - 3) + '...'
+  }
+
+  function shuffleCorrect(opts: string[], correctIdx: number): { options: string[]; correct: number } {
+    const positions = [0, 1, 2, 3]
+    for (let i = positions.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [positions[i], positions[j]] = [positions[j], positions[i]]
+    }
+    const newOpts = positions.map(p => opts[p])
+    const newCorrect = positions.indexOf(correctIdx)
+    return { options: newOpts, correct: newCorrect }
+  }
+
+  // Type 1: Definition questions from actual content
+  for (const def of definitions.slice(0, 3)) {
+    if (questions.length >= 7) break
+    const s = shuffleCorrect([
+      truncate(def, 140),
+      'Es un procedimiento administrativo sin relación con la seguridad',
+      'No tiene una definición específica en la normativa colombiana',
+      'Es un concepto que solo aplica en países europeos',
+    ], 0)
+    questions.push({
+      q: `Según la capacitación "${title}", ¿cuál de las siguientes definiciones es correcta?`,
+      ...s,
+      explanation: `Según el contenido presentado en las diapositivas: "${truncate(def, 200)}"`,
+    })
+  }
+
+  // Type 2: Key fact questions - what does the content say?
+  for (const fact of keyFacts.slice(0, 4)) {
+    if (questions.length >= 7) break
+    if (definitions.includes(fact)) continue
+    const s = shuffleCorrect([
+      truncate(fact, 140),
+      'No se mencionó ningún requisito específico sobre este tema',
+      'Solo aplica para empresas del sector público',
+      'Este aspecto fue eliminado de la normativa vigente',
+    ], 0)
+    questions.push({
+      q: `De acuerdo con el contenido de "${title}", ¿qué información se presentó?`,
+      ...s,
+      explanation: `El contenido de la capacitación indica: "${truncate(fact, 200)}"`,
+    })
+  }
+
+  // Type 3: Procedure questions
+  for (const proc of procedures.slice(0, 2)) {
+    if (questions.length >= 7) break
+    if (definitions.includes(proc) || keyFacts.includes(proc)) continue
+    const s = shuffleCorrect([
+      truncate(proc, 140),
+      'No existe un procedimiento establecido para esta actividad',
+      'El procedimiento es opcional según criterio del trabajador',
+      'Se debe consultar únicamente al supervisor sin tomar acción',
+    ], 0)
+    questions.push({
+      q: `¿Cuál es el procedimiento correcto según la capacitación "${title}"?`,
+      ...s,
+      explanation: `Según las diapositivas: "${truncate(proc, 200)}"`,
+    })
+  }
+
+  // Type 4: Prohibition/risk questions
+  for (const prob of prohibitions.slice(0, 2)) {
+    if (questions.length >= 7) break
+    const s = shuffleCorrect([
+      truncate(prob, 140),
+      'No existen restricciones o prohibiciones para esta actividad',
+      'Las restricciones solo aplican en jornada nocturna',
+      'Las medidas de prevención son opcionales',
+    ], 0)
+    questions.push({
+      q: `Respecto a los riesgos y precauciones en "${title}", ¿qué se indica?`,
+      ...s,
+      explanation: `Según el contenido: "${truncate(prob, 200)}"`,
+    })
+  }
+
+  // Type 5: Numeric/normative questions
+  for (const num of numbers.slice(0, 2)) {
+    if (questions.length >= 7) break
+    const s = shuffleCorrect([
+      truncate(num, 140),
+      'No se establecen valores numéricos específicos',
+      'Los valores dependen exclusivamente del criterio del empleador',
+      'La normativa no define parámetros medibles para este tema',
+    ], 0)
+    questions.push({
+      q: `¿Qué dato específico se menciona en la capacitación "${title}"?`,
+      ...s,
+      explanation: `Dato presentado en las diapositivas: "${truncate(num, 200)}"`,
+    })
+  }
+
+  // Type 6: General comprehension from remaining sentences
+  const remaining = sentences.filter(s => !definitions.includes(s) && !keyFacts.includes(s) && !procedures.includes(s) && !prohibitions.includes(s))
+  for (const rem of remaining.slice(0, 3)) {
+    if (questions.length >= 7) break
+    const s = shuffleCorrect([
+      truncate(rem, 140),
+      'Este tema no fue abordado en la capacitación',
+      'La información presentada contradice la normativa vigente',
+      'No se proporcionó información relevante sobre este aspecto',
+    ], 0)
+    questions.push({
+      q: `¿Cuál de los siguientes temas fue tratado en "${title}"?`,
+      ...s,
+      explanation: `En la capacitación se presentó: "${truncate(rem, 200)}"`,
+    })
+  }
+
+  // If not enough content-based questions, add title-based fallbacks
+  if (questions.length < 5) {
+    const tl = title.toLowerCase()
+    const fallbacks: Question[] = [
+      {
+        q: `¿Cuál es el objetivo principal de la capacitación "${title}"?`,
         options: [
-          'Proteger al trabajador de riesgos que no pueden eliminarse en la fuente',
-          'Es opcional según el criterio del trabajador',
-          'Solo se usa en emergencias',
-          'Es responsabilidad exclusiva de la ARL',
+          `Formar a los trabajadores en prácticas seguras relacionadas con ${tl}`,
+          'Cumplir un trámite administrativo sin impacto real',
+          'Reducir los costos operativos de la empresa',
+          'Reemplazar la experiencia práctica del trabajador',
         ],
         correct: 0,
-        explanation: 'El EPP (Equipo de Protección Personal) es la última barrera de protección del trabajador cuando los riesgos no pueden eliminarse o controlarse en la fuente o en el medio.',
+        explanation: `El objetivo es formar al trabajador para prevenir accidentes y enfermedades laborales en el contexto de ${tl}.`,
       },
-    },
-    {
-      keyword: 'altura',
-      topic: 'alturas',
-      question: {
-        q: `Según el contenido presentado sobre "${title}", ¿a partir de qué altura aplica la normativa?`,
+      {
+        q: `¿Qué debe hacer el trabajador al identificar un riesgo relacionado con "${title}"?`,
         options: [
-          'A partir de 1 metro',
-          'A partir de 2 metros sobre el plano de los pies',
-          'A partir de 3 metros',
-          'Solo en andamios superiores a 5 metros',
-        ],
-        correct: 1,
-        explanation: 'Según la Resolución 4272 de 2021, trabajo en alturas aplica a toda actividad realizada a 2 metros o más sobre el plano de los pies del trabajador.',
-      },
-    },
-    {
-      keyword: 'riesgo',
-      topic: 'riesgos',
-      question: {
-        q: `De acuerdo con la capacitación "${title}", ¿cuál es el primer paso en la gestión de riesgos?`,
-        options: [
-          'Comprar equipos de protección',
-          'Identificar los peligros y valorar los riesgos',
-          'Capacitar a los trabajadores',
-          'Reportar a la ARL',
-        ],
-        correct: 1,
-        explanation: 'El primer paso siempre es la identificación de peligros y valoración de riesgos (IPVR), según la GTC 45 y el Decreto 1072 de 2015.',
-      },
-    },
-    {
-      keyword: 'extintor',
-      topic: 'extintores',
-      question: {
-        q: `Según lo presentado en "${title}", ¿cuál es la técnica correcta para usar un extintor?`,
-        options: [
-          'Técnica ABCD',
-          'Técnica PASS (Pull, Aim, Squeeze, Sweep)',
-          'Apuntar directamente a la llama',
-          'Usar solo en incendios clase A',
-        ],
-        correct: 1,
-        explanation: 'La técnica PASS consiste en: Pull (Jalar el pasador), Aim (Apuntar a la base del fuego), Squeeze (Apretar la palanca), Sweep (Barrer de lado a lado).',
-      },
-    },
-    {
-      keyword: 'primeros auxilios',
-      topic: 'primeros auxilios',
-      question: {
-        q: `Según la capacitación "${title}", ¿cuál es la primera acción ante una emergencia médica?`,
-        options: [
-          'Administrar medicamentos inmediatamente',
-          'Evaluar la escena y garantizar la seguridad propia',
-          'Mover al paciente a un lugar seguro',
-          'Llamar a la familia del afectado',
-        ],
-        correct: 1,
-        explanation: 'Siempre lo primero es evaluar la seguridad de la escena. No se debe atender a la víctima si la escena no es segura para el primer respondiente.',
-      },
-    },
-    {
-      keyword: 'copasst',
-      topic: 'COPASST',
-      question: {
-        q: `Según el contenido de "${title}", ¿cuál es la función principal del COPASST?`,
-        options: [
-          'Aprobar el presupuesto de SST',
-          'Promover y vigilar el cumplimiento del SG-SST',
-          'Contratar al coordinador de SST',
-          'Reemplazar al vigía de SST',
-        ],
-        correct: 1,
-        explanation: 'El COPASST (Comité Paritario de Seguridad y Salud en el Trabajo) tiene como función principal promover, divulgar y vigilar el cumplimiento del SG-SST.',
-      },
-    },
-    {
-      keyword: 'señalización',
-      topic: 'señalización',
-      question: {
-        q: `Según "${title}", ¿qué color de señalización indica prohibición?`,
-        options: [
-          'Amarillo',
-          'Verde',
-          'Rojo',
-          'Azul',
+          'Ignorarlo si no afecta directamente su puesto',
+          'Esperar a que el supervisor lo descubra',
+          'Reportarlo inmediatamente y tomar medidas preventivas',
+          'Documentarlo por escrito pero no informar a nadie',
         ],
         correct: 2,
-        explanation: 'El color rojo indica prohibición y peligro inmediato. Amarillo = precaución, Verde = seguridad/evacuación, Azul = obligación.',
+        explanation: 'Todo trabajador debe reportar inmediatamente condiciones inseguras y tomar medidas preventivas según el SG-SST.',
       },
-    },
-    {
-      keyword: 'ergon',
-      topic: 'ergonomía',
-      question: {
-        q: `De acuerdo con la capacitación "${title}", ¿cuál es un factor de riesgo ergonómico?`,
+      {
+        q: `Según el SG-SST, ¿quién es responsable de aplicar lo aprendido en "${title}"?`,
         options: [
-          'Exposición a ruido industrial',
-          'Movimientos repetitivos y posturas forzadas',
-          'Contacto con sustancias químicas',
-          'Trabajo en espacios confinados',
+          'Solo el departamento de seguridad',
+          'Únicamente el empleador',
+          'Tanto el empleador como el trabajador tienen responsabilidades',
+          'Solo los supervisores directos',
+        ],
+        correct: 2,
+        explanation: 'El Decreto 1072 de 2015 establece responsabilidades tanto para el empleador como para el trabajador en materia de SST.',
+      },
+      {
+        q: `¿Cuál es la importancia de la capacitación en "${title}" dentro del SG-SST?`,
+        options: [
+          'No tiene relevancia si el trabajador tiene experiencia',
+          'Es fundamental para la prevención de accidentes y el cumplimiento normativo',
+          'Solo es importante para trabajadores nuevos',
+          'Es un requisito opcional según la normativa colombiana',
         ],
         correct: 1,
-        explanation: 'Los factores de riesgo ergonómico incluyen movimientos repetitivos, posturas forzadas, manipulación manual de cargas y trabajo estático prolongado.',
+        explanation: 'La capacitación es obligatoria y fundamental dentro del SG-SST para prevenir accidentes y cumplir con el Decreto 1072 de 2015.',
       },
-    },
-    {
-      keyword: 'químic',
-      topic: 'químicos',
-      question: {
-        q: `Según "${title}", ¿qué sistema se usa para identificar peligros de sustancias químicas?`,
+      {
+        q: `¿Qué normativa colombiana respalda la obligatoriedad de capacitaciones como "${title}"?`,
         options: [
-          'Sistema PASS',
-          'Sistema GHS (Sistema Globalmente Armonizado)',
-          'Sistema ISO 9001',
-          'Sistema HACCP',
+          'No existe normativa que lo exija',
+          'Decreto 1072 de 2015 y Resolución 0312 de 2019',
+          'Solo aplican normas internacionales, no colombianas',
+          'La Constitución Política únicamente',
         ],
         correct: 1,
-        explanation: 'El SGA/GHS (Sistema Globalmente Armonizado) clasifica y etiqueta sustancias químicas con pictogramas, palabras de advertencia e indicaciones de peligro.',
+        explanation: 'El Decreto 1072 de 2015 y la Resolución 0312 de 2019 establecen los estándares mínimos del SG-SST incluyendo capacitaciones obligatorias.',
       },
-    },
-    {
-      keyword: 'emergencia',
-      topic: 'emergencias',
-      question: {
-        q: `Según la capacitación "${title}", ¿qué debe contener un plan de emergencias?`,
+      {
+        q: `¿Qué consecuencia puede tener no aplicar los conocimientos de "${title}" en el trabajo?`,
         options: [
-          'Solo números de teléfono de emergencia',
-          'Procedimientos de evacuación, brigadas, rutas de escape y puntos de encuentro',
-          'Solo la ubicación de extintores',
-          'Solo el protocolo de llamada al 123',
+          'Ninguna, las capacitaciones son solo informativas',
+          'Aumento del riesgo de accidentes, enfermedades laborales y sanciones',
+          'Solo afecta la evaluación de desempeño',
+          'Únicamente genera una amonestación verbal',
         ],
         correct: 1,
-        explanation: 'Un plan de emergencias integral incluye: análisis de amenazas, procedimientos operativos, conformación de brigadas, rutas de evacuación y puntos de encuentro.',
+        explanation: 'No aplicar las medidas de seguridad aumenta el riesgo de accidentes, enfermedades laborales y puede generar sanciones según la normativa colombiana.',
       },
-    },
-  ]
-
-  // Match questions based on content
-  for (const concept of concepts) {
-    if (allText.includes(concept.keyword)) {
-      questions.push(concept.question)
+      {
+        q: `¿Con qué frecuencia se deben actualizar los conocimientos sobre "${title}"?`,
+        options: [
+          'Una sola vez en la vida laboral es suficiente',
+          'Solo cuando ocurra un accidente',
+          'Periódicamente según el plan anual de capacitación del SG-SST',
+          'Cada 10 años',
+        ],
+        correct: 2,
+        explanation: 'Las capacitaciones deben reprogramarse periódicamente según el plan anual del SG-SST y cuando cambien las condiciones de riesgo.',
+      },
+    ]
+    for (const fb of fallbacks) {
+      if (questions.length >= 5) break
+      questions.push(fb)
     }
   }
 
-  // Always add these general SST questions relevant to any training
-  const generalQuestions: Question[] = [
-    {
-      q: `¿Cuál es la responsabilidad del trabajador respecto a "${title}"?`,
-      options: [
-        'No tiene ninguna responsabilidad, es del empleador',
-        'Participar en la capacitación, aplicar lo aprendido y reportar condiciones inseguras',
-        'Solo firmar la asistencia',
-        'Delegar al compañero más experimentado',
-      ],
-      correct: 1,
-      explanation: 'Según el Decreto 1072 de 2015, el trabajador debe participar activamente en las capacitaciones, aplicar lo aprendido y reportar condiciones peligrosas.',
-    },
-    {
-      q: `¿Por qué es obligatoria la capacitación en "${title}"?`,
-      options: [
-        'Para cumplir con el SG-SST según el Decreto 1072 de 2015',
-        'Es voluntaria, no obligatoria',
-        'Solo para trabajadores nuevos',
-        'Solo si la empresa tiene más de 50 empleados',
-      ],
-      correct: 0,
-      explanation: 'El Decreto 1072 de 2015 y la Resolución 0312 de 2019 establecen la obligatoriedad de capacitar a todos los trabajadores en los riesgos asociados a sus actividades.',
-    },
-    {
-      q: `Al completar esta capacitación sobre "${title}", ¿qué debe hacer el trabajador?`,
-      options: [
-        'Nada, la capacitación es solo teórica',
-        'Aplicar lo aprendido en su puesto de trabajo y reportar novedades',
-        'Esperar a que el supervisor le indique',
-        'Repetir la capacitación cada semana',
-      ],
-      correct: 1,
-      explanation: 'El objetivo de toda capacitación SST es que el trabajador aplique los conocimientos adquiridos en su actividad diaria y contribuya a un ambiente de trabajo seguro.',
-    },
-  ]
-
-  // Add general questions to fill up to 5
-  for (const gq of generalQuestions) {
-    if (questions.length >= 5) break
-    questions.push(gq)
-  }
-
-  // If still less than 5, add more
-  if (questions.length < 5) {
-    questions.push({
-      q: `¿Qué norma colombiana establece los estándares mínimos del SG-SST aplicables a "${title}"?`,
-      options: [
-        'Resolución 2400 de 1979',
-        'Resolución 0312 de 2019',
-        'Ley 100 de 1993',
-        'Decreto 614 de 1984',
-      ],
-      correct: 1,
-      explanation: 'La Resolución 0312 de 2019 define los estándares mínimos del Sistema de Gestión de Seguridad y Salud en el Trabajo (SG-SST).',
-    })
+  // Shuffle all questions and take 5
+  for (let i = questions.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [questions[i], questions[j]] = [questions[j], questions[i]]
   }
 
   return questions.slice(0, 5)
 }
 
 export default function TrainingDetailPage() {
+  const { data: session } = useSession()
   const params = useParams()
   const router = useRouter()
   const courseId = parseInt(params.id as string)
@@ -263,20 +288,37 @@ export default function TrainingDetailPage() {
 
   const passed = score >= 3
 
+  // Question editor state
+  const [editQuestions, setEditQuestions] = useState<Question[]>([])
+  const [savingQuestions, setSavingQuestions] = useState(false)
+  const [hasCustomQuestions, setHasCustomQuestions] = useState(false)
+  const emptyQ = (): Question => ({ q: '', options: ['', '', '', ''], correct: 0, explanation: '' })
+
   useEffect(() => {
     async function load() {
-      const saved = localStorage.getItem('sst-trainings')
-      if (saved) {
-        const all = JSON.parse(saved)
-        const found = all.find((t: any) => t.id === courseId)
-        if (found) setTraining(found)
-      }
-
       try {
-        const data = await getCourseData(courseId)
-        setSlides(data.images)
-        const title = JSON.parse(localStorage.getItem('sst-trainings') || '[]').find((t: any) => t.id === courseId)?.title || 'Capacitación SST'
-        setQuestions(generateQuestionsFromContent(data.texts, title))
+        const res = await fetch(`/api/trainings/${courseId}`)
+        if (res.ok) {
+          const data = await res.json()
+          setTraining(data.training)
+          setSlides(data.images || [])
+          const title = data.training?.title || 'Capacitación SST'
+
+          if (data.questions && data.questions.length > 0) {
+            setQuestions(data.questions)
+            setEditQuestions(data.questions)
+            setHasCustomQuestions(true)
+          } else {
+            const custom = await getCustomQuestions(courseId)
+            if (custom.length > 0) {
+              setQuestions(custom)
+              setEditQuestions(custom)
+              setHasCustomQuestions(true)
+            } else {
+              setQuestions(generateQuestionsFromContent(data.texts || [], title))
+            }
+          }
+        }
       } catch (_) {}
       setLoading(false)
     }
@@ -313,9 +355,24 @@ export default function TrainingDetailPage() {
 
   const [certImage, setCertImage] = useState<string | null>(null)
   const [generatingCert, setGeneratingCert] = useState(false)
-  const [employeeName, setEmployeeName] = useState('')
-  const [employeeCedula, setEmployeeCedula] = useState('')
+  const employeeName = session?.user?.name || ''
+  const [employeeCedula, setEmployeeCedula] = useState((session?.user as any)?.cedula || '')
   const [employeeSignature, setEmployeeSignature] = useState<string | null>(null)
+  const [savedSignatureLoaded, setSavedSignatureLoaded] = useState(false)
+
+  useEffect(() => {
+    if (phase === 'signing' && !savedSignatureLoaded) {
+      fetch('/api/signatures')
+        .then(r => r.json())
+        .then(data => {
+          if (data.signature?.signature_data) {
+            setEmployeeSignature(data.signature.signature_data)
+          }
+          setSavedSignatureLoaded(true)
+        })
+        .catch(() => setSavedSignatureLoaded(true))
+    }
+  }, [phase, savedSignatureLoaded])
   const certCode = `AVC-${new Date().getFullYear()}-${String(new Date().getMonth() + 1).padStart(2, '0')}${String(new Date().getDate()).padStart(2, '0')}-${String(courseId).padStart(3, '0')}`
 
   const handleGenerateCert = async () => {
@@ -338,6 +395,27 @@ export default function TrainingDetailPage() {
     setCertImage(img)
     setGeneratingCert(false)
     setPhase('certificate')
+
+    try {
+      const durationLabel = durationMap[dur] || dur
+      const userId = (session?.user as any)?.id
+      if (userId) {
+        await fetch('/api/certificates', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            code: certCode,
+            name: employeeName.trim(),
+            cedula: employeeCedula.trim(),
+            course: training?.title || 'Capacitación SST',
+            issued: new Date().toISOString().split('T')[0],
+            expires: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+            duration: durationLabel,
+            score: `${Math.round((score / questions.length) * 100)}%`,
+          })
+        })
+      }
+    } catch (_) {}
   }
 
   const downloadCert = () => {
@@ -400,9 +478,16 @@ export default function TrainingDetailPage() {
             </p>
           </div>
           {phase === 'slides' && (
-            <div className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold"
-              style={{ background: 'var(--amber)', color: 'var(--text)' }}>
-              <Clock size={12} /> {training?.duration || '8h'}
+            <div className="hidden sm:flex items-center gap-2">
+              <button onClick={() => { if (editQuestions.length === 0) setEditQuestions([emptyQ()]); setPhase('edit-questions') }}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all hover:opacity-80"
+                style={{ background: 'rgba(16,185,129,0.15)', border: '1px solid rgba(16,185,129,0.3)', color: '#6EE7B7' }}>
+                <Edit3 size={12} /> {hasCustomQuestions ? 'Editar Preguntas' : 'Crear Preguntas'}
+              </button>
+              <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold"
+                style={{ background: 'var(--amber)', color: 'var(--text)' }}>
+                <Clock size={12} /> {training?.duration || '8h'}
+              </div>
             </div>
           )}
         </div>
@@ -468,12 +553,124 @@ export default function TrainingDetailPage() {
                 Siguiente <ChevronRight size={16} />
               </button>
             ) : (
-              <button onClick={() => setPhase('quiz')}
-                className="flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-bold transition-all"
-                style={{ background: 'linear-gradient(135deg, #10B981, #059669)', color: 'white' }}>
-                Iniciar Evaluación <CheckCircle size={16} />
-              </button>
+              <div className="flex gap-2">
+                <button onClick={() => { if (editQuestions.length === 0) setEditQuestions([emptyQ()]); setPhase('edit-questions') }}
+                  className="sm:hidden flex items-center gap-1.5 px-3 py-2.5 rounded-xl text-xs font-bold transition-all"
+                  style={{ background: 'rgba(245,158,11,0.15)', border: '1px solid rgba(245,158,11,0.3)', color: '#FCD34D' }}>
+                  <Edit3 size={14} />
+                </button>
+                <button onClick={() => setPhase('quiz')}
+                  className="flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-bold transition-all"
+                  style={{ background: 'linear-gradient(135deg, #10B981, #059669)', color: 'white' }}>
+                  Iniciar Evaluación <CheckCircle size={16} />
+                </button>
+              </div>
             )}
+          </div>
+        </motion.div>
+      )}
+
+      {/* ═══ EDIT QUESTIONS PHASE ═══ */}
+      {phase === 'edit-questions' && (
+        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}>
+          <div className="terra-card p-6 sm:p-8 max-w-3xl mx-auto">
+            <div className="flex items-center gap-3 mb-6">
+              <div className="w-10 h-10 rounded-xl flex items-center justify-center"
+                style={{ background: 'rgba(16,185,129,0.15)', border: '1px solid rgba(16,185,129,0.3)' }}>
+                <FileText size={18} className="text-emerald-400" />
+              </div>
+              <div className="flex-1">
+                <h2 className="text-lg font-bold" style={{ color: 'var(--text)' }}>Gestionar Preguntas</h2>
+                <p className="text-xs" style={{ color: 'var(--text-dim)' }}>
+                  Agrega preguntas de selección múltiple para la evaluación de este curso ({editQuestions.length} preguntas)
+                </p>
+              </div>
+            </div>
+
+            <div className="space-y-6 mb-6 max-h-[60vh] overflow-y-auto pr-2">
+              {editQuestions.map((eq, qi) => (
+                <div key={qi} className="rounded-xl p-5" style={{ background: 'var(--bg-card)', border: '1px solid var(--border)' }}>
+                  <div className="flex items-center justify-between mb-3">
+                    <span className="text-xs font-bold px-2.5 py-1 rounded-lg"
+                      style={{ background: 'rgba(245,158,11,0.12)', color: '#FCD34D' }}>
+                      Pregunta {qi + 1}
+                    </span>
+                    <button onClick={() => setEditQuestions(prev => prev.filter((_, i) => i !== qi))}
+                      className="p-1.5 rounded-lg hover:bg-red-500/15 transition-colors" title="Eliminar pregunta">
+                      <Trash2 size={14} className="text-red-400" />
+                    </button>
+                  </div>
+
+                  <textarea
+                    value={eq.q}
+                    onChange={e => setEditQuestions(prev => prev.map((p, i) => i === qi ? { ...p, q: e.target.value } : p))}
+                    placeholder="Escribe la pregunta aquí..."
+                    rows={2}
+                    className="terra-input resize-none mb-3 text-sm"
+                  />
+
+                  <div className="space-y-2 mb-3">
+                    {eq.options.map((opt, oi) => (
+                      <div key={oi} className="flex items-center gap-2">
+                        <button
+                          onClick={() => setEditQuestions(prev => prev.map((p, i) => i === qi ? { ...p, correct: oi } : p))}
+                          className="w-8 h-8 rounded-lg flex items-center justify-center text-xs font-bold flex-shrink-0 transition-all"
+                          style={{
+                            background: eq.correct === oi ? '#10B981' : 'transparent',
+                            border: `2px solid ${eq.correct === oi ? '#10B981' : 'var(--border)'}`,
+                            color: eq.correct === oi ? 'white' : 'var(--text-dim)',
+                          }}
+                          title={eq.correct === oi ? 'Respuesta correcta' : 'Marcar como correcta'}>
+                          {String.fromCharCode(65 + oi)}
+                        </button>
+                        <input
+                          value={opt}
+                          onChange={e => setEditQuestions(prev => prev.map((p, i) => i === qi ? { ...p, options: p.options.map((o, j) => j === oi ? e.target.value : o) } : p))}
+                          placeholder={`Opción ${String.fromCharCode(65 + oi)}...`}
+                          className="terra-input text-sm flex-1"
+                        />
+                      </div>
+                    ))}
+                  </div>
+
+                  <input
+                    value={eq.explanation}
+                    onChange={e => setEditQuestions(prev => prev.map((p, i) => i === qi ? { ...p, explanation: e.target.value } : p))}
+                    placeholder="Explicación de la respuesta correcta (opcional)"
+                    className="terra-input text-xs"
+                    style={{ color: 'var(--text-dim)' }}
+                  />
+                </div>
+              ))}
+            </div>
+
+            <button onClick={() => setEditQuestions(prev => [...prev, emptyQ()])}
+              className="w-full py-3 rounded-xl border-2 border-dashed text-sm font-semibold transition-all hover:opacity-80 mb-4 flex items-center justify-center gap-2"
+              style={{ borderColor: 'var(--border-strong)', color: 'var(--text-dim)' }}>
+              <Plus size={16} /> Agregar Pregunta
+            </button>
+
+            <div className="flex gap-3">
+              <button onClick={() => setPhase('slides')}
+                className="terra-btn-outline flex-1 py-2.5 justify-center text-sm">
+                Cancelar
+              </button>
+              <button
+                onClick={async () => {
+                  const valid = editQuestions.filter(q => q.q.trim() && q.options.every(o => o.trim()))
+                  if (valid.length === 0) return
+                  setSavingQuestions(true)
+                  await saveCustomQuestions(courseId, valid)
+                  setQuestions(valid)
+                  setHasCustomQuestions(true)
+                  setSavingQuestions(false)
+                  setPhase('slides')
+                }}
+                disabled={savingQuestions || editQuestions.filter(q => q.q.trim() && q.options.every(o => o.trim())).length === 0}
+                className="terra-btn flex-1 py-2.5 justify-center text-sm disabled:opacity-40">
+                {savingQuestions ? <><Loader2 size={16} className="animate-spin" /> Guardando...</> : <><Save size={16} /> Guardar {editQuestions.filter(q => q.q.trim() && q.options.every(o => o.trim())).length} Preguntas</>}
+              </button>
+            </div>
           </div>
         </motion.div>
       )}
@@ -622,11 +819,12 @@ export default function TrainingDetailPage() {
             </div>
 
             <div className="space-y-4 mb-6">
-              <div>
-                <label className="text-xs font-semibold mb-1.5 block" style={{ color: 'var(--text-dim)' }}>Nombre completo *</label>
-                <input value={employeeName} onChange={e => setEmployeeName(e.target.value)}
-                  placeholder="Ej: Carlos Andrés Pérez López"
-                  className="terra-input" />
+              <div className="p-3 rounded-xl" style={{ background: 'rgba(16,185,129,0.08)', border: '1px solid rgba(16,185,129,0.2)' }}>
+                <div className="text-xs font-semibold mb-1" style={{ color: 'var(--text-faint)' }}>Participante</div>
+                <div className="text-sm font-bold" style={{ color: 'var(--text)' }}>
+                  <User size={14} className="inline mr-1.5" style={{ color: '#10B981' }} />
+                  {employeeName || 'Sin sesión activa'}
+                </div>
               </div>
               <div>
                 <label className="text-xs font-semibold mb-1.5 block" style={{ color: 'var(--text-dim)' }}>Número de cédula *</label>
@@ -660,7 +858,7 @@ export default function TrainingDetailPage() {
             </div>
 
             <button onClick={handleGenerateCert}
-              disabled={!employeeName.trim() || !employeeCedula.trim() || !employeeSignature || generatingCert}
+              disabled={!employeeName || !employeeCedula.trim() || !employeeSignature || generatingCert}
               className="terra-btn w-full py-3 justify-center disabled:opacity-40">
               {generatingCert
                 ? <><Loader2 size={18} className="animate-spin" /> Generando Certificado...</>
@@ -674,8 +872,8 @@ export default function TrainingDetailPage() {
       {/* ═══ CERTIFICATE PHASE ═══ */}
       {phase === 'certificate' && certImage && (
         <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}>
-          <div className="max-w-4xl mx-auto">
-            <div className="terra-card overflow-hidden p-4">
+          <div className="max-w-7xl mx-auto">
+            <div className="terra-card overflow-hidden p-2">
               <img src={certImage} alt="Certificado" className="w-full rounded-lg" />
             </div>
             <div className="flex gap-3 mt-4 max-w-md mx-auto">

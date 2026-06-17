@@ -3,69 +3,12 @@
 import { useState, useRef, useEffect } from 'react'
 import { motion } from 'framer-motion'
 import { useRouter } from 'next/navigation'
-import { extractPPTXImages, extractPPTXTexts, saveCourseData, deleteSlides } from '@/lib/pptx-extractor'
+import { extractPPTXImages, extractPPTXTexts } from '@/lib/pptx-extractor'
 import {
   BookOpen, Plus, Search, Clock, CheckCircle, AlertCircle,
   Users, Star, Play, Upload, ChevronRight, X, Award, Zap,
-  FileText, Video, Layers, Trash2
+  FileText, Video, Layers, Trash2, Loader2
 } from 'lucide-react'
-
-const TRAININGS_DATA = [
-  {
-    id: 1, title: 'Trabajo en Alturas – Nivel 1', category: 'Obligatorio', duration: '8h',
-    enrolled: 24, completed: 20, due: '2026-02-15', status: 'activo', rating: 4.8,
-    cover: 'https://images.unsplash.com/photo-1504307651254-35680f356dfd?w=800&q=80',
-    color: 'from-amber-500 to-red-500',
-    description: 'Capacitacion obligatoria segun Resolucion 4272 de 2021. Tecnicas seguras para trabajar en alturas superiores a 2 metros.',
-    slides: 12, questions: 15,
-  },
-  {
-    id: 2, title: 'Primeros Auxilios Basicos', category: 'Obligatorio', duration: '16h',
-    enrolled: 30, completed: 12, due: '2026-01-20', status: 'vencido', rating: 4.9,
-    cover: 'https://images.unsplash.com/photo-1559757148-5c350d0d3c56?w=800&q=80',
-    color: 'from-red-500 to-rose-500',
-    description: 'Responder ante emergencias medicas en el lugar de trabajo: RCP, manejo de heridas, atencion de fracturas.',
-    slides: 14, questions: 20,
-  },
-  {
-    id: 3, title: 'Manejo de Extintores y Contra Incendios', category: 'Obligatorio', duration: '4h',
-    enrolled: 48, completed: 48, due: '2026-01-30', status: 'completado', rating: 4.5,
-    cover: 'https://images.unsplash.com/photo-1578328819058-b69f3a3b0f6b?w=800&q=80',
-    color: 'from-orange-500 to-amber-500',
-    description: 'Tipos de extintores, clasificacion y tecnica PASS para combatir incendios clase A, B y C.',
-    slides: 10, questions: 12,
-  },
-  {
-    id: 4, title: 'EPP – Equipos de Proteccion Personal', category: 'Obligatorio', duration: '6h',
-    enrolled: 56, completed: 51, due: '2026-03-10', status: 'activo', rating: 4.3,
-    cover: 'https://images.unsplash.com/photo-1581092335397-9583eb92d232?w=800&q=80',
-    color: 'from-amber-600 to-orange-500',
-    description: 'Seleccion, uso, mantenimiento e inspeccion de equipos de proteccion individual segun NTC 1733.',
-    slides: 11, questions: 15,
-  },
-  {
-    id: 5, title: 'COPASST – Comite Paritario SST', category: 'Especializado', duration: '12h',
-    enrolled: 8, completed: 8, due: '2026-04-01', status: 'completado', rating: 4.7,
-    cover: 'https://images.unsplash.com/photo-1552664730-d307ca884978?w=800&q=80',
-    color: 'from-emerald-500 to-teal-500',
-    description: 'Funciones y responsabilidades del Comite Paritario de SST segun Decreto 1072 de 2015.',
-    slides: 13, questions: 18,
-  },
-  {
-    id: 6, title: 'Riesgo Electrico Industrial', category: 'Especializado', duration: '8h',
-    enrolled: 15, completed: 9, due: '2026-02-28', status: 'activo', rating: 4.6,
-    cover: 'https://images.unsplash.com/photo-1555664424-778a1e5e1b48?w=800&q=80',
-    color: 'from-yellow-500 to-amber-500',
-    description: 'Identificacion de riesgos electricos, medidas de control, LOTO y normativa NTC 2050.',
-    slides: 12, questions: 16,
-  },
-]
-
-const statusStyles: Record<string, { label: string; color: string; bg: string; border: string }> = {
-  activo:     { label: 'En curso',    color: '#60A5FA', bg: 'rgba(96,165,250,0.1)', border: 'rgba(96,165,250,0.25)' },
-  completado: { label: 'Completado',  color: '#6EE7B7', bg: 'rgba(16,185,129,0.1)', border: 'rgba(16,185,129,0.25)' },
-  vencido:    { label: 'Vencido',     color: '#FCA5A5', bg: 'rgba(239,68,68,0.1)',  border: 'rgba(239,68,68,0.25)' },
-}
 
 const GRADIENTS = [
   'from-amber-500 to-red-500', 'from-red-500 to-rose-500', 'from-orange-500 to-amber-500',
@@ -81,25 +24,33 @@ const COVERS = [
   'https://images.unsplash.com/photo-1555664424-778a1e5e1b48?w=800&q=80',
 ]
 
+const statusStyles: Record<string, { label: string; color: string; bg: string; border: string }> = {
+  activo:     { label: 'En curso',    color: '#60A5FA', bg: 'rgba(96,165,250,0.1)', border: 'rgba(96,165,250,0.25)' },
+  completado: { label: 'Completado',  color: '#6EE7B7', bg: 'rgba(16,185,129,0.1)', border: 'rgba(16,185,129,0.25)' },
+  vencido:    { label: 'Vencido',     color: '#FCA5A5', bg: 'rgba(239,68,68,0.1)',  border: 'rgba(239,68,68,0.25)' },
+}
+
 export default function TrainingsPage() {
   const router = useRouter()
-  const [trainings, setTrainings] = useState<typeof TRAININGS_DATA>(() => {
-    if (typeof window !== 'undefined') {
-      const saved = localStorage.getItem('sst-trainings')
-      if (saved) return JSON.parse(saved)
-    }
-    return TRAININGS_DATA
-  })
-
-  useEffect(() => {
-    localStorage.setItem('sst-trainings', JSON.stringify(trainings))
-  }, [trainings])
+  const [trainings, setTrainings] = useState<any[]>([])
+  const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
   const [filter, setFilter] = useState('todos')
   const [showModal, setShowModal] = useState(false)
   const [newCourse, setNewCourse] = useState({ name: '', duration: '', description: '', category: 'Obligatorio' })
   const [uploadedFile, setUploadedFile] = useState<File | null>(null)
+  const [creating, setCreating] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
+
+  useEffect(() => {
+    fetch('/api/trainings')
+      .then(r => r.json())
+      .then(data => {
+        if (Array.isArray(data)) setTrainings(data)
+      })
+      .catch(() => {})
+      .finally(() => setLoading(false))
+  }, [])
 
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
@@ -107,44 +58,47 @@ export default function TrainingsPage() {
     e.target.value = ''
   }
 
-  const [creating, setCreating] = useState(false)
-
   const handleCreateCourse = async () => {
     if (!newCourse.name.trim()) return
     setCreating(true)
-    const newId = trainings.length > 0 ? Math.max(...trainings.map((t: any) => t.id)) + 1 : 1
 
-    let slideCount = 0
+    let slides: string[] = []
+    let texts: string[] = []
+
     if (uploadedFile && /\.pptx$/i.test(uploadedFile.name)) {
       try {
-        const images = await extractPPTXImages(uploadedFile)
-        const texts = await extractPPTXTexts(uploadedFile)
-        await saveCourseData(newId, { images, texts })
-        slideCount = images.length
+        slides = await extractPPTXImages(uploadedFile)
+        texts = await extractPPTXTexts(uploadedFile)
       } catch (e) {
         console.error('Error extracting PPTX:', e)
       }
     }
 
-    const newTraining = {
-      id: newId,
-      title: newCourse.name,
-      category: newCourse.category,
-      duration: newCourse.duration || '8h',
-      enrolled: 0,
-      completed: 0,
-      due: new Date(Date.now() + 90 * 86400000).toISOString().split('T')[0],
-      status: 'activo',
-      rating: 0,
-      cover: COVERS[newId % COVERS.length],
-      color: GRADIENTS[newId % GRADIENTS.length],
-      description: newCourse.description || `Capacitación: ${newCourse.name}`,
-      slides: slideCount,
-      questions: 5,
-      fileName: uploadedFile?.name || undefined,
-      hasCustomSlides: slideCount > 0,
+    try {
+      const res = await fetch('/api/trainings', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          title: newCourse.name,
+          category: newCourse.category,
+          duration: newCourse.duration || '8h',
+          description: newCourse.description,
+          slides_count: slides.length,
+          cover_url: slides[0] || COVERS[trainings.length % COVERS.length],
+          color: GRADIENTS[trainings.length % GRADIENTS.length],
+          file_name: uploadedFile?.name,
+          slides,
+          texts,
+        }),
+      })
+      const training = await res.json()
+      if (res.ok) {
+        setTrainings(prev => [training, ...prev])
+      }
+    } catch (e) {
+      console.error('Error creating course:', e)
     }
-    setTrainings(prev => [newTraining, ...prev])
+
     setShowModal(false)
     setNewCourse({ name: '', duration: '', description: '', category: 'Obligatorio' })
     setUploadedFile(null)
@@ -152,12 +106,15 @@ export default function TrainingsPage() {
   }
 
   const handleDeleteCourse = async (id: number) => {
-    setTrainings(prev => prev.filter(t => t.id !== id))
-    try { await deleteSlides(id) } catch (_) {}
+    try {
+      await fetch(`/api/trainings?id=${id}`, { method: 'DELETE' })
+      setTrainings(prev => prev.filter(t => t.id !== id))
+    } catch (_) {}
   }
 
   const filtered = trainings.filter(t => {
-    const matchSearch = t.title.toLowerCase().includes(search.toLowerCase()) || t.category.toLowerCase().includes(search.toLowerCase())
+    if (!t || !t.title) return false
+    const matchSearch = (t.title || '').toLowerCase().includes(search.toLowerCase()) || (t.category || '').toLowerCase().includes(search.toLowerCase())
     return matchSearch && (filter === 'todos' || t.status === filter)
   })
 
@@ -222,88 +179,107 @@ export default function TrainingsPage() {
         </div>
       </div>
 
+      {/* Loading */}
+      {loading && (
+        <div className="py-16 text-center">
+          <Loader2 size={32} className="mx-auto mb-3 animate-spin" style={{ color: 'var(--amber)' }} />
+          <p style={{ color: 'var(--text-dim)' }}>Cargando capacitaciones...</p>
+        </div>
+      )}
+
       {/* Cards Grid */}
-      <div className="grid sm:grid-cols-2 xl:grid-cols-3 gap-5">
-        {filtered.map((t, i) => {
-          const st = statusStyles[t.status] || statusStyles.activo
-          const progress = Math.round((t.completed / t.enrolled) * 100)
-          return (
-            <motion.div key={t.id} initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.07 }}
-              className="terra-card terra-card-lift overflow-hidden cursor-pointer group"
-              onClick={() => router.push(`/dashboard/trainings/${t.id}`)}>
+      {!loading && (
+        <div className="grid sm:grid-cols-2 xl:grid-cols-3 gap-5">
+          {filtered.map((t, i) => {
+            const st = statusStyles[t.status as keyof typeof statusStyles] || statusStyles.activo
+            const progress = (t.enrolled || 0) > 0 ? Math.round(((t.completed || 0) / t.enrolled) * 100) : 0
+            const coverImg = t.cover_url || COVERS[t.id % COVERS.length]
+            const gradColor = t.color || GRADIENTS[t.id % GRADIENTS.length]
+            return (
+              <motion.div key={t.id} initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.07 }}
+                className="terra-card terra-card-lift overflow-hidden cursor-pointer group"
+                onClick={() => router.push(`/dashboard/trainings/${t.id}`)}>
 
-              <div className="relative h-44 overflow-hidden">
-                <img src={t.cover} alt={t.title}
-                  className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
-                  onError={e => { (e.target as HTMLImageElement).style.display = 'none' }} />
-                <div className="absolute inset-0" style={{ background: 'linear-gradient(to top, var(--bg-surface), rgba(17,9,0,0.4), transparent)' }} />
-                <div className={`absolute inset-0 bg-gradient-to-br ${t.color} opacity-20`} />
+                <div className="relative h-44 overflow-hidden">
+                  <img src={coverImg} alt={t.title}
+                    className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                    onError={e => { (e.target as HTMLImageElement).style.display = 'none' }} />
+                  <div className="absolute inset-0" style={{ background: 'linear-gradient(to top, var(--bg-surface), rgba(17,9,0,0.4), transparent)' }} />
+                  <div className={`absolute inset-0 bg-gradient-to-br ${gradColor} opacity-20`} />
 
-                <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
-                  <div className="w-14 h-14 rounded-full bg-white/20 backdrop-blur-sm border border-white/30 flex items-center justify-center">
-                    <Play size={22} className="text-white ml-1" fill="white" />
+                  <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                    <div className="w-14 h-14 rounded-full bg-white/20 backdrop-blur-sm border border-white/30 flex items-center justify-center">
+                      <Play size={22} className="text-white ml-1" fill="white" />
+                    </div>
+                  </div>
+
+                  <div className="absolute top-3 right-3">
+                    <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-semibold backdrop-blur-sm"
+                      style={{ background: st.bg, border: `1px solid ${st.border}`, color: st.color }}>
+                      {st.label}
+                    </span>
+                  </div>
+                  <div className="absolute top-3 left-3">
+                    <span className="badge-amber">{t.category}</span>
+                  </div>
+                  <div className="absolute bottom-3 left-4 right-4 flex items-center justify-between">
+                    <div className="flex items-center gap-1.5 text-white/80 text-xs"><Layers size={11} /> {t.slides_count || 0} diapositivas</div>
+                    <div className="flex items-center gap-1.5 text-white/80 text-xs"><FileText size={11} /> {t.questions_count || 5} preguntas</div>
                   </div>
                 </div>
 
-                <div className="absolute top-3 right-3">
-                  <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-semibold backdrop-blur-sm"
-                    style={{ background: st.bg, border: `1px solid ${st.border}`, color: st.color }}>
-                    {st.label}
-                  </span>
-                </div>
-                <div className="absolute top-3 left-3">
-                  <span className="badge-amber">{t.category}</span>
-                </div>
-                <div className="absolute bottom-3 left-4 right-4 flex items-center justify-between">
-                  <div className="flex items-center gap-1.5 text-white/80 text-xs"><Layers size={11} /> {t.slides} diapositivas</div>
-                  <div className="flex items-center gap-1.5 text-white/80 text-xs"><FileText size={11} /> {t.questions} preguntas</div>
-                </div>
-              </div>
+                <div className="p-4">
+                  <h3 className="font-bold text-[15px] mb-1.5 leading-snug transition-colors text-white">{t.title}</h3>
+                  <p className="text-xs mb-3 line-clamp-2 leading-relaxed text-gray-300">{t.description}</p>
 
-              <div className="p-4">
-                <h3 className="font-bold text-sm mb-1.5 leading-snug transition-colors" style={{ color: 'var(--text)' }}>{t.title}</h3>
-                <p className="text-xs mb-3 line-clamp-2 leading-relaxed" style={{ color: 'var(--text-faint)' }}>{t.description}</p>
+                  <div className="flex items-center gap-3 text-xs mb-3 text-gray-400">
+                    <div className="flex items-center gap-1"><Clock size={11} /> {t.duration}</div>
+                    <div className="flex items-center gap-1"><Users size={11} /> {t.enrolled || 0}</div>
+                    <div className="flex items-center gap-1 ml-auto">
+                      <Star size={11} className="fill-amber-400 text-amber-400" />
+                      <span className="text-white font-semibold">{t.rating || 0}</span>
+                    </div>
+                  </div>
 
-                <div className="flex items-center gap-3 text-xs mb-3" style={{ color: 'var(--text-faint)' }}>
-                  <div className="flex items-center gap-1"><Clock size={11} /> {t.duration}</div>
-                  <div className="flex items-center gap-1"><Users size={11} /> {t.enrolled}</div>
-                  <div className="flex items-center gap-1 ml-auto">
-                    <Star size={11} className="fill-amber-400" style={{ color: 'var(--amber)' }} />
-                    <span style={{ color: 'var(--text)' }}>{t.rating}</span>
+                  <div className="mb-3">
+                    <div className="flex justify-between mb-1">
+                      <span className="text-xs text-gray-400">Progreso</span>
+                      <span className="text-xs font-bold text-white">{progress}%</span>
+                    </div>
+                    <div className="terra-progress-track">
+                      <motion.div initial={{ width: 0 }} animate={{ width: `${progress}%` }} transition={{ duration: 1, delay: 0.5 }}
+                        className={`terra-progress-fill bg-gradient-to-r ${gradColor}`} />
+                    </div>
+                  </div>
+
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-1.5">
+                      <Award size={13} className="text-amber-400" />
+                      <span className="text-xs text-gray-300">Certificado al completar</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <button onClick={(e) => { e.stopPropagation(); handleDeleteCourse(t.id) }}
+                        className="p-1.5 rounded-lg hover:bg-red-500/15 transition-colors" title="Eliminar curso">
+                        <Trash2 size={13} className="text-red-400" />
+                      </button>
+                      <button className="flex items-center gap-1 text-xs font-bold transition-colors text-amber-400 hover:text-amber-300">
+                        Iniciar <ChevronRight size={13} />
+                      </button>
+                    </div>
                   </div>
                 </div>
+              </motion.div>
+            )
+          })}
+        </div>
+      )}
 
-                <div className="mb-3">
-                  <div className="flex justify-between mb-1">
-                    <span className="text-xs" style={{ color: 'var(--text-faint)' }}>Progreso</span>
-                    <span className="text-xs font-bold" style={{ color: 'var(--text)' }}>{progress}%</span>
-                  </div>
-                  <div className="terra-progress-track">
-                    <motion.div initial={{ width: 0 }} animate={{ width: `${progress}%` }} transition={{ duration: 1, delay: 0.5 }}
-                      className={`terra-progress-fill bg-gradient-to-r ${t.color}`} />
-                  </div>
-                </div>
-
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-1.5">
-                    <Award size={13} style={{ color: 'var(--amber)' }} />
-                    <span className="text-xs" style={{ color: 'var(--text-faint)' }}>Certificado al completar</span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <button onClick={(e) => { e.stopPropagation(); handleDeleteCourse(t.id) }}
-                      className="p-1.5 rounded-lg hover:bg-red-500/15 transition-colors" title="Eliminar curso">
-                      <Trash2 size={13} className="text-red-400" />
-                    </button>
-                    <button className="flex items-center gap-1 text-xs font-bold transition-colors" style={{ color: 'var(--amber)' }}>
-                      Iniciar <ChevronRight size={13} />
-                    </button>
-                  </div>
-                </div>
-              </div>
-            </motion.div>
-          )
-        })}
-      </div>
+      {!loading && filtered.length === 0 && (
+        <div className="py-16 text-center">
+          <BookOpen size={32} className="mx-auto mb-3 opacity-30" style={{ color: 'var(--text-faint)' }} />
+          <p style={{ color: 'var(--text-faint)' }}>No hay capacitaciones{search ? ' que coincidan con la búsqueda' : ''}</p>
+        </div>
+      )}
 
       {/* Upload Modal */}
       {showModal && (
