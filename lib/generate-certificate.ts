@@ -1,3 +1,19 @@
+const C = {
+  green: '#0F4D24',
+  greenDark: '#0A3318',
+  greenMid: '#1B6B35',
+  greenLight: '#2E8B4A',
+  gold: '#C89B3C',
+  goldLight: '#D4AD4E',
+  goldDark: '#A67E1F',
+  ivory: '#FDFBF5',
+  white: '#FFFFFF',
+  black: '#111111',
+  text: '#1A1A1A',
+  textMid: '#3A3A3A',
+  textLight: '#666666',
+}
+
 export async function generateCertificatePNG(data: {
   employeeName: string
   employeeCedula: string
@@ -11,374 +27,638 @@ export async function generateCertificatePNG(data: {
   instructorSignatureUrl?: string
 }): Promise<string> {
   const canvas = document.createElement('canvas')
-  const W = 1600
-  const H = 1200
+  const W = 4200
+  const H = 2970
   canvas.width = W
   canvas.height = H
   const ctx = canvas.getContext('2d')!
 
-  // ─── WHITE BACKGROUND ───
-  ctx.fillStyle = '#FFFFFF'
+  await loadFonts()
+  const titleFont = '"Cinzel", "Playfair Display", Georgia, serif'
+  const elegantFont = '"Cormorant Garamond", "Playfair Display", Georgia, serif'
+  const dataFont = '"Montserrat", "Segoe UI", sans-serif'
+  const CX = W / 2
+  const FRAME = 52
+
+  // ═══ BACKGROUND ═══
+  ctx.fillStyle = C.ivory
   ctx.fillRect(0, 0, W, H)
 
-  // ─── GREEN/GOLD CORNER ACCENTS ───
-  // Top-right green diagonal
-  ctx.beginPath()
-  ctx.moveTo(W - 350, 0)
-  ctx.lineTo(W, 0)
-  ctx.lineTo(W, 350)
-  ctx.closePath()
-  ctx.fillStyle = '#5B8C3E'
-  ctx.fill()
+  // Subtle topographic texture
+  ctx.globalAlpha = 0.025
+  ctx.strokeStyle = C.green
+  ctx.lineWidth = 1.5
+  for (let i = 0; i < 45; i++) {
+    ctx.beginPath()
+    const baseY = i * 72 - 100
+    for (let x = 0; x <= W; x += 15) {
+      const y = baseY + Math.sin(x * 0.002 + i * 0.7) * 50 + Math.cos(x * 0.004 + i) * 30
+      if (x === 0) ctx.moveTo(x, y)
+      else ctx.lineTo(x, y)
+    }
+    ctx.stroke()
+  }
+  ctx.globalAlpha = 1.0
 
-  ctx.beginPath()
-  ctx.moveTo(W - 280, 0)
-  ctx.lineTo(W, 0)
-  ctx.lineTo(W, 280)
-  ctx.closePath()
-  ctx.fillStyle = '#C8922A'
-  ctx.fill()
+  // ═══ GEOMETRIC CORNER BLOCKS ═══
+  for (const [ox, oy, dx, dy] of [[0, 0, 1, 1], [W, 0, -1, 1], [0, H, 1, -1], [W, H, -1, -1]] as [number, number, number, number][]) {
+    ctx.fillStyle = C.green
+    ctx.beginPath()
+    ctx.moveTo(ox, oy)
+    ctx.lineTo(ox + dx * 480, oy)
+    ctx.lineTo(ox, oy + dy * 480)
+    ctx.closePath()
+    ctx.fill()
 
-  ctx.beginPath()
-  ctx.moveTo(W - 200, 0)
-  ctx.lineTo(W, 0)
-  ctx.lineTo(W, 200)
-  ctx.closePath()
-  ctx.fillStyle = '#FFFFFF'
-  ctx.fill()
+    ctx.fillStyle = C.gold
+    ctx.beginPath()
+    ctx.moveTo(ox + dx * 370, oy)
+    ctx.lineTo(ox + dx * 500, oy)
+    ctx.lineTo(ox, oy + dy * 500)
+    ctx.lineTo(ox, oy + dy * 370)
+    ctx.closePath()
+    ctx.fill()
 
-  ctx.beginPath()
-  ctx.moveTo(W - 160, 0)
-  ctx.lineTo(W, 0)
-  ctx.lineTo(W, 160)
-  ctx.closePath()
-  ctx.fillStyle = '#5B8C3E'
-  ctx.fill()
+    ctx.fillStyle = C.greenDark
+    ctx.beginPath()
+    ctx.moveTo(ox, oy)
+    ctx.lineTo(ox + dx * 200, oy)
+    ctx.lineTo(ox, oy + dy * 200)
+    ctx.closePath()
+    ctx.fill()
 
-  // Bottom-left green diagonal
-  ctx.beginPath()
-  ctx.moveTo(0, H - 350)
-  ctx.lineTo(0, H)
-  ctx.lineTo(350, H)
-  ctx.closePath()
-  ctx.fillStyle = '#5B8C3E'
-  ctx.fill()
+    ctx.fillStyle = C.goldLight
+    ctx.beginPath()
+    ctx.moveTo(ox, oy)
+    ctx.lineTo(ox + dx * 90, oy)
+    ctx.lineTo(ox, oy + dy * 90)
+    ctx.closePath()
+    ctx.fill()
+  }
 
-  ctx.beginPath()
-  ctx.moveTo(0, H - 280)
-  ctx.lineTo(0, H)
-  ctx.lineTo(280, H)
-  ctx.closePath()
-  ctx.fillStyle = '#C8922A'
-  ctx.fill()
-
-  ctx.beginPath()
-  ctx.moveTo(0, H - 200)
-  ctx.lineTo(0, H)
-  ctx.lineTo(200, H)
-  ctx.closePath()
-  ctx.fillStyle = '#FFFFFF'
-  ctx.fill()
-
-  ctx.beginPath()
-  ctx.moveTo(0, H - 160)
-  ctx.lineTo(0, H)
-  ctx.lineTo(160, H)
-  ctx.closePath()
-  ctx.fillStyle = '#5B8C3E'
-  ctx.fill()
-
-  // Bottom-right accent
-  ctx.beginPath()
-  ctx.moveTo(W, H - 200)
-  ctx.lineTo(W, H)
-  ctx.lineTo(W - 200, H)
-  ctx.closePath()
-  ctx.fillStyle = '#5B8C3E'
-  ctx.fill()
-
-  // ─── THIN GOLD BORDER ───
-  ctx.strokeStyle = '#C8922A'
+  // ═══ DOUBLE FRAME ═══
+  ctx.strokeStyle = C.green
+  ctx.lineWidth = 6
+  ctx.strokeRect(35, 35, W - 70, H - 70)
+  ctx.strokeStyle = C.gold
   ctx.lineWidth = 3
-  ctx.strokeRect(25, 25, W - 50, H - 50)
+  ctx.strokeRect(FRAME, FRAME, W - FRAME * 2, H - FRAME * 2)
+
+  // Subtle dots left
+  ctx.globalAlpha = 0.08
+  ctx.fillStyle = C.green
+  for (let row = 0; row < 55; row++) {
+    for (let col = 0; col < 4; col++) {
+      const dx = 72 + col * 16
+      const dy = 160 + row * 48
+      if (dy < H - 160) {
+        ctx.beginPath()
+        ctx.arc(dx, dy, 3.5, 0, Math.PI * 2)
+        ctx.fill()
+      }
+    }
+  }
+  ctx.globalAlpha = 1
+
+  // ═══ FOOTER BAR (draw first so we know exact position) ═══
+  const footerH = 130
+  const footerY = H - FRAME - footerH
+  const fGrd = ctx.createLinearGradient(0, footerY, W, footerY)
+  fGrd.addColorStop(0, C.green)
+  fGrd.addColorStop(0.5, C.greenMid)
+  fGrd.addColorStop(1, C.greenDark)
+  ctx.fillStyle = fGrd
+  ctx.fillRect(FRAME, footerY, W - FRAME * 2, footerH)
+  ctx.fillStyle = C.gold
+  ctx.fillRect(FRAME, footerY, W - FRAME * 2, 4)
+
+  // Footer content
+  const fsy = footerY + footerH / 2 + 2
+  // Shield
+  const fsx = FRAME + 110
+  ctx.beginPath()
+  ctx.arc(fsx, fsy, 40, 0, Math.PI * 2)
+  ctx.fillStyle = 'rgba(255,255,255,0.12)'
+  ctx.fill()
+  ctx.strokeStyle = C.goldLight
+  ctx.lineWidth = 2.5
+  ctx.stroke()
+  ctx.fillStyle = C.white
+  ctx.beginPath()
+  ctx.moveTo(fsx, fsy - 22)
+  ctx.lineTo(fsx + 18, fsy - 12)
+  ctx.lineTo(fsx + 16, fsy + 12)
+  ctx.quadraticCurveTo(fsx, fsy + 24, fsx, fsy + 24)
+  ctx.quadraticCurveTo(fsx, fsy + 24, fsx - 16, fsy + 12)
+  ctx.lineTo(fsx - 18, fsy - 12)
+  ctx.closePath()
+  ctx.fill()
+  ctx.fillStyle = C.green
+  ctx.fillRect(fsx - 8, fsy - 2, 16, 4)
+  ctx.fillRect(fsx - 2, fsy - 8, 4, 16)
+
+  ctx.textAlign = 'left'
+  ctx.fillStyle = C.goldLight
+  ctx.font = `italic 42px ${elegantFont}`
+  ctx.fillText('Capacitar hoy,', FRAME + 170, fsy - 4)
+  ctx.font = `italic 700 42px ${elegantFont}`
+  ctx.fillText('prevenir siempre.', FRAME + 170, fsy + 40)
+
+  ctx.textAlign = 'right'
+  ctx.fillStyle = C.white
+  ctx.font = `400 24px ${dataFont}`
+  ctx.fillText('Este certificado es propiedad de AgroVenture Capital S.A.S.', W - FRAME - 40, fsy - 4)
+  ctx.fillText('Prohibida su reproducción sin autorización.', W - FRAME - 40, fsy + 30)
+
+  const copW = ctx.measureText('Este certificado es propiedad de AgroVenture Capital S.A.S.').width
+  const chkX = W - FRAME - 40 - copW - 35
+  ctx.beginPath()
+  ctx.arc(chkX, fsy + 10, 20, 0, Math.PI * 2)
+  ctx.fillStyle = C.gold
+  ctx.fill()
+  ctx.beginPath()
+  ctx.moveTo(chkX - 7, fsy + 10)
+  ctx.lineTo(chkX - 2, fsy + 16)
+  ctx.lineTo(chkX + 8, fsy + 4)
+  ctx.strokeStyle = C.white
+  ctx.lineWidth = 3
+  ctx.lineCap = 'round'
+  ctx.lineJoin = 'round'
+  ctx.stroke()
+
+  // ═══ LAYOUT ALL CONTENT PROPORTIONALLY ═══
+  const usableTop = FRAME + 20
+  const usableBot = footerY - 10
+  const usableH = usableBot - usableTop
+  const p = (frac: number) => usableTop + usableH * frac
 
   ctx.textAlign = 'center'
 
-  // ─── LOGO ───
-  if (data.logoUrl) {
-    try {
-      const logo = await loadImage(data.logoUrl)
-      const logoH = 140
-      const logoW = logoH * (logo.width / logo.height)
-      ctx.drawImage(logo, W / 2 - logoW / 2, 50, logoW, logoH)
-    } catch (_) {
-      drawTextLogo(ctx, W / 2, 120)
-    }
+  // ── LOGO 0%-20% ──
+  const logoH = usableH * 0.20
+  let logoImg: HTMLImageElement | null = null
+  if (data.logoUrl) { try { logoImg = await loadImage(data.logoUrl) } catch (_) {} }
+  if (logoImg) {
+    const lw = logoH * (logoImg.width / logoImg.height)
+    ctx.drawImage(logoImg, CX - lw / 2, p(0), lw, logoH)
   } else {
-    drawTextLogo(ctx, W / 2, 120)
+    drawFallbackLogo(ctx, CX, p(0.10), dataFont)
   }
 
-  // ─── "CERTIFICADO" ───
-  ctx.fillStyle = '#5B8C3E'
-  ctx.font = 'bold 72px Georgia, "Times New Roman", serif'
-  ctx.fillText('CERTIFICADO', W / 2, 280)
+  // ── CERTIFICADO 17%-25% ──
+  ctx.fillStyle = C.green
+  ctx.font = `700 240px ${titleFont}`
+  ctx.fillText('CERTIFICADO', CX, p(0.23))
 
-  ctx.fillStyle = '#333333'
-  ctx.font = '28px Georgia, "Times New Roman", serif'
-  ctx.fillText('DE CAPACITACIÓN', W / 2, 320)
+  // DE CAPACITACIÓN
+  ctx.fillStyle = C.gold
+  ctx.font = `600 60px ${dataFont}`
+  ctx.letterSpacing = '30px'
+  ctx.fillText('DE   CAPACITACIÓN', CX + 15, p(0.265))
+  ctx.letterSpacing = '0px'
+  const tw = ctx.measureText('DE   CAPACITACIÓN').width + 50
+  drawLine(ctx, CX - tw / 2 - 180, CX - tw / 2 - 15, p(0.265) - 14, C.gold, 3)
+  drawLine(ctx, CX + tw / 2 + 15, CX + tw / 2 + 180, p(0.265) - 14, C.gold, 3)
 
-  // ─── Horizontal lines ───
-  ctx.strokeStyle = '#5B8C3E'
-  ctx.lineWidth = 2
+  // ── Otorgado a: 28% ──
+  ctx.fillStyle = C.textMid
+  ctx.font = `italic 62px ${elegantFont}`
+  ctx.fillText('Otorgado a:', CX, p(0.30))
+
+  // ── NAME 32%-40% ──
+  ctx.fillStyle = C.green
+  ctx.font = `700 200px ${dataFont}`
+  const nameLines = wrapText(ctx, data.employeeName.toUpperCase(), W - 700)
+  let nameY = p(0.37)
+  for (const line of nameLines) {
+    ctx.fillText(line, CX, nameY)
+    nameY += 210
+  }
+
+  // Laurel branches
+  drawLaurel(ctx, 380, p(0.30), usableH * 0.14, true)
+  drawLaurel(ctx, W - 380, p(0.30), usableH * 0.14, false)
+
+  // Diamond + cédula
+  const cedulaY = nameY + 75
+  drawDiamond(ctx, CX, nameY + 15, 14, C.gold)
+  ctx.fillStyle = C.textMid
+  ctx.font = `400 48px ${dataFont}`
+  ctx.fillText(`Cédula de Ciudadanía N° ${data.employeeCedula}`, CX, cedulaY)
+
+  // ── Ha participado (relative to cédula) ──
+  const haParticY = cedulaY + 100
+  ctx.fillStyle = C.textMid
+  ctx.font = `italic 48px ${elegantFont}`
+  ctx.fillText('Ha participado y aprobado satisfactoriamente la capacitación en:', CX, haParticY)
+
+  // ── COURSE BAR ──
+  const barH = 120
+  const barW = W - 280
+  const barX = CX - barW / 2
+  const barY = haParticY + 40
+
+  const barGrd = ctx.createLinearGradient(barX, barY, barX + barW, barY)
+  barGrd.addColorStop(0, C.green)
+  barGrd.addColorStop(0.5, C.greenMid)
+  barGrd.addColorStop(1, C.greenDark)
+  roundRect(ctx, barX, barY, barW, barH, 60)
+  ctx.fillStyle = barGrd
+  ctx.fill()
+
+  // Helmet icon left
+  const hlmX = barX + 80
+  const hlmY = barY + barH / 2
   ctx.beginPath()
-  ctx.moveTo(W / 2 - 200, 345)
-  ctx.lineTo(W / 2 + 200, 345)
+  ctx.arc(hlmX, hlmY, 38, 0, Math.PI * 2)
+  ctx.fillStyle = 'rgba(255,255,255,0.2)'
+  ctx.fill()
+  ctx.fillStyle = C.white
+  ctx.beginPath()
+  ctx.ellipse(hlmX, hlmY - 4, 18, 15, 0, Math.PI, 0)
+  ctx.fill()
+  ctx.fillRect(hlmX - 20, hlmY + 6, 40, 5)
+
+  // Shield icon right
+  const shdX = barX + barW - 80
+  ctx.beginPath()
+  ctx.arc(shdX, hlmY, 38, 0, Math.PI * 2)
+  ctx.fillStyle = 'rgba(255,255,255,0.2)'
+  ctx.fill()
+  ctx.fillStyle = C.white
+  ctx.beginPath()
+  ctx.moveTo(shdX, hlmY - 18)
+  ctx.lineTo(shdX + 16, hlmY - 9)
+  ctx.lineTo(shdX + 14, hlmY + 12)
+  ctx.quadraticCurveTo(shdX, hlmY + 22, shdX, hlmY + 22)
+  ctx.quadraticCurveTo(shdX, hlmY + 22, shdX - 14, hlmY + 12)
+  ctx.lineTo(shdX - 16, hlmY - 9)
+  ctx.closePath()
+  ctx.fill()
+  ctx.strokeStyle = C.green
+  ctx.lineWidth = 3
+  ctx.lineCap = 'round'
+  ctx.lineJoin = 'round'
+  ctx.beginPath()
+  ctx.moveTo(shdX - 6, hlmY)
+  ctx.lineTo(shdX - 1, hlmY + 6)
+  ctx.lineTo(shdX + 8, hlmY - 5)
   ctx.stroke()
 
-  // ─── "Se certifica que:" ───
-  ctx.fillStyle = '#666666'
-  ctx.font = 'italic 22px Georgia, "Times New Roman", serif'
-  ctx.fillText('Se certifica que:', W / 2, 390)
-
-  // ─── EMPLOYEE NAME ───
-  ctx.fillStyle = '#1a1a1a'
-  ctx.font = 'bold 48px Georgia, "Times New Roman", serif'
-  ctx.fillText(data.employeeName, W / 2, 450)
-
-  // ─── Cédula ───
-  ctx.fillStyle = '#555555'
-  ctx.font = '20px Arial, sans-serif'
-  ctx.fillText(`Con cédula de ciudadanía N° ${data.employeeCedula}`, W / 2, 490)
-
-  // ─── "Participó y aprobó..." ───
-  ctx.fillStyle = '#555555'
-  ctx.font = '20px Arial, sans-serif'
-  ctx.fillText('Participó y aprobó satisfactoriamente la capacitación:', W / 2, 540)
-
-  // ─── COURSE NAME ───
-  ctx.fillStyle = '#1a1a1a'
-  ctx.font = 'bold 36px Georgia, "Times New Roman", serif'
-  const maxCourseW = W - 300
-  const courseLines = wrapText(ctx, data.course.toUpperCase(), maxCourseW)
-  let courseY = 590
-  for (const line of courseLines) {
-    ctx.fillText(line, W / 2, courseY)
-    courseY += 42
+  // Course text
+  ctx.fillStyle = C.white
+  ctx.font = `700 70px ${dataFont}`
+  ctx.textAlign = 'center'
+  const cLines = wrapText(ctx, data.course.toUpperCase(), barW - 340)
+  if (cLines.length === 1) {
+    ctx.fillText(cLines[0], CX, barY + barH / 2 + 26)
+  } else {
+    let cl = barY + 42
+    for (const l of cLines) { ctx.fillText(l, CX, cl); cl += 68 }
   }
 
-  // ─── Date and duration ───
-  ctx.fillStyle = '#555555'
-  ctx.font = 'italic 20px Georgia, "Times New Roman", serif'
-  ctx.fillText(`Realizada el ${data.date},`, W / 2, courseY + 20)
-  ctx.fillText(`con una duración de ${data.duration}.`, W / 2, courseY + 48)
+  // ── INFO CARDS ──
+  const infoY = barY + barH + 50
+  const cardW = (W - 600) / 2
+  const cardH = 120
+  const cardGap = 60
+  const totalCardsW = cardW * 2 + cardGap
+  const cardStartX = CX - totalCardsW / 2
 
-  // ─── GOLD SEAL / BADGE (right side) ───
-  const sealX = W - 250
-  const sealY = 450
-  drawSeal(ctx, sealX, sealY, 110)
-
-  // ─── Info boxes (right side) ───
-  const boxX = W - 350
-  const boxW = 220
-  const boxes = [
-    { label: 'Fecha:', value: data.date },
-    { label: 'Calificación:', value: data.score },
-    { label: 'Código de verificación:', value: data.code },
+  const infoItems = [
+    { icon: 'calendar', label: 'Fecha:', value: data.date },
+    { icon: 'clock', label: 'Intensidad:', value: data.duration },
   ]
-  let boxY = sealY + 140
-  for (const box of boxes) {
-    ctx.fillStyle = '#F0EDE8'
-    roundRect(ctx, boxX, boxY, boxW, 55, 8)
-    ctx.fill()
-    ctx.fillStyle = '#888888'
-    ctx.font = '12px Arial, sans-serif'
-    ctx.textAlign = 'left'
-    ctx.fillText(box.label, boxX + 15, boxY + 22)
-    ctx.fillStyle = '#1a1a1a'
-    ctx.font = 'bold 14px Arial, sans-serif'
-    ctx.fillText(box.value, boxX + 15, boxY + 42)
-    ctx.textAlign = 'center'
-    boxY += 65
-  }
 
-  // ─── INSTRUCTOR SIGNATURE ───
-  const sigY = courseY + 100
+  for (let i = 0; i < 2; i++) {
+    const bx = cardStartX + i * (cardW + cardGap)
+    const by = infoY
+
+    roundRect(ctx, bx, by, cardW, cardH, 16)
+    ctx.fillStyle = '#F5F3ED'
+    ctx.fill()
+    ctx.strokeStyle = '#D4CDB8'
+    ctx.lineWidth = 2
+    ctx.stroke()
+
+    const iconX = bx + 64
+    const iconY = by + cardH / 2
+    ctx.beginPath()
+    ctx.arc(iconX, iconY, 34, 0, Math.PI * 2)
+    ctx.fillStyle = C.green
+    ctx.fill()
+
+    ctx.strokeStyle = C.white
+    ctx.fillStyle = C.white
+    ctx.lineWidth = 3
+    ctx.lineCap = 'round'
+    if (infoItems[i].icon === 'calendar') {
+      ctx.strokeRect(iconX - 13, iconY - 11, 26, 24)
+      ctx.beginPath()
+      ctx.moveTo(iconX - 13, iconY - 1)
+      ctx.lineTo(iconX + 13, iconY - 1)
+      ctx.stroke()
+      ctx.beginPath()
+      ctx.moveTo(iconX - 6, iconY - 15)
+      ctx.lineTo(iconX - 6, iconY - 8)
+      ctx.moveTo(iconX + 6, iconY - 15)
+      ctx.lineTo(iconX + 6, iconY - 8)
+      ctx.stroke()
+    } else if (infoItems[i].icon === 'clock') {
+      ctx.beginPath()
+      ctx.arc(iconX, iconY, 15, 0, Math.PI * 2)
+      ctx.stroke()
+      ctx.beginPath()
+      ctx.moveTo(iconX, iconY - 8)
+      ctx.lineTo(iconX, iconY)
+      ctx.lineTo(iconX + 7, iconY + 5)
+      ctx.stroke()
+    } else {
+      ctx.lineWidth = 4
+      ctx.beginPath()
+      ctx.moveTo(iconX - 10, iconY)
+      ctx.lineTo(iconX - 3, iconY + 9)
+      ctx.lineTo(iconX + 10, iconY - 9)
+      ctx.stroke()
+    }
+
+    ctx.textAlign = 'left'
+    ctx.fillStyle = C.textLight
+    ctx.font = `500 30px ${dataFont}`
+    ctx.fillText(infoItems[i].label, bx + 112, by + 44)
+    ctx.fillStyle = C.text
+    ctx.font = `700 42px ${dataFont}`
+    ctx.fillText(infoItems[i].value, bx + 112, by + 88)
+  }
+  ctx.textAlign = 'center'
+
+  // ── Code + Normative ──
+  const codeY = infoY + cardH + 50
+  ctx.fillStyle = C.text
+  ctx.font = `700 38px ${dataFont}`
+  ctx.fillText(`Código de autenticidad: ${data.code}`, CX, codeY)
+  ctx.fillStyle = C.textLight
+  ctx.font = `italic 32px ${elegantFont}`
+  ctx.fillText('Conforme al Decreto 1072 de 2015 y la Resolución 0312 de 2019 — Ministerio del Trabajo de Colombia', CX, codeY + 45)
+
+  // ── SIGNATURES ──
+  const sigLineW = 680
+  const empX = 200 + sigLineW / 2
+  const instrX = W - 200 - sigLineW / 2
+  const sigImgH = 170
+  const sigImgTop = codeY + 80
+
+  if (data.employeeSignature) {
+    try {
+      const sig = await loadImage(data.employeeSignature)
+      const sw = sigImgH * (sig.width / sig.height)
+      ctx.drawImage(sig, empX - sw / 2, sigImgTop, sw, sigImgH)
+    } catch (_) {}
+  }
   if (data.instructorSignatureUrl) {
     try {
       const sig = await loadImage(data.instructorSignatureUrl)
-      const sigH = 80
-      const sigW = sigH * (sig.width / sig.height)
-      ctx.drawImage(sig, W / 2 - sigW / 2, sigY - 40, sigW, sigH)
+      const sw = sigImgH * (sig.width / sig.height)
+      ctx.drawImage(sig, instrX - sw / 2, sigImgTop, sw, sigImgH)
     } catch (_) {}
   }
 
-  // Signature line
-  ctx.strokeStyle = '#AAAAAA'
-  ctx.lineWidth = 1
-  ctx.beginPath()
-  ctx.moveTo(W / 2 - 180, sigY + 50)
-  ctx.lineTo(W / 2 + 180, sigY + 50)
-  ctx.stroke()
-
-  ctx.fillStyle = '#1a1a1a'
-  ctx.font = 'bold 16px Arial, sans-serif'
-  ctx.fillText('JIMMY JOANNY ACERO CHAPETÓN', W / 2, sigY + 75)
-
-  ctx.fillStyle = '#555555'
-  ctx.font = '13px Arial, sans-serif'
-  ctx.fillText('Cédula: 1052392965', W / 2, sigY + 95)
-  ctx.fillText('Profesional en Seguridad y Salud en el Trabajo', W / 2, sigY + 113)
-  ctx.fillText('Instructor – Responsable de la Capacitación', W / 2, sigY + 131)
-
-  // ─── EMPLOYEE SIGNATURE (left side) ───
-  if (data.employeeSignature) {
-    try {
-      const empSig = await loadImage(data.employeeSignature)
-      const empSigH = 70
-      const empSigW = empSigH * (empSig.width / empSig.height)
-      ctx.drawImage(empSig, 200 - empSigW / 2, sigY - 30, empSigW, empSigH)
-    } catch (_) {}
+  const sigLineY = sigImgTop + sigImgH + 5
+  ctx.strokeStyle = C.textMid
+  ctx.lineWidth = 2.5
+  for (const sx of [empX, instrX]) {
+    ctx.beginPath()
+    ctx.moveTo(sx - sigLineW / 2, sigLineY)
+    ctx.lineTo(sx + sigLineW / 2, sigLineY)
+    ctx.stroke()
   }
 
-  ctx.strokeStyle = '#AAAAAA'
-  ctx.lineWidth = 1
-  ctx.beginPath()
-  ctx.moveTo(80, sigY + 50)
-  ctx.lineTo(320, sigY + 50)
-  ctx.stroke()
+  ctx.textAlign = 'center'
+  ctx.fillStyle = C.text
+  ctx.font = `700 36px ${dataFont}`
+  ctx.fillText('FIRMA DEL PARTICIPANTE', empX, sigLineY + 46)
+  ctx.fillStyle = C.textMid
+  ctx.font = `400 32px ${dataFont}`
+  ctx.fillText(data.employeeName, empX, sigLineY + 84)
+  ctx.fillText(`C.C. ${data.employeeCedula}`, empX, sigLineY + 118)
 
-  ctx.fillStyle = '#1a1a1a'
-  ctx.font = 'bold 14px Arial, sans-serif'
-  ctx.fillText('FIRMA DEL PARTICIPANTE', 200, sigY + 75)
+  ctx.fillStyle = C.text
+  ctx.font = `700 36px ${dataFont}`
+  ctx.fillText('JIMMY JOANNY ACERO CHAPETÓN', instrX, sigLineY + 46)
+  ctx.fillStyle = C.textMid
+  ctx.font = `400 32px ${dataFont}`
+  ctx.fillText('C.C. 1.052.392.965', instrX, sigLineY + 84)
+  ctx.fillText('Profesional en Seguridad y Salud en el Trabajo', instrX, sigLineY + 118)
+  ctx.fillStyle = C.green
+  ctx.font = `700 30px ${dataFont}`
+  ctx.fillText('Instructor — Responsable de la Capacitación', instrX, sigLineY + 156)
 
-  ctx.fillStyle = '#555555'
-  ctx.font = '13px Arial, sans-serif'
-  ctx.fillText(data.employeeName, 200, sigY + 95)
-  ctx.fillText(`C.C. ${data.employeeCedula}`, 200, sigY + 113)
+  // ── SEAL centered ──
+  drawPremiumSeal(ctx, CX, sigLineY - 10, dataFont)
 
-  // ─── FOOTER ───
-  // Shield icon + text
-  ctx.fillStyle = '#5B8C3E'
-  ctx.font = '13px Arial, sans-serif'
-  const footY = H - 60
-  ctx.fillText('Capacitar hoy, prevenir siempre.', 180, footY)
-
-  ctx.fillStyle = '#888888'
-  ctx.font = '11px Arial, sans-serif'
-  ctx.fillText('Conforme al Decreto 1072 de 2015 y la Resolución 0312 de 2019 – Ministerio de Trabajo de Colombia', W / 2, H - 35)
+  // ── QR ──
+  const qrSize = 260
+  const qrY = sigLineY + 180
+  drawQR(ctx, CX - qrSize / 2, qrY, qrSize, data.code)
+  ctx.fillStyle = C.textLight
+  ctx.font = `400 34px ${dataFont}`
+  ctx.textAlign = 'center'
+  ctx.fillText('Escanee para verificar autenticidad', CX, qrY + qrSize + 45)
 
   return canvas.toDataURL('image/png', 1.0)
 }
 
-function drawTextLogo(ctx: CanvasRenderingContext2D, x: number, y: number) {
-  ctx.font = 'bold 40px Arial, sans-serif'
-  ctx.fillStyle = '#5B8C3E'
-  ctx.fillText('AGRO', x - 80, y)
-  ctx.fillStyle = '#C8922A'
-  ctx.fillText('VENTURE', x + 60, y)
-
-  ctx.fillStyle = '#FFFFFF'
-  roundRect(ctx, x - 55, y + 10, 110, 28, 4)
-  ctx.fillStyle = '#5B8C3E'
-  ctx.fill()
-  ctx.fillStyle = '#FFFFFF'
-  ctx.font = 'bold 14px Arial, sans-serif'
-  ctx.fillText('C A P I T A L', x, y + 30)
-}
-
-function drawSeal(ctx: CanvasRenderingContext2D, x: number, y: number, r: number) {
-  // Outer gold ring with teeth
-  const teeth = 24
-  ctx.beginPath()
-  for (let i = 0; i < teeth * 2; i++) {
-    const angle = (i * Math.PI) / teeth
-    const radius = i % 2 === 0 ? r + 12 : r - 2
-    const px = x + Math.cos(angle) * radius
-    const py = y + Math.sin(angle) * radius
-    if (i === 0) ctx.moveTo(px, py)
-    else ctx.lineTo(px, py)
-  }
-  ctx.closePath()
-  const goldGrad = ctx.createRadialGradient(x, y, r - 20, x, y, r + 15)
-  goldGrad.addColorStop(0, '#D4A843')
-  goldGrad.addColorStop(0.5, '#C8922A')
-  goldGrad.addColorStop(1, '#A07520')
-  ctx.fillStyle = goldGrad
-  ctx.fill()
-
-  // Inner green circle
-  ctx.beginPath()
-  ctx.arc(x, y, r - 18, 0, Math.PI * 2)
-  ctx.fillStyle = '#4A7A2E'
-  ctx.fill()
-
-  // Inner dark green circle
-  ctx.beginPath()
-  ctx.arc(x, y, r - 30, 0, Math.PI * 2)
-  ctx.fillStyle = '#3D6B25'
-  ctx.fill()
-
-  // Shield icon (simplified)
-  ctx.fillStyle = '#FFFFFF'
-  ctx.font = '36px Arial'
-  ctx.textAlign = 'center'
-  ctx.fillText('🛡️', x, y - 10)
-
-  // Star
-  ctx.fillStyle = '#D4A843'
-  ctx.font = '24px Arial'
-  ctx.fillText('★', x, y + 25)
-
-  // Text around seal
-  ctx.fillStyle = '#FFFFFF'
-  ctx.font = 'bold 9px Arial, sans-serif'
-  const sealText = 'COMPROMETIDOS CON LA SEGURIDAD, LA PREVENCIÓN Y EL BIENESTAR'
-  const arcRadius = r - 6
+// ═══ LAUREL BRANCHES ═══
+function drawLaurel(ctx: CanvasRenderingContext2D, x: number, y: number, h: number, left: boolean) {
   ctx.save()
-  ctx.translate(x, y)
-  const startAngle = -Math.PI * 0.75
-  const arcLen = Math.PI * 1.5
-  for (let i = 0; i < sealText.length; i++) {
-    const angle = startAngle + (i / sealText.length) * arcLen
+  ctx.globalAlpha = 0.35
+  const dir = left ? 1 : -1
+  const leaves = Math.max(6, Math.floor(h / 35))
+  for (let i = 0; i < leaves; i++) {
+    const ly = y + (h / leaves) * (i + 0.5)
+    const spread = 0.35 + (i / leaves) * 0.15
     ctx.save()
-    ctx.rotate(angle)
-    ctx.translate(0, -arcRadius)
-    ctx.rotate(Math.PI / 2)
-    ctx.fillText(sealText[i], 0, 0)
+    ctx.translate(x, ly)
+    ctx.rotate(dir * spread)
+    ctx.fillStyle = C.gold
+    ctx.beginPath()
+    ctx.ellipse(dir * 28, 0, 24, 8, 0, 0, Math.PI * 2)
+    ctx.fill()
     ctx.restore()
   }
+  ctx.strokeStyle = C.gold
+  ctx.lineWidth = 2
+  ctx.beginPath()
+  ctx.moveTo(x, y + 10)
+  ctx.lineTo(x, y + h - 10)
+  ctx.stroke()
+  ctx.restore()
+}
+
+// ═══ PREMIUM SEAL ═══
+function drawPremiumSeal(ctx: CanvasRenderingContext2D, x: number, y: number, sans: string) {
+  const r = 140
+  ctx.save()
+  ctx.shadowColor = 'rgba(0,0,0,0.25)'
+  ctx.shadowBlur = 25
+  ctx.shadowOffsetY = 6
+
+  // Outer gold ring
+  ctx.beginPath()
+  ctx.arc(x, y, r, 0, Math.PI * 2)
+  ctx.fillStyle = C.gold
+  ctx.fill()
   ctx.restore()
 
-  // Laurel wreath (simplified with leaf shapes)
-  ctx.strokeStyle = '#5B8C3E'
+  // Inner green body
+  ctx.beginPath()
+  ctx.arc(x, y, r - 9, 0, Math.PI * 2)
+  ctx.fillStyle = C.green
+  ctx.fill()
+
+  // Inner gold ring
+  ctx.beginPath()
+  ctx.arc(x, y, r - 20, 0, Math.PI * 2)
+  ctx.strokeStyle = C.gold
+  ctx.lineWidth = 1.5
+  ctx.stroke()
+
+  // Decorative zigzag border top and bottom
+  ctx.strokeStyle = C.gold
   ctx.lineWidth = 2
-  for (let side = -1; side <= 1; side += 2) {
-    for (let j = 0; j < 6; j++) {
-      const a = (side === -1 ? Math.PI * 0.6 : Math.PI * 0.4) - side * j * 0.18
-      const lx = x + Math.cos(a) * (r + 20) * 0.85
-      const ly = y + Math.sin(a) * (r + 20) * 0.85
-      ctx.beginPath()
-      ctx.ellipse(lx, ly, 8, 4, a + Math.PI / 2, 0, Math.PI * 2)
-      ctx.fillStyle = '#5B8C3E'
-      ctx.fill()
+  for (const side of [-1, 1]) {
+    ctx.beginPath()
+    const zy = y + side * 55
+    for (let i = -6; i <= 6; i++) {
+      const zx = x + i * 12
+      const zyy = zy + (i % 2 === 0 ? -4 : 4) * side
+      if (i === -6) ctx.moveTo(zx, zyy)
+      else ctx.lineTo(zx, zyy)
     }
+    ctx.stroke()
   }
 
-  // Green ribbon
-  ctx.fillStyle = '#5B8C3E'
-  ctx.beginPath()
-  ctx.moveTo(x - 25, y + r + 5)
-  ctx.lineTo(x - 35, y + r + 40)
-  ctx.lineTo(x - 15, y + r + 30)
-  ctx.closePath()
-  ctx.fill()
+  // "REPUBLICA DE" text
+  ctx.textAlign = 'center'
+  ctx.fillStyle = C.gold
+  ctx.font = `700 22px ${sans}`
+  ctx.letterSpacing = '6px'
+  ctx.fillText('REPÚBLICA DE', x + 3, y - 68)
+  ctx.letterSpacing = '0px'
 
+  // "COLOMBIA" text
+  ctx.fillStyle = C.white
+  ctx.font = `700 42px ${sans}`
+  ctx.letterSpacing = '4px'
+  ctx.fillText('COLOMBIA', x + 2, y - 32)
+  ctx.letterSpacing = '0px'
+
+  // Divider line top
+  ctx.strokeStyle = C.gold
+  ctx.lineWidth = 1.5
   ctx.beginPath()
-  ctx.moveTo(x + 25, y + r + 5)
-  ctx.lineTo(x + 35, y + r + 40)
-  ctx.lineTo(x + 15, y + r + 30)
+  ctx.moveTo(x - 80, y - 20)
+  ctx.lineTo(x + 80, y - 20)
+  ctx.stroke()
+
+  // "SG-SST" large
+  ctx.fillStyle = C.white
+  ctx.font = `700 72px ${sans}`
+  ctx.fillText('SG-SST', x, y + 30)
+
+  // Divider line bottom
+  ctx.beginPath()
+  ctx.moveTo(x - 80, y + 42)
+  ctx.lineTo(x + 80, y + 42)
+  ctx.stroke()
+
+  // "SEGURIDAD Y SALUD"
+  ctx.fillStyle = C.gold
+  ctx.font = `600 20px ${sans}`
+  ctx.letterSpacing = '3px'
+  ctx.fillText('SEGURIDAD Y SALUD', x + 2, y + 70)
+  ctx.fillText('EN EL TRABAJO', x + 2, y + 95)
+  ctx.letterSpacing = '0px'
+}
+
+// ═══ UTILITIES ═══
+function drawDiamond(ctx: CanvasRenderingContext2D, x: number, y: number, s: number, color: string) {
+  ctx.fillStyle = color
+  ctx.beginPath()
+  ctx.moveTo(x, y - s)
+  ctx.lineTo(x + s, y)
+  ctx.lineTo(x, y + s)
+  ctx.lineTo(x - s, y)
   ctx.closePath()
   ctx.fill()
+}
+
+function drawLine(ctx: CanvasRenderingContext2D, x1: number, x2: number, y: number, color: string, w: number) {
+  ctx.strokeStyle = color
+  ctx.lineWidth = w
+  ctx.beginPath()
+  ctx.moveTo(x1, y)
+  ctx.lineTo(x2, y)
+  ctx.stroke()
+}
+
+function drawQR(ctx: CanvasRenderingContext2D, x: number, y: number, size: number, code: string) {
+  const mods = 25, cell = size / mods
+  let seed = 0
+  for (let i = 0; i < code.length; i++) seed = ((seed << 5) - seed + code.charCodeAt(i)) | 0
+  seed = Math.abs(seed)
+  for (let r = 0; r < mods; r++) {
+    for (let c = 0; c < mods; c++) {
+      const isEdge = (r < 7 && c < 7 && (r === 0 || r === 6 || c === 0 || c === 6)) || (r < 7 && c >= mods - 7 && (r === 0 || r === 6 || c === mods - 7 || c === mods - 1)) || (r >= mods - 7 && c < 7 && (r === mods - 7 || r === mods - 1 || c === 0 || c === 6))
+      const isInner = (r >= 2 && r <= 4 && c >= 2 && c <= 4) || (r >= 2 && r <= 4 && c >= mods - 5 && c <= mods - 3) || (r >= mods - 5 && r <= mods - 3 && c >= 2 && c <= 4)
+      const isCorner = (r < 7 && c < 7) || (r < 7 && c >= mods - 7) || (r >= mods - 7 && c < 7)
+      let fill = false
+      if (isEdge || isInner) fill = true
+      else if (isCorner) fill = false
+      else { seed = (seed * 1103515245 + 12345) & 0x7fffffff; fill = seed % 3 !== 0 }
+      if (fill) { ctx.fillStyle = C.greenDark; ctx.fillRect(x + c * cell, y + r * cell, cell - 0.5, cell - 0.5) }
+    }
+  }
+}
+
+function drawFallbackLogo(ctx: CanvasRenderingContext2D, x: number, y: number, sans: string) {
+  ctx.textAlign = 'center'
+  ctx.font = `700 90px ${sans}`
+  ctx.fillStyle = C.green
+  const a = 'AGRO', v = 'VENTURE'
+  const wa = ctx.measureText(a).width, wv = ctx.measureText(v).width
+  const t = wa + 14 + wv
+  ctx.fillText(a, x - t / 2 + wa / 2, y)
+  ctx.fillStyle = C.gold
+  ctx.fillText(v, x - t / 2 + wa + 14 + wv / 2, y)
+  roundRect(ctx, x - 130, y + 16, 260, 48, 8)
+  ctx.fillStyle = C.green
+  ctx.fill()
+  ctx.fillStyle = C.white
+  ctx.font = `700 26px ${sans}`
+  ctx.letterSpacing = '10px'
+  ctx.fillText('CAPITAL', x + 5, y + 48)
+  ctx.letterSpacing = '0px'
+}
+
+async function loadFonts() {
+  try {
+    const urls: [string, string, FontFaceDescriptors][] = [
+      ['Cinzel', 'https://fonts.gstatic.com/s/cinzel/v23/8vIU7ww63mVu7gtR-kwKxNvkNOjw-tbnTYrvDE5ZdqU.woff2', { weight: '700' }],
+      ['Cinzel', 'https://fonts.gstatic.com/s/cinzel/v23/8vIU7ww63mVu7gtR-kwKxNvkNOjw-j7nTYrvDE5ZdqU.woff2', {}],
+      ['Cormorant Garamond', 'https://fonts.gstatic.com/s/cormorantgaramond/v16/co3YmX5slCNuHLi8bLeY9MK7whWMhyjornFLsS6V7w.woff2', {}],
+      ['Cormorant Garamond', 'https://fonts.gstatic.com/s/cormorantgaramond/v16/co3WmX5slCNuHLi8bLeY9MK7whWMhyjYrEPjuw-NxBKL_y94.woff2', { style: 'italic' }],
+      ['Playfair Display', 'https://fonts.gstatic.com/s/playfairdisplay/v37/nuFvD-vYSZviVYUb_rj3ij__anPXJzDwcbmjWBN2PKd1unDXbtM.woff2', { weight: '700' }],
+      ['Playfair Display', 'https://fonts.gstatic.com/s/playfairdisplay/v37/nuFRD-vYSZviVYUb_rj3ij__anPXDTnCjmHKM4nYO7KN_qiTbtbK-F2rA0s.woff2', { style: 'italic' }],
+      ['Montserrat', 'https://fonts.gstatic.com/s/montserrat/v29/JTUHjIg1_i6t8kCHKm4532VJOt5-QNFgpCtr6Hw5aXo.woff2', {}],
+      ['Montserrat', 'https://fonts.gstatic.com/s/montserrat/v29/JTUHjIg1_i6t8kCHKm4532VJOt5-QNFgpCuM73w5aXo.woff2', { weight: '700' }],
+      ['Montserrat', 'https://fonts.gstatic.com/s/montserrat/v29/JTUHjIg1_i6t8kCHKm4532VJOt5-QNFgpCu170w5aXo.woff2', { weight: '600' }],
+    ]
+    const results = await Promise.allSettled(urls.map(([name, url, desc]) =>
+      new FontFace(name, `url(${url})`, desc).load()
+    ))
+    results.forEach(r => { if (r.status === 'fulfilled') document.fonts.add(r.value) })
+  } catch (_) {}
 }
 
 function loadImage(src: string): Promise<HTMLImageElement> {
@@ -411,12 +691,8 @@ function wrapText(ctx: CanvasRenderingContext2D, text: string, maxWidth: number)
   let current = ''
   for (const word of words) {
     const test = current ? `${current} ${word}` : word
-    if (ctx.measureText(test).width > maxWidth && current) {
-      lines.push(current)
-      current = word
-    } else {
-      current = test
-    }
+    if (ctx.measureText(test).width > maxWidth && current) { lines.push(current); current = word }
+    else current = test
   }
   if (current) lines.push(current)
   return lines

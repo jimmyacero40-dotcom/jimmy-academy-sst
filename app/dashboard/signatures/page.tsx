@@ -8,21 +8,9 @@ import {
   User, Shield, Send
 } from 'lucide-react'
 
-const DOCS = [
-  { id: 1, title: 'Política de Seguridad y Salud en el Trabajo 2026', type: 'Política SST', signed: 48, total: 48, created: '2026-01-05', status: 'completado' },
-  { id: 2, title: 'Reglamento de Higiene y Seguridad Industrial', type: 'Reglamento', signed: 35, total: 48, created: '2026-01-08', status: 'pendiente' },
-  { id: 3, title: 'Compromiso EPP – Área de Producción', type: 'Compromiso', signed: 18, total: 24, created: '2026-01-10', status: 'pendiente' },
-  { id: 4, title: 'Acta COPASST Reunión Enero 2026', type: 'Acta', signed: 8, total: 8, created: '2026-01-12', status: 'completado' },
-  { id: 5, title: 'Plan de Emergencias y Evacuación', type: 'Plan', signed: 12, total: 56, created: '2026-01-14', status: 'pendiente' },
-  { id: 6, title: 'Inducción SST – Nuevos Empleados Q1 2026', type: 'Inducción', signed: 5, total: 5, created: '2026-01-15', status: 'completado' },
-]
+const DOCS: { id: number; title: string; type: string; signed: number; total: number; created: string; status: string }[] = []
 
-const PENDING_SIGNATURES = [
-  { id: 1, name: 'Pedro Gómez', area: 'Mantenimiento', doc: 'Reglamento de Higiene y Seguridad Industrial', due: '2026-01-20', days: 5 },
-  { id: 2, name: 'Andrés Castro', area: 'Logística', doc: 'Política SST 2026', due: '2026-01-18', days: 3 },
-  { id: 3, name: 'Camila Vargas', area: 'Producción', doc: 'Compromiso EPP – Área de Producción', due: '2026-01-22', days: 7 },
-  { id: 4, name: 'Luis Mora', area: 'Producción', doc: 'Plan de Emergencias y Evacuación', due: '2026-01-19', days: 4 },
-]
+const PENDING_SIGNATURES: { id: number; name: string; area: string; doc: string; due: string; days: number }[] = []
 
 const statusConfig = {
   completado: { label: 'Completado', color: 'text-emerald-400', bg: 'bg-emerald-400/10 border-emerald-400/20', icon: CheckCircle },

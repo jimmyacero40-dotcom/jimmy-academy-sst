@@ -1,22 +1,15 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { motion } from 'framer-motion'
+import Link from 'next/link'
 import {
   Award, Search, Plus, Download, CheckCircle, Clock,
-  AlertCircle, Calendar, User, X, QrCode, Shield
+  AlertCircle, Calendar, User, X, QrCode, Shield, Loader2
 } from 'lucide-react'
+import { generateCertificatePNG } from '@/lib/generate-certificate'
 
-const CERTS = [
-  { id: 'CERT-2026-001', name: 'Carlos Mendoza', course: 'Trabajo en Alturas Nivel 1', issued: '2026-01-10', expires: '2027-01-10', status: 'vigente', code: 'ALTURA-CM-001' },
-  { id: 'CERT-2026-002', name: 'María López', course: 'COPASST – Funciones', issued: '2026-01-08', expires: '2028-01-08', status: 'vigente', code: 'CPASS-ML-002' },
-  { id: 'CERT-2026-003', name: 'Diana Ruiz', course: 'Primeros Auxilios Básicos', issued: '2025-01-05', expires: '2026-01-05', status: 'vencido', code: 'PAUX-DR-003' },
-  { id: 'CERT-2026-004', name: 'Felipe Torres', course: 'Inspección de Seguridad', issued: '2026-01-12', expires: '2027-01-12', status: 'vigente', code: 'INSP-FT-004' },
-  { id: 'CERT-2026-005', name: 'Laura Herrera', course: 'Manejo de Extintores', issued: '2025-06-15', expires: '2026-06-15', status: 'por-vencer', code: 'EXT-LH-005' },
-  { id: 'CERT-2026-006', name: 'Andrés Castro', course: 'EPP y Equipos de Protección', issued: '2025-03-20', expires: '2026-03-20', status: 'por-vencer', code: 'EPP-AC-006' },
-  { id: 'CERT-2026-007', name: 'Pedro Gómez', course: 'Trabajo en Alturas Nivel 2', issued: '2024-12-01', expires: '2025-12-01', status: 'vencido', code: 'ALTURA2-PG-007' },
-  { id: 'CERT-2026-008', name: 'Camila Vargas', course: 'Riesgo Eléctrico', issued: '2026-01-14', expires: '2027-01-14', status: 'vigente', code: 'ELEC-CV-008' },
-]
+type Cert = { id: string; name: string; cedula?: string; course: string; issued: string; expires: string; status: string; code: string; duration?: string; score?: string }
 
 const statusConfig = {
   vigente: { label: 'Vigente', color: 'text-emerald-400', bg: 'bg-emerald-400/10 border-emerald-400/20', icon: CheckCircle },
@@ -24,12 +17,70 @@ const statusConfig = {
   'por-vencer': { label: 'Por vencer', color: 'text-orange-400', bg: 'bg-orange-400/10 border-orange-400/20', icon: Clock },
 }
 
+function computeStatus(cert: Cert): Cert {
+  const now = Date.now()
+  const exp = new Date(cert.expires).getTime()
+  const thirtyDays = 30 * 24 * 60 * 60 * 1000
+  if (exp < now) return { ...cert, status: 'vencido' }
+  if (exp - now < thirtyDays) return { ...cert, status: 'por-vencer' }
+  return { ...cert, status: 'vigente' }
+}
+
 export default function CertificatesPage() {
+  const [certs, setCerts] = useState<Cert[]>([])
   const [search, setSearch] = useState('')
   const [filter, setFilter] = useState('todos')
-  const [selected, setSelected] = useState<typeof CERTS[0] | null>(null)
+  const [selected, setSelected] = useState<Cert | null>(null)
+  const [downloading, setDownloading] = useState(false)
 
-  const filtered = CERTS.filter(c => {
+  const handleDownload = async (cert: Cert) => {
+    if (downloading) return
+    setDownloading(true)
+    try {
+      const img = await generateCertificatePNG({
+        employeeName: cert.name,
+        employeeCedula: cert.cedula || '',
+        course: cert.course,
+        date: new Date(cert.issued).toLocaleDateString('es-CO', { day: 'numeric', month: 'long', year: 'numeric' }),
+        duration: cert.duration || '8 horas',
+        score: cert.score || '100%',
+        code: cert.code,
+        logoUrl: '/images/LOGO.png',
+        instructorSignatureUrl: '/images/FIRMA FIRMA.png',
+      })
+      const link = document.createElement('a')
+      link.download = `Certificado_${cert.course.replace(/\s+/g, '_')}_${cert.code}.png`
+      link.href = img
+      link.click()
+    } catch (e) {
+      console.error('Error generating certificate:', e)
+    }
+    setDownloading(false)
+  }
+
+  useEffect(() => {
+    fetch('/api/certificates')
+      .then(r => r.json())
+      .then((data: any[]) => {
+        if (Array.isArray(data)) {
+          setCerts(data.map((c: any) => computeStatus({
+            id: c.id,
+            name: c.name,
+            cedula: c.cedula,
+            course: c.course,
+            issued: c.issued,
+            expires: c.expires,
+            status: 'vigente',
+            code: c.code,
+            duration: c.duration,
+            score: c.score,
+          })))
+        }
+      })
+      .catch(() => {})
+  }, [])
+
+  const filtered = certs.filter(c => {
     const matchSearch = c.name.toLowerCase().includes(search.toLowerCase()) ||
       c.course.toLowerCase().includes(search.toLowerCase()) ||
       c.id.toLowerCase().includes(search.toLowerCase())
@@ -44,21 +95,22 @@ export default function CertificatesPage() {
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div>
             <h1 className="text-2xl font-black text-[var(--text)] mb-1">Certificados</h1>
-            <p className="text-[var(--text-dim)] text-sm">{CERTS.length} certificados emitidos</p>
+            <p className="text-[var(--text-dim)] text-sm">{certs.length} certificados emitidos</p>
           </div>
-          <button className="flex items-center gap-2 bg-[var(--amber)] hover:bg-amber-500 text-[var(--text)] px-4 py-2.5 rounded-xl font-semibold text-sm transition-all self-start sm:self-auto">
+          <Link href="/dashboard/trainings"
+            className="flex items-center gap-2 bg-[var(--amber)] hover:bg-amber-500 text-[var(--text)] px-4 py-2.5 rounded-xl font-semibold text-sm transition-all self-start sm:self-auto">
             <Plus size={16} /> Emitir Certificado
-          </button>
+          </Link>
         </div>
       </motion.div>
 
       {/* Stats */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-6">
         {[
-          { label: 'Total emitidos', value: CERTS.length, color: 'text-amber-400' },
-          { label: 'Vigentes', value: CERTS.filter(c => c.status === 'vigente').length, color: 'text-emerald-400' },
-          { label: 'Por vencer', value: CERTS.filter(c => c.status === 'por-vencer').length, color: 'text-orange-400' },
-          { label: 'Vencidos', value: CERTS.filter(c => c.status === 'vencido').length, color: 'text-rose-400' },
+          { label: 'Total emitidos', value: certs.length, color: 'text-amber-400' },
+          { label: 'Vigentes', value: certs.filter(c => c.status === 'vigente').length, color: 'text-emerald-400' },
+          { label: 'Por vencer', value: certs.filter(c => c.status === 'por-vencer').length, color: 'text-orange-400' },
+          { label: 'Vencidos', value: certs.filter(c => c.status === 'vencido').length, color: 'text-rose-400' },
         ].map(({ label, value, color }, i) => (
           <motion.div key={label} initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.05 }}
             className="bg-[var(--bg-surface)] border border-[var(--border)] rounded-xl p-4">
@@ -224,8 +276,9 @@ export default function CertificatesPage() {
                   className="flex-1 py-2.5 rounded-xl border border-[var(--border)] text-[var(--text-dim)] hover:text-[var(--text)] text-sm font-semibold transition-all">
                   Cerrar
                 </button>
-                <button className="flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl bg-[var(--amber)] hover:bg-amber-500 text-[var(--text)] text-sm font-semibold transition-all">
-                  <Download size={14} /> Descargar
+                <button onClick={() => selected && handleDownload(selected)} disabled={downloading}
+                  className="flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl bg-[var(--amber)] hover:bg-amber-500 text-[var(--text)] text-sm font-semibold transition-all disabled:opacity-50">
+                  {downloading ? <><Loader2 size={14} className="animate-spin" /> Generando...</> : <><Download size={14} /> Descargar</>}
                 </button>
               </div>
             </div>

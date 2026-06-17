@@ -7,28 +7,48 @@ import Link from 'next/link'
 import {
   LayoutDashboard, Users, BookOpen, PenTool, Award,
   BarChart2, Brain, Bell, Settings, LogOut, Shield,
-  ChevronLeft, ChevronRight, FileCheck, Search, Menu, X
+  ChevronLeft, ChevronRight, FileCheck, Search, Menu, X,
+  Sun, Moon
 } from 'lucide-react'
 
-const navItems = [
-  { href: '/dashboard', icon: LayoutDashboard, label: 'Dashboard' },
-  { href: '/dashboard/users', icon: Users, label: 'Usuarios' },
-  { href: '/dashboard/trainings', icon: BookOpen, label: 'Capacitaciones' },
-  { href: '/dashboard/signatures', icon: PenTool, label: 'Firmas' },
-  { href: '/dashboard/certificates', icon: Award, label: 'Certificados' },
-  { href: '/dashboard/evaluations', icon: FileCheck, label: 'Evaluaciones' },
-  { href: '/dashboard/reports', icon: BarChart2, label: 'Reportes' },
-  { href: '/dashboard/audit', icon: Search, label: 'Auditoria' },
-  { href: '/dashboard/ai', icon: Brain, label: 'IA SST' },
-  { href: '/dashboard/notifications', icon: Bell, label: 'Notificaciones' },
-  { href: '/dashboard/settings', icon: Settings, label: 'Configuracion' },
+const allNavItems = [
+  { href: '/dashboard', icon: LayoutDashboard, label: 'Dashboard', adminOnly: false },
+  { href: '/dashboard/users', icon: Users, label: 'Usuarios', adminOnly: true },
+  { href: '/dashboard/trainings', icon: BookOpen, label: 'Capacitaciones', adminOnly: false },
+  { href: '/dashboard/my-signature', icon: PenTool, label: 'Mi Firma', adminOnly: false },
+  { href: '/dashboard/signatures', icon: PenTool, label: 'Firmas Docs', adminOnly: true },
+  { href: '/dashboard/certificates', icon: Award, label: 'Certificados', adminOnly: false },
+  { href: '/dashboard/evaluations', icon: FileCheck, label: 'Evaluaciones', adminOnly: false },
+  { href: '/dashboard/reports', icon: BarChart2, label: 'Reportes', adminOnly: true },
+  { href: '/dashboard/audit', icon: Search, label: 'Auditoria', adminOnly: true },
+  { href: '/dashboard/ai', icon: Brain, label: 'IA SST', adminOnly: true },
+  { href: '/dashboard/notifications', icon: Bell, label: 'Notificaciones', adminOnly: false },
+  { href: '/dashboard/settings', icon: Settings, label: 'Configuracion', adminOnly: true },
 ]
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname()
   const { data: session } = useSession()
+  const userRole = (session?.user as any)?.role || 'worker'
+  const isAdmin = userRole === 'admin'
   const [collapsed, setCollapsed] = useState(false)
   const [mobileOpen, setMobileOpen] = useState(false)
+  const [theme, setTheme] = useState<'dark' | 'light'>('dark')
+
+  useEffect(() => {
+    const saved = localStorage.getItem('sst-theme') as 'dark' | 'light' | null
+    if (saved) {
+      setTheme(saved)
+      document.documentElement.setAttribute('data-theme', saved)
+    }
+  }, [])
+
+  const toggleTheme = () => {
+    const next = theme === 'dark' ? 'light' : 'dark'
+    setTheme(next)
+    document.documentElement.setAttribute('data-theme', next)
+    localStorage.setItem('sst-theme', next)
+  }
 
   useEffect(() => {
     setMobileOpen(false)
@@ -75,7 +95,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
         {/* Nav items */}
         <nav className="flex-1 overflow-y-auto py-3 px-2.5">
-          {navItems.map(({ href, icon: Icon, label }) => {
+          {allNavItems.filter(item => isAdmin || !item.adminOnly).map(({ href, icon: Icon, label }) => {
             const active = isActive(href)
             return (
               <Link key={href} href={href}
@@ -132,7 +152,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
         {/* Header */}
         <header className="h-16 flex items-center justify-between px-5 backdrop-blur-xl flex-shrink-0"
-          style={{ background: 'rgba(17,9,0,0.8)', borderBottom: '1px solid var(--border)' }}>
+          style={{ background: 'var(--header-bg)', borderBottom: '1px solid var(--border)' }}>
           <div className="flex items-center gap-3">
             <button
               onClick={() => setMobileOpen(true)}
@@ -154,11 +174,18 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           </div>
 
           <div className="flex items-center gap-2">
-            <button className="relative w-9 h-9 rounded-lg flex items-center justify-center transition-all"
+            <button onClick={toggleTheme}
+              className="w-9 h-9 rounded-lg flex items-center justify-center transition-all"
+              style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', color: 'var(--text-dim)' }}
+              title={theme === 'dark' ? 'Modo claro' : 'Modo oscuro'}>
+              {theme === 'dark' ? <Sun size={17} strokeWidth={2} /> : <Moon size={17} strokeWidth={2} />}
+            </button>
+
+            <Link href="/dashboard/notifications" className="relative w-9 h-9 rounded-lg flex items-center justify-center transition-all"
               style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', color: 'var(--text-dim)' }}>
               <Bell size={17} strokeWidth={2} />
               <span className="absolute top-1.5 right-1.5 w-1.5 h-1.5 rounded-full" style={{ background: 'var(--red)' }} />
-            </button>
+            </Link>
 
             <div className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 rounded-lg"
               style={{ background: 'rgba(16,185,129,0.08)', border: '1px solid rgba(16,185,129,0.2)' }}>

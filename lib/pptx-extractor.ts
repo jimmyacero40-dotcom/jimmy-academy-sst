@@ -43,6 +43,28 @@ export async function getCourseData(courseId: number): Promise<{ images: string[
   })
 }
 
+export type CustomQuestion = { q: string; options: string[]; correct: number; explanation: string }
+
+export async function saveCustomQuestions(courseId: number, questions: CustomQuestion[]): Promise<void> {
+  const db = await openDB()
+  const tx = db.transaction(STORE_NAME, 'readwrite')
+  tx.objectStore(STORE_NAME).put(questions, `questions-${courseId}`)
+  return new Promise((resolve, reject) => {
+    tx.oncomplete = () => resolve()
+    tx.onerror = () => reject(tx.error)
+  })
+}
+
+export async function getCustomQuestions(courseId: number): Promise<CustomQuestion[]> {
+  const db = await openDB()
+  const tx = db.transaction(STORE_NAME, 'readonly')
+  const req = tx.objectStore(STORE_NAME).get(`questions-${courseId}`)
+  return new Promise((resolve, reject) => {
+    req.onsuccess = () => resolve(req.result || [])
+    req.onerror = () => reject(req.error)
+  })
+}
+
 export async function saveSlides(courseId: number, images: string[]): Promise<void> {
   const db = await openDB()
   const tx = db.transaction(STORE_NAME, 'readwrite')

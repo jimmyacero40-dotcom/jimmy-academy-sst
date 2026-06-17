@@ -37,10 +37,32 @@
   --glow-amber:   0 0 40px rgba(245,158,11,0.2);
   --glow-red:     0 0 40px rgba(239,68,68,0.15);
 
+  --header-bg:    rgba(17,9,0,0.8);
+
   --radius:       14px;
   --radius-sm:    8px;
   --radius-lg:    20px;
   --radius-xl:    28px;
+}
+
+[data-theme="light"] {
+  --bg:           #F5F1EB;
+  --bg-surface:   #FFFFFF;
+  --bg-card:      rgba(245,158,11,0.05);
+  --bg-card-hover:rgba(245,158,11,0.10);
+
+  --border:       rgba(0,0,0,0.08);
+  --border-strong:rgba(0,0,0,0.16);
+
+  --text:         #1A1207;
+  --text-dim:     rgba(26,18,7,0.6);
+  --text-faint:   rgba(26,18,7,0.35);
+
+  --header-bg:    rgba(255,255,255,0.85);
+
+  --grad-subtle:  linear-gradient(135deg, rgba(245,158,11,0.10), rgba(239,68,68,0.05));
+  --glow-amber:   0 0 40px rgba(245,158,11,0.12);
+  --glow-red:     0 0 40px rgba(239,68,68,0.08);
 }
 
 * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -171,7 +193,7 @@ body {
 .badge-blue   { background: rgba(59,130,246,0.12); border: 1px solid rgba(59,130,246,0.25); color: #93C5FD; font-size: 11px; font-weight: 600; padding: 3px 10px; border-radius: 100px; }
 
 /* ── PROGRESS BAR ── */
-.terra-progress-track { height: 6px; background: rgba(255,255,255,0.06); border-radius: 100px; overflow: hidden; }
+.terra-progress-track { height: 6px; background: var(--border); border-radius: 100px; overflow: hidden; }
 .terra-progress-fill  { height: 100%; border-radius: 100px; transition: width 1s ease; }
 
 /* ── GLOW EFFECTS ── */
@@ -222,6 +244,14 @@ body {
 .fade-in   { animation: fadeIn .5s ease both; }
 .animate-marquee { animation: marquee 24s linear infinite; }
 .animate-pulse-dot { animation: pulse-dot 2s infinite; }
+
+[data-theme="light"] .divide-white\/5 > :not([hidden]) ~ :not([hidden]) {
+  border-color: rgba(0,0,0,0.06);
+}
+[data-theme="light"] .bg-white\/5  { background: rgba(0,0,0,0.04) !important; }
+[data-theme="light"] .bg-white\/8  { background: rgba(0,0,0,0.06) !important; }
+[data-theme="light"] .bg-white\/10 { background: rgba(0,0,0,0.06) !important; }
+[data-theme="light"] .bg-black\/60 { background: rgba(0,0,0,0.4) !important; }
 
 .delay-1 { animation-delay: .1s; }
 .delay-2 { animation-delay: .2s; }

@@ -6,27 +6,13 @@ import {
   Award, BookOpen, AlertCircle, Calendar, FileText, ArrowUpRight
 } from 'lucide-react'
 
-const MONTHLY = [
-  { month: 'Ago', val: 78 }, { month: 'Sep', val: 82 }, { month: 'Oct', val: 85 },
-  { month: 'Nov', val: 88 }, { month: 'Dic', val: 91 }, { month: 'Ene', val: 94 },
-]
+const MONTHLY: { month: string; val: number }[] = []
 
-const REPORTS = [
-  { title: 'Reporte Mensual SST – Enero 2026', type: 'Mensual', date: '2026-01-31', size: '2.4 MB', status: 'listo' },
-  { title: 'Cumplimiento de Capacitaciones Q4 2025', type: 'Trimestral', date: '2026-01-05', size: '4.1 MB', status: 'listo' },
-  { title: 'Informe de Incidentes 2025', type: 'Anual', date: '2026-01-10', size: '8.7 MB', status: 'listo' },
-  { title: 'Estadísticas COPASST – Enero 2026', type: 'Mensual', date: '2026-01-28', size: '1.2 MB', status: 'listo' },
-  { title: 'Reporte de Certificados Vencidos', type: 'Alerta', date: '2026-01-15', size: '0.8 MB', status: 'alerta' },
-]
+const REPORTS: { title: string; type: string; date: string; size: string; status: string }[] = []
 
-const INDICATORS = [
-  { label: 'Índice de Frecuencia Accidentes', value: '0.8', change: '-0.3', up: false, good: true, icon: AlertCircle, color: 'text-emerald-400', bg: 'bg-emerald-400/10 border-emerald-400/20' },
-  { label: 'Índice de Severidad', value: '12', change: '-4', up: false, good: true, icon: TrendingDown, color: 'text-emerald-400', bg: 'bg-emerald-400/10 border-emerald-400/20' },
-  { label: 'Cobertura Capacitaciones', value: '94%', change: '+6%', up: true, good: true, icon: BookOpen, color: 'text-amber-400', bg: 'bg-blue-400/10 border-blue-400/20' },
-  { label: 'Empleados certificados', value: '87%', change: '+3%', up: true, good: true, icon: Award, color: 'text-violet-400', bg: 'bg-violet-400/10 border-violet-400/20' },
-]
+const INDICATORS: { label: string; value: string; change: string; up: boolean; good: boolean; icon: any; color: string; bg: string }[] = []
 
-const maxVal = Math.max(...MONTHLY.map(m => m.val))
+const maxVal = 100
 
 export default function ReportsPage() {
   return (

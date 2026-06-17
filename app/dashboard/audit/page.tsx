@@ -7,20 +7,9 @@ import {
   Calendar, User, MapPin, ChevronRight, X, Shield, ClipboardList
 } from 'lucide-react'
 
-const AUDITS = [
-  { id: 'AUD-2026-01', title: 'Auditoría Interna SST Q1 2026', area: 'Toda la empresa', auditor: 'Felipe Torres', date: '2026-01-28', status: 'programada', findings: 0, score: null },
-  { id: 'AUD-2025-04', title: 'Auditoría EPP – Producción', area: 'Producción', auditor: 'Diana Ruiz', date: '2025-12-15', status: 'completada', findings: 3, score: 87 },
-  { id: 'AUD-2025-03', title: 'Auditoría COPASST Semestral', area: 'COPASST', auditor: 'María López', date: '2025-11-20', status: 'completada', findings: 1, score: 96 },
-  { id: 'AUD-2025-02', title: 'Revisión Plan de Emergencias', area: 'Toda la empresa', auditor: 'Felipe Torres', date: '2025-10-10', status: 'completada', findings: 5, score: 74 },
-  { id: 'AUD-2025-01', title: 'Auditoría Extintores y Señalización', area: 'Planta principal', auditor: 'Carlos Mendoza', date: '2025-09-05', status: 'completada', findings: 2, score: 91 },
-]
+const AUDITS: { id: string; title: string; area: string; auditor: string; date: string; status: string; findings: number; score: number | null }[] = []
 
-const FINDINGS = [
-  { id: 1, audit: 'AUD-2025-04', type: 'No conformidad menor', desc: 'EPP incompleto en 3 puestos de trabajo área corte', responsible: 'Juan García', due: '2026-02-01', status: 'abierto' },
-  { id: 2, audit: 'AUD-2025-04', type: 'Observación', desc: 'Señalización de rutas de evacuación desactualizada', responsible: 'Laura Herrera', due: '2026-01-25', status: 'cerrado' },
-  { id: 3, audit: 'AUD-2025-02', type: 'No conformidad mayor', desc: 'Plan de emergencias sin actualización en 18 meses', responsible: 'Felipe Torres', due: '2025-12-31', status: 'cerrado' },
-  { id: 4, audit: 'AUD-2025-02', type: 'No conformidad menor', desc: 'Directorio de emergencias desactualizado', responsible: 'Camila Vargas', due: '2025-11-30', status: 'cerrado' },
-]
+const FINDINGS: { id: number; audit: string; type: string; desc: string; responsible: string; due: string; status: string }[] = []
 
 const statusConfig = {
   programada: { label: 'Programada', color: 'text-amber-400', bg: 'bg-blue-400/10 border-blue-400/20', icon: Clock },

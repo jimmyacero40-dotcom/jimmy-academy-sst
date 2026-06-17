@@ -7,21 +7,9 @@ import {
   Users, BarChart2, Trophy, X, ChevronRight, Star
 } from 'lucide-react'
 
-const EVALS = [
-  { id: 1, title: 'Evaluación Trabajo en Alturas N1', course: 'Trabajo en Alturas', questions: 20, avgScore: 87, passed: 18, total: 20, due: '2026-02-15', status: 'activo' },
-  { id: 2, title: 'Test Manejo de Extintores', course: 'Extintores', questions: 15, avgScore: 94, passed: 48, total: 48, due: '2026-01-30', status: 'completado' },
-  { id: 3, title: 'Evaluación Primeros Auxilios', course: 'Primeros Auxilios', questions: 25, avgScore: 71, passed: 8, total: 12, due: '2026-01-20', status: 'activo' },
-  { id: 4, title: 'Conocimiento COPASST', course: 'COPASST', questions: 30, avgScore: 96, passed: 8, total: 8, due: '2026-04-01', status: 'completado' },
-  { id: 5, title: 'Evaluación EPP General', course: 'EPP', questions: 18, avgScore: 82, passed: 44, total: 56, due: '2026-03-10', status: 'activo' },
-]
+const EVALS: { id: number; title: string; course: string; questions: number; avgScore: number; passed: number; total: number; due: string; status: string }[] = []
 
-const RECENT_RESULTS = [
-  { name: 'Carlos Mendoza', eval: 'Trabajo en Alturas N1', score: 95, passed: true, date: '2026-01-15' },
-  { name: 'María López', eval: 'COPASST', score: 100, passed: true, date: '2026-01-14' },
-  { name: 'Pedro Gómez', eval: 'Primeros Auxilios', score: 58, passed: false, date: '2026-01-13' },
-  { name: 'Laura Herrera', eval: 'EPP General', score: 88, passed: true, date: '2026-01-12' },
-  { name: 'Andrés Castro', eval: 'Trabajo en Alturas N1', score: 72, passed: true, date: '2026-01-11' },
-]
+const RECENT_RESULTS: { name: string; eval: string; score: number; passed: boolean; date: string }[] = []
 
 const statusConfig = {
   activo: { label: 'Activo', color: 'text-amber-400', bg: 'bg-blue-400/10 border-blue-400/20' },

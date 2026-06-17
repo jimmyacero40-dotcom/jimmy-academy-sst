@@ -14,6 +14,7 @@ type UserStatus = 'activo' | 'inactivo'
 interface AppUser {
   id: string
   name: string
+  email: string
   empresa: string
   role: string
   cedula: string
@@ -37,9 +38,9 @@ function colorForUser(id: string) {
   return COLORS[sum % COLORS.length]
 }
 
-const EMPTY_FORM = { name: '', empresa: '', role: '', cedula: '', status: 'activo' as UserStatus }
+const EMPTY_FORM = { name: '', email: '', password: '', empresa: '', role: '', cedula: '', status: 'activo' as UserStatus }
 
-function parseExcel(buffer: ArrayBuffer): Omit<AppUser, 'id' | 'createdAt'>[] {
+function parseExcel(buffer: ArrayBuffer): Omit<AppUser, 'id' | 'createdAt' | 'email'>[] {
   const wb = XLSX.read(buffer, { type: 'array' })
   const ws = wb.Sheets[wb.SheetNames[0]]
   const rows = XLSX.utils.sheet_to_json<Record<string, unknown>>(ws, { defval: '' })
@@ -85,42 +86,101 @@ export default function UsersPage() {
   const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null)
   const [menuOpen, setMenuOpen] = useState<string | null>(null)
   const [excelError, setExcelError] = useState('')
+  const [saving, setSaving] = useState(false)
   const fileRef = useRef<HTMLInputElement>(null)
 
-  useEffect(() => {
-    try { const s = localStorage.getItem(STORAGE_KEY); if (s) setUsers(JSON.parse(s)) } catch {}
-  }, [])
+  const loadUsers = async () => {
+    try {
+      const res = await fetch('/api/users')
+      if (res.ok) {
+        const data = await res.json()
+        setUsers(data.map((u: any) => ({
+          id: u.id,
+          name: u.name,
+          email: u.email,
+          empresa: u.area || '',
+          role: u.role === 'admin' ? 'Administrador' : (u.area || 'Trabajador'),
+          cedula: u.cedula || '',
+          status: u.active ? 'activo' as UserStatus : 'inactivo' as UserStatus,
+          createdAt: new Date(u.created_at).toLocaleDateString('es-CO'),
+        })))
+      }
+    } catch {}
+  }
 
-  const save = (u: AppUser[]) => { setUsers(u); localStorage.setItem(STORAGE_KEY, JSON.stringify(u)) }
+  useEffect(() => { loadUsers() }, [])
+
   const openNew = () => { setEditUser(null); setForm(EMPTY_FORM); setFormErrors({}); setShowModal(true) }
   const openEdit = (u: AppUser) => {
-    setEditUser(u); setForm({ name: u.name, empresa: u.empresa, role: u.role, cedula: u.cedula, status: u.status })
+    setEditUser(u); setForm({ name: u.name, email: (u as any).email || '', password: '', empresa: u.empresa, role: u.role, cedula: u.cedula, status: u.status })
     setFormErrors({}); setShowModal(true); setMenuOpen(null)
   }
 
   const validate = () => {
     const e: Record<string, string> = {}
     if (!form.name.trim()) e.name = 'Nombre requerido'
-    if (!form.cedula.trim()) e.cedula = 'Cedula requerida'
-    if (!form.role.trim()) e.role = 'Cargo requerido'
-    const dup = users.find(u => u.cedula === form.cedula && u.id !== editUser?.id)
-    if (dup) e.cedula = 'Ya existe un usuario con esa cedula'
+    if (!form.email.trim()) e.email = 'Correo requerido'
+    else if (!/\S+@\S+\.\S+/.test(form.email)) e.email = 'Correo inválido'
+    if (!editUser && !form.password.trim()) e.password = 'Contraseña requerida'
+    if (!form.cedula.trim()) e.cedula = 'Cédula requerida'
     return e
   }
 
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
     const errs = validate()
     if (Object.keys(errs).length) { setFormErrors(errs); return }
-    if (editUser) {
-      save(users.map(u => u.id === editUser.id ? { ...u, ...form } : u))
-    } else {
-      save([...users, { id: `usr_${Date.now()}`, ...form, createdAt: new Date().toLocaleDateString('es-CO') }])
-    }
-    setShowModal(false)
+    setSaving(true)
+    try {
+      if (editUser) {
+        const body: any = {
+          id: editUser.id,
+          name: form.name,
+          email: form.email,
+          cedula: form.cedula,
+          area: form.empresa,
+          active: form.status === 'activo',
+        }
+        if (form.password.trim()) body.password = form.password
+        const res = await fetch('/api/users', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
+        if (!res.ok) { const d = await res.json(); setFormErrors({ name: d.error || 'Error al guardar' }); setSaving(false); return }
+      } else {
+        const res = await fetch('/api/users', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            name: form.name,
+            email: form.email,
+            password: form.password,
+            cedula: form.cedula,
+            role: 'worker',
+            area: form.empresa,
+          })
+        })
+        if (!res.ok) { const d = await res.json(); setFormErrors({ email: d.error || 'Error al crear' }); setSaving(false); return }
+      }
+      await loadUsers()
+      setShowModal(false)
+    } catch { setFormErrors({ name: 'Error de conexión' }) }
+    setSaving(false)
   }
 
-  const handleDelete = (id: string) => { save(users.filter(u => u.id !== id)); setDeleteConfirm(null); setMenuOpen(null) }
-  const toggleStatus = (id: string) => { save(users.map(u => u.id === id ? { ...u, status: u.status === 'activo' ? 'inactivo' : 'activo' } : u)); setMenuOpen(null) }
+  const handleDelete = async (id: string) => {
+    await fetch('/api/users', { method: 'DELETE', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id }) })
+    await loadUsers()
+    setDeleteConfirm(null); setMenuOpen(null)
+  }
+
+  const toggleStatus = async (id: string) => {
+    const u = users.find(u => u.id === id)
+    if (!u) return
+    await fetch('/api/users', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id, active: u.status !== 'activo' })
+    })
+    await loadUsers()
+    setMenuOpen(null)
+  }
 
   const handleExcel = (e: React.ChangeEvent<HTMLInputElement>) => {
     setExcelError('')
@@ -131,9 +191,9 @@ export default function UsersPage() {
         const parsed = parseExcel(ev.target!.result as ArrayBuffer)
         if (!parsed.length) { setExcelError('No se encontraron datos. Verifica que el archivo tenga filas con Nombre, Cedula y Cargo.'); return }
         const newUsers: AppUser[] = parsed.map(p => ({
-          id: `usr_${Date.now()}_${Math.random().toString(36).slice(2)}`, ...p, createdAt: new Date().toLocaleDateString('es-CO'),
+          id: `usr_${Date.now()}_${Math.random().toString(36).slice(2)}`, ...p, email: '', createdAt: new Date().toLocaleDateString('es-CO'),
         }))
-        save([...users, ...newUsers])
+        setUsers(prev => [...prev, ...newUsers])
       } catch { setExcelError('Error al leer el archivo. Asegurate de que sea un Excel valido (.xlsx)') }
     }
     reader.readAsArrayBuffer(file)
@@ -254,7 +314,7 @@ export default function UsersPage() {
           <div className="hidden md:block overflow-x-auto">
             <table className="w-full terra-table">
               <thead>
-                <tr><th>Trabajador</th><th>Cedula</th><th>Cargo</th><th>Empresa</th><th>Estado</th><th></th></tr>
+                <tr><th>Trabajador</th><th>Correo</th><th>Cédula</th><th>Área</th><th>Estado</th><th></th></tr>
               </thead>
               <tbody>
                 <AnimatePresence>
@@ -268,13 +328,9 @@ export default function UsersPage() {
                           <div className="font-semibold leading-snug" style={{ color: 'var(--text)' }}>{u.name}</div>
                         </div>
                       </td>
+                      <td><span className="text-xs" style={{ color: 'var(--text-dim)' }}>{u.email || '—'}</span></td>
                       <td><span className="font-mono">{u.cedula || '—'}</span></td>
-                      <td>{u.role || '—'}</td>
-                      <td>
-                        {u.empresa
-                          ? <div className="flex items-center gap-1.5"><Building2 size={13} style={{ color: 'var(--text-faint)' }} /> {u.empresa}</div>
-                          : '—'}
-                      </td>
+                      <td>{u.empresa || '—'}</td>
                       <td>
                         <span className={u.status === 'activo' ? 'badge-green' : 'badge-red'}>
                           {u.status === 'activo' ? 'Activo' : 'Inactivo'}
@@ -382,14 +438,17 @@ export default function UsersPage() {
               </div>
               <div className="p-6 space-y-4">
                 {[
-                  { key: 'name', label: 'Nombre completo *', placeholder: 'JUAN CARLOS PEREZ GOMEZ', mono: false },
-                  { key: 'cedula', label: 'Cedula *', placeholder: '1052392965', mono: true },
-                  { key: 'role', label: 'Cargo *', placeholder: 'SUPERVISOR DE MONTAJE', mono: false },
-                  { key: 'empresa', label: 'Empresa', placeholder: 'AGROVENTURE', mono: false },
-                ].map(({ key, label, placeholder, mono }) => (
+                  { key: 'name', label: 'Nombre completo *', placeholder: 'JUAN CARLOS PEREZ GOMEZ', mono: false, type: 'text' },
+                  { key: 'email', label: 'Correo electrónico *', placeholder: 'juan@empresa.com', mono: false, type: 'email' },
+                  { key: 'password', label: editUser ? 'Nueva contraseña (dejar vacío para no cambiar)' : 'Contraseña *', placeholder: '••••••••', mono: false, type: 'password' },
+                  { key: 'cedula', label: 'Cédula *', placeholder: '1052392965', mono: true, type: 'text' },
+                  { key: 'role', label: 'Cargo', placeholder: 'SUPERVISOR DE MONTAJE', mono: false, type: 'text' },
+                  { key: 'empresa', label: 'Empresa / Área', placeholder: 'AGROVENTURE', mono: false, type: 'text' },
+                ].map(({ key, label, placeholder, mono, type }) => (
                   <div key={key}>
                     <label className="text-xs font-semibold mb-1.5 block" style={{ color: 'var(--text-dim)' }}>{label}</label>
                     <input
+                      type={type}
                       value={(form as any)[key]}
                       onChange={e => setForm({ ...form, [key]: key === 'cedula' ? e.target.value.replace(/\D/g, '') : e.target.value })}
                       placeholder={placeholder}
@@ -419,8 +478,8 @@ export default function UsersPage() {
               </div>
               <div className="px-6 pb-6 flex gap-3">
                 <button onClick={() => setShowModal(false)} className="terra-btn-outline flex-1 py-2.5 justify-center">Cancelar</button>
-                <button onClick={handleSubmit} className="terra-btn flex-1 py-2.5 justify-center">
-                  <UserPlus size={15} /> {editUser ? 'Guardar' : 'Agregar'}
+                <button onClick={handleSubmit} disabled={saving} className="terra-btn flex-1 py-2.5 justify-center">
+                  <UserPlus size={15} /> {saving ? 'Guardando...' : editUser ? 'Guardar' : 'Agregar'}
                 </button>
               </div>
             </motion.div>

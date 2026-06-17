@@ -4,7 +4,7 @@ import { useState } from 'react'
 import { signIn } from 'next-auth/react'
 import { useRouter } from 'next/navigation'
 import { motion } from 'framer-motion'
-import { Shield, Eye, EyeOff, ArrowRight, Lock, Mail, ChevronDown } from 'lucide-react'
+import { Shield, Eye, EyeOff, ArrowRight, Lock, Mail } from 'lucide-react'
 
 export default function LoginPage() {
   const router = useRouter()
@@ -13,7 +13,6 @@ export default function LoginPage() {
   const [form, setForm] = useState({ email: '', password: '' })
   const [errors, setErrors] = useState<Record<string, string>>({})
   const [authError, setAuthError] = useState('')
-  const [showHint, setShowHint] = useState(false)
 
   const validate = () => {
     const e: Record<string, string> = {}
@@ -214,36 +213,10 @@ export default function LoginPage() {
             </button>
           </form>
 
-          {/* Demo access */}
-          <div className="mt-6">
-            <button onClick={() => setShowHint(!showHint)}
-              className="w-full flex items-center justify-between px-4 py-2.5 rounded-xl text-xs transition-all"
-              style={{ border: '1px solid var(--border)', color: 'var(--text-dim)' }}>
-              <span>Acceso de demostracion</span>
-              <ChevronDown size={13} className={`transition-transform ${showHint ? 'rotate-180' : ''}`} />
-            </button>
-            {showHint && (
-              <motion.div initial={{ opacity: 0, y: -6 }} animate={{ opacity: 1, y: 0 }}
-                className="mt-2 rounded-xl p-3 space-y-2"
-                style={{ background: 'var(--bg-card)', border: '1px solid var(--border)' }}>
-                {[
-                  { role: 'Admin', email: 'admin@jimmyacademy.com', pass: 'admin123' },
-                  { role: 'Coordinadora', email: 'diana@jimmyacademy.com', pass: 'sst2026' },
-                ].map(({ role, email, pass }) => (
-                  <button key={role} onClick={() => { setForm({ email, password: pass }); setAuthError(''); setShowHint(false) }}
-                    className="w-full text-left flex items-center justify-between px-3 py-2 rounded-lg transition-all"
-                    style={{ color: 'var(--text-dim)' }}
-                    onMouseEnter={e => (e.currentTarget.style.background = 'var(--bg-card-hover)')}
-                    onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}>
-                    <div>
-                      <span className="text-xs font-medium" style={{ color: 'var(--text)' }}>{role}</span>
-                      <span className="text-xs ml-2" style={{ color: 'var(--text-faint)' }}>{email}</span>
-                    </div>
-                    <span className="font-mono text-xs" style={{ color: 'var(--amber)' }}>{pass}</span>
-                  </button>
-                ))}
-              </motion.div>
-            )}
+          <div className="mt-6 text-center">
+            <p className="text-xs" style={{ color: 'var(--text-faint)' }}>
+              Contacta al administrador SST si no tienes credenciales
+            </p>
           </div>
         </motion.div>
       </div>
