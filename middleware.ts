@@ -6,10 +6,10 @@ export default withAuth(
     const token = req.nextauth.token
     const path = req.nextUrl.pathname
 
-    if (token?.role === 'superadmin' && path !== '/dashboard/select-company') {
+    if (token?.role === 'superadmin' && path.startsWith('/dashboard')) {
       const activeCompany = req.cookies.get('x-active-company')?.value
       if (!activeCompany) {
-        return NextResponse.redirect(new URL('/dashboard/select-company', req.url))
+        return NextResponse.redirect(new URL('/select-company', req.url))
       }
     }
 
@@ -19,5 +19,5 @@ export default withAuth(
 )
 
 export const config = {
-  matcher: ['/dashboard/:path*'],
+  matcher: ['/dashboard/:path*', '/select-company'],
 }

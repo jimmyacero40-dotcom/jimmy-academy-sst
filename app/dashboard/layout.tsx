@@ -13,7 +13,7 @@ import {
 
 const allNavItems = [
   { href: '/dashboard', icon: LayoutDashboard, label: 'Dashboard', adminOnly: false, superadminOnly: false },
-  { href: '/dashboard/select-company', icon: Building2, label: 'Empresas', adminOnly: false, superadminOnly: true },
+  { href: '/select-company', icon: Building2, label: 'Cambiar Empresa', adminOnly: false, superadminOnly: true },
   { href: '/dashboard/users', icon: Users, label: 'Usuarios', adminOnly: true, superadminOnly: false },
   { href: '/dashboard/trainings', icon: BookOpen, label: 'Capacitaciones', adminOnly: false, superadminOnly: false },
   { href: '/dashboard/my-signature', icon: PenTool, label: 'Mi Firma', adminOnly: false, superadminOnly: false },
