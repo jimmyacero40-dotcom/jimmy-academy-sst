@@ -2,5 +2,9 @@ node_modules
 .next
 .vercel
 out
+.env
+.env.*
+cookies.txt
+tsconfig.tsbuildinfo
 .claude/settings.local.json
 .claude/scheduled_tasks.lock
