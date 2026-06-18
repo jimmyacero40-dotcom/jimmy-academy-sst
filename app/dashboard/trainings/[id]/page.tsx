@@ -263,7 +263,7 @@ function generateQuestionsFromContent(texts: string[], title: string): Question[
     [questions[i], questions[j]] = [questions[j], questions[i]]
   }
 
-  return questions.slice(0, 5)
+  return questions
 }
 
 export default function TrainingDetailPage() {
@@ -286,7 +286,7 @@ export default function TrainingDetailPage() {
   const [score, setScore] = useState(0)
   const [answers, setAnswers] = useState<boolean[]>([])
 
-  const passed = score >= 3
+  const passed = questions.length > 0 ? score >= Math.ceil(questions.length * 0.6) : false
 
   // Question editor state
   const [editQuestions, setEditQuestions] = useState<Question[]>([])
@@ -729,7 +729,11 @@ export default function TrainingDetailPage() {
                   const valid = editQuestions.filter(q => q.q.trim() && q.options.every(o => o.trim()))
                   if (valid.length === 0) return
                   setSavingQuestions(true)
-                  await saveCustomQuestions(courseId, valid)
+                  await fetch('/api/trainings/questions', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ training_id: courseId, questions: valid }),
+                  })
                   setQuestions(valid)
                   setHasCustomQuestions(true)
                   setSavingQuestions(false)
