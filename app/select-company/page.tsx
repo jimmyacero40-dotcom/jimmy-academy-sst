@@ -4,7 +4,7 @@ import { useState, useEffect, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import { useSession, signOut } from 'next-auth/react'
 import { motion } from 'framer-motion'
-import { Building2, Plus, ArrowRight, Users, BookOpen, Loader2, X, Shield, LogOut, Upload, Image } from 'lucide-react'
+import { Building2, Plus, ArrowRight, Users, BookOpen, Loader2, X, Shield, LogOut, Image, Edit3 } from 'lucide-react'
 
 interface Company {
   id: string
@@ -16,6 +16,15 @@ interface Company {
   created_at: string
 }
 
+const COLORS = [
+  { label: 'Naranja', value: 'from-amber-500 to-orange-500', css: 'linear-gradient(135deg, #f59e0b, #f97316)' },
+  { label: 'Azul', value: 'from-blue-500 to-cyan-500', css: 'linear-gradient(135deg, #3b82f6, #06b6d4)' },
+  { label: 'Verde', value: 'from-emerald-500 to-teal-500', css: 'linear-gradient(135deg, #10b981, #14b8a6)' },
+  { label: 'Rojo', value: 'from-red-500 to-rose-500', css: 'linear-gradient(135deg, #ef4444, #f43f5e)' },
+  { label: 'Morado', value: 'from-violet-500 to-purple-500', css: 'linear-gradient(135deg, #8b5cf6, #a855f7)' },
+  { label: 'Amarillo', value: 'from-yellow-500 to-amber-500', css: 'linear-gradient(135deg, #eab308, #f59e0b)' },
+]
+
 export default function SelectCompanyPage() {
   const router = useRouter()
   const { data: session } = useSession()
@@ -23,12 +32,15 @@ export default function SelectCompanyPage() {
   const [companies, setCompanies] = useState<Company[]>([])
   const [loading, setLoading] = useState(true)
   const [selecting, setSelecting] = useState<string | null>(null)
-  const [showCreate, setShowCreate] = useState(false)
-  const [newName, setNewName] = useState('')
-  const [newNit, setNewNit] = useState('')
-  const [newLogo, setNewLogo] = useState('')
-  const [newColor, setNewColor] = useState('from-amber-500 to-orange-500')
-  const [creating, setCreating] = useState(false)
+
+  // Modal state (create or edit)
+  const [showModal, setShowModal] = useState(false)
+  const [editingCompany, setEditingCompany] = useState<Company | null>(null)
+  const [formName, setFormName] = useState('')
+  const [formNit, setFormNit] = useState('')
+  const [formLogo, setFormLogo] = useState('')
+  const [formColor, setFormColor] = useState('from-amber-500 to-orange-500')
+  const [saving, setSaving] = useState(false)
   const logoInputRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
@@ -53,51 +65,74 @@ export default function SelectCompanyPage() {
     router.push('/dashboard')
   }
 
+  const openCreate = () => {
+    setEditingCompany(null)
+    setFormName('')
+    setFormNit('')
+    setFormLogo('')
+    setFormColor('from-amber-500 to-orange-500')
+    setShowModal(true)
+  }
+
+  const openEdit = (e: React.MouseEvent, company: Company) => {
+    e.stopPropagation()
+    setEditingCompany(company)
+    setFormName(company.name)
+    setFormNit(company.nit || '')
+    setFormLogo(company.logo_url || '')
+    setFormColor(company.color || 'from-amber-500 to-orange-500')
+    setShowModal(true)
+  }
+
   const handleLogoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
     if (!file) return
-    if (file.size > 500 * 1024) {
-      alert('El logo debe ser menor a 500KB')
-      return
-    }
+    if (file.size > 500 * 1024) { alert('El logo debe ser menor a 500KB'); return }
     const reader = new FileReader()
-    reader.onload = () => setNewLogo(reader.result as string)
+    reader.onload = () => setFormLogo(reader.result as string)
     reader.readAsDataURL(file)
   }
 
-  const createCompany = async () => {
-    if (!newName.trim()) return
-    setCreating(true)
-    const res = await fetch('/api/companies', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        name: newName.trim(),
-        nit: newNit.trim() || null,
-        logo_url: newLogo || null,
-        color: newColor,
-      }),
-    })
-    if (res.ok) {
-      const company = await res.json()
-      setCompanies(prev => [...prev, company])
-      setNewName('')
-      setNewNit('')
-      setNewLogo('')
-      setNewColor('from-amber-500 to-orange-500')
-      setShowCreate(false)
-    }
-    setCreating(false)
-  }
+  const handleSave = async () => {
+    if (!formName.trim()) return
+    setSaving(true)
 
-  const COLORS = [
-    { label: 'Naranja', value: 'from-amber-500 to-orange-500', css: 'linear-gradient(135deg, #f59e0b, #f97316)' },
-    { label: 'Azul', value: 'from-blue-500 to-cyan-500', css: 'linear-gradient(135deg, #3b82f6, #06b6d4)' },
-    { label: 'Verde', value: 'from-emerald-500 to-teal-500', css: 'linear-gradient(135deg, #10b981, #14b8a6)' },
-    { label: 'Rojo', value: 'from-red-500 to-rose-500', css: 'linear-gradient(135deg, #ef4444, #f43f5e)' },
-    { label: 'Morado', value: 'from-violet-500 to-purple-500', css: 'linear-gradient(135deg, #8b5cf6, #a855f7)' },
-    { label: 'Amarillo', value: 'from-yellow-500 to-amber-500', css: 'linear-gradient(135deg, #eab308, #f59e0b)' },
-  ]
+    if (editingCompany) {
+      const res = await fetch('/api/companies', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          id: editingCompany.id,
+          name: formName.trim(),
+          nit: formNit.trim() || null,
+          logo_url: formLogo || null,
+          color: formColor,
+        }),
+      })
+      if (res.ok) {
+        const updated = await res.json()
+        setCompanies(prev => prev.map(c => c.id === updated.id ? updated : c))
+        setShowModal(false)
+      }
+    } else {
+      const res = await fetch('/api/companies', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: formName.trim(),
+          nit: formNit.trim() || null,
+          logo_url: formLogo || null,
+          color: formColor,
+        }),
+      })
+      if (res.ok) {
+        const company = await res.json()
+        setCompanies(prev => [...prev, company])
+        setShowModal(false)
+      }
+    }
+    setSaving(false)
+  }
 
   return (
     <div className="min-h-screen flex flex-col" style={{ background: 'var(--bg)' }}>
@@ -142,15 +177,24 @@ export default function SelectCompanyPage() {
 
             <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3 max-w-3xl mx-auto">
               {companies.filter(c => c.active).map((company, i) => (
-                <motion.button
+                <motion.div
                   key={company.id}
                   initial={{ opacity: 0, y: 20 }}
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ delay: i * 0.07 }}
-                  onClick={() => selectCompany(company.id)}
-                  disabled={!!selecting}
-                  className="terra-card terra-card-lift p-6 text-left group relative"
+                  onClick={() => !selecting && selectCompany(company.id)}
+                  className="terra-card terra-card-lift p-6 text-left group relative cursor-pointer"
                 >
+                  {/* Edit button */}
+                  <button
+                    onClick={(e) => openEdit(e, company)}
+                    className="absolute top-3 right-3 w-7 h-7 rounded-lg flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all z-10"
+                    style={{ background: 'var(--bg-card)', border: '1px solid var(--border)' }}
+                    title="Editar empresa"
+                  >
+                    <Edit3 size={13} style={{ color: 'var(--amber)' }} />
+                  </button>
+
                   <div className="flex items-start justify-between mb-4">
                     {company.logo_url ? (
                       <img src={company.logo_url} alt={company.name}
@@ -174,14 +218,14 @@ export default function SelectCompanyPage() {
                     <span className="flex items-center gap-1"><Users size={12} /> Usuarios</span>
                     <span className="flex items-center gap-1"><BookOpen size={12} /> Capacitaciones</span>
                   </div>
-                </motion.button>
+                </motion.div>
               ))}
 
               <motion.button
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: companies.length * 0.07 }}
-                onClick={() => setShowCreate(true)}
+                onClick={openCreate}
                 className="terra-card p-6 flex flex-col items-center justify-center gap-3 min-h-[200px] group"
                 style={{ border: '2px dashed var(--border)' }}
               >
@@ -196,9 +240,9 @@ export default function SelectCompanyPage() {
         )}
       </div>
 
-      {/* Create modal */}
-      {showCreate && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60" onClick={() => setShowCreate(false)}>
+      {/* Create/Edit modal */}
+      {showModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60" onClick={() => setShowModal(false)}>
           <motion.div
             initial={{ opacity: 0, scale: 0.95 }}
             animate={{ opacity: 1, scale: 1 }}
@@ -206,22 +250,24 @@ export default function SelectCompanyPage() {
             onClick={e => e.stopPropagation()}
           >
             <div className="flex items-center justify-between mb-5">
-              <h2 className="font-bold text-lg" style={{ color: 'var(--text)' }}>Nueva Empresa</h2>
-              <button onClick={() => setShowCreate(false)} style={{ color: 'var(--text-dim)' }}><X size={18} /></button>
+              <h2 className="font-bold text-lg" style={{ color: 'var(--text)' }}>
+                {editingCompany ? 'Editar Empresa' : 'Nueva Empresa'}
+              </h2>
+              <button onClick={() => setShowModal(false)} style={{ color: 'var(--text-dim)' }}><X size={18} /></button>
             </div>
             <div className="space-y-4">
               {/* Logo upload */}
               <div>
                 <label className="text-xs font-medium mb-1.5 block" style={{ color: 'var(--text-dim)' }}>Logo de la empresa</label>
                 <input ref={logoInputRef} type="file" accept="image/*" className="hidden" onChange={handleLogoUpload} />
-                {newLogo ? (
+                {formLogo ? (
                   <div className="flex items-center gap-3">
-                    <img src={newLogo} alt="Logo" className="w-16 h-16 rounded-xl object-contain" style={{ background: 'var(--bg-card)', padding: '4px', border: '1px solid var(--border)' }} />
+                    <img src={formLogo} alt="Logo" className="w-16 h-16 rounded-xl object-contain" style={{ background: 'var(--bg-card)', padding: '4px', border: '1px solid var(--border)' }} />
                     <div className="flex-1">
                       <p className="text-xs mb-1" style={{ color: 'var(--text-dim)' }}>Logo cargado</p>
                       <div className="flex gap-2">
                         <button onClick={() => logoInputRef.current?.click()} className="text-xs px-2 py-1 rounded" style={{ color: 'var(--amber)' }}>Cambiar</button>
-                        <button onClick={() => setNewLogo('')} className="text-xs px-2 py-1 rounded" style={{ color: '#FCA5A5' }}>Quitar</button>
+                        <button onClick={() => setFormLogo('')} className="text-xs px-2 py-1 rounded" style={{ color: '#FCA5A5' }}>Quitar</button>
                       </div>
                     </div>
                   </div>
@@ -240,8 +286,8 @@ export default function SelectCompanyPage() {
                 <label className="text-xs font-medium mb-1.5 block" style={{ color: 'var(--text-dim)' }}>Nombre de la empresa *</label>
                 <input
                   className="terra-input w-full"
-                  value={newName}
-                  onChange={e => setNewName(e.target.value)}
+                  value={formName}
+                  onChange={e => setFormName(e.target.value)}
                   placeholder="Ej: AgroVenture Capital"
                 />
               </div>
@@ -249,8 +295,8 @@ export default function SelectCompanyPage() {
                 <label className="text-xs font-medium mb-1.5 block" style={{ color: 'var(--text-dim)' }}>NIT</label>
                 <input
                   className="terra-input w-full"
-                  value={newNit}
-                  onChange={e => setNewNit(e.target.value)}
+                  value={formNit}
+                  onChange={e => setFormNit(e.target.value)}
                   placeholder="Ej: 900.123.456-7"
                 />
               </div>
@@ -260,11 +306,11 @@ export default function SelectCompanyPage() {
                 <label className="text-xs font-medium mb-1.5 block" style={{ color: 'var(--text-dim)' }}>Color de la empresa</label>
                 <div className="flex gap-2 flex-wrap">
                   {COLORS.map(c => (
-                    <button key={c.value} onClick={() => setNewColor(c.value)}
+                    <button key={c.value} onClick={() => setFormColor(c.value)}
                       className="w-8 h-8 rounded-lg transition-all"
                       style={{
                         background: c.css,
-                        outline: newColor === c.value ? '2px solid var(--amber)' : 'none',
+                        outline: formColor === c.value ? '2px solid var(--amber)' : 'none',
                         outlineOffset: '2px',
                       }}
                       title={c.label} />
@@ -273,11 +319,11 @@ export default function SelectCompanyPage() {
               </div>
 
               <button
-                onClick={createCompany}
-                disabled={creating || !newName.trim()}
+                onClick={handleSave}
+                disabled={saving || !formName.trim()}
                 className="terra-btn-primary w-full py-2.5"
               >
-                {creating ? <Loader2 size={16} className="animate-spin mx-auto" /> : 'Crear Empresa'}
+                {saving ? <Loader2 size={16} className="animate-spin mx-auto" /> : (editingCompany ? 'Guardar Cambios' : 'Crear Empresa')}
               </button>
             </div>
           </motion.div>
