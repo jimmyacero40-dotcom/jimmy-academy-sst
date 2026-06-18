@@ -38,7 +38,17 @@ function colorForUser(id: string) {
   return COLORS[sum % COLORS.length]
 }
 
-const EMPTY_FORM = { name: '', email: '', password: '', empresa: '', role: '', cedula: '', status: 'activo' as UserStatus }
+const EMPTY_FORM = { name: '', email: '', password: '', empresa: '', role: '', cedula: '', status: 'activo' as UserStatus, emailManual: false }
+
+function generateEmail(name: string): string {
+  if (!name.trim()) return ''
+  const parts = name.trim().toLowerCase()
+    .normalize('NFD').replace(/[̀-ͯ]/g, '')
+    .split(/\s+/).filter(Boolean)
+  if (parts.length === 0) return ''
+  if (parts.length === 1) return `${parts[0]}@jimmyacademy.com`
+  return `${parts[0]}.${parts[parts.length - 1]}@jimmyacademy.com`
+}
 
 function parseExcel(buffer: ArrayBuffer): Omit<AppUser, 'id' | 'createdAt' | 'email'>[] {
   const wb = XLSX.read(buffer, { type: 'array' })
@@ -112,17 +122,16 @@ export default function UsersPage() {
 
   const openNew = () => { setEditUser(null); setForm(EMPTY_FORM); setFormErrors({}); setShowModal(true) }
   const openEdit = (u: AppUser) => {
-    setEditUser(u); setForm({ name: u.name, email: (u as any).email || '', password: '', empresa: u.empresa, role: u.role, cedula: u.cedula, status: u.status })
+    setEditUser(u); setForm({ name: u.name, email: (u as any).email || '', password: '', empresa: u.empresa, role: u.role, cedula: u.cedula, status: u.status, emailManual: true })
     setFormErrors({}); setShowModal(true); setMenuOpen(null)
   }
 
   const validate = () => {
     const e: Record<string, string> = {}
     if (!form.name.trim()) e.name = 'Nombre requerido'
+    if (!form.cedula.trim()) e.cedula = 'Cédula requerida'
     if (!form.email.trim()) e.email = 'Correo requerido'
     else if (!/\S+@\S+\.\S+/.test(form.email)) e.email = 'Correo inválido'
-    if (!editUser && !form.password.trim()) e.password = 'Contraseña requerida'
-    if (!form.cedula.trim()) e.cedula = 'Cédula requerida'
     return e
   }
 
@@ -150,7 +159,7 @@ export default function UsersPage() {
           body: JSON.stringify({
             name: form.name,
             email: form.email,
-            password: form.password,
+            password: form.cedula,
             cedula: form.cedula,
             role: 'worker',
             area: form.empresa,
@@ -186,14 +195,26 @@ export default function UsersPage() {
     setExcelError('')
     const file = e.target.files?.[0]; if (!file) return
     const reader = new FileReader()
-    reader.onload = ev => {
+    reader.onload = async ev => {
       try {
         const parsed = parseExcel(ev.target!.result as ArrayBuffer)
         if (!parsed.length) { setExcelError('No se encontraron datos. Verifica que el archivo tenga filas con Nombre, Cedula y Cargo.'); return }
-        const newUsers: AppUser[] = parsed.map(p => ({
-          id: `usr_${Date.now()}_${Math.random().toString(36).slice(2)}`, ...p, email: '', createdAt: new Date().toLocaleDateString('es-CO'),
-        }))
-        setUsers(prev => [...prev, ...newUsers])
+        let created = 0
+        for (const p of parsed) {
+          const email = generateEmail(p.name)
+          const password = p.cedula
+          if (!email || !password) continue
+          try {
+            const res = await fetch('/api/users', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ name: p.name, email, password, cedula: p.cedula, role: 'worker', area: p.empresa }),
+            })
+            if (res.ok) created++
+          } catch {}
+        }
+        await loadUsers()
+        if (created > 0) alert(`${created} trabajador(es) creado(s) exitosamente`)
       } catch { setExcelError('Error al leer el archivo. Asegurate de que sea un Excel valido (.xlsx)') }
     }
     reader.readAsArrayBuffer(file)
@@ -439,9 +460,8 @@ export default function UsersPage() {
               <div className="p-6 space-y-4">
                 {[
                   { key: 'name', label: 'Nombre completo *', placeholder: 'JUAN CARLOS PEREZ GOMEZ', mono: false, type: 'text' },
-                  { key: 'email', label: 'Correo electrónico *', placeholder: 'juan@empresa.com', mono: false, type: 'email' },
-                  { key: 'password', label: editUser ? 'Nueva contraseña (dejar vacío para no cambiar)' : 'Contraseña *', placeholder: '••••••••', mono: false, type: 'password' },
-                  { key: 'cedula', label: 'Cédula *', placeholder: '1052392965', mono: true, type: 'text' },
+                  { key: 'cedula', label: 'Cédula * (será la contraseña)', placeholder: '1052392965', mono: true, type: 'text' },
+                  { key: 'email', label: 'Correo electrónico * (se sugiere automáticamente)', placeholder: 'juan.perez@jimmyacademy.com', mono: false, type: 'email' },
                   { key: 'role', label: 'Cargo', placeholder: 'SUPERVISOR DE MONTAJE', mono: false, type: 'text' },
                   { key: 'empresa', label: 'Empresa / Área', placeholder: 'AGROVENTURE', mono: false, type: 'text' },
                 ].map(({ key, label, placeholder, mono, type }) => (
@@ -450,7 +470,19 @@ export default function UsersPage() {
                     <input
                       type={type}
                       value={(form as any)[key]}
-                      onChange={e => setForm({ ...form, [key]: key === 'cedula' ? e.target.value.replace(/\D/g, '') : e.target.value })}
+                      onChange={e => {
+                        const val = key === 'cedula' ? e.target.value.replace(/\D/g, '') : e.target.value
+                        if (key === 'name') {
+                          const suggested = generateEmail(val)
+                          setForm(f => ({ ...f, name: val, ...(!f.emailManual ? { email: suggested } : {}), password: f.cedula || f.password }))
+                        } else if (key === 'cedula') {
+                          setForm(f => ({ ...f, cedula: val, password: val }))
+                        } else if (key === 'email') {
+                          setForm(f => ({ ...f, email: e.target.value, emailManual: true }))
+                        } else {
+                          setForm(f => ({ ...f, [key]: val }))
+                        }
+                      }}
                       placeholder={placeholder}
                       inputMode={key === 'cedula' ? 'numeric' : undefined}
                       className={`terra-input ${mono ? 'font-mono' : ''}`}
