@@ -7,10 +7,18 @@ import { isAdminOrSuper, getActiveCompanyId } from '@/lib/get-company'
 export async function GET() {
   const companyId = await getActiveCompanyId()
 
-  let query = supabase.from('trainings').select('*').order('created_at', { ascending: false })
+  const cols = 'id, title, category, duration, description, status, due, slides_count, questions_count, cover_url, color, file_name, created_by, company_id, valid_from, valid_until, created_at'
+  let query = supabase.from('trainings').select(cols).order('created_at', { ascending: false })
   if (companyId) query = query.eq('company_id', companyId)
 
-  const { data, error } = await query
+  let { data, error } = await query
+
+  if (error && error.message.includes('timeout')) {
+    const retry = await query
+    data = retry.data
+    error = retry.error
+  }
+
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
   return NextResponse.json(data || [])
 }

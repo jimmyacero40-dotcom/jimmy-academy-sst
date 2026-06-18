@@ -8,12 +8,14 @@ export async function getActiveCompanyId(): Promise<string | null> {
   if (!session?.user?.email) return null
 
   const role = (session.user as any).role
+  const sessionCompanyId = (session.user as any).companyId
 
   if (role === 'superadmin') {
     const cookieStore = cookies()
-    const activeCompany = cookieStore.get('x-active-company')?.value
-    return activeCompany || null
+    return cookieStore.get('x-active-company')?.value || null
   }
+
+  if (sessionCompanyId) return sessionCompanyId
 
   const { data: user } = await supabase
     .from('users')
