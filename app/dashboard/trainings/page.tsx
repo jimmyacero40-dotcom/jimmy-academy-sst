@@ -154,9 +154,12 @@ export default function TrainingsPage() {
       const training = await res.json()
       if (res.ok) {
         setTrainings(prev => [training, ...prev])
+      } else {
+        alert(`Error al crear curso: ${training.error || 'Error desconocido'}${training.debug ? ' - ' + training.debug : ''}`)
       }
     } catch (e) {
       console.error('Error creating course:', e)
+      alert('Error de conexión al crear el curso')
     }
 
     setShowModal(false)

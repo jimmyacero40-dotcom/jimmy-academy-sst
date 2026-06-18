@@ -15,21 +15,26 @@ async function getUser() {
 }
 
 export async function GET() {
-  const user = await getUser()
-  if (!user) return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
-
   const { data, error } = await supabase
     .from('trainings')
     .select('*')
     .order('created_at', { ascending: false })
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
-  return NextResponse.json(data)
+  return NextResponse.json(data || [])
 }
 
 export async function POST(req: NextRequest) {
-  const user = await getUser()
-  if (!user) return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
+  const session = await getServerSession(authOptions)
+  if (!session?.user?.email) {
+    return NextResponse.json({ error: 'No autorizado', debug: 'No session found' }, { status: 401 })
+  }
+  const { data: user } = await supabase
+    .from('users')
+    .select('id, role, email, name')
+    .eq('email', session.user.email)
+    .single()
+  if (!user) return NextResponse.json({ error: 'Usuario no encontrado' }, { status: 401 })
   if (user.role !== 'admin') return NextResponse.json({ error: 'Solo admin puede crear cursos' }, { status: 403 })
 
   const body = await req.json()
