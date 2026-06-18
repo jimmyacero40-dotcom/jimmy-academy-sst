@@ -1,27 +1,19 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { getServerSession } from 'next-auth'
-import { authOptions } from '@/lib/auth'
 import { supabase } from '@/lib/supabase'
-
-async function getUser() {
-  const session = await getServerSession(authOptions)
-  if (!session?.user?.email) return null
-  const { data } = await supabase
-    .from('users')
-    .select('id, role, email, name, cedula')
-    .eq('email', session.user.email)
-    .single()
-  return data
-}
+import { getActiveCompanyId, getCurrentUser } from '@/lib/get-company'
 
 export async function GET() {
-  const user = await getUser()
+  const user = await getCurrentUser()
   if (!user) return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
+
+  const companyId = await getActiveCompanyId()
 
   let query = supabase
     .from('certificates')
     .select('*')
     .order('created_at', { ascending: false })
+
+  if (companyId) query = query.eq('company_id', companyId)
 
   if (user.role !== 'admin' && user.role !== 'superadmin') {
     query = query.eq('user_id', user.id)
@@ -33,8 +25,10 @@ export async function GET() {
 }
 
 export async function POST(req: NextRequest) {
-  const user = await getUser()
+  const user = await getCurrentUser()
   if (!user) return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
+
+  const companyId = await getActiveCompanyId()
 
   const body = await req.json()
   const { code, name, cedula, course, issued, expires, duration, score } = body
@@ -47,6 +41,7 @@ export async function POST(req: NextRequest) {
     .from('certificates')
     .insert({
       user_id: user.id,
+      company_id: companyId,
       code,
       name,
       cedula: cedula || '',
