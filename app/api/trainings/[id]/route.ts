@@ -3,23 +3,24 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { supabase } from '@/lib/supabase'
 
-async function getUser() {
-  const session = await getServerSession(authOptions)
-  if (!session?.user?.email) return null
-  const { data } = await supabase
-    .from('users')
-    .select('id, role, email, name')
-    .eq('email', session.user.email)
-    .single()
-  return data
-}
-
 export async function GET(req: NextRequest, { params }: { params: { id: string } }) {
-  const user = await getUser()
-  if (!user) return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
-
   const trainingId = parseInt(params.id)
+  const slideIndex = req.nextUrl.searchParams.get('slide')
 
+  // If requesting a specific slide, return just that image
+  if (slideIndex !== null) {
+    const { data } = await supabase
+      .from('training_slides')
+      .select('image_data')
+      .eq('training_id', trainingId)
+      .eq('slide_index', parseInt(slideIndex))
+      .single()
+
+    if (!data) return NextResponse.json({ error: 'Slide not found' }, { status: 404 })
+    return NextResponse.json({ image: data.image_data })
+  }
+
+  // Otherwise return training metadata + texts (no heavy images)
   const { data: training } = await supabase
     .from('trainings')
     .select('*')
@@ -30,7 +31,7 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
 
   const { data: slides } = await supabase
     .from('training_slides')
-    .select('slide_index, image_data, slide_text')
+    .select('slide_index, slide_text')
     .eq('training_id', trainingId)
     .order('slide_index', { ascending: true })
 
@@ -41,7 +42,7 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
 
   return NextResponse.json({
     training,
-    images: slides?.map(s => s.image_data) || [],
+    slideCount: slides?.length || 0,
     texts: slides?.map(s => s.slide_text) || [],
     questions: questions?.map(q => ({
       q: q.question,

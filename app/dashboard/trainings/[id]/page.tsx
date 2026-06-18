@@ -294,36 +294,86 @@ export default function TrainingDetailPage() {
   const [hasCustomQuestions, setHasCustomQuestions] = useState(false)
   const emptyQ = (): Question => ({ q: '', options: ['', '', '', ''], correct: 0, explanation: '' })
 
-  useEffect(() => {
-    async function load() {
-      try {
-        const res = await fetch(`/api/trainings/${courseId}`)
-        if (res.ok) {
-          const data = await res.json()
-          setTraining(data.training)
-          setSlides(data.images || [])
-          const title = data.training?.title || 'Capacitación SST'
+  const [slideCount, setSlideCount] = useState(0)
+  const slideCache = useState<Record<number, string>>({})[0]
+  const [currentSlideImage, setCurrentSlideImage] = useState<string | null>(null)
+  const [loadingSlide, setLoadingSlide] = useState(false)
 
-          if (data.questions && data.questions.length > 0) {
-            setQuestions(data.questions)
-            setEditQuestions(data.questions)
-            setHasCustomQuestions(true)
-          } else {
-            const custom = await getCustomQuestions(courseId)
-            if (custom.length > 0) {
-              setQuestions(custom)
-              setEditQuestions(custom)
-              setHasCustomQuestions(true)
-            } else {
-              setQuestions(generateQuestionsFromContent(data.texts || [], title))
-            }
+  const loadSlide = async (index: number) => {
+    if (slideCache[index]) {
+      setCurrentSlideImage(slideCache[index])
+      return
+    }
+    setLoadingSlide(true)
+    try {
+      const res = await fetch(`/api/trainings/${courseId}?slide=${index}`)
+      if (res.ok) {
+        const data = await res.json()
+        if (data.image) {
+          slideCache[index] = data.image
+          setCurrentSlideImage(data.image)
+          if (slides.length <= index) {
+            setSlides(prev => {
+              const next = [...prev]
+              next[index] = data.image
+              return next
+            })
           }
         }
-      } catch (_) {}
-      setLoading(false)
-    }
-    load()
+      }
+    } catch (_) {}
+    setLoadingSlide(false)
+  }
+
+  const loadTraining = async (retries = 0) => {
+    try {
+      const res = await fetch(`/api/trainings/${courseId}`)
+      if (res.ok) {
+        const data = await res.json()
+        setTraining(data.training)
+        const count = data.slideCount || 0
+        setSlideCount(count)
+        setSlides(new Array(count).fill(''))
+        const title = data.training?.title || 'Capacitación SST'
+
+        if (data.questions && data.questions.length > 0) {
+          setQuestions(data.questions)
+          setEditQuestions(data.questions)
+          setHasCustomQuestions(true)
+        } else {
+          const custom = await getCustomQuestions(courseId)
+          if (custom.length > 0) {
+            setQuestions(custom)
+            setEditQuestions(custom)
+            setHasCustomQuestions(true)
+          } else {
+            setQuestions(generateQuestionsFromContent(data.texts || [], title))
+          }
+        }
+
+        if (count === 0 && data.training?.slides_count > 0 && retries < 3) {
+          setTimeout(() => loadTraining(retries + 1), 3000)
+          return
+        }
+
+        if (count > 0) {
+          loadSlide(0)
+        }
+      }
+    } catch (_) {}
+    setLoading(false)
+  }
+
+  useEffect(() => {
+    loadTraining()
   }, [courseId])
+
+  useEffect(() => {
+    if (phase === 'slides' && slideCount > 0) {
+      loadSlide(currentSlide)
+      if (currentSlide + 1 < slideCount) loadSlide(currentSlide + 1)
+    }
+  }, [currentSlide, phase])
 
   const handleAnswer = (idx: number) => {
     if (answered) return
@@ -437,19 +487,31 @@ export default function TrainingDetailPage() {
     )
   }
 
-  if (slides.length === 0) {
+  if (slideCount === 0) {
     return (
       <div className="flex items-center justify-center h-full min-h-[60vh]">
         <div className="text-center max-w-md">
           <BookOpen size={48} className="mx-auto mb-4 opacity-30" style={{ color: 'var(--text-faint)' }} />
-          <h2 className="text-lg font-bold mb-2" style={{ color: 'var(--text)' }}>Sin diapositivas</h2>
+          <h2 className="text-lg font-bold mb-2" style={{ color: 'var(--text)' }}>
+            {training?.slides_count > 0 ? 'Cargando diapositivas...' : 'Sin diapositivas'}
+          </h2>
           <p className="text-sm mb-6" style={{ color: 'var(--text-dim)' }}>
-            Este curso no tiene un archivo PPTX con diapositivas. Sube un archivo PowerPoint al crear el curso.
+            {training?.slides_count > 0
+              ? 'Las diapositivas pueden tardar unos segundos en estar disponibles. Intenta recargar.'
+              : 'Este curso no tiene un archivo PPTX con diapositivas. Sube un archivo PowerPoint al crear el curso.'}
           </p>
-          <button onClick={() => router.push('/dashboard/trainings')}
-            className="terra-btn px-6 py-2.5">
-            <ChevronLeft size={16} /> Volver a Capacitaciones
-          </button>
+          <div className="flex gap-3 justify-center">
+            <button onClick={() => router.push('/dashboard/trainings')}
+              className="terra-btn-outline px-5 py-2.5">
+              <ChevronLeft size={16} /> Volver
+            </button>
+            {training?.slides_count > 0 && (
+              <button onClick={() => { setLoading(true); loadTraining() }}
+                className="terra-btn px-5 py-2.5">
+                <RotateCcw size={16} /> Recargar
+              </button>
+            )}
+          </div>
         </div>
       </div>
     )
@@ -470,7 +532,7 @@ export default function TrainingDetailPage() {
               {training?.title || 'Capacitación'}
             </h1>
             <p className="text-xs" style={{ color: 'var(--text-dim)' }}>
-              {phase === 'slides' && `Diapositiva ${currentSlide + 1} de ${slides.length}`}
+              {phase === 'slides' && `Diapositiva ${currentSlide + 1} de ${slideCount}`}
               {phase === 'quiz' && `Evaluación — Pregunta ${currentQ + 1} de ${questions.length}`}
               {phase === 'result' && 'Resultado de la Evaluación'}
               {phase === 'signing' && 'Constancia de Capacitación — Firma del Participante'}
@@ -497,7 +559,7 @@ export default function TrainingDetailPage() {
           <div className="terra-progress-track">
             <motion.div
               className={`terra-progress-fill bg-gradient-to-r ${phase === 'slides' ? 'from-amber-500 to-red-500' : 'from-emerald-500 to-teal-500'}`}
-              animate={{ width: `${phase === 'slides' ? ((currentSlide + 1) / slides.length) * 100 : ((currentQ + 1) / questions.length) * 100}%` }}
+              animate={{ width: `${phase === 'slides' ? ((currentSlide + 1) / slideCount) * 100 : ((currentQ + 1) / questions.length) * 100}%` }}
               transition={{ duration: 0.3 }}
             />
           </div>
@@ -518,11 +580,18 @@ export default function TrainingDetailPage() {
                 className="flex items-center justify-center p-2 sm:p-4"
                 style={{ minHeight: 400 }}
               >
-                <img
-                  src={slides[currentSlide]}
-                  alt={`Diapositiva ${currentSlide + 1}`}
-                  className="max-w-full max-h-[70vh] object-contain rounded-lg"
-                />
+                {loadingSlide && !currentSlideImage ? (
+                  <div className="flex flex-col items-center gap-3">
+                    <Loader2 size={32} className="animate-spin" style={{ color: 'var(--amber)' }} />
+                    <p className="text-sm" style={{ color: 'var(--text-dim)' }}>Cargando diapositiva...</p>
+                  </div>
+                ) : (
+                  <img
+                    src={currentSlideImage || ''}
+                    alt={`Diapositiva ${currentSlide + 1}`}
+                    className="max-w-full max-h-[70vh] object-contain rounded-lg"
+                  />
+                )}
               </motion.div>
             </AnimatePresence>
           </div>
@@ -548,7 +617,7 @@ export default function TrainingDetailPage() {
               ))}
             </div>
 
-            {currentSlide < slides.length - 1 ? (
+            {currentSlide < slideCount - 1 ? (
               <button onClick={() => setCurrentSlide(s => s + 1)} className="terra-btn px-4 py-2.5">
                 Siguiente <ChevronRight size={16} />
               </button>
