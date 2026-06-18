@@ -370,8 +370,6 @@ export default function TrainingDetailPage() {
             setQuestions(custom)
             setEditQuestions(custom)
             setHasCustomQuestions(true)
-          } else {
-            setQuestions(generateQuestionsFromContent(data.texts || [], title))
           }
         }
 
