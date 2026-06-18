@@ -1,38 +1,24 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { getServerSession } from 'next-auth'
-import { authOptions } from '@/lib/auth'
 import { supabase } from '@/lib/supabase'
+import { isAdminOrSuper } from '@/lib/get-company'
 import bcrypt from 'bcryptjs'
 
-async function isAdmin() {
-  const session = await getServerSession(authOptions)
-  if (!session?.user?.email) return false
-  const { data } = await supabase
-    .from('users')
-    .select('role')
-    .eq('email', session.user.email)
-    .single()
-  return data?.role === 'admin'
-}
-
 export async function GET() {
-  if (!(await isAdmin())) {
-    return NextResponse.json({ error: 'No autorizado' }, { status: 403 })
-  }
+  const { authorized, companyId } = await isAdminOrSuper()
+  if (!authorized) return NextResponse.json({ error: 'No autorizado' }, { status: 403 })
 
-  const { data, error } = await supabase
-    .from('users')
-    .select('id, email, name, cedula, role, area, active, created_at')
-    .order('created_at', { ascending: false })
+  let query = supabase.from('users').select('id, email, name, cedula, role, area, active, company_id, created_at').order('created_at', { ascending: false })
+  if (companyId) query = query.eq('company_id', companyId)
 
+  const { data, error } = await query
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
   return NextResponse.json(data)
 }
 
 export async function POST(req: NextRequest) {
-  if (!(await isAdmin())) {
-    return NextResponse.json({ error: 'No autorizado' }, { status: 403 })
-  }
+  const { authorized, companyId } = await isAdminOrSuper()
+  if (!authorized) return NextResponse.json({ error: 'No autorizado' }, { status: 403 })
+  if (!companyId) return NextResponse.json({ error: 'Selecciona una empresa primero' }, { status: 400 })
 
   const body = await req.json()
   const { email, password, name, cedula, role, area } = body
@@ -52,8 +38,9 @@ export async function POST(req: NextRequest) {
       role: role || 'worker',
       area: area || '',
       active: true,
+      company_id: companyId,
     })
-    .select('id, email, name, cedula, role, area, active, created_at')
+    .select('id, email, name, cedula, role, area, active, company_id, created_at')
     .single()
 
   if (error) {
@@ -67,43 +54,36 @@ export async function POST(req: NextRequest) {
 }
 
 export async function PUT(req: NextRequest) {
-  if (!(await isAdmin())) {
-    return NextResponse.json({ error: 'No autorizado' }, { status: 403 })
-  }
+  const { authorized, companyId } = await isAdminOrSuper()
+  if (!authorized) return NextResponse.json({ error: 'No autorizado' }, { status: 403 })
 
   const body = await req.json()
   const { id, ...updates } = body
-
   if (!id) return NextResponse.json({ error: 'ID requerido' }, { status: 400 })
 
   if (updates.password) {
     updates.password = await bcrypt.hash(updates.password, 10)
   }
 
-  const { data, error } = await supabase
-    .from('users')
-    .update(updates)
-    .eq('id', id)
-    .select('id, email, name, cedula, role, area, active, created_at')
-    .single()
+  let query = supabase.from('users').update(updates).eq('id', id)
+  if (companyId) query = query.eq('company_id', companyId)
 
+  const { data, error } = await query.select('id, email, name, cedula, role, area, active, company_id, created_at').single()
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
   return NextResponse.json(data)
 }
 
 export async function DELETE(req: NextRequest) {
-  if (!(await isAdmin())) {
-    return NextResponse.json({ error: 'No autorizado' }, { status: 403 })
-  }
+  const { authorized, companyId } = await isAdminOrSuper()
+  if (!authorized) return NextResponse.json({ error: 'No autorizado' }, { status: 403 })
 
   const { id } = await req.json()
   if (!id) return NextResponse.json({ error: 'ID requerido' }, { status: 400 })
 
-  const { error } = await supabase
-    .from('users')
-    .update({ active: false })
-    .eq('id', id)
+  let query = supabase.from('users').update({ active: false }).eq('id', id)
+  if (companyId) query = query.eq('company_id', companyId)
 
+  const { error } = await query
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
   return NextResponse.json({ success: true })
 }

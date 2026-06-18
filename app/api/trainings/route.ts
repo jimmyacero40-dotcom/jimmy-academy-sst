@@ -2,43 +2,26 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { supabase } from '@/lib/supabase'
-
-async function getUser() {
-  const session = await getServerSession(authOptions)
-  if (!session?.user?.email) return null
-  const { data } = await supabase
-    .from('users')
-    .select('id, role, email, name')
-    .eq('email', session.user.email)
-    .single()
-  return data
-}
+import { isAdminOrSuper, getActiveCompanyId } from '@/lib/get-company'
 
 export async function GET() {
-  const { data, error } = await supabase
-    .from('trainings')
-    .select('*')
-    .order('created_at', { ascending: false })
+  const companyId = await getActiveCompanyId()
 
+  let query = supabase.from('trainings').select('*').order('created_at', { ascending: false })
+  if (companyId) query = query.eq('company_id', companyId)
+
+  const { data, error } = await query
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
   return NextResponse.json(data || [])
 }
 
 export async function POST(req: NextRequest) {
-  const session = await getServerSession(authOptions)
-  if (!session?.user?.email) {
-    return NextResponse.json({ error: 'No autorizado', debug: 'No session found' }, { status: 401 })
-  }
-  const { data: user } = await supabase
-    .from('users')
-    .select('id, role, email, name')
-    .eq('email', session.user.email)
-    .single()
-  if (!user) return NextResponse.json({ error: 'Usuario no encontrado' }, { status: 401 })
-  if (user.role !== 'admin') return NextResponse.json({ error: 'Solo admin puede crear cursos' }, { status: 403 })
+  const { authorized, user, companyId } = await isAdminOrSuper()
+  if (!authorized || !user) return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
+  if (!companyId) return NextResponse.json({ error: 'Selecciona una empresa primero' }, { status: 400 })
 
   const body = await req.json()
-  const { title, category, duration, description, status, due, slides_count, questions_count, cover_url, color, file_name } = body
+  const { title, category, duration, description, status, due, slides_count, questions_count, cover_url, color, file_name, valid_from, valid_until } = body
 
   if (!title?.trim()) return NextResponse.json({ error: 'Título requerido' }, { status: 400 })
 
@@ -57,25 +40,28 @@ export async function POST(req: NextRequest) {
       color: color || null,
       file_name: file_name || null,
       created_by: user.id,
+      company_id: companyId,
+      valid_from: valid_from || null,
+      valid_until: valid_until || null,
     })
     .select()
     .single()
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
-
   return NextResponse.json(training, { status: 201 })
 }
 
 export async function DELETE(req: NextRequest) {
-  const user = await getUser()
-  if (!user) return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
-  if (user.role !== 'admin') return NextResponse.json({ error: 'Solo admin' }, { status: 403 })
+  const { authorized, companyId } = await isAdminOrSuper()
+  if (!authorized) return NextResponse.json({ error: 'No autorizado' }, { status: 403 })
 
   const id = req.nextUrl.searchParams.get('id')
   if (!id) return NextResponse.json({ error: 'ID requerido' }, { status: 400 })
 
-  const { error } = await supabase.from('trainings').delete().eq('id', parseInt(id))
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+  let query = supabase.from('trainings').delete().eq('id', parseInt(id))
+  if (companyId) query = query.eq('company_id', companyId)
 
+  const { error } = await query
+  if (error) return NextResponse.json({ error: error.message }, { status: 500 })
   return NextResponse.json({ success: true })
 }

@@ -8,29 +8,48 @@ import {
   LayoutDashboard, Users, BookOpen, PenTool, Award,
   BarChart2, Brain, Bell, Settings, LogOut, Shield,
   ChevronLeft, ChevronRight, FileCheck, Search, Menu, X,
-  Sun, Moon
+  Sun, Moon, Building2
 } from 'lucide-react'
 
 const allNavItems = [
-  { href: '/dashboard', icon: LayoutDashboard, label: 'Dashboard', adminOnly: false },
-  { href: '/dashboard/users', icon: Users, label: 'Usuarios', adminOnly: true },
-  { href: '/dashboard/trainings', icon: BookOpen, label: 'Capacitaciones', adminOnly: false },
-  { href: '/dashboard/my-signature', icon: PenTool, label: 'Mi Firma', adminOnly: false },
-  { href: '/dashboard/signatures', icon: PenTool, label: 'Firmas Docs', adminOnly: true },
-  { href: '/dashboard/certificates', icon: Award, label: 'Certificados', adminOnly: false },
-  { href: '/dashboard/evaluations', icon: FileCheck, label: 'Evaluaciones', adminOnly: false },
-  { href: '/dashboard/reports', icon: BarChart2, label: 'Reportes', adminOnly: true },
-  { href: '/dashboard/audit', icon: Search, label: 'Auditoria', adminOnly: true },
-  { href: '/dashboard/ai', icon: Brain, label: 'IA SST', adminOnly: true },
-  { href: '/dashboard/notifications', icon: Bell, label: 'Notificaciones', adminOnly: false },
-  { href: '/dashboard/settings', icon: Settings, label: 'Configuracion', adminOnly: true },
+  { href: '/dashboard', icon: LayoutDashboard, label: 'Dashboard', adminOnly: false, superadminOnly: false },
+  { href: '/dashboard/select-company', icon: Building2, label: 'Empresas', adminOnly: false, superadminOnly: true },
+  { href: '/dashboard/users', icon: Users, label: 'Usuarios', adminOnly: true, superadminOnly: false },
+  { href: '/dashboard/trainings', icon: BookOpen, label: 'Capacitaciones', adminOnly: false, superadminOnly: false },
+  { href: '/dashboard/my-signature', icon: PenTool, label: 'Mi Firma', adminOnly: false, superadminOnly: false },
+  { href: '/dashboard/signatures', icon: PenTool, label: 'Firmas Docs', adminOnly: true, superadminOnly: false },
+  { href: '/dashboard/certificates', icon: Award, label: 'Certificados', adminOnly: false, superadminOnly: false },
+  { href: '/dashboard/evaluations', icon: FileCheck, label: 'Evaluaciones', adminOnly: false, superadminOnly: false },
+  { href: '/dashboard/reports', icon: BarChart2, label: 'Reportes', adminOnly: true, superadminOnly: false },
+  { href: '/dashboard/audit', icon: Search, label: 'Auditoria', adminOnly: true, superadminOnly: false },
+  { href: '/dashboard/ai', icon: Brain, label: 'IA SST', adminOnly: true, superadminOnly: false },
+  { href: '/dashboard/notifications', icon: Bell, label: 'Notificaciones', adminOnly: false, superadminOnly: false },
+  { href: '/dashboard/settings', icon: Settings, label: 'Configuracion', adminOnly: true, superadminOnly: false },
 ]
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname()
   const { data: session } = useSession()
   const userRole = (session?.user as any)?.role || 'worker'
-  const isAdmin = userRole === 'admin'
+  const isAdmin = userRole === 'admin' || userRole === 'superadmin'
+  const isSuperAdmin = userRole === 'superadmin'
+  const [companyName, setCompanyName] = useState<string | null>(null)
+
+  useEffect(() => {
+    if (isSuperAdmin) {
+      const match = document.cookie.match(/x-active-company=([^;]+)/)
+      if (match) {
+        fetch('/api/companies')
+          .then(r => r.json())
+          .then(data => {
+            if (Array.isArray(data)) {
+              const active = data.find((c: any) => c.id === match[1])
+              if (active) setCompanyName(active.name)
+            }
+          })
+      }
+    }
+  }, [isSuperAdmin])
   const [collapsed, setCollapsed] = useState(false)
   const [mobileOpen, setMobileOpen] = useState(false)
   const [theme, setTheme] = useState<'dark' | 'light'>('dark')
@@ -85,7 +104,11 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           {!collapsed && (
             <div className="flex-1 min-w-0">
               <div className="font-extrabold text-sm truncate" style={{ color: 'var(--text)', fontFamily: 'var(--font-display)' }}>Jimmy Academy</div>
-              <div className="text-xs font-semibold" style={{ color: 'var(--amber)' }}>SG-SST</div>
+              {isSuperAdmin && companyName ? (
+                <div className="text-[10px] font-semibold truncate" style={{ color: 'var(--amber)' }}>{companyName}</div>
+              ) : (
+                <div className="text-xs font-semibold" style={{ color: 'var(--amber)' }}>SG-SST</div>
+              )}
             </div>
           )}
           <button onClick={() => setMobileOpen(false)} className="md:hidden" style={{ color: 'var(--text-dim)' }}>
@@ -95,7 +118,10 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
         {/* Nav items */}
         <nav className="flex-1 overflow-y-auto py-3 px-2.5">
-          {allNavItems.filter(item => isAdmin || !item.adminOnly).map(({ href, icon: Icon, label }) => {
+          {allNavItems.filter(item => {
+            if (item.superadminOnly && !isSuperAdmin) return false
+            return isAdmin || !item.adminOnly
+          }).map(({ href, icon: Icon, label }) => {
             const active = isActive(href)
             return (
               <Link key={href} href={href}

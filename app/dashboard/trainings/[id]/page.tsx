@@ -487,6 +487,41 @@ export default function TrainingDetailPage() {
     )
   }
 
+  const now = new Date().toISOString().split('T')[0]
+  const isExpired = training?.valid_until && training.valid_until < now
+  const notYetValid = training?.valid_from && training.valid_from > now
+  const isOutOfRange = isExpired || notYetValid
+
+  if (isOutOfRange) {
+    return (
+      <div className="flex items-center justify-center h-full min-h-[60vh]">
+        <div className="text-center max-w-md">
+          <div className="w-20 h-20 rounded-full mx-auto mb-6 flex items-center justify-center"
+            style={{ background: isExpired ? 'rgba(239,68,68,0.1)' : 'rgba(245,158,11,0.1)', border: `2px solid ${isExpired ? 'rgba(239,68,68,0.3)' : 'rgba(245,158,11,0.3)'}` }}>
+            <Clock size={36} style={{ color: isExpired ? '#FCA5A5' : '#FCD34D' }} />
+          </div>
+          <h2 className="text-xl font-bold mb-3" style={{ color: 'var(--text)' }}>
+            {isExpired ? 'Capacitación vencida' : 'Capacitación no disponible aún'}
+          </h2>
+          <p className="text-sm mb-2" style={{ color: 'var(--text-dim)' }}>
+            {isExpired
+              ? `Esta capacitación estuvo disponible hasta el ${training.valid_until}. Ya no es posible realizarla.`
+              : `Esta capacitación estará disponible a partir del ${training.valid_from}.`}
+          </p>
+          {training.valid_from && training.valid_until && (
+            <p className="text-xs mb-6" style={{ color: 'var(--text-faint)' }}>
+              Período de vigencia: {training.valid_from} → {training.valid_until}
+            </p>
+          )}
+          <button onClick={() => router.push('/dashboard/trainings')}
+            className="terra-btn-primary px-6 py-2.5">
+            ← Volver a capacitaciones
+          </button>
+        </div>
+      </div>
+    )
+  }
+
   if (slideCount === 0) {
     return (
       <div className="flex items-center justify-center h-full min-h-[60vh]">

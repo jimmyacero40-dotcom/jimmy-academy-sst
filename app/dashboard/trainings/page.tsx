@@ -37,7 +37,7 @@ export default function TrainingsPage() {
   const [search, setSearch] = useState('')
   const [filter, setFilter] = useState('todos')
   const [showModal, setShowModal] = useState(false)
-  const [newCourse, setNewCourse] = useState({ name: '', duration: '', description: '', category: 'Obligatorio' })
+  const [newCourse, setNewCourse] = useState({ name: '', duration: '', description: '', category: 'Obligatorio', valid_from: '', valid_until: '' })
   const [uploadedFile, setUploadedFile] = useState<File | null>(null)
   const [creating, setCreating] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
@@ -152,6 +152,8 @@ export default function TrainingsPage() {
           cover_url: slides[0] || null,
           color: GRADIENTS[trainings.length % GRADIENTS.length],
           file_name: uploadedFile?.name,
+          valid_from: newCourse.valid_from || null,
+          valid_until: newCourse.valid_until || null,
         }),
       })
       const training = await res.json()
@@ -190,7 +192,7 @@ export default function TrainingsPage() {
 
       setTrainings(prev => [training, ...prev])
       setShowModal(false)
-      setNewCourse({ name: '', duration: '', description: '', category: 'Obligatorio' })
+      setNewCourse({ name: '', duration: '', description: '', category: 'Obligatorio', valid_from: '', valid_until: '' })
       setUploadedFile(null)
     } catch (e) {
       console.error('Error creating course:', e)
@@ -299,7 +301,11 @@ export default function TrainingsPage() {
       {!loading && (
         <div className="grid sm:grid-cols-2 xl:grid-cols-3 gap-5">
           {filtered.map((t, i) => {
-            const st = statusStyles[t.status as keyof typeof statusStyles] || statusStyles.activo
+            const now = new Date().toISOString().split('T')[0]
+            const isExpired = t.valid_until && t.valid_until < now
+            const notYetValid = t.valid_from && t.valid_from > now
+            const effectiveStatus = isExpired ? 'vencido' : (t.status || 'activo')
+            const st = statusStyles[effectiveStatus as keyof typeof statusStyles] || statusStyles.activo
             const progress = (t.enrolled || 0) > 0 ? Math.round(((t.completed || 0) / t.enrolled) * 100) : 0
             const coverImg = t.cover_url
             const gradColor = t.color || GRADIENTS[t.id % GRADIENTS.length]
@@ -346,6 +352,13 @@ export default function TrainingsPage() {
                   <h3 className="font-bold text-[15px] mb-1.5 leading-snug transition-colors text-white">{t.title}</h3>
                   <p className="text-xs mb-3 line-clamp-2 leading-relaxed text-gray-300">{t.description}</p>
 
+                  {(t.valid_from || t.valid_until) && (
+                    <div className="text-[10px] mb-2 px-2 py-1 rounded-lg inline-block"
+                      style={{ background: isExpired ? 'rgba(239,68,68,0.1)' : notYetValid ? 'rgba(245,158,11,0.1)' : 'rgba(16,185,129,0.1)',
+                               color: isExpired ? '#FCA5A5' : notYetValid ? '#FCD34D' : '#6EE7B7' }}>
+                      Vigencia: {t.valid_from || '...'} → {t.valid_until || '...'}
+                    </div>
+                  )}
                   <div className="flex items-center gap-3 text-xs mb-3 text-gray-400">
                     <div className="flex items-center gap-1"><Clock size={11} /> {t.duration}</div>
                     <div className="flex items-center gap-1"><Users size={11} /> {t.enrolled || 0}</div>
@@ -409,7 +422,7 @@ export default function TrainingsPage() {
                 </div>
                 <h2 className="font-bold" style={{ color: 'var(--text)' }}>Subir Capacitacion</h2>
               </div>
-              <button onClick={() => { setShowModal(false); setUploadedFile(null); setNewCourse({ name: '', duration: '', description: '', category: 'Obligatorio' }) }}
+              <button onClick={() => { setShowModal(false); setUploadedFile(null); setNewCourse({ name: '', duration: '', description: '', category: 'Obligatorio', valid_from: '', valid_until: '' }) }}
                 style={{ color: 'var(--text-dim)' }}><X size={18} /></button>
             </div>
             <div className="p-6 space-y-4">
@@ -456,6 +469,24 @@ export default function TrainingsPage() {
                   onChange={e => setNewCourse({ ...newCourse, description: e.target.value })}
                   className="terra-input resize-none" />
               </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="text-xs font-semibold mb-1.5 block" style={{ color: 'var(--text-dim)' }}>Vigencia desde</label>
+                  <input type="date"
+                    value={newCourse.valid_from}
+                    onChange={e => setNewCourse({ ...newCourse, valid_from: e.target.value })}
+                    className="terra-input"
+                    style={{ colorScheme: 'dark' }} />
+                </div>
+                <div>
+                  <label className="text-xs font-semibold mb-1.5 block" style={{ color: 'var(--text-dim)' }}>Vigencia hasta</label>
+                  <input type="date"
+                    value={newCourse.valid_until}
+                    onChange={e => setNewCourse({ ...newCourse, valid_until: e.target.value })}
+                    className="terra-input"
+                    style={{ colorScheme: 'dark' }} />
+                </div>
+              </div>
               <div>
                 <label className="text-xs font-semibold mb-1.5 block" style={{ color: 'var(--text-dim)' }}>Material del curso</label>
                 <input
@@ -496,7 +527,7 @@ export default function TrainingsPage() {
               </div>
             </div>
             <div className="px-6 pb-6 flex gap-3">
-              <button onClick={() => { setShowModal(false); setUploadedFile(null); setNewCourse({ name: '', duration: '', description: '', category: 'Obligatorio' }) }}
+              <button onClick={() => { setShowModal(false); setUploadedFile(null); setNewCourse({ name: '', duration: '', description: '', category: 'Obligatorio', valid_from: '', valid_until: '' }) }}
                 className="terra-btn-outline flex-1 py-2.5 justify-center">Cancelar</button>
               <button onClick={handleCreateCourse}
                 disabled={!newCourse.name.trim() || creating}

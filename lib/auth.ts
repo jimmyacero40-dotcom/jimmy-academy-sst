@@ -33,6 +33,7 @@ export const authOptions: NextAuthOptions = {
           role: user.role,
           cedula: user.cedula,
           area: user.area,
+          companyId: user.company_id,
         }
       },
     }),
@@ -44,6 +45,7 @@ export const authOptions: NextAuthOptions = {
         token.cedula = (user as any).cedula
         token.area = (user as any).area
         token.userId = (user as any).id
+        token.companyId = (user as any).companyId
       }
       return token
     },
@@ -52,7 +54,8 @@ export const authOptions: NextAuthOptions = {
         (session.user as any).role = token.role;
         (session.user as any).cedula = token.cedula;
         (session.user as any).area = token.area;
-        (session.user as any).id = token.userId
+        (session.user as any).id = token.userId;
+        (session.user as any).companyId = token.companyId
       }
       return session
     },
