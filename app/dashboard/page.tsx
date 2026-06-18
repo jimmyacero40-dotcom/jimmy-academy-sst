@@ -1,6 +1,8 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import { useRouter } from 'next/navigation'
+import { useSession } from 'next-auth/react'
 import { motion } from 'framer-motion'
 import {
   Users, BookOpen, Award, TrendingUp,
@@ -8,14 +10,21 @@ import {
 } from 'lucide-react'
 
 export default function DashboardPage() {
+  const router = useRouter()
+  const { data: session } = useSession()
+  const userRole = (session?.user as any)?.role || 'worker'
   const [trainings, setTrainings] = useState<any[]>([])
 
   useEffect(() => {
+    if (userRole === 'worker') {
+      router.replace('/dashboard/trainings')
+      return
+    }
     fetch('/api/trainings')
       .then(r => r.json())
       .then(data => { if (Array.isArray(data)) setTrainings(data) })
       .catch(() => {})
-  }, [])
+  }, [userRole, router])
 
   const totalCourses = trainings.length
   const completed = trainings.filter(t => t.status === 'completado').length

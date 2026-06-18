@@ -3,6 +3,7 @@
 import { useState, useRef, useEffect } from 'react'
 import { motion } from 'framer-motion'
 import { useRouter } from 'next/navigation'
+import { useSession } from 'next-auth/react'
 import { extractPPTXImages, extractPPTXTexts, getCourseData, getCustomQuestions } from '@/lib/pptx-extractor'
 import {
   BookOpen, Plus, Search, Clock, CheckCircle, AlertCircle,
@@ -32,6 +33,9 @@ const statusStyles: Record<string, { label: string; color: string; bg: string; b
 
 export default function TrainingsPage() {
   const router = useRouter()
+  const { data: session } = useSession()
+  const userRole = (session?.user as any)?.role || 'worker'
+  const isAdmin = userRole === 'admin' || userRole === 'superadmin'
   const [trainings, setTrainings] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
@@ -262,14 +266,14 @@ export default function TrainingsPage() {
             <h1 className="text-2xl font-black mb-1" style={{ color: 'var(--text)', fontFamily: 'var(--font-display)' }}>Capacitaciones</h1>
             <p className="text-sm" style={{ color: 'var(--text-dim)' }}>{trainings.length} cursos disponibles · evaluacion y certificado automatico</p>
           </div>
-          <div className="flex gap-2 flex-wrap">
+          {isAdmin && <div className="flex gap-2 flex-wrap">
             <button onClick={() => router.push('/dashboard/trainings/create')} className="terra-btn text-sm py-2.5 px-4">
               <Zap size={15} /> Generar con IA
             </button>
             <button onClick={() => setShowModal(true)} className="terra-btn-outline text-sm py-2.5 px-4">
               <Plus size={16} /> Subir Capacitacion
             </button>
-          </div>
+          </div>}
         </div>
       </motion.div>
 
@@ -421,14 +425,16 @@ export default function TrainingsPage() {
                       <span className="text-xs text-gray-300">Certificado al completar</span>
                     </div>
                     <div className="flex items-center gap-2">
-                      <button onClick={(e) => openEditValidity(e, t)}
-                        className="p-1.5 rounded-lg hover:bg-amber-500/15 transition-colors" title="Editar vigencia">
-                        <Calendar size={13} className="text-amber-400" />
-                      </button>
-                      <button onClick={(e) => { e.stopPropagation(); handleDeleteCourse(t.id) }}
-                        className="p-1.5 rounded-lg hover:bg-red-500/15 transition-colors" title="Eliminar curso">
-                        <Trash2 size={13} className="text-red-400" />
-                      </button>
+                      {isAdmin && <>
+                        <button onClick={(e) => openEditValidity(e, t)}
+                          className="p-1.5 rounded-lg hover:bg-amber-500/15 transition-colors" title="Editar vigencia">
+                          <Calendar size={13} className="text-amber-400" />
+                        </button>
+                        <button onClick={(e) => { e.stopPropagation(); handleDeleteCourse(t.id) }}
+                          className="p-1.5 rounded-lg hover:bg-red-500/15 transition-colors" title="Eliminar curso">
+                          <Trash2 size={13} className="text-red-400" />
+                        </button>
+                      </>}
                       <button className="flex items-center gap-1 text-xs font-bold transition-colors text-amber-400 hover:text-amber-300">
                         Iniciar <ChevronRight size={13} />
                       </button>

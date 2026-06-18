@@ -334,8 +334,20 @@ export default function TrainingDetailPage() {
     prefetchIndexes.forEach(i => { if (!slideCacheRef.current[i]) fetchSlide(i) })
   }
 
-  // Keep backward compat
   const loadSlide = showSlide
+
+  const goToSlide = (index: number) => {
+    if (index < 0 || index >= slideCount || index === currentSlide) return
+    const cached = slideCacheRef.current[index]
+    if (cached) {
+      setCurrentSlideImage(cached)
+      setLoadingSlide(false)
+    } else {
+      setCurrentSlideImage(null)
+      setLoadingSlide(true)
+    }
+    setCurrentSlide(index)
+  }
 
   const loadTraining = async (retries = 0) => {
     try {
@@ -381,7 +393,7 @@ export default function TrainingDetailPage() {
   }, [courseId])
 
   useEffect(() => {
-    if (phase === 'slides' && slideCount > 0) {
+    if (phase === 'slides' && slideCount > 0 && !slideCacheRef.current[currentSlide]) {
       showSlide(currentSlide)
     }
   }, [currentSlide, phase, slideCount])
@@ -644,7 +656,7 @@ export default function TrainingDetailPage() {
 
           <div className="flex items-center justify-between mt-4">
             <button
-              onClick={() => setCurrentSlide(s => Math.max(0, s - 1))}
+              onClick={() => goToSlide(currentSlide - 1)}
               disabled={currentSlide === 0}
               className="flex items-center gap-2 px-4 py-2.5 rounded-xl border text-sm font-semibold transition-all disabled:opacity-30"
               style={{ borderColor: 'var(--border)', color: 'var(--text-dim)' }}>
@@ -653,7 +665,7 @@ export default function TrainingDetailPage() {
 
             <div className="flex gap-1.5 flex-wrap justify-center max-w-[50%]">
               {slides.map((_, i) => (
-                <button key={i} onClick={() => setCurrentSlide(i)}
+                <button key={i} onClick={() => goToSlide(i)}
                   className="w-2.5 h-2.5 rounded-full transition-all"
                   style={{
                     background: i === currentSlide ? 'var(--amber)' : i < currentSlide ? 'rgba(245,158,11,0.4)' : 'var(--border)',
@@ -664,7 +676,7 @@ export default function TrainingDetailPage() {
             </div>
 
             {currentSlide < slideCount - 1 ? (
-              <button onClick={() => setCurrentSlide(s => s + 1)} className="terra-btn px-4 py-2.5">
+              <button onClick={() => goToSlide(currentSlide + 1)} className="terra-btn px-4 py-2.5">
                 Siguiente <ChevronRight size={16} />
               </button>
             ) : (

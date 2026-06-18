@@ -12,18 +12,18 @@ import {
 } from 'lucide-react'
 
 const allNavItems = [
-  { href: '/dashboard', icon: LayoutDashboard, label: 'Dashboard', adminOnly: false, superadminOnly: false },
+  { href: '/dashboard', icon: LayoutDashboard, label: 'Dashboard', adminOnly: true, superadminOnly: false },
   { href: '/select-company', icon: Building2, label: 'Cambiar Empresa', adminOnly: false, superadminOnly: true },
   { href: '/dashboard/users', icon: Users, label: 'Usuarios', adminOnly: true, superadminOnly: false },
   { href: '/dashboard/trainings', icon: BookOpen, label: 'Capacitaciones', adminOnly: false, superadminOnly: false },
   { href: '/dashboard/my-signature', icon: PenTool, label: 'Mi Firma', adminOnly: false, superadminOnly: false },
   { href: '/dashboard/signatures', icon: PenTool, label: 'Firmas Docs', adminOnly: true, superadminOnly: false },
   { href: '/dashboard/certificates', icon: Award, label: 'Certificados', adminOnly: false, superadminOnly: false },
-  { href: '/dashboard/evaluations', icon: FileCheck, label: 'Evaluaciones', adminOnly: false, superadminOnly: false },
+  { href: '/dashboard/evaluations', icon: FileCheck, label: 'Evaluaciones', adminOnly: true, superadminOnly: false },
   { href: '/dashboard/reports', icon: BarChart2, label: 'Reportes', adminOnly: true, superadminOnly: false },
   { href: '/dashboard/audit', icon: Search, label: 'Auditoria', adminOnly: true, superadminOnly: false },
   { href: '/dashboard/ai', icon: Brain, label: 'IA SST', adminOnly: true, superadminOnly: false },
-  { href: '/dashboard/notifications', icon: Bell, label: 'Notificaciones', adminOnly: false, superadminOnly: false },
+  { href: '/dashboard/notifications', icon: Bell, label: 'Notificaciones', adminOnly: true, superadminOnly: false },
   { href: '/dashboard/settings', icon: Settings, label: 'Configuracion', adminOnly: true, superadminOnly: false },
 ]
 

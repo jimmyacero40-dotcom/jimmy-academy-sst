@@ -23,7 +23,7 @@ export async function GET() {
     .select('*')
     .order('created_at', { ascending: false })
 
-  if (user.role !== 'admin') {
+  if (user.role !== 'admin' && user.role !== 'superadmin') {
     query = query.eq('user_id', user.id)
   }
 
