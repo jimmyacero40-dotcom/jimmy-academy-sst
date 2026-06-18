@@ -38,6 +38,7 @@ export default function LoginPage() {
     if (result?.error) {
       setAuthError('Correo o contraseña incorrectos')
     } else {
+      document.cookie = 'x-active-company=; path=/; max-age=0'
       router.push('/dashboard')
       router.refresh()
     }
