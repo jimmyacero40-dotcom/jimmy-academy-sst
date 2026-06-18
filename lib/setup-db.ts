@@ -2,7 +2,6 @@ import { supabase } from './supabase'
 import bcrypt from 'bcryptjs'
 
 export async function setupDatabase() {
-  // Create users table
   await supabase.rpc('exec_sql', {
     sql: `
       CREATE TABLE IF NOT EXISTS users (
@@ -11,9 +10,10 @@ export async function setupDatabase() {
         password TEXT NOT NULL,
         name TEXT NOT NULL,
         cedula TEXT,
-        role TEXT NOT NULL DEFAULT 'worker' CHECK (role IN ('admin', 'worker')),
+        role TEXT NOT NULL DEFAULT 'worker' CHECK (role IN ('superadmin', 'admin', 'worker')),
         area TEXT,
         active BOOLEAN DEFAULT true,
+        company_id UUID,
         created_at TIMESTAMPTZ DEFAULT NOW()
       );
     `
@@ -21,12 +21,20 @@ export async function setupDatabase() {
 }
 
 export async function createAdminUser() {
+  const { data: existing } = await supabase
+    .from('users')
+    .select('id')
+    .eq('email', 'admin@jimmyacademy.com')
+    .single()
+
+  if (existing) return null
+
   const hash = await bcrypt.hash('admin123', 10)
-  const { error } = await supabase.from('users').upsert({
+  const { error } = await supabase.from('users').insert({
     email: 'admin@jimmyacademy.com',
     password: hash,
     name: 'Admin SST',
-    role: 'admin',
-  }, { onConflict: 'email' })
+    role: 'superadmin',
+  })
   return error
 }
