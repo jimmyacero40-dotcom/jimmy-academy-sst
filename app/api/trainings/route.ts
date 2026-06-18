@@ -51,6 +51,21 @@ export async function POST(req: NextRequest) {
   return NextResponse.json(training, { status: 201 })
 }
 
+export async function PUT(req: NextRequest) {
+  const { authorized, companyId } = await isAdminOrSuper()
+  if (!authorized) return NextResponse.json({ error: 'No autorizado' }, { status: 403 })
+
+  const { id, ...updates } = await req.json()
+  if (!id) return NextResponse.json({ error: 'ID requerido' }, { status: 400 })
+
+  let query = supabase.from('trainings').update(updates).eq('id', id)
+  if (companyId) query = query.eq('company_id', companyId)
+
+  const { data, error } = await query.select().single()
+  if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+  return NextResponse.json(data)
+}
+
 export async function DELETE(req: NextRequest) {
   const { authorized, companyId } = await isAdminOrSuper()
   if (!authorized) return NextResponse.json({ error: 'No autorizado' }, { status: 403 })

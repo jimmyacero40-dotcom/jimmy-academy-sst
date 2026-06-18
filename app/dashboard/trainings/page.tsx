@@ -7,7 +7,7 @@ import { extractPPTXImages, extractPPTXTexts, getCourseData, getCustomQuestions 
 import {
   BookOpen, Plus, Search, Clock, CheckCircle, AlertCircle,
   Users, Star, Play, Upload, ChevronRight, X, Award, Zap,
-  FileText, Video, Layers, Trash2, Loader2
+  FileText, Video, Layers, Trash2, Loader2, Calendar, Edit3, Save
 } from 'lucide-react'
 
 const GRADIENTS = [
@@ -43,6 +43,12 @@ export default function TrainingsPage() {
   const fileInputRef = useRef<HTMLInputElement>(null)
 
   const [migrating, setMigrating] = useState(false)
+
+  // Edit validity modal
+  const [editingTraining, setEditingTraining] = useState<any>(null)
+  const [editValidFrom, setEditValidFrom] = useState('')
+  const [editValidUntil, setEditValidUntil] = useState('')
+  const [savingValidity, setSavingValidity] = useState(false)
 
   useEffect(() => {
     async function loadAndMigrate() {
@@ -208,6 +214,36 @@ export default function TrainingsPage() {
       await fetch(`/api/trainings?id=${id}`, { method: 'DELETE' })
       setTrainings(prev => prev.filter(t => t.id !== id))
     } catch (_) {}
+  }
+
+  const openEditValidity = (e: React.MouseEvent, t: any) => {
+    e.stopPropagation()
+    setEditingTraining(t)
+    setEditValidFrom(t.valid_from || '')
+    setEditValidUntil(t.valid_until || '')
+  }
+
+  const saveValidity = async () => {
+    if (!editingTraining) return
+    setSavingValidity(true)
+    try {
+      const res = await fetch('/api/trainings', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          id: editingTraining.id,
+          valid_from: editValidFrom || null,
+          valid_until: editValidUntil || null,
+        }),
+      })
+      if (res.ok) {
+        setTrainings(prev => prev.map(t =>
+          t.id === editingTraining.id ? { ...t, valid_from: editValidFrom || null, valid_until: editValidUntil || null } : t
+        ))
+        setEditingTraining(null)
+      }
+    } catch (_) {}
+    setSavingValidity(false)
   }
 
   const filtered = trainings.filter(t => {
@@ -385,6 +421,10 @@ export default function TrainingsPage() {
                       <span className="text-xs text-gray-300">Certificado al completar</span>
                     </div>
                     <div className="flex items-center gap-2">
+                      <button onClick={(e) => openEditValidity(e, t)}
+                        className="p-1.5 rounded-lg hover:bg-amber-500/15 transition-colors" title="Editar vigencia">
+                        <Calendar size={13} className="text-amber-400" />
+                      </button>
                       <button onClick={(e) => { e.stopPropagation(); handleDeleteCourse(t.id) }}
                         className="p-1.5 rounded-lg hover:bg-red-500/15 transition-colors" title="Eliminar curso">
                         <Trash2 size={13} className="text-red-400" />
@@ -532,6 +572,51 @@ export default function TrainingsPage() {
               <button onClick={handleCreateCourse}
                 disabled={!newCourse.name.trim() || creating}
                 className="terra-btn flex-1 py-2.5 justify-center">{creating ? (uploadProgress || 'Procesando...') : 'Crear Curso'}</button>
+            </div>
+          </motion.div>
+        </div>
+      )}
+
+      {/* Edit validity modal */}
+      {editingTraining && (
+        <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-4"
+          onClick={() => setEditingTraining(null)}>
+          <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }}
+            className="w-full max-w-sm rounded-2xl"
+            style={{ background: 'var(--bg-surface)', border: '1px solid var(--border-strong)' }}
+            onClick={e => e.stopPropagation()}>
+            <div className="flex items-center justify-between px-5 py-4" style={{ borderBottom: '1px solid var(--border)' }}>
+              <div className="flex items-center gap-2.5">
+                <div className="w-8 h-8 rounded-lg flex items-center justify-center"
+                  style={{ background: 'rgba(245,158,11,0.1)', border: '1px solid rgba(245,158,11,0.2)' }}>
+                  <Calendar size={15} style={{ color: 'var(--amber)' }} />
+                </div>
+                <h2 className="font-bold text-sm" style={{ color: 'var(--text)' }}>Editar Vigencia</h2>
+              </div>
+              <button onClick={() => setEditingTraining(null)} style={{ color: 'var(--text-dim)' }}><X size={18} /></button>
+            </div>
+            <div className="p-5 space-y-4">
+              <div className="text-sm font-semibold" style={{ color: 'var(--text)' }}>{editingTraining.title}</div>
+              <div>
+                <label className="text-xs font-semibold mb-1.5 block" style={{ color: 'var(--text-dim)' }}>Vigencia desde</label>
+                <input type="date" value={editValidFrom}
+                  onChange={e => setEditValidFrom(e.target.value)}
+                  className="terra-input w-full" style={{ colorScheme: 'dark' }} />
+              </div>
+              <div>
+                <label className="text-xs font-semibold mb-1.5 block" style={{ color: 'var(--text-dim)' }}>Vigencia hasta</label>
+                <input type="date" value={editValidUntil}
+                  onChange={e => setEditValidUntil(e.target.value)}
+                  className="terra-input w-full" style={{ colorScheme: 'dark' }} />
+              </div>
+              <div className="flex gap-3">
+                <button onClick={() => setEditingTraining(null)}
+                  className="terra-btn-outline flex-1 py-2.5 justify-center">Cancelar</button>
+                <button onClick={saveValidity} disabled={savingValidity}
+                  className="terra-btn flex-1 py-2.5 justify-center flex items-center gap-2">
+                  {savingValidity ? <Loader2 size={14} className="animate-spin" /> : <><Save size={14} /> Guardar</>}
+                </button>
+              </div>
             </div>
           </motion.div>
         </div>
