@@ -31,20 +31,6 @@ const statusStyles: Record<string, { label: string; color: string; bg: string; b
   vencido:    { label: 'Vencido',     color: '#FCA5A5', bg: 'rgba(239,68,68,0.1)',  border: 'rgba(239,68,68,0.25)' },
 }
 
-function TrainingCover({ trainingId, slidesCount, gradColor, title }: { trainingId: number; slidesCount: number; gradColor: string; title: string }) {
-  const [img, setImg] = useState<string | null>(null)
-  useEffect(() => {
-    if (slidesCount > 0) {
-      fetch(`/api/trainings/${trainingId}?slide=0`)
-        .then(r => r.json())
-        .then(d => { if (d.image) setImg(d.image) })
-        .catch(() => {})
-    }
-  }, [trainingId, slidesCount])
-  if (img) return <img src={img} alt={title} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
-  return <div className={`w-full h-full bg-gradient-to-br ${gradColor} flex items-center justify-center`}><BookOpen size={48} className="text-white/30" /></div>
-}
-
 export default function TrainingsPage() {
   const router = useRouter()
   const { data: session } = useSession()
@@ -368,7 +354,9 @@ export default function TrainingsPage() {
                 onClick={() => router.push(`/dashboard/trainings/${t.id}`)}>
 
                 <div className="relative h-44 overflow-hidden">
-                  <TrainingCover trainingId={t.id} slidesCount={t.slides_count} gradColor={gradColor} title={t.title} />
+                  <div className={`w-full h-full bg-gradient-to-br ${gradColor} flex items-center justify-center`}>
+                    <BookOpen size={48} className="text-white/30" />
+                  </div>
                   <div className="absolute inset-0" style={{ background: 'linear-gradient(to top, var(--bg-surface), rgba(17,9,0,0.4), transparent)' }} />
                   <div className={`absolute inset-0 bg-gradient-to-br ${gradColor} opacity-20`} />
 
