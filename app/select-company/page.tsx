@@ -195,22 +195,25 @@ export default function SelectCompanyPage() {
                     <Edit3 size={13} style={{ color: 'var(--amber)' }} />
                   </button>
 
-                  <div className="flex items-start justify-between mb-4">
+                  {/* Logo area */}
+                  <div className={`h-28 -mx-6 -mt-6 mb-4 rounded-t-2xl flex items-center justify-center overflow-hidden ${!company.logo_url ? `bg-gradient-to-br ${company.color || 'from-amber-500 to-orange-500'}` : ''}`}
+                    style={!company.logo_url ? {} : { background: 'var(--bg-card)' }}>
                     {company.logo_url ? (
                       <img src={company.logo_url} alt={company.name}
-                        className="w-14 h-14 rounded-xl object-contain" style={{ background: 'var(--bg-card)', padding: '4px' }} />
+                        className="h-20 max-w-[80%] object-contain" />
                     ) : (
-                      <div className={`w-14 h-14 rounded-xl flex items-center justify-center bg-gradient-to-br ${company.color || 'from-amber-500 to-orange-500'}`}>
-                        <Building2 size={28} className="text-white" />
-                      </div>
-                    )}
-                    {selecting === company.id ? (
-                      <Loader2 size={18} className="animate-spin" style={{ color: 'var(--amber)' }} />
-                    ) : (
-                      <ArrowRight size={18} className="opacity-0 group-hover:opacity-100 transition-opacity" style={{ color: 'var(--amber)' }} />
+                      <Building2 size={44} className="text-white/60" />
                     )}
                   </div>
-                  <h3 className="font-bold text-lg mb-1" style={{ color: 'var(--text)' }}>{company.name}</h3>
+
+                  <div className="flex items-center justify-between mb-1">
+                    <h3 className="font-bold text-lg" style={{ color: 'var(--text)' }}>{company.name}</h3>
+                    {selecting === company.id ? (
+                      <Loader2 size={16} className="animate-spin" style={{ color: 'var(--amber)' }} />
+                    ) : (
+                      <ArrowRight size={16} className="opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0" style={{ color: 'var(--amber)' }} />
+                    )}
+                  </div>
                   {company.nit && (
                     <p className="text-xs mb-3" style={{ color: 'var(--text-faint)' }}>NIT: {company.nit}</p>
                   )}

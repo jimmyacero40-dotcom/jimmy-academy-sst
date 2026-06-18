@@ -97,7 +97,9 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         {/* Logo */}
         <div className="flex items-center h-16 px-4 gap-3 flex-shrink-0" style={{ borderBottom: '1px solid var(--border)' }}>
           {activeCompany?.logo_url ? (
-            <img src={activeCompany.logo_url} alt={activeCompany.name} className="w-8 h-8 rounded-lg object-contain flex-shrink-0" />
+            <div className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 overflow-hidden" style={{ background: 'white' }}>
+              <img src={activeCompany.logo_url} alt={activeCompany.name} className="w-7 h-7 object-contain" />
+            </div>
           ) : (
             <div className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0" style={{ background: 'var(--grad-main)', boxShadow: '0 4px 16px rgba(245,158,11,0.25)' }}>
               <Shield size={16} className="text-white" strokeWidth={2.5} />
