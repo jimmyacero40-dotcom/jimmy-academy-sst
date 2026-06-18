@@ -31,6 +31,20 @@ const statusStyles: Record<string, { label: string; color: string; bg: string; b
   vencido:    { label: 'Vencido',     color: '#FCA5A5', bg: 'rgba(239,68,68,0.1)',  border: 'rgba(239,68,68,0.25)' },
 }
 
+function TrainingCover({ trainingId, slidesCount, gradColor, title }: { trainingId: number; slidesCount: number; gradColor: string; title: string }) {
+  const [img, setImg] = useState<string | null>(null)
+  useEffect(() => {
+    if (slidesCount > 0) {
+      fetch(`/api/trainings/${trainingId}?slide=0`)
+        .then(r => r.json())
+        .then(d => { if (d.image) setImg(d.image) })
+        .catch(() => {})
+    }
+  }, [trainingId, slidesCount])
+  if (img) return <img src={img} alt={title} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
+  return <div className={`w-full h-full bg-gradient-to-br ${gradColor} flex items-center justify-center`}><BookOpen size={48} className="text-white/30" /></div>
+}
+
 export default function TrainingsPage() {
   const router = useRouter()
   const { data: session } = useSession()
@@ -347,7 +361,6 @@ export default function TrainingsPage() {
             const effectiveStatus = isExpired ? 'vencido' : (t.status || 'activo')
             const st = statusStyles[effectiveStatus as keyof typeof statusStyles] || statusStyles.activo
             const progress = (t.enrolled || 0) > 0 ? Math.round(((t.completed || 0) / t.enrolled) * 100) : 0
-            const coverImg = t.cover_url
             const gradColor = t.color || GRADIENTS[t.id % GRADIENTS.length]
             return (
               <motion.div key={t.id} initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.07 }}
@@ -355,15 +368,7 @@ export default function TrainingsPage() {
                 onClick={() => router.push(`/dashboard/trainings/${t.id}`)}>
 
                 <div className="relative h-44 overflow-hidden">
-                  {coverImg ? (
-                    <img src={coverImg} alt={t.title}
-                      className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
-                      onError={e => { (e.target as HTMLImageElement).style.display = 'none' }} />
-                  ) : (
-                    <div className={`w-full h-full bg-gradient-to-br ${gradColor} flex items-center justify-center`}>
-                      <BookOpen size={48} className="text-white/30" />
-                    </div>
-                  )}
+                  <TrainingCover trainingId={t.id} slidesCount={t.slides_count} gradColor={gradColor} title={t.title} />
                   <div className="absolute inset-0" style={{ background: 'linear-gradient(to top, var(--bg-surface), rgba(17,9,0,0.4), transparent)' }} />
                   <div className={`absolute inset-0 bg-gradient-to-br ${gradColor} opacity-20`} />
 
