@@ -23,6 +23,16 @@ export default function RootLayout({
 }) {
   return (
     <html lang="es" suppressHydrationWarning>
+      <head>
+        <script dangerouslySetInnerHTML={{ __html: `
+          (function(){
+            try {
+              var t = localStorage.getItem('sst-theme');
+              if (t === 'light' || t === 'dark') document.documentElement.setAttribute('data-theme', t);
+            } catch(e) {}
+          })();
+        `}} />
+      </head>
       <body className="antialiased">
         <SessionProviderWrapper>{children}</SessionProviderWrapper>
       </body>

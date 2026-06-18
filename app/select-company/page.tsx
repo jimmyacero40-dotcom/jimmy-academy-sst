@@ -195,14 +195,17 @@ export default function SelectCompanyPage() {
                     <Edit3 size={13} style={{ color: 'var(--amber)' }} />
                   </button>
 
-                  {/* Logo area */}
-                  <div className={`h-28 -mx-6 -mt-6 mb-4 rounded-t-2xl flex items-center justify-center overflow-hidden ${!company.logo_url ? `bg-gradient-to-br ${company.color || 'from-amber-500 to-orange-500'}` : ''}`}
-                    style={!company.logo_url ? {} : { background: 'var(--bg-card)' }}>
+                  {/* Logo banner */}
+                  <div className={`h-32 -mx-6 -mt-6 mb-4 rounded-t-2xl flex items-center justify-center overflow-hidden bg-gradient-to-br ${company.color || 'from-amber-500 to-orange-500'}`}>
                     {company.logo_url ? (
-                      <img src={company.logo_url} alt={company.name}
-                        className="h-20 max-w-[80%] object-contain" />
+                      <div className="w-20 h-20 rounded-2xl bg-white shadow-lg flex items-center justify-center p-2">
+                        <img src={company.logo_url} alt={company.name}
+                          className="w-full h-full object-contain" />
+                      </div>
                     ) : (
-                      <Building2 size={44} className="text-white/60" />
+                      <div className="w-20 h-20 rounded-2xl bg-white/20 backdrop-blur-sm flex items-center justify-center">
+                        <Building2 size={36} className="text-white" />
+                      </div>
                     )}
                   </div>
 
