@@ -118,9 +118,12 @@ export default function TrainingsPage() {
     e.target.value = ''
   }
 
+  const [uploadProgress, setUploadProgress] = useState('')
+
   const handleCreateCourse = async () => {
     if (!newCourse.name.trim()) return
     setCreating(true)
+    setUploadProgress('Extrayendo diapositivas...')
 
     let slides: string[] = []
     let texts: string[] = []
@@ -135,6 +138,8 @@ export default function TrainingsPage() {
     }
 
     try {
+      // Step 1: Create training with metadata only (no slides - too large for single request)
+      setUploadProgress('Creando curso...')
       const res = await fetch('/api/trainings', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -144,28 +149,56 @@ export default function TrainingsPage() {
           duration: newCourse.duration || '8h',
           description: newCourse.description,
           slides_count: slides.length,
-          cover_url: slides[0] || COVERS[trainings.length % COVERS.length],
+          cover_url: COVERS[trainings.length % COVERS.length],
           color: GRADIENTS[trainings.length % GRADIENTS.length],
           file_name: uploadedFile?.name,
-          slides,
-          texts,
         }),
       })
       const training = await res.json()
-      if (res.ok) {
-        setTrainings(prev => [training, ...prev])
-      } else {
-        alert(`Error al crear curso: ${training.error || 'Error desconocido'}${training.debug ? ' - ' + training.debug : ''}`)
+      if (!res.ok) {
+        alert(`Error al crear curso: ${training.error || 'Error desconocido'}`)
+        setCreating(false)
+        setUploadProgress('')
+        return
       }
+
+      // Step 2: Upload slides one by one
+      if (slides.length > 0) {
+        for (let i = 0; i < slides.length; i++) {
+          setUploadProgress(`Subiendo diapositiva ${i + 1} de ${slides.length}...`)
+          try {
+            await fetch('/api/trainings/slides', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                training_id: training.id,
+                slide_index: i,
+                image_data: slides[i],
+                slide_text: texts[i] || '',
+              }),
+            })
+          } catch (e) {
+            console.error(`Error uploading slide ${i}:`, e)
+          }
+        }
+      }
+
+      // Update cover with first slide if available
+      if (slides[0]) {
+        training.cover_url = slides[0]
+      }
+
+      setTrainings(prev => [training, ...prev])
+      setShowModal(false)
+      setNewCourse({ name: '', duration: '', description: '', category: 'Obligatorio' })
+      setUploadedFile(null)
     } catch (e) {
       console.error('Error creating course:', e)
       alert('Error de conexión al crear el curso')
     }
 
-    setShowModal(false)
-    setNewCourse({ name: '', duration: '', description: '', category: 'Obligatorio' })
-    setUploadedFile(null)
     setCreating(false)
+    setUploadProgress('')
   }
 
   const handleDeleteCourse = async (id: number) => {
@@ -461,7 +494,7 @@ export default function TrainingsPage() {
                 className="terra-btn-outline flex-1 py-2.5 justify-center">Cancelar</button>
               <button onClick={handleCreateCourse}
                 disabled={!newCourse.name.trim() || creating}
-                className="terra-btn flex-1 py-2.5 justify-center">{creating ? 'Procesando archivo...' : 'Crear Curso'}</button>
+                className="terra-btn flex-1 py-2.5 justify-center">{creating ? (uploadProgress || 'Procesando...') : 'Crear Curso'}</button>
             </div>
           </motion.div>
         </div>

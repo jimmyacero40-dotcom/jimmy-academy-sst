@@ -38,7 +38,7 @@ export async function POST(req: NextRequest) {
   if (user.role !== 'admin') return NextResponse.json({ error: 'Solo admin puede crear cursos' }, { status: 403 })
 
   const body = await req.json()
-  const { title, category, duration, description, status, due, slides_count, questions_count, cover_url, color, file_name, slides, texts, questions } = body
+  const { title, category, duration, description, status, due, slides_count, questions_count, cover_url, color, file_name } = body
 
   if (!title?.trim()) return NextResponse.json({ error: 'Título requerido' }, { status: 400 })
 
@@ -62,29 +62,6 @@ export async function POST(req: NextRequest) {
     .single()
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
-
-  // Save slides if provided
-  if (slides && Array.isArray(slides) && slides.length > 0) {
-    const slideRows = slides.map((img: string, i: number) => ({
-      training_id: training.id,
-      slide_index: i,
-      image_data: img,
-      slide_text: texts?.[i] || '',
-    }))
-    await supabase.from('training_slides').insert(slideRows)
-  }
-
-  // Save custom questions if provided
-  if (questions && Array.isArray(questions) && questions.length > 0) {
-    const qRows = questions.map((q: any) => ({
-      training_id: training.id,
-      question: q.q || q.question,
-      options: q.options,
-      correct_index: q.correct ?? q.correct_index ?? 0,
-      explanation: q.explanation || '',
-    }))
-    await supabase.from('training_questions').insert(qRows)
-  }
 
   return NextResponse.json(training, { status: 201 })
 }
