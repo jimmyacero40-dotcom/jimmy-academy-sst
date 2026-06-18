@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useSession } from 'next-auth/react'
 import { useParams, useRouter } from 'next/navigation'
 import { motion, AnimatePresence } from 'framer-motion'
@@ -295,35 +295,47 @@ export default function TrainingDetailPage() {
   const emptyQ = (): Question => ({ q: '', options: ['', '', '', ''], correct: 0, explanation: '' })
 
   const [slideCount, setSlideCount] = useState(0)
-  const slideCache = useState<Record<number, string>>({})[0]
+  const slideCacheRef = useRef<Record<number, string>>({})
+  const fetchingRef = useRef<Record<number, boolean>>({})
   const [currentSlideImage, setCurrentSlideImage] = useState<string | null>(null)
   const [loadingSlide, setLoadingSlide] = useState(false)
 
-  const loadSlide = async (index: number) => {
-    if (slideCache[index]) {
-      setCurrentSlideImage(slideCache[index])
-      return
-    }
-    setLoadingSlide(true)
+  const fetchSlide = async (index: number): Promise<string | null> => {
+    if (slideCacheRef.current[index]) return slideCacheRef.current[index]
+    if (fetchingRef.current[index]) return null
+    fetchingRef.current[index] = true
     try {
       const res = await fetch(`/api/trainings/${courseId}?slide=${index}`)
       if (res.ok) {
         const data = await res.json()
         if (data.image) {
-          slideCache[index] = data.image
-          setCurrentSlideImage(data.image)
-          if (slides.length <= index) {
-            setSlides(prev => {
-              const next = [...prev]
-              next[index] = data.image
-              return next
-            })
-          }
+          slideCacheRef.current[index] = data.image
+          return data.image
         }
       }
     } catch (_) {}
-    setLoadingSlide(false)
+    finally { fetchingRef.current[index] = false }
+    return null
   }
+
+  const showSlide = async (index: number) => {
+    const cached = slideCacheRef.current[index]
+    if (cached) {
+      setCurrentSlideImage(cached)
+      setLoadingSlide(false)
+    } else {
+      setLoadingSlide(true)
+      const img = await fetchSlide(index)
+      if (img) setCurrentSlideImage(img)
+      setLoadingSlide(false)
+    }
+    // Prefetch neighbors
+    const prefetchIndexes = [index + 1, index + 2, index - 1].filter(i => i >= 0 && i < slideCount)
+    prefetchIndexes.forEach(i => { if (!slideCacheRef.current[i]) fetchSlide(i) })
+  }
+
+  // Keep backward compat
+  const loadSlide = showSlide
 
   const loadTraining = async (retries = 0) => {
     try {
@@ -370,10 +382,9 @@ export default function TrainingDetailPage() {
 
   useEffect(() => {
     if (phase === 'slides' && slideCount > 0) {
-      loadSlide(currentSlide)
-      if (currentSlide + 1 < slideCount) loadSlide(currentSlide + 1)
+      showSlide(currentSlide)
     }
-  }, [currentSlide, phase])
+  }, [currentSlide, phase, slideCount])
 
   const handleAnswer = (idx: number) => {
     if (answered) return
