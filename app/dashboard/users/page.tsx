@@ -6,7 +6,7 @@ import * as XLSX from 'xlsx'
 import {
   Users, Search, MoreVertical, CheckCircle, Clock,
   Building2, X, Edit2, Trash2, Download, ChevronDown,
-  UserPlus, FileSpreadsheet, AlertCircle
+  UserPlus, FileSpreadsheet, AlertCircle, Loader2
 } from 'lucide-react'
 
 type UserStatus = 'activo' | 'inactivo'
@@ -89,6 +89,13 @@ export default function UsersPage() {
   const [users, setUsers] = useState<AppUser[]>([])
   const [search, setSearch] = useState('')
   const [filter, setFilter] = useState('todos')
+  const [selected, setSelected] = useState<Set<string>>(new Set())
+  const [deleting, setDeleting] = useState(false)
+  const usersFiltered = users.filter(u => {
+    const q = search.toLowerCase()
+    const match = u.name.toLowerCase().includes(q) || u.cedula.includes(q) || u.role.toLowerCase().includes(q) || u.empresa.toLowerCase().includes(q)
+    return match && (filter === 'todos' || u.status === filter)
+  })
   const [showModal, setShowModal] = useState(false)
   const [editUser, setEditUser] = useState<AppUser | null>(null)
   const [form, setForm] = useState(EMPTY_FORM)
@@ -176,7 +183,26 @@ export default function UsersPage() {
   const handleDelete = async (id: string) => {
     await fetch('/api/users', { method: 'DELETE', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id }) })
     await loadUsers()
-    setDeleteConfirm(null); setMenuOpen(null)
+    setDeleteConfirm(null); setMenuOpen(null); setSelected(prev => { const n = new Set(prev); n.delete(id); return n })
+  }
+
+  const toggleSelect = (id: string) => {
+    setSelected(prev => { const n = new Set(prev); n.has(id) ? n.delete(id) : n.add(id); return n })
+  }
+
+  const toggleSelectAll = () => {
+    if (selected.size === filtered.length) setSelected(new Set())
+    else setSelected(new Set(filtered.map(u => u.id)))
+  }
+
+  const handleBulkDelete = async () => {
+    if (!selected.size) return
+    if (!confirm(`¿Eliminar ${selected.size} usuario(s) permanentemente?`)) return
+    setDeleting(true)
+    await fetch('/api/users', { method: 'DELETE', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ids: Array.from(selected) }) })
+    setSelected(new Set())
+    await loadUsers()
+    setDeleting(false)
   }
 
   const toggleStatus = async (id: string) => {
@@ -221,11 +247,7 @@ export default function UsersPage() {
     e.target.value = ''
   }
 
-  const filtered = users.filter(u => {
-    const q = search.toLowerCase()
-    const match = u.name.toLowerCase().includes(q) || u.cedula.includes(q) || u.role.toLowerCase().includes(q) || u.empresa.toLowerCase().includes(q)
-    return match && (filter === 'todos' || u.status === filter)
-  })
+  const filtered = usersFiltered
 
   const activos = users.filter(u => u.status === 'activo').length
 
@@ -263,6 +285,27 @@ export default function UsersPage() {
           </div>
         )}
       </motion.div>
+
+      {/* Bulk actions bar */}
+      {selected.size > 0 && (
+        <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }}
+          className="mb-4 flex items-center justify-between gap-3 px-4 py-3 rounded-xl"
+          style={{ background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.25)' }}>
+          <div className="flex items-center gap-3">
+            <input type="checkbox" checked={selected.size === filtered.length} onChange={toggleSelectAll}
+              className="w-4 h-4 rounded accent-amber-500" />
+            <span className="text-sm font-semibold" style={{ color: 'var(--text)' }}>
+              {selected.size} seleccionado{selected.size > 1 ? 's' : ''}
+            </span>
+          </div>
+          <button onClick={handleBulkDelete} disabled={deleting}
+            className="flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-bold transition-all"
+            style={{ background: 'rgba(239,68,68,0.15)', border: '1px solid rgba(239,68,68,0.3)', color: '#FCA5A5' }}>
+            {deleting ? <Loader2 size={14} className="animate-spin" /> : <Trash2 size={14} />}
+            Eliminar seleccionados
+          </button>
+        </motion.div>
+      )}
 
       {/* Stats */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-6">
@@ -335,12 +378,20 @@ export default function UsersPage() {
           <div className="hidden md:block overflow-x-auto">
             <table className="w-full terra-table">
               <thead>
-                <tr><th>Trabajador</th><th>Correo</th><th>Cédula</th><th>Área</th><th>Estado</th><th></th></tr>
+                <tr>
+                  <th style={{ width: 40 }}>
+                    <input type="checkbox" checked={selected.size === filtered.length && filtered.length > 0} onChange={toggleSelectAll} className="w-4 h-4 rounded accent-amber-500" />
+                  </th>
+                  <th>Trabajador</th><th>Correo</th><th>Cédula</th><th>Área</th><th>Estado</th><th></th>
+                </tr>
               </thead>
               <tbody>
                 <AnimatePresence>
                   {filtered.map((u, i) => (
                     <motion.tr key={u.id} initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ delay: i * 0.03 }}>
+                      <td>
+                        <input type="checkbox" checked={selected.has(u.id)} onChange={() => toggleSelect(u.id)} className="w-4 h-4 rounded accent-amber-500" />
+                      </td>
                       <td>
                         <div className="flex items-center gap-3">
                           <div className={`w-9 h-9 rounded-full bg-gradient-to-br ${colorForUser(u.id)} flex items-center justify-center text-white text-xs font-bold flex-shrink-0`}>
@@ -400,6 +451,7 @@ export default function UsersPage() {
                   className="p-4" style={{ borderBottom: '1px solid rgba(245,158,11,0.05)' }}>
                   <div className="flex items-start justify-between">
                     <div className="flex items-center gap-3">
+                      <input type="checkbox" checked={selected.has(u.id)} onChange={() => toggleSelect(u.id)} className="w-4 h-4 rounded accent-amber-500 mt-1 flex-shrink-0" />
                       <div className={`w-10 h-10 rounded-full bg-gradient-to-br ${colorForUser(u.id)} flex items-center justify-center text-white text-sm font-bold flex-shrink-0`}>
                         {getInitials(u.name)}
                       </div>

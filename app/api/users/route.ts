@@ -77,10 +77,11 @@ export async function DELETE(req: NextRequest) {
   const { authorized, companyId } = await isAdminOrSuper()
   if (!authorized) return NextResponse.json({ error: 'No autorizado' }, { status: 403 })
 
-  const { id } = await req.json()
-  if (!id) return NextResponse.json({ error: 'ID requerido' }, { status: 400 })
+  const { id, ids } = await req.json()
+  const deleteIds: string[] = ids || (id ? [id] : [])
+  if (!deleteIds.length) return NextResponse.json({ error: 'ID requerido' }, { status: 400 })
 
-  let query = supabase.from('users').update({ active: false }).eq('id', id)
+  let query = supabase.from('users').delete().in('id', deleteIds)
   if (companyId) query = query.eq('company_id', companyId)
 
   const { error } = await query
