@@ -35,7 +35,7 @@ export default function TrainingsPage() {
   const router = useRouter()
   const { data: session } = useSession()
   const userRole = (session?.user as any)?.role || 'worker'
-  const isAdmin = userRole === 'admin' || userRole === 'superadmin'
+  const isAdmin = userRole === 'superadmin'
   const [trainings, setTrainings] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')

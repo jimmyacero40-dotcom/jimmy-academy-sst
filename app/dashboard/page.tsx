@@ -16,7 +16,7 @@ export default function DashboardPage() {
   const [trainings, setTrainings] = useState<any[]>([])
 
   useEffect(() => {
-    if (userRole === 'worker') {
+    if (userRole !== 'superadmin') {
       router.replace('/dashboard/trainings')
       return
     }

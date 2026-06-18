@@ -12,19 +12,19 @@ import {
 } from 'lucide-react'
 
 const allNavItems = [
-  { href: '/dashboard', icon: LayoutDashboard, label: 'Dashboard', adminOnly: true, superadminOnly: false },
-  { href: '/select-company', icon: Building2, label: 'Cambiar Empresa', adminOnly: false, superadminOnly: true },
-  { href: '/dashboard/users', icon: Users, label: 'Usuarios', adminOnly: true, superadminOnly: false },
-  { href: '/dashboard/trainings', icon: BookOpen, label: 'Capacitaciones', adminOnly: false, superadminOnly: false },
-  { href: '/dashboard/my-signature', icon: PenTool, label: 'Mi Firma', adminOnly: false, superadminOnly: false },
-  { href: '/dashboard/signatures', icon: PenTool, label: 'Firmas Docs', adminOnly: true, superadminOnly: false },
-  { href: '/dashboard/certificates', icon: Award, label: 'Certificados', adminOnly: false, superadminOnly: false },
-  { href: '/dashboard/evaluations', icon: FileCheck, label: 'Evaluaciones', adminOnly: true, superadminOnly: false },
-  { href: '/dashboard/reports', icon: BarChart2, label: 'Reportes', adminOnly: true, superadminOnly: false },
-  { href: '/dashboard/audit', icon: Search, label: 'Auditoria', adminOnly: true, superadminOnly: false },
-  { href: '/dashboard/ai', icon: Brain, label: 'IA SST', adminOnly: true, superadminOnly: false },
-  { href: '/dashboard/notifications', icon: Bell, label: 'Notificaciones', adminOnly: true, superadminOnly: false },
-  { href: '/dashboard/settings', icon: Settings, label: 'Configuracion', adminOnly: true, superadminOnly: false },
+  { href: '/dashboard', icon: LayoutDashboard, label: 'Dashboard', superOnly: true },
+  { href: '/select-company', icon: Building2, label: 'Cambiar Empresa', superOnly: true },
+  { href: '/dashboard/users', icon: Users, label: 'Usuarios', superOnly: true },
+  { href: '/dashboard/trainings', icon: BookOpen, label: 'Capacitaciones', superOnly: false },
+  { href: '/dashboard/my-signature', icon: PenTool, label: 'Mi Firma', superOnly: false },
+  { href: '/dashboard/signatures', icon: PenTool, label: 'Firmas Docs', superOnly: true },
+  { href: '/dashboard/certificates', icon: Award, label: 'Certificados', superOnly: false },
+  { href: '/dashboard/evaluations', icon: FileCheck, label: 'Evaluaciones', superOnly: true },
+  { href: '/dashboard/reports', icon: BarChart2, label: 'Reportes', superOnly: true },
+  { href: '/dashboard/audit', icon: Search, label: 'Auditoria', superOnly: true },
+  { href: '/dashboard/ai', icon: Brain, label: 'IA SST', superOnly: true },
+  { href: '/dashboard/notifications', icon: Bell, label: 'Notificaciones', superOnly: true },
+  { href: '/dashboard/settings', icon: Settings, label: 'Configuracion', superOnly: true },
 ]
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
@@ -121,8 +121,8 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         {/* Nav items */}
         <nav className="flex-1 overflow-y-auto py-3 px-2.5">
           {allNavItems.filter(item => {
-            if (item.superadminOnly && !isSuperAdmin) return false
-            return isAdmin || !item.adminOnly
+            if (item.superOnly && !isSuperAdmin) return false
+            return true
           }).map(({ href, icon: Icon, label }) => {
             const active = isActive(href)
             return (
