@@ -149,7 +149,7 @@ export default function TrainingsPage() {
           duration: newCourse.duration || '8h',
           description: newCourse.description,
           slides_count: slides.length,
-          cover_url: COVERS[trainings.length % COVERS.length],
+          cover_url: slides[0] || null,
           color: GRADIENTS[trainings.length % GRADIENTS.length],
           file_name: uploadedFile?.name,
         }),
@@ -301,7 +301,7 @@ export default function TrainingsPage() {
           {filtered.map((t, i) => {
             const st = statusStyles[t.status as keyof typeof statusStyles] || statusStyles.activo
             const progress = (t.enrolled || 0) > 0 ? Math.round(((t.completed || 0) / t.enrolled) * 100) : 0
-            const coverImg = t.cover_url || COVERS[t.id % COVERS.length]
+            const coverImg = t.cover_url
             const gradColor = t.color || GRADIENTS[t.id % GRADIENTS.length]
             return (
               <motion.div key={t.id} initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.07 }}
@@ -309,9 +309,15 @@ export default function TrainingsPage() {
                 onClick={() => router.push(`/dashboard/trainings/${t.id}`)}>
 
                 <div className="relative h-44 overflow-hidden">
-                  <img src={coverImg} alt={t.title}
-                    className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
-                    onError={e => { (e.target as HTMLImageElement).style.display = 'none' }} />
+                  {coverImg ? (
+                    <img src={coverImg} alt={t.title}
+                      className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                      onError={e => { (e.target as HTMLImageElement).style.display = 'none' }} />
+                  ) : (
+                    <div className={`w-full h-full bg-gradient-to-br ${gradColor} flex items-center justify-center`}>
+                      <BookOpen size={48} className="text-white/30" />
+                    </div>
+                  )}
                   <div className="absolute inset-0" style={{ background: 'linear-gradient(to top, var(--bg-surface), rgba(17,9,0,0.4), transparent)' }} />
                   <div className={`absolute inset-0 bg-gradient-to-br ${gradColor} opacity-20`} />
 
