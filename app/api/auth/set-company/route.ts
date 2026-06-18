@@ -1,10 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { getCurrentUser } from '@/lib/get-company'
+import { getServerSession } from 'next-auth'
+import { authOptions } from '@/lib/auth'
 
 export async function POST(req: NextRequest) {
-  const user = await getCurrentUser()
-  if (!user || user.role !== 'superadmin') {
-    return NextResponse.json({ error: 'Solo superadmin' }, { status: 403 })
+  const session = await getServerSession(authOptions)
+  if (!session?.user?.email) {
+    return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
   }
 
   const { companyId } = await req.json()
@@ -23,11 +24,6 @@ export async function POST(req: NextRequest) {
 }
 
 export async function DELETE() {
-  const user = await getCurrentUser()
-  if (!user || user.role !== 'superadmin') {
-    return NextResponse.json({ error: 'Solo superadmin' }, { status: 403 })
-  }
-
   const res = NextResponse.json({ success: true })
   res.cookies.delete('x-active-company')
   return res
