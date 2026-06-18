@@ -33,23 +33,21 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   const userRole = (session?.user as any)?.role || 'worker'
   const isAdmin = userRole === 'admin' || userRole === 'superadmin'
   const isSuperAdmin = userRole === 'superadmin'
-  const [companyName, setCompanyName] = useState<string | null>(null)
+  const [activeCompany, setActiveCompany] = useState<{ name: string; logo_url?: string; color?: string } | null>(null)
 
   useEffect(() => {
-    if (isSuperAdmin) {
-      const match = document.cookie.match(/x-active-company=([^;]+)/)
-      if (match) {
-        fetch('/api/companies')
-          .then(r => r.json())
-          .then(data => {
-            if (Array.isArray(data)) {
-              const active = data.find((c: any) => c.id === match[1])
-              if (active) setCompanyName(active.name)
-            }
-          })
-      }
+    const match = document.cookie.match(/x-active-company=([^;]+)/)
+    if (match) {
+      fetch('/api/companies')
+        .then(r => r.json())
+        .then(data => {
+          if (Array.isArray(data)) {
+            const active = data.find((c: any) => c.id === match[1])
+            if (active) setActiveCompany({ name: active.name, logo_url: active.logo_url, color: active.color })
+          }
+        })
     }
-  }, [isSuperAdmin])
+  }, [])
   const [collapsed, setCollapsed] = useState(false)
   const [mobileOpen, setMobileOpen] = useState(false)
   const [theme, setTheme] = useState<'dark' | 'light'>('dark')
@@ -98,17 +96,19 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
         {/* Logo */}
         <div className="flex items-center h-16 px-4 gap-3 flex-shrink-0" style={{ borderBottom: '1px solid var(--border)' }}>
-          <div className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0" style={{ background: 'var(--grad-main)', boxShadow: '0 4px 16px rgba(245,158,11,0.25)' }}>
-            <Shield size={16} className="text-white" strokeWidth={2.5} />
-          </div>
+          {activeCompany?.logo_url ? (
+            <img src={activeCompany.logo_url} alt={activeCompany.name} className="w-8 h-8 rounded-lg object-contain flex-shrink-0" />
+          ) : (
+            <div className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0" style={{ background: 'var(--grad-main)', boxShadow: '0 4px 16px rgba(245,158,11,0.25)' }}>
+              <Shield size={16} className="text-white" strokeWidth={2.5} />
+            </div>
+          )}
           {!collapsed && (
             <div className="flex-1 min-w-0">
-              <div className="font-extrabold text-sm truncate" style={{ color: 'var(--text)', fontFamily: 'var(--font-display)' }}>Jimmy Academy</div>
-              {isSuperAdmin && companyName ? (
-                <div className="text-[10px] font-semibold truncate" style={{ color: 'var(--amber)' }}>{companyName}</div>
-              ) : (
-                <div className="text-xs font-semibold" style={{ color: 'var(--amber)' }}>SG-SST</div>
-              )}
+              <div className="font-extrabold text-sm truncate" style={{ color: 'var(--text)', fontFamily: 'var(--font-display)' }}>
+                {activeCompany?.name || 'Jimmy Academy'}
+              </div>
+              <div className="text-xs font-semibold" style={{ color: 'var(--amber)' }}>SG-SST</div>
             </div>
           )}
           <button onClick={() => setMobileOpen(false)} className="md:hidden" style={{ color: 'var(--text-dim)' }}>

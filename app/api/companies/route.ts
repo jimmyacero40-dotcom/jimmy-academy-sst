@@ -33,12 +33,12 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Solo superadmin' }, { status: 403 })
   }
 
-  const { name, nit } = await req.json()
+  const { name, nit, logo_url, color } = await req.json()
   if (!name?.trim()) return NextResponse.json({ error: 'Nombre requerido' }, { status: 400 })
 
   const { data, error } = await supabase
     .from('companies')
-    .insert({ name: name.trim(), nit: nit?.trim() || null })
+    .insert({ name: name.trim(), nit: nit?.trim() || null, logo_url: logo_url || null, color: color || null })
     .select()
     .single()
 
