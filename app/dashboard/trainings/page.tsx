@@ -5,7 +5,7 @@ import { motion } from 'framer-motion'
 import { useRouter } from 'next/navigation'
 import { useSession } from 'next-auth/react'
 import { extractPPTXImages, extractPPTXTexts, getCourseData, getCustomQuestions } from '@/lib/pptx-extractor'
-import * as XLSX from 'xlsx'
+import { generateAttendancePDF } from '@/lib/generate-attendance-pdf'
 import {
   BookOpen, Plus, Search, Clock, CheckCircle, AlertCircle,
   Users, Star, Play, Upload, ChevronRight, X, Award, Zap,
@@ -33,88 +33,14 @@ const statusStyles: Record<string, { label: string; color: string; bg: string; b
 }
 
 async function downloadAttendanceList(training: any) {
-  let participants: any[] = []
   try {
-    const res = await fetch('/api/certificates')
-    const certs = await res.json()
-    if (Array.isArray(certs)) {
-      participants = certs.filter((c: any) => c.course === training.title)
-    }
-  } catch {}
-
-  const wb = XLSX.utils.book_new()
-  const rows: any[][] = []
-  const today = new Date().toLocaleDateString('es-CO')
-
-  // Row 1: Title
-  rows.push(['', '', 'REGISTRO DE ASISTENCIA A CAPACITACIÓN Y/O EVENTOS', '', '', '', '', '', '', ''])
-  // Row 2: empty
-  rows.push([])
-  // Row 3: Version headers
-  rows.push(['', 'Versión', 'Código', '', 'Área', 'Fecha de Elaboración', '', '', 'Fecha de Revisión', ''])
-  // Row 4: Version values
-  rows.push(['', '1', 'AVC-FR05', '', 'CEO', today, '', '', today, ''])
-  // Row 5: FECHA / HORARIO / INTENSIDAD
-  rows.push(['FECHA', today, '', 'HORARIO', '', '', 'INTENSIDAD', training.duration || '4h', '', ''])
-  // Row 6: ORGANIZADO POR / REALIZADO POR / DIRIGIDO A
-  rows.push(['ORGANIZADO POR', 'JIMMY ACADEMY SST', '', 'REALIZADO POR', 'JIMMY ACADEMY SST', '', 'DIRIGIDO A', 'TRABAJADORES', '', ''])
-  // Row 7: TEMARIO
-  rows.push(['TEMARIO DEL EVENTO', '', '', '', '', '', '', '', '', ''])
-  // Row 8: Training title as temario
-  rows.push([training.title, '', '', '', '', '', '', '', '', ''])
-  // Row 9-11: Description
-  rows.push([training.description || '', '', '', '', '', '', '', '', '', ''])
-  rows.push([])
-  rows.push([])
-  // Row 12: REGISTRO header
-  rows.push(['', '', '', 'REGISTRO DE PARTICIPANTES', '', '', '', '', '', ''])
-  // Row 13: Table headers
-  rows.push(['Nº', 'CÉDULA', '', 'NOMBRES Y APELLIDOS', '', '', 'CARGO', '', 'FIRMA', ''])
-
-  // Participant rows
-  if (participants.length > 0) {
-    participants.forEach((p: any, i: number) => {
-      rows.push([i + 1, p.cedula || '', '', p.name || '', '', '', '', '', '', ''])
-    })
-  } else {
-    for (let i = 1; i <= 20; i++) {
-      rows.push([i, '', '', '', '', '', '', '', '', ''])
-    }
+    const res = await fetch(`/api/trainings/${training.id}/attendance`)
+    if (!res.ok) { alert('Error al obtener datos de asistencia'); return }
+    const data = await res.json()
+    generateAttendancePDF(data)
+  } catch {
+    alert('Error al generar la lista de asistencia')
   }
-
-  const ws = XLSX.utils.aoa_to_sheet(rows)
-
-  // Column widths
-  ws['!cols'] = [
-    { wch: 16 }, { wch: 14 }, { wch: 14 }, { wch: 16 }, { wch: 22 },
-    { wch: 18 }, { wch: 14 }, { wch: 16 }, { wch: 14 }, { wch: 14 },
-  ]
-
-  // Merge cells for title
-  ws['!merges'] = [
-    { s: { r: 0, c: 2 }, e: { r: 0, c: 9 } },
-    { s: { r: 4, c: 1 }, e: { r: 4, c: 2 } },
-    { s: { r: 4, c: 3 }, e: { r: 4, c: 5 } },
-    { s: { r: 5, c: 1 }, e: { r: 5, c: 2 } },
-    { s: { r: 5, c: 3 }, e: { r: 5, c: 5 } },
-    { s: { r: 6, c: 0 }, e: { r: 6, c: 9 } },
-    { s: { r: 7, c: 0 }, e: { r: 7, c: 9 } },
-    { s: { r: 8, c: 0 }, e: { r: 8, c: 9 } },
-    { s: { r: 11, c: 2 }, e: { r: 11, c: 7 } },
-    { s: { r: 12, c: 1 }, e: { r: 12, c: 2 } },
-    { s: { r: 12, c: 3 }, e: { r: 12, c: 5 } },
-    { s: { r: 12, c: 6 }, e: { r: 12, c: 7 } },
-  ]
-
-  // Merge participant name columns
-  for (let i = 13; i < rows.length; i++) {
-    ws['!merges'].push({ s: { r: i, c: 1 }, e: { r: i, c: 2 } })
-    ws['!merges'].push({ s: { r: i, c: 3 }, e: { r: i, c: 5 } })
-    ws['!merges'].push({ s: { r: i, c: 6 }, e: { r: i, c: 7 } })
-  }
-
-  XLSX.utils.book_append_sheet(wb, ws, 'Lista de Asistencia')
-  XLSX.writeFile(wb, `Lista_Asistencia_${training.title.replace(/\s+/g, '_').slice(0, 30)}.xlsx`)
 }
 
 export default function TrainingsPage() {
