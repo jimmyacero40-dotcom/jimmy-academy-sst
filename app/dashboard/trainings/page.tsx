@@ -71,7 +71,7 @@ async function downloadAttendanceList(training: any) {
     cl(cX(5),y,cols[5],6,'Área',{bold:true,size:6.5});cl(cX(6),y,cW(6,8),6,'Fecha de Elaboración',{bold:true,size:6.5})
     cl(cX(9),y,cW(9,10),6,'Fecha de Revisión',{bold:true,size:6.5});y+=6
     cl(cX(0),y,logoW,6,'');cl(cX(2),y,cols[2],6,'1',{size:7});cl(cX(3),y,cW(3,4),6,'AVC-FR05',{size:7})
-    cl(cX(5),y,cols[5],6,'CEO',{size:7});cl(cX(6),y,cW(6,8),6,today,{size:7});cl(cX(9),y,cW(9,10),6,today,{size:7});y+=6
+    cl(cX(5),y,cols[5],6,'CEO',{size:7});cl(cX(6),y,cW(6,8),6,'14/10/2025',{size:7});cl(cX(9),y,cW(9,10),6,'22/01/2026',{size:7});y+=6
     cl(cX(0),y,cW(0,1),9,'FECHA',{bg:CG,color:CW,bold:true,size:8});cl(cX(2),y,cW(2,3),9,today,{size:8})
     cl(cX(4),y,cW(4,5),9,'HORARIO',{bg:CG,color:CW,bold:true,size:8});cl(cX(6),y,cW(6,7),9,'',{size:8})
     cl(cX(8),y,cW(8,9),9,'INTENSIDAD',{bg:CG,color:CW,bold:true,size:8});cl(cX(10),y,cols[10],9,tr.duration||'4h',{size:8});y+=9
