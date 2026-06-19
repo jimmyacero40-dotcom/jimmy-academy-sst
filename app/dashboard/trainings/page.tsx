@@ -75,8 +75,8 @@ async function downloadAttendanceList(training: any) {
     cl(cX(0),y,cW(0,1),9,'FECHA',{bg:CG,color:CW,bold:true,size:8});cl(cX(2),y,cW(2,3),9,today,{size:8})
     cl(cX(4),y,cW(4,5),9,'HORARIO',{bg:CG,color:CW,bold:true,size:8});cl(cX(6),y,cW(6,7),9,'',{size:8})
     cl(cX(8),y,cW(8,9),9,'INTENSIDAD',{bg:CG,color:CW,bold:true,size:8});cl(cX(10),y,cols[10],9,tr.duration||'4h',{size:8});y+=9
-    cl(cX(0),y,cW(0,1),9,'ORGANIZADO POR',{bg:CG,color:CW,bold:true,size:7});cl(cX(2),y,cW(2,3),9,companyName||'',{size:7})
-    cl(cX(4),y,cW(4,5),9,'REALIZADO POR',{bg:CG,color:CW,bold:true,size:7});cl(cX(6),y,cW(6,7),9,companyName||'',{size:7})
+    cl(cX(0),y,cW(0,1),9,'ORGANIZADO POR',{bg:CG,color:CW,bold:true,size:7});cl(cX(2),y,cW(2,3),9,'SST-AGROVENTURE CAPITAL',{size:6})
+    cl(cX(4),y,cW(4,5),9,'REALIZADO POR',{bg:CG,color:CW,bold:true,size:7});cl(cX(6),y,cW(6,7),9,'Jimmy J. Acero. C. Profesional SST',{size:5.5})
     cl(cX(8),y,cW(8,9),9,'DIRIGIDO A',{bg:CG,color:CW,bold:true,size:7});cl(cX(10),y,cols[10],9,'TRABAJADORES',{size:7});y+=9
     cl(cX(0),y,usable,7,'TEMARIO DEL EVENTO',{bg:CO,color:CW,bold:true,size:9});y+=7
     cl(cX(0),y,usable,6,tr.title,{bold:true,size:8,align:'left'});y+=6
