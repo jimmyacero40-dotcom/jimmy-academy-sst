@@ -32,7 +32,10 @@ const statusStyles: Record<string, { label: string; color: string; bg: string; b
 }
 
 async function downloadAttendanceList(training: any) {
-  alert('Generando PDF de asistencia...')
+  const horario = prompt('Ingrese el HORARIO (ej: 8:00 AM - 12:00 PM):')
+  if (horario === null) return
+  const intensidad = prompt('Ingrese la INTENSIDAD (ej: 4 horas):')
+  if (intensidad === null) return
   try {
     const res = await fetch(`/api/trainings/${training.id}/attendance`)
     if (!res.ok) { alert('Error API: ' + res.status); return }
@@ -73,8 +76,8 @@ async function downloadAttendanceList(training: any) {
     cl(cX(0),y,logoW,6,'');cl(cX(2),y,cols[2],6,'1',{size:7});cl(cX(3),y,cW(3,4),6,'AVC-FR05',{size:7})
     cl(cX(5),y,cols[5],6,'CEO',{size:7});cl(cX(6),y,cW(6,8),6,'14/10/2025',{size:7});cl(cX(9),y,cW(9,10),6,'22/01/2026',{size:7});y+=6
     cl(cX(0),y,cW(0,1),9,'FECHA',{bg:CG,color:CW,bold:true,size:8});cl(cX(2),y,cW(2,3),9,today,{size:8})
-    cl(cX(4),y,cW(4,5),9,'HORARIO',{bg:CG,color:CW,bold:true,size:8});cl(cX(6),y,cW(6,7),9,'',{size:8})
-    cl(cX(8),y,cW(8,9),9,'INTENSIDAD',{bg:CG,color:CW,bold:true,size:8});cl(cX(10),y,cols[10],9,tr.duration||'4h',{size:8});y+=9
+    cl(cX(4),y,cW(4,5),9,'HORARIO',{bg:CG,color:CW,bold:true,size:8});cl(cX(6),y,cW(6,7),9,horario,{size:7})
+    cl(cX(8),y,cW(8,9),9,'INTENSIDAD',{bg:CG,color:CW,bold:true,size:8});cl(cX(10),y,cols[10],9,intensidad,{size:7});y+=9
     cl(cX(0),y,cW(0,1),9,'ORGANIZADO POR',{bg:CG,color:CW,bold:true,size:7});cl(cX(2),y,cW(2,3),9,'SST-AGROVENTURE CAPITAL',{size:6})
     cl(cX(4),y,cW(4,5),9,'REALIZADO POR',{bg:CG,color:CW,bold:true,size:7})
     const rpX=cX(6),rpW=cW(6,7);fl(rpX,y,rpW,9,CW);bd(rpX,y,rpW,9)
