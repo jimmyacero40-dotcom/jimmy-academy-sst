@@ -5,7 +5,6 @@ import { motion } from 'framer-motion'
 import { useRouter } from 'next/navigation'
 import { useSession } from 'next-auth/react'
 import { extractPPTXImages, extractPPTXTexts, getCourseData, getCustomQuestions } from '@/lib/pptx-extractor'
-import { generateAttendancePDF } from '@/lib/generate-attendance-pdf'
 import {
   BookOpen, Plus, Search, Clock, CheckCircle, AlertCircle,
   Users, Star, Play, Upload, ChevronRight, X, Award, Zap,
