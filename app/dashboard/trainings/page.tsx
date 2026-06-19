@@ -35,11 +35,14 @@ const statusStyles: Record<string, { label: string; color: string; bg: string; b
 async function downloadAttendanceList(training: any) {
   try {
     const res = await fetch(`/api/trainings/${training.id}/attendance`)
-    if (!res.ok) { alert('Error al obtener datos de asistencia'); return }
+    if (!res.ok) { alert('Error al obtener datos de asistencia: ' + res.status); return }
     const data = await res.json()
+    if (!data || !data.training) { alert('Datos de asistencia vacíos'); return }
+    const { generateAttendancePDF } = await import('@/lib/generate-attendance-pdf')
     generateAttendancePDF(data)
-  } catch {
-    alert('Error al generar la lista de asistencia')
+  } catch (err: any) {
+    console.error('Error PDF:', err)
+    alert('Error al generar PDF: ' + (err?.message || err))
   }
 }
 
