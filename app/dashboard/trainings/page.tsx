@@ -229,6 +229,14 @@ export default function TrainingsPage() {
       } catch (e) {
         console.error('Error extracting PPTX:', e)
       }
+    } else if (uploadedFile && /\.pdf$/i.test(uploadedFile.name)) {
+      try {
+        setUploadProgress('Extrayendo páginas del PDF...')
+        const { extractPDFImages } = await import('@/lib/pdf-extractor')
+        slides = await extractPDFImages(uploadedFile)
+      } catch (e) {
+        console.error('Error extracting PDF:', e)
+      }
     }
 
     try {
