@@ -8,7 +8,7 @@ import { extractPPTXImages, extractPPTXTexts, getCourseData, getCustomQuestions 
 import {
   BookOpen, Plus, Search, Clock, CheckCircle, AlertCircle,
   Users, Star, Play, Upload, ChevronRight, X, Award, Zap,
-  FileText, Video, Layers, Trash2, Loader2, Calendar, Edit3, Save, Download
+  FileText, Video, Layers, Trash2, Loader2, Calendar, Edit3, Save, Download, ImagePlus
 } from 'lucide-react'
 
 const GRADIENTS = [
@@ -446,11 +446,14 @@ export default function TrainingsPage() {
                 onClick={() => router.push(`/dashboard/trainings/${t.id}`)}>
 
                 <div className="relative h-44 overflow-hidden">
-                  <div className={`w-full h-full bg-gradient-to-br ${gradColor} flex items-center justify-center`}>
-                    <BookOpen size={48} className="text-white/30" />
-                  </div>
+                  {t.cover_url && t.cover_url.startsWith('http') ? (
+                    <img src={t.cover_url} alt={t.title} className="w-full h-full object-cover" />
+                  ) : (
+                    <div className={`w-full h-full bg-gradient-to-br ${gradColor} flex items-center justify-center`}>
+                      <BookOpen size={48} className="text-white/30" />
+                    </div>
+                  )}
                   <div className="absolute inset-0" style={{ background: 'linear-gradient(to top, var(--bg-surface), rgba(17,9,0,0.4), transparent)' }} />
-                  <div className={`absolute inset-0 bg-gradient-to-br ${gradColor} opacity-20`} />
 
                   <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
                     <div className="w-14 h-14 rounded-full bg-white/20 backdrop-blur-sm border border-white/30 flex items-center justify-center">
@@ -511,6 +514,16 @@ export default function TrainingsPage() {
                     </div>
                     <div className="flex items-center gap-2">
                       {isAdmin && <>
+                        <label onClick={(e) => e.stopPropagation()} className="p-1.5 rounded-lg hover:bg-blue-500/15 transition-colors cursor-pointer" title="Subir portada">
+                          <ImagePlus size={13} className="text-blue-400" />
+                          <input type="file" accept="image/*" className="hidden" onChange={async (e) => {
+                            const file = e.target.files?.[0]; if (!file) return
+                            const fd = new FormData(); fd.append('file', file); fd.append('training_id', String(t.id))
+                            const res = await fetch('/api/trainings/cover', { method: 'POST', body: fd })
+                            if (res.ok) { const d = await res.json(); setTrainings(prev => prev.map(tr => tr.id === t.id ? { ...tr, cover_url: d.cover_url } : tr)) }
+                            else alert('Error al subir portada')
+                          }} />
+                        </label>
                         <button onClick={(e) => { e.stopPropagation(); downloadAttendanceList(t) }}
                           className="p-1.5 rounded-lg hover:bg-emerald-500/15 transition-colors" title="Descargar lista de asistencia">
                           <Download size={13} className="text-emerald-400" />

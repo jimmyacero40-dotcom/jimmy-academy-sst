@@ -7,7 +7,7 @@ import { isAdminOrSuper, getActiveCompanyId } from '@/lib/get-company'
 export async function GET() {
   const companyId = await getActiveCompanyId()
 
-  const cols = 'id, title, category, duration, description, status, due, slides_count, questions_count, color, file_name, created_by, company_id, valid_from, valid_until, created_at'
+  const cols = 'id, title, category, duration, description, status, due, slides_count, questions_count, color, file_name, created_by, company_id, valid_from, valid_until, created_at, cover_url'
   let query = supabase.from('trainings').select(cols).order('created_at', { ascending: false })
   if (companyId) query = query.eq('company_id', companyId)
 
