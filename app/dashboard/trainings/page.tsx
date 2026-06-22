@@ -474,8 +474,8 @@ export default function TrainingsPage() {
                 </div>
 
                 <div className="p-4">
-                  <h3 className="font-bold text-[15px] mb-1.5 leading-snug transition-colors text-white">{t.title}</h3>
-                  <p className="text-xs mb-3 line-clamp-2 leading-relaxed text-gray-300">{t.description}</p>
+                  <h3 className="font-bold text-[15px] mb-1.5 leading-snug transition-colors" style={{ color: 'var(--text)' }}>{t.title}</h3>
+                  <p className="text-xs mb-3 line-clamp-2 leading-relaxed" style={{ color: 'var(--text-dim)' }}>{t.description}</p>
 
                   {(t.valid_from || t.valid_until) && (
                     <div className="text-[10px] mb-2 px-2 py-1 rounded-lg inline-block"
@@ -484,7 +484,7 @@ export default function TrainingsPage() {
                       Vigencia: {t.valid_from || '...'} → {t.valid_until || '...'}
                     </div>
                   )}
-                  <div className="flex items-center gap-3 text-xs mb-3 text-gray-400">
+                  <div className="flex items-center gap-3 text-xs mb-3" style={{ color: 'var(--text-dim)' }}>
                     <div className="flex items-center gap-1"><Clock size={11} /> {t.duration}</div>
                     <div className="flex items-center gap-1"><Users size={11} /> {t.enrolled || 0}</div>
                     <div className="flex items-center gap-1 ml-auto">
@@ -495,8 +495,8 @@ export default function TrainingsPage() {
 
                   <div className="mb-3">
                     <div className="flex justify-between mb-1">
-                      <span className="text-xs text-gray-400">Progreso</span>
-                      <span className="text-xs font-bold text-white">{progress}%</span>
+                      <span className="text-xs" style={{ color: 'var(--text-dim)' }}>Progreso</span>
+                      <span className="text-xs font-bold" style={{ color: 'var(--text)' }}>{progress}%</span>
                     </div>
                     <div className="terra-progress-track">
                       <motion.div initial={{ width: 0 }} animate={{ width: `${progress}%` }} transition={{ duration: 1, delay: 0.5 }}
@@ -507,7 +507,7 @@ export default function TrainingsPage() {
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-1.5">
                       <Award size={13} className="text-amber-400" />
-                      <span className="text-xs text-gray-300">Certificado al completar</span>
+                      <span className="text-xs" style={{ color: 'var(--text-dim)' }}>Certificado al completar</span>
                     </div>
                     <div className="flex items-center gap-2">
                       {isAdmin && <>
