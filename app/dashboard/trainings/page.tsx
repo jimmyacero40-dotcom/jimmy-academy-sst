@@ -521,7 +521,7 @@ export default function TrainingsPage() {
                             const fd = new FormData(); fd.append('file', file); fd.append('training_id', String(t.id))
                             const res = await fetch('/api/trainings/cover', { method: 'POST', body: fd })
                             if (res.ok) { const d = await res.json(); setTrainings(prev => prev.map(tr => tr.id === t.id ? { ...tr, cover_url: d.cover_url } : tr)) }
-                            else alert('Error al subir portada')
+                            else { const d = await res.json().catch(()=>({})); alert('Error al subir portada: ' + (d.error || res.status)) }
                           }} />
                         </label>
                         <button onClick={(e) => { e.stopPropagation(); downloadAttendanceList(t) }}
