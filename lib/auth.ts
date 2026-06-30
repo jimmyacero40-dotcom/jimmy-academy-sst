@@ -14,6 +14,22 @@ export const authOptions: NextAuthOptions = {
       async authorize(credentials) {
         if (!credentials?.email || !credentials?.password) return null
 
+        // Temporary hardcoded admin while DB is being configured
+        if (
+          credentials.email === 'admin@jimmyacademy.com' &&
+          credentials.password === 'admin123'
+        ) {
+          return {
+            id: '1',
+            email: 'admin@jimmyacademy.com',
+            name: 'Administrador',
+            role: 'admin',
+            cedula: '000000000',
+            area: 'Administración',
+            companyId: '1',
+          } as any
+        }
+
         const { data: user, error } = await supabase
           .from('users')
           .select('*')
