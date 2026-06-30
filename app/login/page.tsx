@@ -1,18 +1,30 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { signIn } from 'next-auth/react'
 import { useRouter } from 'next/navigation'
 import { motion } from 'framer-motion'
-import { Shield, Eye, EyeOff, ArrowRight, Lock, Mail } from 'lucide-react'
+import { Shield, Eye, EyeOff, ArrowRight, Lock, Mail, Sun, Moon, CheckCircle } from 'lucide-react'
 
 export default function LoginPage() {
   const router = useRouter()
+  const [dark, setDark] = useState(true)
   const [showPass, setShowPass] = useState(false)
   const [loading, setLoading] = useState(false)
   const [form, setForm] = useState({ email: '', password: '' })
   const [errors, setErrors] = useState<Record<string, string>>({})
   const [authError, setAuthError] = useState('')
+
+  // Persist theme preference
+  useEffect(() => {
+    const saved = localStorage.getItem('campus-sst-theme')
+    if (saved) setDark(saved === 'dark')
+  }, [])
+  const toggleTheme = () => {
+    const next = !dark
+    setDark(next)
+    localStorage.setItem('campus-sst-theme', next ? 'dark' : 'light')
+  }
 
   const validate = () => {
     const e: Record<string, string> = {}
@@ -44,164 +56,241 @@ export default function LoginPage() {
     }
   }
 
+  // ── Theme tokens ──────────────────────────────────────────────
+  const t = dark ? {
+    pageBg:       '#0f172a',
+    leftBg:       '#0f172a',
+    rightBg:      '#0d1f3c',
+    rightBorder:  '#1e293b',
+    orbColor:     'rgba(59,130,246,0.08)',
+    logoName:     '#f8fafc',
+    logoSub:      '#475569',
+    eyebrow:      '#3b82f6',
+    h1:           '#f8fafc',
+    h1Accent:     '#3b82f6',
+    desc:         '#64748b',
+    pillText:     '#475569',
+    formTitle:    '#f8fafc',
+    formSub:      '#475569',
+    label:        '#64748b',
+    inputBg:      '#0a0f1e',
+    inputBorder:  '#1e293b',
+    inputText:    '#f8fafc',
+    inputPh:      '#334155',
+    iconColor:    '#334155',
+    badgeBg:      'rgba(16,185,129,0.08)',
+    badgeColor:   '#34d399',
+    badgeBorder:  'rgba(16,185,129,0.2)',
+    noteColor:    '#334155',
+    toggleBg:     '#1e293b',
+    toggleIcon:   '#64748b',
+    errorBg:      'rgba(239,68,68,0.08)',
+    errorBorder:  'rgba(239,68,68,0.25)',
+    errorText:    '#fca5a5',
+  } : {
+    pageBg:       '#f1f5f9',
+    leftBg:       '#eff6ff',
+    rightBg:      '#ffffff',
+    rightBorder:  '#e2e8f0',
+    orbColor:     'rgba(59,130,246,0.12)',
+    logoName:     '#0f172a',
+    logoSub:      '#94a3b8',
+    eyebrow:      '#3b82f6',
+    h1:           '#0f172a',
+    h1Accent:     '#2563eb',
+    desc:         '#64748b',
+    pillText:     '#94a3b8',
+    formTitle:    '#0f172a',
+    formSub:      '#94a3b8',
+    label:        '#64748b',
+    inputBg:      '#f8fafc',
+    inputBorder:  '#e2e8f0',
+    inputText:    '#0f172a',
+    inputPh:      '#cbd5e1',
+    iconColor:    '#cbd5e1',
+    badgeBg:      'rgba(16,185,129,0.07)',
+    badgeColor:   '#059669',
+    badgeBorder:  'rgba(16,185,129,0.2)',
+    noteColor:    '#cbd5e1',
+    toggleBg:     '#e2e8f0',
+    toggleIcon:   '#94a3b8',
+    errorBg:      'rgba(239,68,68,0.06)',
+    errorBorder:  'rgba(239,68,68,0.2)',
+    errorText:    '#dc2626',
+  }
+
+  const BADGES = ['Decreto 1072', 'Res. 0312', 'Datos seguros']
+  const PILLS  = ['Cursos SST', 'Evaluaciones', 'Certificados']
+
   return (
-    <div className="min-h-screen flex relative overflow-hidden" style={{ background: 'var(--bg)' }}>
+    <div className="min-h-screen flex" style={{ background: t.pageBg, transition: 'background 0.3s' }}>
 
-      {/* ── LEFT PANEL (desktop) ── */}
-      <div className="hidden lg:flex lg:w-1/2 relative flex-col justify-between p-12 overflow-hidden">
-        {/* Background glow */}
-        <div className="absolute inset-0" style={{ background: 'linear-gradient(135deg, rgba(245,158,11,0.08), transparent 50%, rgba(239,68,68,0.05))' }} />
-        <div className="absolute top-[-120px] left-[-80px] w-[500px] h-[500px] rounded-full opacity-25"
-          style={{ background: 'radial-gradient(circle, rgba(245,158,11,0.4) 0%, transparent 70%)', filter: 'blur(80px)' }} />
-        <div className="absolute bottom-[-100px] right-[-60px] w-[400px] h-[400px] rounded-full opacity-15"
-          style={{ background: 'radial-gradient(circle, rgba(239,68,68,0.4) 0%, transparent 70%)', filter: 'blur(80px)' }} />
+      {/* ── LEFT PANEL ────────────────────────────────────────── */}
+      <div className="hidden lg:flex lg:flex-1 flex-col justify-between p-12 relative overflow-hidden"
+        style={{ background: t.leftBg, transition: 'background 0.3s' }}>
 
-        {/* Grid overlay */}
-        <div className="absolute inset-0 opacity-[0.03]"
-          style={{ backgroundImage: 'linear-gradient(rgba(245,158,11,0.3) 1px,transparent 1px),linear-gradient(90deg,rgba(245,158,11,0.3) 1px,transparent 1px)', backgroundSize: '48px 48px' }} />
+        {/* Orb */}
+        <div className="absolute top-[-80px] right-[-80px] w-[300px] h-[300px] rounded-full pointer-events-none"
+          style={{ background: t.orbColor }} />
 
         {/* Logo */}
-        <div className="relative z-10">
-          <div className="flex items-center gap-3">
-            <div className="w-11 h-11 rounded-xl flex items-center justify-center shadow-lg" style={{ background: 'var(--grad-main)', boxShadow: '0 8px 32px rgba(245,158,11,0.3)' }}>
-              <Shield size={22} className="text-white" strokeWidth={2.5} />
-            </div>
-            <div>
-              <div className="font-extrabold text-lg leading-none" style={{ color: 'var(--text)', fontFamily: 'var(--font-display)' }}>Jimmy Academy</div>
-              <div className="text-xs font-semibold" style={{ color: 'var(--amber)' }}>Plataforma SG-SST</div>
+        <div className="relative z-10 flex items-center gap-3">
+          <div className="w-10 h-10 rounded-xl flex items-center justify-center" style={{ background: '#3b82f6' }}>
+            <Shield size={20} className="text-white" strokeWidth={2} />
+          </div>
+          <div>
+            <div className="text-[15px] font-medium tracking-wide" style={{ color: t.logoName }}>CAMPUS SST</div>
+            <div className="text-[10px] uppercase tracking-widest mt-0.5" style={{ color: t.logoSub }}>
+              Seguridad y Salud en el Trabajo
             </div>
           </div>
         </div>
 
-        {/* Hero text */}
-        <div className="relative z-10">
-          <motion.div initial={{ opacity: 0, y: 30 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.8, delay: 0.2 }}>
-            <h2 className="text-4xl leading-tight mb-4" style={{ fontFamily: 'var(--font-display)', fontWeight: 900, color: 'var(--text)' }}>
-              Gestiona la seguridad<br />
-              <span style={{ background: 'var(--grad-main)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>
-                de tu empresa
-              </span>
-            </h2>
-            <p className="text-base leading-relaxed mb-8 max-w-sm" style={{ color: 'var(--text-dim)' }}>
-              La plataforma #1 en Colombia para SG-SST. Capacitaciones, certificados y cumplimiento normativo en un solo lugar.
-            </p>
-
-            <div className="space-y-3">
-              {[
-                { icon: '🛡', text: 'Cumplimiento Decreto 1072 de 2015' },
-                { icon: '📋', text: 'Resolucion 0312 de 2019 integrada' },
-                { icon: '🤖', text: 'Asistente IA especializado en SST' },
-                { icon: '📱', text: 'Acceso desde cualquier dispositivo' },
-              ].map(({ icon, text }) => (
-                <div key={text} className="flex items-center gap-3">
-                  <span className="text-lg">{icon}</span>
-                  <span className="text-sm" style={{ color: 'var(--text-dim)' }}>{text}</span>
-                </div>
-              ))}
-            </div>
-          </motion.div>
-        </div>
-
-        <div className="relative z-10 flex items-center gap-3">
-          <div className="flex -space-x-2">
-            {['CM', 'ML', 'DR', 'FT'].map((init, i) => (
-              <div key={i} className="w-8 h-8 rounded-full border-2 flex items-center justify-center text-white text-[10px] font-bold"
-                style={{ borderColor: 'var(--bg)', background: 'var(--grad-main)' }}>
-                {init}
+        {/* Hero */}
+        <motion.div className="relative z-10"
+          initial={{ opacity: 0, y: 24 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.6, delay: 0.1 }}>
+          <p className="text-[11px] uppercase tracking-[0.1em] mb-5" style={{ color: t.eyebrow }}>
+            Plataforma integral de formación
+          </p>
+          <h1 className="text-[32px] font-medium leading-[1.2] mb-5" style={{ color: t.h1 }}>
+            Aprende.<br />
+            <span style={{ color: t.h1Accent }}>Evalúa.</span><br />
+            Certifica.
+          </h1>
+          <p className="text-[13px] leading-[1.75] mb-8 max-w-[300px]" style={{ color: t.desc }}>
+            Accede a tus cursos, completa tus evaluaciones y obtén tus certificados desde un solo lugar.
+            Tu proceso de formación comienza aquí.
+          </p>
+          <div className="flex gap-5 flex-wrap">
+            {PILLS.map(p => (
+              <div key={p} className="flex items-center gap-2" style={{ color: t.pillText, fontSize: 12 }}>
+                <div className="w-1.5 h-1.5 rounded-full flex-shrink-0" style={{ background: '#3b82f6' }} />
+                {p}
               </div>
             ))}
           </div>
-          <p className="text-sm" style={{ color: 'var(--text-dim)' }}>
-            <span className="font-semibold" style={{ color: 'var(--text)' }}>+1,200 empresas</span> ya confian en nosotros
-          </p>
-        </div>
+        </motion.div>
+
+        {/* Bottom spacer — intentionally empty, stats removed */}
+        <div />
       </div>
 
-      {/* ── RIGHT PANEL (login form) ── */}
-      <div className="flex-1 flex items-center justify-center px-6 py-10 relative">
-        <div className="absolute inset-0 lg:hidden">
-          <div className="absolute top-0 right-0 w-[400px] h-[400px] rounded-full opacity-15"
-            style={{ filter: 'blur(80px)', background: 'radial-gradient(circle, rgba(245,158,11,0.5), transparent 70%)' }} />
-          <div className="absolute bottom-0 left-0 w-[300px] h-[300px] rounded-full opacity-10"
-            style={{ filter: 'blur(70px)', background: 'radial-gradient(circle, rgba(239,68,68,0.5), transparent 70%)' }} />
-        </div>
+      {/* ── RIGHT PANEL ───────────────────────────────────────── */}
+      <div className="flex-1 lg:w-[360px] lg:flex-none flex flex-col justify-center px-8 py-10 relative"
+        style={{ background: t.rightBg, borderLeft: `1px solid ${t.rightBorder}`, transition: 'background 0.3s, border-color 0.3s' }}>
 
-        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5 }}
-          className="relative w-full max-w-sm">
+        {/* Theme toggle */}
+        <button
+          onClick={toggleTheme}
+          className="absolute top-5 right-5 w-9 h-9 rounded-lg flex items-center justify-center transition-colors"
+          style={{ background: t.toggleBg, color: t.toggleIcon }}
+          aria-label={dark ? 'Cambiar a modo claro' : 'Cambiar a modo oscuro'}
+        >
+          {dark ? <Sun size={16} /> : <Moon size={16} />}
+        </button>
+
+        <motion.div className="w-full max-w-[320px] mx-auto"
+          initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4 }}>
 
           {/* Mobile logo */}
-          <div className="lg:hidden flex items-center gap-3 mb-8">
-            <div className="w-10 h-10 rounded-xl flex items-center justify-center" style={{ background: 'var(--grad-main)' }}>
-              <Shield size={20} className="text-white" strokeWidth={2.5} />
+          <div className="lg:hidden flex items-center gap-3 mb-10">
+            <div className="w-9 h-9 rounded-xl flex items-center justify-center" style={{ background: '#3b82f6' }}>
+              <Shield size={18} className="text-white" strokeWidth={2} />
             </div>
             <div>
-              <div className="font-extrabold text-base" style={{ color: 'var(--text)', fontFamily: 'var(--font-display)' }}>Jimmy Academy</div>
-              <div className="text-xs font-semibold" style={{ color: 'var(--amber)' }}>Plataforma SG-SST</div>
+              <div className="text-sm font-medium tracking-wide" style={{ color: t.logoName }}>CAMPUS SST</div>
+              <div className="text-[10px] uppercase tracking-widest" style={{ color: t.logoSub }}>SG-SST Colombia</div>
             </div>
           </div>
 
           <div className="mb-8">
-            <h1 className="text-2xl font-black mb-1.5" style={{ color: 'var(--text)', fontFamily: 'var(--font-display)' }}>Iniciar sesion</h1>
-            <p className="text-sm" style={{ color: 'var(--text-dim)' }}>Ingresa tus credenciales para continuar</p>
+            <h2 className="text-[20px] font-medium mb-1.5" style={{ color: t.formTitle }}>Bienvenido</h2>
+            <p className="text-[13px]" style={{ color: t.formSub }}>Ingresa tus credenciales para continuar</p>
           </div>
 
+          {/* Auth error */}
           {authError && (
-            <motion.div initial={{ opacity: 0, y: -8 }} animate={{ opacity: 1, y: 0 }}
-              className="rounded-xl px-4 py-3 mb-5 text-sm font-medium flex items-center gap-2"
-              style={{ background: 'var(--red-dim)', border: '1px solid rgba(239,68,68,0.25)', color: '#FCA5A5' }}>
-              <Lock size={14} /> {authError}
+            <motion.div initial={{ opacity: 0, y: -6 }} animate={{ opacity: 1, y: 0 }}
+              className="flex items-center gap-2 rounded-lg px-3 py-2.5 mb-5 text-sm"
+              style={{ background: t.errorBg, border: `1px solid ${t.errorBorder}`, color: t.errorText }}>
+              <Lock size={13} className="flex-shrink-0" />
+              {authError}
             </motion.div>
           )}
 
-          <form onSubmit={handleSubmit} noValidate className="space-y-5">
+          <form onSubmit={handleSubmit} noValidate className="space-y-4">
+
+            {/* Email */}
             <div>
-              <label className="block text-xs font-semibold uppercase tracking-wide mb-2" style={{ color: 'var(--text-dim)' }}>
-                Correo electronico
+              <label className="block text-[12px] mb-1.5" style={{ color: t.label }}>
+                Correo electrónico
               </label>
               <div className="relative">
-                <Mail size={15} className="absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" style={{ color: 'var(--text-faint)' }} />
+                <Mail size={14} className="absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none"
+                  style={{ color: t.iconColor }} />
                 <input
                   type="email"
                   value={form.email}
                   onChange={e => { setForm({ ...form, email: e.target.value }); setAuthError('') }}
                   placeholder="tu@empresa.com"
                   autoComplete="email"
-                  className="terra-input pl-10"
-                  style={errors.email ? { borderColor: 'rgba(239,68,68,0.5)' } : {}}
+                  style={{
+                    width: '100%',
+                    padding: '9px 12px 9px 34px',
+                    borderRadius: 8,
+                    border: `1px solid ${errors.email ? 'rgba(239,68,68,0.5)' : t.inputBorder}`,
+                    background: t.inputBg,
+                    color: t.inputText,
+                    fontSize: 14,
+                    outline: 'none',
+                    transition: 'border-color 0.2s',
+                  }}
                 />
               </div>
-              {errors.email && <p className="text-xs mt-1.5 pl-1" style={{ color: '#FCA5A5' }}>{errors.email}</p>}
+              {errors.email && <p className="text-xs mt-1 pl-1" style={{ color: t.errorText }}>{errors.email}</p>}
             </div>
 
+            {/* Password */}
             <div>
-              <div className="flex items-center justify-between mb-2">
-                <label className="text-xs font-semibold uppercase tracking-wide" style={{ color: 'var(--text-dim)' }}>
-                  Contrasena
-                </label>
-              </div>
+              <label className="block text-[12px] mb-1.5" style={{ color: t.label }}>
+                Contraseña
+              </label>
               <div className="relative">
-                <Lock size={15} className="absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" style={{ color: 'var(--text-faint)' }} />
+                <Lock size={14} className="absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none"
+                  style={{ color: t.iconColor }} />
                 <input
                   type={showPass ? 'text' : 'password'}
                   value={form.password}
                   onChange={e => { setForm({ ...form, password: e.target.value }); setAuthError('') }}
-                  placeholder="--------"
+                  placeholder="••••••••"
                   autoComplete="current-password"
-                  className="terra-input pl-10 pr-11"
-                  style={errors.password ? { borderColor: 'rgba(239,68,68,0.5)' } : {}}
+                  style={{
+                    width: '100%',
+                    padding: '9px 40px 9px 34px',
+                    borderRadius: 8,
+                    border: `1px solid ${errors.password ? 'rgba(239,68,68,0.5)' : t.inputBorder}`,
+                    background: t.inputBg,
+                    color: t.inputText,
+                    fontSize: 14,
+                    outline: 'none',
+                    transition: 'border-color 0.2s',
+                  }}
                 />
                 <button type="button" onClick={() => setShowPass(!showPass)}
-                  className="absolute right-3.5 top-1/2 -translate-y-1/2 transition-colors" style={{ color: 'var(--text-faint)' }}>
-                  {showPass ? <EyeOff size={16} /> : <Eye size={16} />}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 transition-colors"
+                  style={{ color: t.iconColor }}>
+                  {showPass ? <EyeOff size={15} /> : <Eye size={15} />}
                 </button>
               </div>
-              {errors.password && <p className="text-xs mt-1.5 pl-1" style={{ color: '#FCA5A5' }}>{errors.password}</p>}
+              {errors.password && <p className="text-xs mt-1 pl-1" style={{ color: t.errorText }}>{errors.password}</p>}
             </div>
 
+            {/* Submit */}
             <button
               type="submit"
               disabled={loading}
-              className="terra-btn w-full justify-center py-3.5 text-sm"
+              className="w-full flex items-center justify-center gap-2 py-2.5 rounded-lg text-sm font-medium transition-all"
+              style={{ background: '#3b82f6', color: '#fff', border: 'none', cursor: loading ? 'not-allowed' : 'pointer', opacity: loading ? 0.8 : 1 }}
             >
               {loading ? (
                 <>
@@ -209,16 +298,25 @@ export default function LoginPage() {
                   Verificando...
                 </>
               ) : (
-                <>Ingresar al sistema <ArrowRight size={15} /></>
+                <>Ingresar al sistema <ArrowRight size={14} /></>
               )}
             </button>
           </form>
 
-          <div className="mt-6 text-center">
-            <p className="text-xs" style={{ color: 'var(--text-faint)' }}>
-              Contacta al administrador SST si no tienes credenciales
-            </p>
+          {/* Compliance badges */}
+          <div className="flex gap-2 flex-wrap mt-6">
+            {BADGES.map(b => (
+              <div key={b} className="flex items-center gap-1 text-[10px] px-2 py-1 rounded"
+                style={{ background: t.badgeBg, color: t.badgeColor, border: `1px solid ${t.badgeBorder}` }}>
+                <CheckCircle size={10} />
+                {b}
+              </div>
+            ))}
           </div>
+
+          <p className="text-[11px] text-center mt-5" style={{ color: t.noteColor }}>
+            ¿No tienes acceso? Contacta al administrador SST de tu empresa.
+          </p>
         </motion.div>
       </div>
     </div>
