@@ -271,19 +271,59 @@ export default function PlanPage() {
       const rows = parsePlanExcel(buf)
       if (!rows.length) { setError('No se encontraron actividades en el archivo'); setImporting(false); return }
 
+      // Build a local map title→id (existing + newly created)
+      const titleMap: Record<string, number> = {}
+      trainings.forEach(t => { titleMap[t.title.trim().toLowerCase()] = t.id })
+
+      // Get unique titles from the Excel
+      const uniqueTitles = [...new Set(rows.map(r => r.title.trim()))]
+
+      let created = 0
+      for (const title of uniqueTitles) {
+        const key = title.toLowerCase()
+        // Try to find existing training (fuzzy match)
+        const existing = Object.entries(titleMap).find(([k]) =>
+          k.includes(key.slice(0, 25)) || key.includes(k.slice(0, 25))
+        )
+        if (existing) {
+          titleMap[key] = existing[1]
+          continue
+        }
+        // Create new training from the Excel title
+        const res = await fetch('/api/trainings', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            title,
+            category: 'SST',
+            duration: '8h',
+            description: `Capacitación SST: ${title}`,
+            status: 'activo',
+          }),
+        })
+        if (res.ok) {
+          const t = await res.json()
+          titleMap[key] = t.id
+          created++
+        }
+      }
+
+      // Refresh trainings list in state
+      const freshTrainings = await fetch('/api/trainings').then(r => r.ok ? r.json() : trainings)
+      setTrainings(freshTrainings)
+
+      // Create plan items
       let added = 0
       for (const row of rows) {
-        // Match training by title (case-insensitive prefix)
-        const match = trainings.find(t =>
-          t.title.toLowerCase().includes(row.title.toLowerCase().slice(0, 20)) ||
-          row.title.toLowerCase().includes(t.title.toLowerCase().slice(0, 20))
-        )
-        if (!match) continue
+        const key = row.title.trim().toLowerCase()
+        const trainingId = titleMap[key] ?? Object.entries(titleMap).find(([k]) =>
+          k.includes(key.slice(0, 25)) || key.includes(k.slice(0, 25))
+        )?.[1]
+        if (!trainingId) continue
 
         const res = await fetch(`/api/plans/${activePlan.id}/items`, {
           method: 'POST', headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            training_id: match.id,
+            training_id: trainingId,
             month: row.month,
             periodicity: row.periodicity,
             required: true,
@@ -294,10 +334,16 @@ export default function PlanPage() {
         })
         if (res.ok) added++
       }
+
       await loadItems(activePlan.id)
       setPlans(prev => prev.map(p => p.id === activePlan!.id ? { ...p, item_count: p.item_count + added } : p))
-      alert(`${added} ítem(s) importados del Excel (${rows.length} filas procesadas).`)
-    } catch { setError('Error al leer el archivo') }
+      alert(
+        `✅ Importación completa:\n` +
+        `• ${created} capacitación(es) nueva(s) creada(s)\n` +
+        `• ${added} ítem(s) agregados al plan\n\n` +
+        `Puedes editar las capacitaciones en Menú → Capacitaciones.`
+      )
+    } catch (err) { setError('Error al leer el archivo') }
     setImporting(false)
     if (importRef.current) importRef.current.value = ''
   }
