@@ -176,148 +176,174 @@ export default function LoginPage() {
       </div>
 
       {/* ── RIGHT PANEL ───────────────────────────────────────── */}
-      <div className="flex-1 lg:w-[360px] lg:flex-none flex flex-col justify-center px-8 py-10 relative"
+      <div className="flex-1 lg:w-[400px] lg:flex-none flex flex-col relative"
         style={{ background: t.rightBg, borderLeft: `1px solid ${t.rightBorder}`, transition: 'background 0.3s, border-color 0.3s' }}>
 
         {/* Theme toggle */}
-        <button
-          onClick={toggleTheme}
-          className="absolute top-5 right-5 w-9 h-9 rounded-lg flex items-center justify-center transition-colors"
-          style={{ background: t.toggleBg, color: t.toggleIcon }}
-          aria-label={dark ? 'Cambiar a modo claro' : 'Cambiar a modo oscuro'}
-        >
-          {dark ? <Sun size={16} /> : <Moon size={16} />}
-        </button>
+        <div className="flex justify-end p-5">
+          <button
+            onClick={toggleTheme}
+            className="w-9 h-9 rounded-lg flex items-center justify-center transition-colors"
+            style={{ background: t.toggleBg, color: t.toggleIcon }}
+            aria-label={dark ? 'Cambiar a modo claro' : 'Cambiar a modo oscuro'}
+          >
+            {dark ? <Sun size={16} /> : <Moon size={16} />}
+          </button>
+        </div>
 
-        <motion.div className="w-full max-w-[320px] mx-auto"
-          initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4 }}>
+        {/* Center content */}
+        <div className="flex-1 flex items-center justify-center px-10 pb-8">
+          <motion.div className="w-full max-w-[340px]"
+            initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4 }}>
 
-          {/* Mobile logo */}
-          <div className="lg:hidden flex items-center gap-3 mb-10">
-            <div className="w-9 h-9 rounded-xl flex items-center justify-center" style={{ background: '#3b82f6' }}>
-              <Shield size={18} className="text-white" strokeWidth={2} />
-            </div>
-            <div>
-              <div className="text-sm font-medium tracking-wide" style={{ color: t.logoName }}>CAMPUS SST</div>
-              <div className="text-[10px] uppercase tracking-widest" style={{ color: t.logoSub }}>SG-SST Colombia</div>
-            </div>
-          </div>
-
-          <div className="mb-8">
-            <h2 className="text-[20px] font-medium mb-1.5" style={{ color: t.formTitle }}>Bienvenido</h2>
-            <p className="text-[13px]" style={{ color: t.formSub }}>Ingresa tus credenciales para continuar</p>
-          </div>
-
-          {/* Auth error */}
-          {authError && (
-            <motion.div initial={{ opacity: 0, y: -6 }} animate={{ opacity: 1, y: 0 }}
-              className="flex items-center gap-2 rounded-lg px-3 py-2.5 mb-5 text-sm"
-              style={{ background: t.errorBg, border: `1px solid ${t.errorBorder}`, color: t.errorText }}>
-              <Lock size={13} className="flex-shrink-0" />
-              {authError}
-            </motion.div>
-          )}
-
-          <form onSubmit={handleSubmit} noValidate className="space-y-4">
-
-            {/* Email */}
-            <div>
-              <label className="block text-[12px] mb-1.5" style={{ color: t.label }}>
-                Correo electrónico
-              </label>
-              <div className="relative">
-                <Mail size={14} className="absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none"
-                  style={{ color: t.iconColor }} />
-                <input
-                  type="email"
-                  value={form.email}
-                  onChange={e => { setForm({ ...form, email: e.target.value }); setAuthError('') }}
-                  placeholder="tu@empresa.com"
-                  autoComplete="email"
-                  style={{
-                    width: '100%',
-                    padding: '9px 12px 9px 34px',
-                    borderRadius: 8,
-                    border: `1px solid ${errors.email ? 'rgba(239,68,68,0.5)' : t.inputBorder}`,
-                    background: t.inputBg,
-                    color: t.inputText,
-                    fontSize: 14,
-                    outline: 'none',
-                    transition: 'border-color 0.2s',
-                  }}
-                />
+            {/* Mobile logo */}
+            <div className="lg:hidden flex items-center gap-3 mb-10">
+              <div className="w-9 h-9 rounded-xl flex items-center justify-center" style={{ background: '#3b82f6' }}>
+                <Shield size={18} className="text-white" strokeWidth={2} />
               </div>
-              {errors.email && <p className="text-xs mt-1 pl-1" style={{ color: t.errorText }}>{errors.email}</p>}
+              <div>
+                <div className="text-sm font-medium tracking-wide" style={{ color: t.logoName }}>CAMPUS SST</div>
+                <div className="text-[10px] uppercase tracking-widest" style={{ color: t.logoSub }}>SG-SST Colombia</div>
+              </div>
             </div>
 
-            {/* Password */}
-            <div>
-              <label className="block text-[12px] mb-1.5" style={{ color: t.label }}>
-                Contraseña
-              </label>
-              <div className="relative">
-                <Lock size={14} className="absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none"
-                  style={{ color: t.iconColor }} />
-                <input
-                  type={showPass ? 'text' : 'password'}
-                  value={form.password}
-                  onChange={e => { setForm({ ...form, password: e.target.value }); setAuthError('') }}
-                  placeholder="••••••••"
-                  autoComplete="current-password"
-                  style={{
-                    width: '100%',
-                    padding: '9px 40px 9px 34px',
-                    borderRadius: 8,
-                    border: `1px solid ${errors.password ? 'rgba(239,68,68,0.5)' : t.inputBorder}`,
-                    background: t.inputBg,
-                    color: t.inputText,
-                    fontSize: 14,
-                    outline: 'none',
-                    transition: 'border-color 0.2s',
-                  }}
-                />
-                <button type="button" onClick={() => setShowPass(!showPass)}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 transition-colors"
-                  style={{ color: t.iconColor }}>
-                  {showPass ? <EyeOff size={15} /> : <Eye size={15} />}
-                </button>
+            {/* Header */}
+            <div className="mb-8">
+              <div className="text-[11px] uppercase tracking-[0.1em] mb-3" style={{ color: '#3b82f6' }}>
+                Acceso seguro
               </div>
-              {errors.password && <p className="text-xs mt-1 pl-1" style={{ color: t.errorText }}>{errors.password}</p>}
+              <h2 className="text-[24px] font-medium mb-2" style={{ color: t.formTitle }}>Bienvenido</h2>
+              <p className="text-[13px] leading-relaxed" style={{ color: t.formSub }}>
+                Ingresa tus credenciales para acceder a tu plataforma de formación SST.
+              </p>
             </div>
 
-            {/* Submit */}
-            <button
-              type="submit"
-              disabled={loading}
-              className="w-full flex items-center justify-center gap-2 py-2.5 rounded-lg text-sm font-medium transition-all"
-              style={{ background: '#3b82f6', color: '#fff', border: 'none', cursor: loading ? 'not-allowed' : 'pointer', opacity: loading ? 0.8 : 1 }}
-            >
-              {loading ? (
-                <>
-                  <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                  Verificando...
-                </>
-              ) : (
-                <>Ingresar al sistema <ArrowRight size={14} /></>
-              )}
-            </button>
-          </form>
+            {/* Auth error */}
+            {authError && (
+              <motion.div initial={{ opacity: 0, y: -6 }} animate={{ opacity: 1, y: 0 }}
+                className="flex items-center gap-2 rounded-lg px-3 py-3 mb-6 text-sm"
+                style={{ background: t.errorBg, border: `1px solid ${t.errorBorder}`, color: t.errorText }}>
+                <Lock size={13} className="flex-shrink-0" />
+                {authError}
+              </motion.div>
+            )}
 
-          {/* Compliance badges */}
-          <div className="flex gap-2 flex-wrap mt-6">
-            {BADGES.map(b => (
-              <div key={b} className="flex items-center gap-1 text-[10px] px-2 py-1 rounded"
-                style={{ background: t.badgeBg, color: t.badgeColor, border: `1px solid ${t.badgeBorder}` }}>
-                <CheckCircle size={10} />
-                {b}
+            <form onSubmit={handleSubmit} noValidate className="space-y-5">
+
+              {/* Email */}
+              <div>
+                <label className="block text-[12px] font-medium mb-2" style={{ color: t.label }}>
+                  Correo electrónico
+                </label>
+                <div className="relative">
+                  <Mail size={14} className="absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none"
+                    style={{ color: t.iconColor }} />
+                  <input
+                    type="email"
+                    value={form.email}
+                    onChange={e => { setForm({ ...form, email: e.target.value }); setAuthError('') }}
+                    placeholder="tu@empresa.com"
+                    autoComplete="email"
+                    style={{
+                      width: '100%',
+                      padding: '11px 14px 11px 36px',
+                      borderRadius: 10,
+                      border: `1px solid ${errors.email ? 'rgba(239,68,68,0.5)' : t.inputBorder}`,
+                      background: t.inputBg,
+                      color: t.inputText,
+                      fontSize: 14,
+                      outline: 'none',
+                      transition: 'border-color 0.2s',
+                    }}
+                  />
+                </div>
+                {errors.email && <p className="text-xs mt-1.5 pl-1" style={{ color: t.errorText }}>{errors.email}</p>}
               </div>
-            ))}
-          </div>
 
-          <p className="text-[11px] text-center mt-5" style={{ color: t.noteColor }}>
-            ¿No tienes acceso? Contacta al administrador SST de tu empresa.
-          </p>
-        </motion.div>
+              {/* Password */}
+              <div>
+                <label className="block text-[12px] font-medium mb-2" style={{ color: t.label }}>
+                  Contraseña
+                </label>
+                <div className="relative">
+                  <Lock size={14} className="absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none"
+                    style={{ color: t.iconColor }} />
+                  <input
+                    type={showPass ? 'text' : 'password'}
+                    value={form.password}
+                    onChange={e => { setForm({ ...form, password: e.target.value }); setAuthError('') }}
+                    placeholder="••••••••"
+                    autoComplete="current-password"
+                    style={{
+                      width: '100%',
+                      padding: '11px 42px 11px 36px',
+                      borderRadius: 10,
+                      border: `1px solid ${errors.password ? 'rgba(239,68,68,0.5)' : t.inputBorder}`,
+                      background: t.inputBg,
+                      color: t.inputText,
+                      fontSize: 14,
+                      outline: 'none',
+                      transition: 'border-color 0.2s',
+                    }}
+                  />
+                  <button type="button" onClick={() => setShowPass(!showPass)}
+                    className="absolute right-3.5 top-1/2 -translate-y-1/2 transition-colors"
+                    style={{ color: t.iconColor }}>
+                    {showPass ? <EyeOff size={15} /> : <Eye size={15} />}
+                  </button>
+                </div>
+                {errors.password && <p className="text-xs mt-1.5 pl-1" style={{ color: t.errorText }}>{errors.password}</p>}
+              </div>
+
+              {/* Submit */}
+              <button
+                type="submit"
+                disabled={loading}
+                className="w-full flex items-center justify-center gap-2 rounded-xl text-sm font-semibold transition-all"
+                style={{
+                  background: '#3b82f6',
+                  color: '#fff',
+                  border: 'none',
+                  padding: '13px 20px',
+                  cursor: loading ? 'not-allowed' : 'pointer',
+                  opacity: loading ? 0.8 : 1,
+                  marginTop: 8,
+                }}
+              >
+                {loading ? (
+                  <>
+                    <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                    Verificando...
+                  </>
+                ) : (
+                  <>Ingresar al sistema <ArrowRight size={15} /></>
+                )}
+              </button>
+            </form>
+
+            {/* Divider */}
+            <div className="flex items-center gap-3 my-6">
+              <div className="flex-1 h-px" style={{ background: t.inputBorder }} />
+              <span className="text-[11px]" style={{ color: t.noteColor }}>cumplimiento normativo</span>
+              <div className="flex-1 h-px" style={{ background: t.inputBorder }} />
+            </div>
+
+            {/* Compliance badges */}
+            <div className="flex gap-2 flex-wrap">
+              {BADGES.map(b => (
+                <div key={b} className="flex items-center gap-1.5 text-[11px] px-3 py-1.5 rounded-lg"
+                  style={{ background: t.badgeBg, color: t.badgeColor, border: `1px solid ${t.badgeBorder}` }}>
+                  <CheckCircle size={11} />
+                  {b}
+                </div>
+              ))}
+            </div>
+
+            <p className="text-[11px] text-center mt-6 leading-relaxed" style={{ color: t.noteColor }}>
+              ¿No tienes acceso? Contacta al administrador SST de tu empresa.
+            </p>
+          </motion.div>
+        </div>
       </div>
     </div>
   )
