@@ -43,12 +43,13 @@ interface ProfileData {
   consume_frutas?: Nullable<boolean>; consume_verduras?: Nullable<boolean>
   fuma?: Nullable<boolean>; cigarrillos_dia?: number; consumo_alcohol?: string
   consume_energizantes?: Nullable<boolean>; consume_psicoactivos?: string
-  enfermedades_diagnosticadas?: string[]; hospitalizado?: Nullable<boolean>
+  enfermedades_diagnosticadas?: string[]; enfermedades_otra?: string
+  hospitalizado?: Nullable<boolean>
   cirugias?: Nullable<boolean>; cirugias_detalle?: string
   alergias?: Nullable<boolean>; alergias_detalle?: string
   medicamentos_permanentes?: Nullable<boolean>; medicamentos_detalle?: string
   limitacion_fisica?: Nullable<boolean>; limitacion_detalle?: string
-  antecedentes_familiares?: string[]
+  antecedentes_familiares?: string[]; antecedentes_familiares_otra?: string
   accidentes_trabajo?: Nullable<boolean>; enfermedades_laborales?: Nullable<boolean>
   restricciones_medicas?: Nullable<boolean>; restricciones_detalle?: string
   usa_gafas?: Nullable<boolean>; usa_audifonos?: Nullable<boolean>
@@ -147,11 +148,14 @@ function BoolField({ label, value, onChange, tip }: { label: string; value: Null
   )
 }
 
-function CheckGroup({ label, options, value, onChange, tip }: {
-  label: string; options: string[]; value: string[]; onChange: (v: string[]) => void; tip?: string
+function CheckGroup({ label, options, value, onChange, tip, otherValue, onOtherChange, otherLabel }: {
+  label: string; options: string[]; value: string[]; onChange: (v: string[]) => void
+  tip?: string; otherValue?: string; onOtherChange?: (v: string) => void; otherLabel?: string
 }) {
   const toggle = (opt: string) =>
     onChange(value.includes(opt) ? value.filter(x => x !== opt) : [...value, opt])
+  // detect if any selected option is an "OTRA/OTRO/OTRAS" variant
+  const showOther = onOtherChange && value.some(v => /^OTRA[S]?$|^OTRO[S]?$/.test(v.trim()))
   return (
     <div className="col-span-2">
       <p className="text-xs font-semibold mb-2" style={{ color: 'var(--text-dim)' }}>{label}</p>
@@ -166,6 +170,16 @@ function CheckGroup({ label, options, value, onChange, tip }: {
           </button>
         ))}
       </div>
+      {showOther && (
+        <div className="mt-3">
+          <label className="block text-xs font-semibold mb-1.5" style={{ color: 'var(--text-dim)' }}>
+            {otherLabel ?? '¿CUÁL(ES)? ESPECIFICA AQUÍ:'}
+          </label>
+          <input className="terra-input text-sm w-full" value={otherValue ?? ''}
+            onChange={e => onOtherChange!(UP(e.target.value))}
+            placeholder="DESCRIBE LAS OPCIONES ADICIONALES..." spellCheck={false} />
+        </div>
+      )}
       {tip && <Tip text={tip} />}
     </div>
   )
@@ -909,7 +923,10 @@ export default function MyProfilePage() {
                   <CheckGroup label="¿LE HAN DIAGNOSTICADO ALGUNA DE ESTAS ENFERMEDADES? (SELECCIONA TODAS LAS QUE APLIQUEN)"
                     options={['HIPERTENSIÓN','DIABETES','ENF. CARDIOVASCULARES','ENF. RESPIRATORIAS','ENF. OSTEOMUSCULARES (COLUMNA, ARTICULACIONES)','ENF. NEUROLÓGICAS','PROBLEMAS VISUALES','PROBLEMAS AUDITIVOS','ENF. MENTALES / PSIQUIÁTRICAS','OTRA']}
                     value={data.enfermedades_diagnosticadas ?? []}
-                    onChange={v => setArr('enfermedades_diagnosticadas', v)} />
+                    onChange={v => setArr('enfermedades_diagnosticadas', v)}
+                    otherValue={data.enfermedades_otra ?? ''}
+                    onOtherChange={v => set('enfermedades_otra', v)}
+                    otherLabel="¿QUÉ OTRA(S) ENFERMEDAD(ES) LE HAN DIAGNOSTICADO?" />
                   <div className="col-span-2 grid grid-cols-2 gap-4">
                     <BoolField label="¿HA SIDO HOSPITALIZADO ALGUNA VEZ?" value={data.hospitalizado ?? null} onChange={v => set('hospitalizado', v)} />
                     <BoolField label="¿HA TENIDO CIRUGÍAS?" value={data.cirugias ?? null} onChange={v => set('cirugias', v)} />
@@ -956,7 +973,10 @@ export default function MyProfilePage() {
                   options={['DIABETES','HIPERTENSIÓN','CÁNCER','ENF. CARDIOVASCULARES','ENF. MENTALES','ARTRITIS / REUMATISMO','OTRA']}
                   value={data.antecedentes_familiares ?? []}
                   onChange={v => setArr('antecedentes_familiares', v)}
-                  tip="Selecciona todas las que apliquen" />
+                  tip="Selecciona todas las que apliquen"
+                  otherValue={data.antecedentes_familiares_otra ?? ''}
+                  onOtherChange={v => set('antecedentes_familiares_otra', v)}
+                  otherLabel="¿QUÉ OTRA(S) ENFERMEDAD(ES) TIENEN SUS FAMILIARES?" />
               </SectionCard>
 
               <SectionCard title="Salud ocupacional" icon={Shield} accent="#F59E0B">

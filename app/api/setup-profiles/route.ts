@@ -112,6 +112,7 @@ CREATE TABLE IF NOT EXISTS worker_profiles (
 
   -- § 10  Antecedentes médicos personales
   enfermedades_diagnosticadas TEXT[],
+  enfermedades_otra           TEXT,
   hospitalizado               BOOLEAN,
   cirugias                    BOOLEAN,
   cirugias_detalle            TEXT,
@@ -123,7 +124,8 @@ CREATE TABLE IF NOT EXISTS worker_profiles (
   limitacion_detalle          TEXT,
 
   -- § 11  Antecedentes familiares
-  antecedentes_familiares   TEXT[],
+  antecedentes_familiares       TEXT[],
+  antecedentes_familiares_otra  TEXT,
 
   -- § 12  Salud ocupacional
   accidentes_trabajo        BOOLEAN,
@@ -166,5 +168,5 @@ ALTER TABLE worker_profiles DISABLE ROW LEVEL SECURITY;
 CREATE INDEX IF NOT EXISTS idx_wp_company ON worker_profiles(company_id);
 CREATE INDEX IF NOT EXISTS idx_wp_user    ON worker_profiles(user_id);
 `
-  return NextResponse.json({ sql })
+  return new Response(sql, { headers: { 'Content-Type': 'text/plain; charset=utf-8' } })
 }
