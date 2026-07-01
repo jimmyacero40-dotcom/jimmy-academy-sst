@@ -1,10 +1,12 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
+import * as XLSX from 'xlsx'
 import {
   CalendarDays, Plus, Trash2, X, Loader2, AlertCircle,
-  BookOpen, ChevronRight, Zap, CheckCircle, Edit2, Users, Layers, UserCheck
+  BookOpen, ChevronRight, Zap, CheckCircle, Edit2, Users, Layers, UserCheck,
+  LayoutGrid, List, FileSpreadsheet, Upload
 } from 'lucide-react'
 
 interface Plan {
@@ -32,11 +34,21 @@ interface Area     { id: string; name: string }
 interface Group    { id: string; name: string }
 
 const MONTHS = ['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic']
+const MONTH_COLORS = [
+  '#3B82F6','#8B5CF6','#EC4899','#F59E0B',
+  '#10B981','#06B6D4','#F97316','#EF4444',
+  '#84CC16','#A855F7','#14B8A6','#6366F1',
+]
+
 const PERIODICITIES = [
-  { value: 'once', label: 'Una vez' },
-  { value: 'monthly', label: 'Mensual' },
-  { value: 'quarterly', label: 'Trimestral' },
-  { value: 'yearly', label: 'Anual' },
+  { value: 'once',           label: 'Una vez'           },
+  { value: 'monthly',        label: 'Mensual'           },
+  { value: 'bimestral',      label: 'Bimestral (c/2m)' },
+  { value: 'trimestral',     label: 'Trimestral (c/3m)' },
+  { value: 'cuatrimestral',  label: 'Cuatrimestral (c/4m)' },
+  { value: 'semestral',      label: 'Semestral (c/6m)' },
+  { value: 'anual',          label: 'Anual'             },
+  { value: 'cada_dos_anos',  label: 'Cada 2 años'       },
 ]
 
 const STATUS_STYLES: Record<string, { bg: string; color: string; label: string }> = {
@@ -48,20 +60,94 @@ const STATUS_STYLES: Record<string, { bg: string; color: string; label: string }
 const EMPTY_PLAN = { name: '', year: new Date().getFullYear() }
 const EMPTY_ITEM = { training_id: '', month: 1, periodicity: 'once', required: true, valid_days: 365, target_type: 'all', target_id: '' }
 
+// Excel import parser for PLAN DE FORMACIÓN HSE format
+function parsePlanExcel(buffer: ArrayBuffer): { title: string; month: number; periodicity: string; population: string }[] {
+  const wb = XLSX.read(buffer, { type: 'array' })
+  const ws = wb.Sheets[wb.SheetNames[0]]
+  const raw = XLSX.utils.sheet_to_json<any[]>(ws, { header: 1, defval: '' })
+
+  const results: { title: string; month: number; periodicity: string; population: string }[] = []
+
+  // Find header row (contains ENE or ENERO)
+  let headerRow = -1
+  for (let r = 0; r < Math.min(20, raw.length); r++) {
+    const row = raw[r] as any[]
+    if (row.some((c: any) => String(c).toUpperCase().includes('ENE'))) { headerRow = r; break }
+  }
+  if (headerRow < 0) return results
+
+  // Month columns: find columns with ENE-DIC (look in headerRow)
+  const headerCells = raw[headerRow] as any[]
+  const monthCols: number[] = []
+  headerCells.forEach((cell: any, ci: number) => {
+    const s = String(cell).toUpperCase().trim()
+    const monthIdx = ['ENE','FEB','MAR','ABR','MAY','JUN','JUL','AGO','SEP','OCT','NOV','DIC'].indexOf(s)
+    if (monthIdx >= 0) monthCols.push(ci)
+  })
+
+  // Data rows start after header (skip possible P/E sub-row)
+  let dataStart = headerRow + 1
+  // Skip sub-rows that don't look like data (e.g. P E P E...)
+  while (dataStart < raw.length) {
+    const row = raw[dataStart] as any[]
+    const firstTwo = [String(row[0] ?? ''), String(row[1] ?? '')].join('').trim()
+    if (firstTwo.length > 3) break
+    dataStart++
+  }
+
+  let currentPopulation = 'TODOS'
+  for (let r = dataStart; r < raw.length; r++) {
+    const row = raw[r] as any[]
+    const col0 = String(row[0] ?? '').trim().toUpperCase()
+    const col1 = String(row[1] ?? '').trim()
+
+    // Population header rows
+    if (col0 && !col1 && col0.length > 5) { currentPopulation = col0; continue }
+    if (col0.includes('COLABOR') || col0.includes('TODOS')) { currentPopulation = 'all'; continue }
+    if (col0.includes('ADMINIST')) { currentPopulation = 'ADMINISTRATIVO'; continue }
+    if (col0.includes('MANTENIM')) { currentPopulation = 'MANTENIMIENTO'; continue }
+    if (col0.includes('CULTIVO')) { currentPopulation = 'CULTIVO'; continue }
+    if (col0.includes('OPERATIV')) { currentPopulation = 'OPERATIVO'; continue }
+
+    if (!col1 || col1.length < 3) continue
+
+    const title = col1
+    const freqRaw = String(row[3] ?? row[2] ?? '').trim().toUpperCase()
+    let periodicity = 'once'
+    if (freqRaw.includes('ANUAL')) periodicity = 'anual'
+    else if (freqRaw.includes('SEMEST')) periodicity = 'semestral'
+    else if (freqRaw.includes('TRIMEST')) periodicity = 'trimestral'
+    else if (freqRaw.includes('BIMEST')) periodicity = 'bimestral'
+    else if (freqRaw.includes('MENSUAL')) periodicity = 'monthly'
+    else if (freqRaw.includes('CUATRIM')) periodicity = 'cuatrimestral'
+
+    // Find planned months (P column > 0 in each month pair)
+    monthCols.forEach((mc, mi) => {
+      const val = row[mc]
+      const numVal = typeof val === 'number' ? val : parseFloat(String(val).replace(',', '.')) || 0
+      if (numVal > 0) {
+        results.push({ title, month: mi + 1, periodicity, population: currentPopulation })
+      }
+    })
+  }
+  return results
+}
+
 export default function PlanPage() {
   const [plans, setPlans]     = useState<Plan[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError]     = useState('')
+  const [view, setView]       = useState<'list' | 'board'>('list')
 
   const [showPlanModal, setShowPlanModal] = useState(false)
   const [planForm, setPlanForm]           = useState(EMPTY_PLAN)
   const [savingPlan, setSavingPlan]       = useState(false)
 
-  const [activePlan, setActivePlan]   = useState<Plan | null>(null)
-  const [items, setItems]             = useState<PlanItem[]>([])
+  const [activePlan, setActivePlan]     = useState<Plan | null>(null)
+  const [items, setItems]               = useState<PlanItem[]>([])
   const [loadingItems, setLoadingItems] = useState(false)
   const [deletingItem, setDeletingItem] = useState<string | null>(null)
-  const [activating, setActivating]   = useState(false)
+  const [activating, setActivating]     = useState(false)
 
   const [showItemForm, setShowItemForm] = useState(false)
   const [itemForm, setItemForm]         = useState(EMPTY_ITEM)
@@ -70,6 +156,9 @@ export default function PlanPage() {
   const [trainings, setTrainings] = useState<Training[]>([])
   const [areas, setAreas]         = useState<Area[]>([])
   const [groups, setGroups]       = useState<Group[]>([])
+
+  const [importing, setImporting] = useState(false)
+  const importRef = useRef<HTMLInputElement>(null)
 
   const loadPlans = async () => {
     setLoading(true)
@@ -160,7 +249,7 @@ export default function PlanPage() {
 
   const handleActivate = async () => {
     if (!activePlan) return
-    if (!confirm(`¿Activar "${activePlan.name}"? Se generarán las matrículas automáticamente para todos los trabajadores aplicables.`)) return
+    if (!confirm(`¿Activar "${activePlan.name}"? Se generarán las matrículas automáticamente.`)) return
     setActivating(true)
     const res = await fetch(`/api/plans/${activePlan.id}/activate`, { method: 'POST' })
     if (res.ok) {
@@ -172,15 +261,57 @@ export default function PlanPage() {
     setActivating(false)
   }
 
+  const handleImportExcel = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file || !activePlan) return
+    if (activePlan.status !== 'draft') { setError('Solo se puede importar en planes en borrador'); return }
+    setImporting(true)
+    try {
+      const buf = await file.arrayBuffer()
+      const rows = parsePlanExcel(buf)
+      if (!rows.length) { setError('No se encontraron actividades en el archivo'); setImporting(false); return }
+
+      let added = 0
+      for (const row of rows) {
+        // Match training by title (case-insensitive prefix)
+        const match = trainings.find(t =>
+          t.title.toLowerCase().includes(row.title.toLowerCase().slice(0, 20)) ||
+          row.title.toLowerCase().includes(t.title.toLowerCase().slice(0, 20))
+        )
+        if (!match) continue
+
+        const res = await fetch(`/api/plans/${activePlan.id}/items`, {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            training_id: match.id,
+            month: row.month,
+            periodicity: row.periodicity,
+            required: true,
+            valid_days: 365,
+            target_type: 'all',
+            target_id: null,
+          }),
+        })
+        if (res.ok) added++
+      }
+      await loadItems(activePlan.id)
+      setPlans(prev => prev.map(p => p.id === activePlan!.id ? { ...p, item_count: p.item_count + added } : p))
+      alert(`${added} ítem(s) importados del Excel (${rows.length} filas procesadas).`)
+    } catch { setError('Error al leer el archivo') }
+    setImporting(false)
+    if (importRef.current) importRef.current.value = ''
+  }
+
   const targetLabel = (item: PlanItem) => {
     const t = item.plan_item_targets?.[0]
     if (!t || t.target_type === 'all') return 'Todos'
-    if (t.target_type === 'area') return areas.find(a => a.id === t.target_id)?.name ?? 'Área'
+    if (t.target_type === 'area')  return areas.find(a => a.id === t.target_id)?.name ?? 'Área'
     if (t.target_type === 'group') return groups.find(g => g.id === t.target_id)?.name ?? 'Grupo'
     return t.target_type
   }
 
-  // Group items by month
+  const perioLabel = (v: string) => PERIODICITIES.find(p => p.value === v)?.label ?? v
+
   const itemsByMonth: Record<number, PlanItem[]> = {}
   items.forEach(item => {
     if (!itemsByMonth[item.month]) itemsByMonth[item.month] = []
@@ -188,7 +319,7 @@ export default function PlanPage() {
   })
 
   return (
-    <div className="p-6 max-w-6xl mx-auto">
+    <div className="p-6 max-w-7xl mx-auto">
 
       {/* Header */}
       <div className="flex items-center justify-between mb-8">
@@ -268,9 +399,8 @@ export default function PlanPage() {
                         )}
                       </div>
                     </div>
-                    <div className="flex items-center justify-between mt-2">
-                      <ChevronRight size={13} style={{ color: 'var(--text-faint)', transform: isActive ? 'rotate(90deg)' : 'none', transition: 'transform .2s' }} />
-                    </div>
+                    <ChevronRight size={13} className="mt-1.5"
+                      style={{ color: 'var(--text-faint)', transform: isActive ? 'rotate(90deg)' : 'none', transition: 'transform .2s' }} />
                   </motion.div>
                 )
               })}
@@ -287,16 +417,39 @@ export default function PlanPage() {
               <div className="rounded-2xl overflow-hidden" style={{ background: 'var(--bg-surface)', border: '1px solid var(--border)' }}>
 
                 {/* Plan header */}
-                <div className="flex items-center justify-between px-5 py-4" style={{ borderBottom: '1px solid var(--border)' }}>
+                <div className="flex items-center justify-between px-5 py-4 flex-wrap gap-3"
+                  style={{ borderBottom: '1px solid var(--border)' }}>
                   <div>
                     <div className="font-bold" style={{ color: 'var(--text)' }}>{activePlan.name}</div>
                     <div className="text-xs mt-0.5" style={{ color: 'var(--text-dim)' }}>
                       {items.length} ítems · Año {activePlan.year}
                     </div>
                   </div>
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-2 flex-wrap">
+
+                    {/* View toggle */}
+                    <div className="flex gap-1 p-1 rounded-lg" style={{ background: 'var(--bg-card)', border: '1px solid var(--border)' }}>
+                      <button onClick={() => setView('list')}
+                        className="w-7 h-7 rounded flex items-center justify-center transition-all"
+                        style={{ background: view === 'list' ? 'var(--primary)' : 'transparent', color: view === 'list' ? '#fff' : 'var(--text-faint)' }}>
+                        <List size={13} />
+                      </button>
+                      <button onClick={() => setView('board')}
+                        className="w-7 h-7 rounded flex items-center justify-center transition-all"
+                        style={{ background: view === 'board' ? 'var(--primary)' : 'transparent', color: view === 'board' ? '#fff' : 'var(--text-faint)' }}>
+                        <LayoutGrid size={13} />
+                      </button>
+                    </div>
+
                     {activePlan.status === 'draft' && (
                       <>
+                        {/* Import Excel */}
+                        <label className="terra-btn-outline cursor-pointer"
+                          style={{ padding: '7px 12px', fontSize: 12, display: 'flex', alignItems: 'center', gap: 6 }}>
+                          {importing ? <Loader2 size={12} className="animate-spin" /> : <FileSpreadsheet size={12} />}
+                          Importar Excel
+                          <input ref={importRef} type="file" accept=".xlsx,.xls" onChange={handleImportExcel} className="hidden" />
+                        </label>
                         <button
                           onClick={() => { setShowItemForm(true); setItemForm(EMPTY_ITEM) }}
                           className="terra-btn-outline"
@@ -316,7 +469,7 @@ export default function PlanPage() {
                     {activePlan.status === 'active' && (
                       <span className="flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-full"
                         style={{ background: 'rgba(16,185,129,0.1)', color: '#34D399' }}>
-                        <CheckCircle size={12} /> Plan activo — matrículas generadas
+                        <CheckCircle size={12} /> Plan activo
                       </span>
                     )}
                   </div>
@@ -404,7 +557,7 @@ export default function PlanPage() {
                   )}
                 </AnimatePresence>
 
-                {/* Items by month */}
+                {/* Content */}
                 {loadingItems ? (
                   <div className="flex items-center justify-center py-16">
                     <Loader2 size={20} className="animate-spin" style={{ color: 'var(--primary)' }} />
@@ -413,9 +566,13 @@ export default function PlanPage() {
                   <div className="flex flex-col items-center justify-center py-16 text-center">
                     <BookOpen size={28} className="mb-3" style={{ color: 'var(--text-faint)' }} />
                     <p className="text-sm font-semibold" style={{ color: 'var(--text)' }}>Sin ítems</p>
-                    <p className="text-xs mt-1 mb-4" style={{ color: 'var(--text-dim)' }}>Agrega cursos al plan con el botón de arriba</p>
+                    <p className="text-xs mt-1 mb-4" style={{ color: 'var(--text-dim)' }}>
+                      Agrega ítems manualmente o importa desde el Excel del plan HSE
+                    </p>
                   </div>
-                ) : (
+                ) : view === 'list' ? (
+
+                  /* ── LIST VIEW ── */
                   <div className="p-5">
                     <div className="grid grid-cols-1 gap-2">
                       {Array.from({ length: 12 }, (_, mi) => mi + 1).map(month => {
@@ -423,24 +580,31 @@ export default function PlanPage() {
                         if (!monthItems?.length) return null
                         return (
                           <div key={month}>
-                            <div className="text-[10px] font-bold uppercase tracking-widest mb-2 mt-1"
-                              style={{ color: 'var(--text-faint)' }}>{MONTHS[month - 1]}</div>
-                            <div className="space-y-1.5">
+                            <div className="flex items-center gap-2 mb-2 mt-1">
+                              <div className="w-5 h-5 rounded-md flex items-center justify-center text-[9px] font-bold text-white flex-shrink-0"
+                                style={{ background: MONTH_COLORS[month - 1] }}>
+                                {month}
+                              </div>
+                              <span className="text-[10px] font-bold uppercase tracking-widest"
+                                style={{ color: 'var(--text-faint)' }}>{MONTHS[month - 1]}</span>
+                              <span className="text-[10px]" style={{ color: 'var(--text-faint)' }}>· {monthItems.length} ítem{monthItems.length !== 1 ? 's' : ''}</span>
+                            </div>
+                            <div className="space-y-1.5 ml-7">
                               {monthItems.map(item => (
                                 <motion.div key={item.id}
                                   initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }}
                                   className="flex items-center gap-3 px-3 py-2.5 rounded-xl group"
                                   style={{ background: 'var(--bg-card)', border: '1px solid var(--border)' }}>
-                                  <div className="w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0"
-                                    style={{ background: 'rgba(139,92,246,0.12)' }}>
-                                    <BookOpen size={13} style={{ color: '#A78BFA' }} />
+                                  <div className="w-6 h-6 rounded-lg flex items-center justify-center flex-shrink-0"
+                                    style={{ background: `${MONTH_COLORS[month - 1]}20` }}>
+                                    <BookOpen size={11} style={{ color: MONTH_COLORS[month - 1] }} />
                                   </div>
                                   <div className="flex-1 min-w-0">
                                     <div className="text-xs font-semibold truncate" style={{ color: 'var(--text)' }}>
                                       {item.trainings?.title}
                                     </div>
                                     <div className="text-[10px] flex items-center gap-2 mt-0.5" style={{ color: 'var(--text-faint)' }}>
-                                      <span>{PERIODICITIES.find(p => p.value === item.periodicity)?.label}</span>
+                                      <span>{perioLabel(item.periodicity)}</span>
                                       <span>·</span>
                                       <span className="flex items-center gap-1">
                                         {item.plan_item_targets?.[0]?.target_type === 'all' ? <Users size={9} /> :
@@ -459,6 +623,60 @@ export default function PlanPage() {
                                   )}
                                 </motion.div>
                               ))}
+                            </div>
+                          </div>
+                        )
+                      })}
+                    </div>
+                  </div>
+
+                ) : (
+
+                  /* ── BOARD VIEW ── */
+                  <div className="p-4 overflow-x-auto">
+                    <div className="flex gap-3" style={{ minWidth: 1100 }}>
+                      {Array.from({ length: 12 }, (_, mi) => mi + 1).map(month => {
+                        const monthItems = itemsByMonth[month] ?? []
+                        const color = MONTH_COLORS[month - 1]
+                        return (
+                          <div key={month} className="flex-1 min-w-0" style={{ minWidth: 140 }}>
+                            {/* Column header */}
+                            <div className="rounded-xl px-3 py-2 mb-2 text-center"
+                              style={{ background: `${color}18`, border: `1px solid ${color}30` }}>
+                              <div className="text-xs font-bold" style={{ color }}>{MONTHS[month - 1]}</div>
+                              <div className="text-[10px] mt-0.5" style={{ color: 'var(--text-faint)' }}>
+                                {monthItems.length} ítem{monthItems.length !== 1 ? 's' : ''}
+                              </div>
+                            </div>
+                            {/* Cards */}
+                            <div className="space-y-2">
+                              <AnimatePresence>
+                                {monthItems.map(item => (
+                                  <motion.div key={item.id}
+                                    initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }}
+                                    exit={{ opacity: 0, scale: 0.95 }}
+                                    className="rounded-xl p-2.5 group relative"
+                                    style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', borderLeft: `3px solid ${color}` }}>
+                                    <div className="text-[11px] font-semibold leading-snug mb-1" style={{ color: 'var(--text)' }}>
+                                      {item.trainings?.title}
+                                    </div>
+                                    <div className="text-[9px] flex items-center gap-1" style={{ color: 'var(--text-faint)' }}>
+                                      {item.plan_item_targets?.[0]?.target_type === 'all' ? <Users size={8} /> :
+                                       item.plan_item_targets?.[0]?.target_type === 'area' ? <Layers size={8} /> :
+                                       <UserCheck size={8} />}
+                                      <span>{targetLabel(item)}</span>
+                                      <span className="ml-auto opacity-70">{perioLabel(item.periodicity).split(' ')[0]}</span>
+                                    </div>
+                                    {activePlan.status === 'draft' && (
+                                      <button onClick={() => handleDeleteItem(item.id)} disabled={deletingItem === item.id}
+                                        className="absolute top-1.5 right-1.5 w-5 h-5 rounded flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
+                                        style={{ background: 'var(--red-dim)', color: '#FCA5A5' }}>
+                                        {deletingItem === item.id ? <Loader2 size={9} className="animate-spin" /> : <X size={9} />}
+                                      </button>
+                                    )}
+                                  </motion.div>
+                                ))}
+                              </AnimatePresence>
                             </div>
                           </div>
                         )
@@ -498,7 +716,7 @@ export default function PlanPage() {
                     </label>
                     <input type="text" value={planForm.name}
                       onChange={e => setPlanForm({ ...planForm, name: e.target.value })}
-                      placeholder="ej. PAC 2026 — Producción"
+                      placeholder="ej. PAC 2026 — HSE Producción"
                       className="terra-input" autoFocus />
                   </div>
                   <div>
