@@ -7,7 +7,7 @@ import {
   Users, Search, MoreVertical, CheckCircle, Clock,
   Building2, X, Edit2, Trash2, Download, ChevronDown,
   UserPlus, FileSpreadsheet, AlertCircle, Loader2,
-  Layers, UserCheck, Tag
+  Layers, UserCheck, Tag, ChevronRight, Plus
 } from 'lucide-react'
 
 type UserStatus = 'activo' | 'inactivo'
@@ -110,6 +110,12 @@ export default function UsersPage() {
   const [saving, setSaving]           = useState(false)
   const [loadingGroups, setLoadingGroups] = useState(false)
   const fileRef = useRef<HTMLInputElement>(null)
+
+  // Inline area/group edit state
+  const [inlineEdit, setInlineEdit] = useState<string | null>(null)   // user id being inline-edited
+  const [inlineArea, setInlineArea] = useState('')
+  const [inlineGroups, setInlineGroups] = useState<string[]>([])
+  const [savingInline, setSavingInline] = useState(false)
 
   const loadUsers = async () => {
     try {
@@ -297,6 +303,32 @@ export default function UsersPage() {
     }))
   }
 
+  const openInlineEdit = async (u: AppUser) => {
+    setInlineEdit(u.id)
+    setInlineArea(u.area_id || '')
+    setInlineGroups([])
+    try {
+      const res = await fetch(`/api/users/${u.id}/groups`)
+      if (res.ok) { const gs = await res.json(); setInlineGroups(gs.map((g: any) => g.id)) }
+    } catch {}
+  }
+
+  const saveInline = async (userId: string) => {
+    setSavingInline(true)
+    const selectedArea = areas.find(a => a.id === inlineArea)
+    await fetch('/api/users', {
+      method: 'PUT', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id: userId, area: selectedArea?.name || '', area_id: inlineArea || null }),
+    })
+    await fetch(`/api/users/${userId}/groups`, {
+      method: 'PUT', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ group_ids: inlineGroups }),
+    })
+    await loadUsers()
+    setInlineEdit(null)
+    setSavingInline(false)
+  }
+
   return (
     <div className="p-6 max-w-6xl mx-auto">
 
@@ -403,7 +435,8 @@ export default function UsersPage() {
                 {filtered.map((u, i) => (
                   <motion.tr key={u.id}
                     initial={{ opacity: 0 }} animate={{ opacity: 1 }}
-                    exit={{ opacity: 0 }} transition={{ delay: Math.min(i * 0.015, 0.25) }}>
+                    exit={{ opacity: 0 }} transition={{ delay: Math.min(i * 0.015, 0.25) }}
+                    className="group">
                     <td>
                       <input type="checkbox" checked={selected.has(u.id)} onChange={() => toggleSelect(u.id)}
                         className="w-4 h-4 rounded accent-blue-500" />
@@ -421,18 +454,51 @@ export default function UsersPage() {
                     </td>
                     <td><span className="text-xs" style={{ color: 'var(--text-dim)' }}>{u.email || '—'}</span></td>
                     <td><span className="font-mono text-xs">{u.cedula || '—'}</span></td>
+                    {/* Área inline */}
                     <td>
-                      {u.area_name ? (
+                      {inlineEdit === u.id ? (
+                        <select value={inlineArea} onChange={e => setInlineArea(e.target.value)}
+                          className="terra-input py-1 text-xs" style={{ minWidth: 130 }}>
+                          <option value="">Sin área</option>
+                          {areas.map(a => <option key={a.id} value={a.id}>{a.name}</option>)}
+                        </select>
+                      ) : u.area_name ? (
                         <span className="flex items-center gap-1 text-xs font-medium" style={{ color: 'var(--text-dim)' }}>
                           <Layers size={11} style={{ color: 'var(--primary)', flexShrink: 0 }} />
                           {u.area_name}
                         </span>
                       ) : <span className="text-xs" style={{ color: 'var(--text-faint)' }}>—</span>}
                     </td>
+                    {/* Grupos inline */}
                     <td>
-                      <span className="text-xs" style={{ color: 'var(--text-faint)' }}>
-                        {u.groups?.length ? u.groups.map(g => g.name).join(', ') : '—'}
-                      </span>
+                      {inlineEdit === u.id ? (
+                        <div className="flex flex-wrap gap-1">
+                          {groups.map(g => {
+                            const on = inlineGroups.includes(g.id)
+                            return (
+                              <button key={g.id} type="button"
+                                onClick={() => setInlineGroups(prev => on ? prev.filter(x => x !== g.id) : [...prev, g.id])}
+                                className="text-[10px] px-2 py-0.5 rounded-full font-semibold transition-all"
+                                style={{
+                                  background: on ? 'var(--primary-dim)' : 'var(--bg-card)',
+                                  border: `1px solid ${on ? 'var(--primary-border)' : 'var(--border)'}`,
+                                  color: on ? 'var(--primary)' : 'var(--text-faint)',
+                                }}>
+                                {on ? '✓ ' : ''}{g.name}
+                              </button>
+                            )
+                          })}
+                        </div>
+                      ) : u.groups?.length ? (
+                        <div className="flex flex-wrap gap-1">
+                          {u.groups.map(g => (
+                            <span key={g.id} className="text-[10px] px-2 py-0.5 rounded-full font-semibold"
+                              style={{ background: 'var(--primary-dim)', color: 'var(--primary)', border: '1px solid var(--primary-border)' }}>
+                              {g.name}
+                            </span>
+                          ))}
+                        </div>
+                      ) : <span className="text-xs" style={{ color: 'var(--text-faint)' }}>—</span>}
                     </td>
                     <td>
                       <span className={u.status === 'activo' ? 'badge-green' : 'badge-red'}>
@@ -440,6 +506,21 @@ export default function UsersPage() {
                       </span>
                     </td>
                     <td>
+                      {inlineEdit === u.id ? (
+                        <div className="flex items-center gap-1">
+                          <button onClick={() => saveInline(u.id)} disabled={savingInline}
+                            className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-bold transition-all"
+                            style={{ background: 'var(--primary)', color: '#fff' }}>
+                            {savingInline ? <Loader2 size={11} className="animate-spin" /> : <CheckCircle size={11} />}
+                            Guardar
+                          </button>
+                          <button onClick={() => setInlineEdit(null)}
+                            className="w-7 h-7 rounded-lg flex items-center justify-center"
+                            style={{ color: 'var(--text-faint)', border: '1px solid var(--border)' }}>
+                            <X size={12} />
+                          </button>
+                        </div>
+                      ) : (
                       <div className="relative">
                         <button onClick={() => setMenuOpen(menuOpen === u.id ? null : u.id)}
                           className="p-1 rounded-lg transition-colors" style={{ color: 'var(--text-faint)' }}>
@@ -466,7 +547,18 @@ export default function UsersPage() {
                           </div>
                         )}
                       </div>
+                      )}
                     </td>
+                    {/* Inline edit trigger button (shown on row hover) */}
+                    {inlineEdit !== u.id && (
+                      <td style={{ width: 0, padding: 0 }}>
+                        <button onClick={() => openInlineEdit(u)}
+                          className="opacity-0 group-hover:opacity-100 ml-1 flex items-center gap-1 px-2 py-1 rounded-lg text-[10px] font-semibold transition-all"
+                          style={{ background: 'var(--primary-dim)', color: 'var(--primary)', border: '1px solid var(--primary-border)', whiteSpace: 'nowrap' }}>
+                          <Layers size={10} /> Área/Grupo
+                        </button>
+                      </td>
+                    )}
                   </motion.tr>
                 ))}
               </AnimatePresence>
@@ -561,10 +653,13 @@ export default function UsersPage() {
                       onChange={e => {
                         const val = key === 'cedula' ? e.target.value.replace(/\D/g, '') : e.target.value
                         if (key === 'name') {
-                          const suggested = generateEmail(val)
-                          setForm(f => ({ ...f, name: val, ...(!f.emailManual ? { email: suggested } : {}) }))
+                          const upper = val.toUpperCase()
+                          const suggested = generateEmail(upper)
+                          setForm(f => ({ ...f, name: upper, ...(!f.emailManual ? { email: suggested } : {}) }))
                         } else if (key === 'cedula') {
                           setForm(f => ({ ...f, cedula: val, password: val }))
+                        } else if (key === 'role') {
+                          setForm(f => ({ ...f, role: val.toUpperCase() }))
                         } else if (key === 'email') {
                           setForm(f => ({ ...f, email: e.target.value, emailManual: true }))
                         } else {
