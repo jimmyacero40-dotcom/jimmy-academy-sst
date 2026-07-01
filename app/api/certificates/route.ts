@@ -55,5 +55,15 @@ export async function POST(req: NextRequest) {
     .single()
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+
+  // Auto-complete any open enrollment for this user+training
+  const numericScore = score ? parseInt(String(score).replace('%', ''), 10) : null
+  await supabase
+    .from('enrollments')
+    .update({ status: 'completed', completed_at: new Date().toISOString(), score: numericScore })
+    .eq('user_id', user.id)
+    .eq('training_id', body.training_id ?? 0)
+    .in('status', ['pending', 'in_progress'])
+
   return NextResponse.json(data, { status: 201 })
 }

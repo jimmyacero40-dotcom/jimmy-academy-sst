@@ -8,23 +8,30 @@ import {
   LayoutDashboard, Users, BookOpen, PenTool, Award,
   BarChart2, Brain, Bell, Settings, LogOut, Shield,
   ChevronLeft, ChevronRight, FileCheck, Search, Menu, X,
-  Sun, Moon, Building2
+  Sun, Moon, Building2, Layers, UserCheck, Briefcase, CalendarDays, GraduationCap, TrendingUp
 } from 'lucide-react'
 
+// roles: which roles can see this item (empty = all)
 const allNavItems = [
-  { href: '/dashboard', icon: LayoutDashboard, label: 'Dashboard', superOnly: true },
-  { href: '/select-company', icon: Building2, label: 'Cambiar Empresa', superOnly: true },
-  { href: '/dashboard/users', icon: Users, label: 'Usuarios', superOnly: true },
-  { href: '/dashboard/trainings', icon: BookOpen, label: 'Capacitaciones', superOnly: false },
-  { href: '/dashboard/my-signature', icon: PenTool, label: 'Mi Firma', superOnly: false },
-  { href: '/dashboard/signatures', icon: PenTool, label: 'Firmas Docs', superOnly: true },
-  { href: '/dashboard/certificates', icon: Award, label: 'Certificados', superOnly: false },
-  { href: '/dashboard/evaluations', icon: FileCheck, label: 'Evaluaciones', superOnly: true },
-  { href: '/dashboard/reports', icon: BarChart2, label: 'Reportes', superOnly: true },
-  { href: '/dashboard/audit', icon: Search, label: 'Auditoria', superOnly: true },
-  { href: '/dashboard/ai', icon: Brain, label: 'IA SST', superOnly: true },
-  { href: '/dashboard/notifications', icon: Bell, label: 'Notificaciones', superOnly: true },
-  { href: '/dashboard/settings', icon: Settings, label: 'Configuracion', superOnly: true },
+  { href: '/dashboard',            icon: LayoutDashboard, label: 'Dashboard',        roles: ['superadmin', 'admin'] },
+  { href: '/select-company',       icon: Building2,       label: 'Cambiar Empresa',  roles: ['superadmin'] },
+  { href: '/dashboard/users',      icon: Users,           label: 'Usuarios',         roles: ['superadmin', 'admin'] },
+  { href: '/dashboard/areas',      icon: Layers,          label: 'Áreas',            roles: ['superadmin', 'admin'] },
+  { href: '/dashboard/groups',     icon: UserCheck,       label: 'Grupos',           roles: ['superadmin', 'admin'] },
+  { href: '/dashboard/profiles',   icon: Briefcase,       label: 'Perfiles',         roles: ['superadmin', 'admin'] },
+  { href: '/dashboard/plan',        icon: CalendarDays,    label: 'Plan Anual',       roles: ['superadmin', 'admin'] },
+  { href: '/dashboard/enrollments', icon: TrendingUp,     label: 'Trazabilidad',     roles: ['superadmin', 'admin'] },
+  { href: '/dashboard/trainings',   icon: BookOpen,       label: 'Capacitaciones',   roles: ['superadmin', 'admin'] },
+  { href: '/dashboard/my-plan',     icon: GraduationCap,  label: 'Mi Formación',     roles: ['worker'] },
+  { href: '/dashboard/my-signature', icon: PenTool,       label: 'Mi Firma',         roles: [] },
+  { href: '/dashboard/signatures', icon: PenTool,         label: 'Firmas Docs',      roles: ['superadmin', 'admin'] },
+  { href: '/dashboard/certificates', icon: Award,         label: 'Certificados',     roles: [] },
+  { href: '/dashboard/evaluations', icon: FileCheck,      label: 'Evaluaciones',     roles: ['superadmin', 'admin'] },
+  { href: '/dashboard/reports',    icon: BarChart2,       label: 'Reportes',         roles: ['superadmin', 'admin'] },
+  { href: '/dashboard/audit',      icon: Search,          label: 'Auditoria',        roles: ['superadmin', 'admin'] },
+  { href: '/dashboard/ai',         icon: Brain,           label: 'IA SST',           roles: ['superadmin', 'admin'] },
+  { href: '/dashboard/notifications', icon: Bell,         label: 'Notificaciones',   roles: ['superadmin', 'admin'] },
+  { href: '/dashboard/settings',   icon: Settings,        label: 'Configuracion',    roles: ['superadmin', 'admin'] },
 ]
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
@@ -121,8 +128,8 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         {/* Nav items */}
         <nav className="flex-1 overflow-y-auto py-3 px-2.5">
           {allNavItems.filter(item => {
-            if (item.superOnly && !isSuperAdmin) return false
-            return true
+            if (!item.roles || item.roles.length === 0) return true
+            return item.roles.includes(userRole)
           }).map(({ href, icon: Icon, label }) => {
             const active = isActive(href)
             return (
