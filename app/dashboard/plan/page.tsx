@@ -61,75 +61,143 @@ const EMPTY_PLAN = { name: '', year: new Date().getFullYear() }
 const EMPTY_ITEM = { training_id: '', month: 1, periodicity: 'once', required: true, valid_days: 365, target_type: 'all', target_id: '' }
 
 // Excel import parser for PLAN DE FORMACIÓN HSE format
+// Handles merged cells, combined headers and P/E subcolumns
 function parsePlanExcel(buffer: ArrayBuffer): { title: string; month: number; periodicity: string; population: string }[] {
-  const wb = XLSX.read(buffer, { type: 'array' })
+  const wb = XLSX.read(buffer, { type: 'array', cellDates: true })
   const ws = wb.Sheets[wb.SheetNames[0]]
-  const raw = XLSX.utils.sheet_to_json<any[]>(ws, { header: 1, defval: '' })
 
+  // ── STEP 1: Expand all merged cell ranges ──────────────────────────
+  // XLSX only fills the top-left cell of a merge; we replicate that value
+  // into every cell of the range so we can read them as normal cells.
+  const merges: XLSX.Range[] = (ws['!merges'] as XLSX.Range[]) || []
+  for (const merge of merges) {
+    const topLeft = XLSX.utils.encode_cell({ r: merge.s.r, c: merge.s.c })
+    const srcCell = ws[topLeft]
+    if (!srcCell) continue
+    for (let r = merge.s.r; r <= merge.e.r; r++) {
+      for (let c = merge.s.c; c <= merge.e.c; c++) {
+        const addr = XLSX.utils.encode_cell({ r, c })
+        if (!ws[addr]) ws[addr] = { t: srcCell.t, v: srcCell.v, w: srcCell.w }
+      }
+    }
+  }
+
+  // ── STEP 2: Read as 2-D array ──────────────────────────────────────
+  const raw = XLSX.utils.sheet_to_json<any[]>(ws, { header: 1, defval: '' }) as any[][]
+
+  const MONTH_ABBR = ['ENE','FEB','MAR','ABR','MAY','JUN','JUL','AGO','SEP','OCT','NOV','DIC']
   const results: { title: string; month: number; periodicity: string; population: string }[] = []
 
-  // Find header row (contains ENE or ENERO)
-  let headerRow = -1
-  for (let r = 0; r < Math.min(20, raw.length); r++) {
-    const row = raw[r] as any[]
-    if (row.some((c: any) => String(c).toUpperCase().includes('ENE'))) { headerRow = r; break }
-  }
-  if (headerRow < 0) return results
+  // ── STEP 3: Find the row that contains the 12 month names ──────────
+  let monthHeaderRow = -1
+  // monthColMap[0..11] = column index of the P (programado) sub-column for that month
+  const monthColMap: Record<number, number> = {}
 
-  // Month columns: find columns with ENE-DIC (look in headerRow)
-  const headerCells = raw[headerRow] as any[]
-  const monthCols: number[] = []
-  headerCells.forEach((cell: any, ci: number) => {
-    const s = String(cell).toUpperCase().trim()
-    const monthIdx = ['ENE','FEB','MAR','ABR','MAY','JUN','JUL','AGO','SEP','OCT','NOV','DIC'].indexOf(s)
-    if (monthIdx >= 0) monthCols.push(ci)
-  })
-
-  // Data rows start after header (skip possible P/E sub-row)
-  let dataStart = headerRow + 1
-  // Skip sub-rows that don't look like data (e.g. P E P E...)
-  while (dataStart < raw.length) {
-    const row = raw[dataStart] as any[]
-    const firstTwo = [String(row[0] ?? ''), String(row[1] ?? '')].join('').trim()
-    if (firstTwo.length > 3) break
-    dataStart++
+  for (let r = 0; r < Math.min(25, raw.length); r++) {
+    const row = raw[r]
+    const found: Record<number, number> = {} // monthIndex → first col seen
+    row.forEach((cell: any, ci: number) => {
+      const s = String(cell ?? '').toUpperCase().trim()
+      const mi = MONTH_ABBR.indexOf(s)
+      if (mi >= 0 && !(mi in found)) found[mi] = ci
+    })
+    if (Object.keys(found).length >= 6) {   // at least 6 months found
+      monthHeaderRow = r
+      Object.assign(monthColMap, found)
+      break
+    }
   }
 
-  let currentPopulation = 'TODOS'
+  if (monthHeaderRow < 0) return results   // couldn't find month row → bail
+
+  // ── STEP 4: Find the P/E sub-row (one or two rows below month row) ──
+  // The sub-row has "P" and "E" labels. We want the "P" (Programado) column
+  // for each month. If there is no P/E row, we use the month column itself.
+  let pRowIndex = -1
+  for (let r = monthHeaderRow + 1; r <= monthHeaderRow + 3 && r < raw.length; r++) {
+    const row = raw[r]
+    const peCount = row.filter((c: any) => {
+      const s = String(c ?? '').toUpperCase().trim()
+      return s === 'P' || s === 'E'
+    }).length
+    if (peCount >= 6) { pRowIndex = r; break }
+  }
+
+  if (pRowIndex >= 0) {
+    // Re-map: for each month, find the "P" column at or after the month column
+    const peRow = raw[pRowIndex]
+    Object.entries(monthColMap).forEach(([miStr, startCol]) => {
+      const mi = parseInt(miStr)
+      // Search from startCol onward for the first "P"
+      for (let c = startCol; c <= startCol + 3; c++) {
+        const s = String(peRow[c] ?? '').toUpperCase().trim()
+        if (s === 'P') { monthColMap[mi] = c; break }
+      }
+    })
+  }
+
+  // ── STEP 5: Find where actual data rows start ──────────────────────
+  // Skip header/sub-header rows (anything before the first row that has
+  // a title in column B with length > 3 and is not a known header keyword)
+  const SKIP_KEYWORDS = ['ACTIVIDAD','CAPACITACIÓN','CAPACITACION','RECURSOS','RESPONSABLE','OBSERV','TOTAL','FUENTE','P','E']
+  const dataStart = (() => {
+    for (let r = monthHeaderRow + 1; r < raw.length; r++) {
+      const col1 = String(raw[r][1] ?? '').trim()
+      if (col1.length > 3 && !SKIP_KEYWORDS.some(k => col1.toUpperCase().startsWith(k))) return r
+    }
+    return monthHeaderRow + 2
+  })()
+
+  // ── STEP 6: Parse data rows ────────────────────────────────────────
+  let currentPopulation = 'all'
+
   for (let r = dataStart; r < raw.length; r++) {
-    const row = raw[r] as any[]
-    const col0 = String(row[0] ?? '').trim().toUpperCase()
+    const row = raw[r]
+    const col0 = String(row[0] ?? '').trim()
     const col1 = String(row[1] ?? '').trim()
 
-    // Population header rows
-    if (col0 && !col1 && col0.length > 5) { currentPopulation = col0; continue }
-    if (col0.includes('COLABOR') || col0.includes('TODOS')) { currentPopulation = 'all'; continue }
-    if (col0.includes('ADMINIST')) { currentPopulation = 'ADMINISTRATIVO'; continue }
-    if (col0.includes('MANTENIM')) { currentPopulation = 'MANTENIMIENTO'; continue }
-    if (col0.includes('CULTIVO')) { currentPopulation = 'CULTIVO'; continue }
-    if (col0.includes('OPERATIV')) { currentPopulation = 'OPERATIVO'; continue }
+    // Update population whenever col 0 has content (now always set due to merge expansion)
+    if (col0) {
+      const up = col0.toUpperCase()
+      if (up.includes('TODOS') || up.includes('COLABOR'))     currentPopulation = 'all'
+      else if (up.includes('ADMINIST'))                        currentPopulation = 'ADMINISTRATIVO'
+      else if (up.includes('MANTENIM'))                        currentPopulation = 'MANTENIMIENTO'
+      else if (up.includes('CULTIVO'))                         currentPopulation = 'CULTIVO'
+      else if (up.includes('OPERATIV'))                        currentPopulation = 'OPERATIVO'
+      else if (col0.length > 3)                                currentPopulation = col0
+    }
 
+    // Skip rows without a valid title in col B
     if (!col1 || col1.length < 3) continue
+    if (SKIP_KEYWORDS.some(k => col1.toUpperCase().startsWith(k))) continue
 
     const title = col1
-    const freqRaw = String(row[3] ?? row[2] ?? '').trim().toUpperCase()
-    let periodicity = 'once'
-    if (freqRaw.includes('ANUAL')) periodicity = 'anual'
-    else if (freqRaw.includes('SEMEST')) periodicity = 'semestral'
-    else if (freqRaw.includes('TRIMEST')) periodicity = 'trimestral'
-    else if (freqRaw.includes('BIMEST')) periodicity = 'bimestral'
-    else if (freqRaw.includes('MENSUAL')) periodicity = 'monthly'
-    else if (freqRaw.includes('CUATRIM')) periodicity = 'cuatrimestral'
 
-    // Find planned months (P column > 0 in each month pair)
-    monthCols.forEach((mc, mi) => {
-      const val = row[mc]
-      const numVal = typeof val === 'number' ? val : parseFloat(String(val).replace(',', '.')) || 0
-      if (numVal > 0) {
+    // Frequency — look in columns 2, 3, 4 for a frequency keyword
+    let periodicity = 'once'
+    for (let fc = 2; fc <= 5; fc++) {
+      const f = String(row[fc] ?? '').toUpperCase().trim()
+      if (!f || f.length < 4) continue
+      if (f.includes('ANUAL'))      { periodicity = 'anual';        break }
+      if (f.includes('SEMEST'))     { periodicity = 'semestral';    break }
+      if (f.includes('TRIMEST'))    { periodicity = 'trimestral';   break }
+      if (f.includes('BIMEST'))     { periodicity = 'bimestral';    break }
+      if (f.includes('CUATRIM'))    { periodicity = 'cuatrimestral';break }
+      if (f.includes('MENSUAL'))    { periodicity = 'monthly';      break }
+    }
+
+    // Check planned months: value in P column > 0 means this training is scheduled that month
+    MONTH_ABBR.forEach((_m, mi) => {
+      const colIdx = monthColMap[mi]
+      if (colIdx === undefined) return
+      const val = row[colIdx]
+      const num = typeof val === 'number' ? val : parseFloat(String(val ?? '').replace(',', '.')) || 0
+      if (num > 0) {
         results.push({ title, month: mi + 1, periodicity, population: currentPopulation })
       }
     })
   }
+
   return results
 }
 
