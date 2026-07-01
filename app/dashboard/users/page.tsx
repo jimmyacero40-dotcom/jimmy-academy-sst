@@ -414,10 +414,20 @@ export default function UsersPage() {
         </motion.div>
       ) : (
         <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} className="terra-card overflow-hidden hidden md:block">
-          <table className="terra-table w-full">
+          <table className="terra-table w-full" style={{ tableLayout: 'fixed' }}>
+            <colgroup>
+              <col style={{ width: 36 }} />
+              <col style={{ width: '22%' }} />
+              <col style={{ width: '20%' }} />
+              <col style={{ width: 110 }} />
+              <col style={{ width: '18%' }} />
+              <col style={{ width: '15%' }} />
+              <col style={{ width: 80 }} />
+              <col style={{ width: 90 }} />
+            </colgroup>
             <thead>
               <tr>
-                <th style={{ width: 36 }}>
+                <th>
                   <input type="checkbox" checked={selected.size === filtered.length && filtered.length > 0}
                     onChange={toggleSelectAll} className="w-4 h-4 rounded accent-blue-500" />
                 </th>
@@ -427,7 +437,7 @@ export default function UsersPage() {
                 <th>Área</th>
                 <th>Grupos</th>
                 <th>Estado</th>
-                <th style={{ width: 48 }}></th>
+                <th></th>
               </tr>
             </thead>
             <tbody>
@@ -437,39 +447,53 @@ export default function UsersPage() {
                     initial={{ opacity: 0 }} animate={{ opacity: 1 }}
                     exit={{ opacity: 0 }} transition={{ delay: Math.min(i * 0.015, 0.25) }}
                     className="group">
+
+                    {/* Checkbox */}
                     <td>
                       <input type="checkbox" checked={selected.has(u.id)} onChange={() => toggleSelect(u.id)}
                         className="w-4 h-4 rounded accent-blue-500" />
                     </td>
+
+                    {/* Nombre — avatar + nombre en una sola línea truncada */}
                     <td>
-                      <div className="flex items-center gap-3">
-                        <div className={`w-8 h-8 rounded-full bg-gradient-to-br ${colorForUser(u.id)} flex items-center justify-center text-white text-xs font-bold flex-shrink-0`}>
+                      <div className="flex items-center gap-2 min-w-0">
+                        <div className={`w-7 h-7 rounded-full bg-gradient-to-br ${colorForUser(u.id)} flex items-center justify-center text-white text-[10px] font-bold flex-shrink-0`}>
                           {getInitials(u.name)}
                         </div>
-                        <div>
-                          <div className="font-semibold text-sm leading-snug" style={{ color: 'var(--text)' }}>{u.name}</div>
-                          <div className="text-[10px]" style={{ color: 'var(--text-faint)' }}>{u.role}</div>
+                        <div className="min-w-0">
+                          <div className="text-xs font-semibold truncate" style={{ color: 'var(--text)' }} title={u.name}>{u.name}</div>
+                          {u.role && <div className="text-[10px] truncate" style={{ color: 'var(--text-faint)' }}>{u.role}</div>}
                         </div>
                       </div>
                     </td>
-                    <td><span className="text-xs" style={{ color: 'var(--text-dim)' }}>{u.email || '—'}</span></td>
+
+                    {/* Correo */}
+                    <td>
+                      <span className="text-xs truncate block" style={{ color: 'var(--text-dim)' }} title={u.email}>{u.email || '—'}</span>
+                    </td>
+
+                    {/* Cédula */}
                     <td><span className="font-mono text-xs">{u.cedula || '—'}</span></td>
-                    {/* Área inline */}
+
+                    {/* Área — dropdown en modo inline */}
                     <td>
                       {inlineEdit === u.id ? (
                         <select value={inlineArea} onChange={e => setInlineArea(e.target.value)}
-                          className="terra-input py-1 text-xs" style={{ minWidth: 130 }}>
+                          className="terra-input py-1 text-xs w-full">
                           <option value="">Sin área</option>
                           {areas.map(a => <option key={a.id} value={a.id}>{a.name}</option>)}
                         </select>
                       ) : u.area_name ? (
-                        <span className="flex items-center gap-1 text-xs font-medium" style={{ color: 'var(--text-dim)' }}>
-                          <Layers size={11} style={{ color: 'var(--primary)', flexShrink: 0 }} />
-                          {u.area_name}
+                        <span className="flex items-center gap-1 text-xs truncate" style={{ color: 'var(--text-dim)' }} title={u.area_name}>
+                          <Layers size={10} style={{ color: 'var(--primary)', flexShrink: 0 }} />
+                          <span className="truncate">{u.area_name}</span>
                         </span>
-                      ) : <span className="text-xs" style={{ color: 'var(--text-faint)' }}>—</span>}
+                      ) : (
+                        <span className="text-xs" style={{ color: 'var(--text-faint)' }}>—</span>
+                      )}
                     </td>
-                    {/* Grupos inline */}
+
+                    {/* Grupos — chips o checkboxes en modo inline */}
                     <td>
                       {inlineEdit === u.id ? (
                         <div className="flex flex-wrap gap-1">
@@ -478,87 +502,98 @@ export default function UsersPage() {
                             return (
                               <button key={g.id} type="button"
                                 onClick={() => setInlineGroups(prev => on ? prev.filter(x => x !== g.id) : [...prev, g.id])}
-                                className="text-[10px] px-2 py-0.5 rounded-full font-semibold transition-all"
+                                className="text-[10px] px-1.5 py-0.5 rounded-full font-semibold transition-all"
                                 style={{
                                   background: on ? 'var(--primary-dim)' : 'var(--bg-card)',
                                   border: `1px solid ${on ? 'var(--primary-border)' : 'var(--border)'}`,
                                   color: on ? 'var(--primary)' : 'var(--text-faint)',
                                 }}>
-                                {on ? '✓ ' : ''}{g.name}
+                                {on && '✓ '}{g.name}
                               </button>
                             )
                           })}
+                          {groups.length === 0 && <span className="text-[10px]" style={{ color: 'var(--text-faint)' }}>Sin grupos</span>}
                         </div>
                       ) : u.groups?.length ? (
                         <div className="flex flex-wrap gap-1">
-                          {u.groups.map(g => (
-                            <span key={g.id} className="text-[10px] px-2 py-0.5 rounded-full font-semibold"
+                          {u.groups.slice(0, 2).map(g => (
+                            <span key={g.id} className="text-[10px] px-1.5 py-0.5 rounded-full font-semibold"
                               style={{ background: 'var(--primary-dim)', color: 'var(--primary)', border: '1px solid var(--primary-border)' }}>
                               {g.name}
                             </span>
                           ))}
+                          {u.groups.length > 2 && (
+                            <span className="text-[10px] px-1.5 py-0.5 rounded-full" style={{ background: 'var(--bg-card)', color: 'var(--text-faint)', border: '1px solid var(--border)' }}>
+                              +{u.groups.length - 2}
+                            </span>
+                          )}
                         </div>
                       ) : <span className="text-xs" style={{ color: 'var(--text-faint)' }}>—</span>}
                     </td>
+
+                    {/* Estado */}
                     <td>
                       <span className={u.status === 'activo' ? 'badge-green' : 'badge-red'}>
                         {u.status === 'activo' ? 'Activo' : 'Inactivo'}
                       </span>
                     </td>
+
+                    {/* Acciones */}
                     <td>
                       {inlineEdit === u.id ? (
                         <div className="flex items-center gap-1">
                           <button onClick={() => saveInline(u.id)} disabled={savingInline}
-                            className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-bold transition-all"
+                            className="flex items-center gap-1 px-2 py-1.5 rounded-lg text-[10px] font-bold transition-all"
                             style={{ background: 'var(--primary)', color: '#fff' }}>
-                            {savingInline ? <Loader2 size={11} className="animate-spin" /> : <CheckCircle size={11} />}
-                            Guardar
+                            {savingInline ? <Loader2 size={10} className="animate-spin" /> : <CheckCircle size={10} />}
+                            OK
                           </button>
                           <button onClick={() => setInlineEdit(null)}
-                            className="w-7 h-7 rounded-lg flex items-center justify-center"
+                            className="w-6 h-6 rounded-lg flex items-center justify-center"
                             style={{ color: 'var(--text-faint)', border: '1px solid var(--border)' }}>
-                            <X size={12} />
+                            <X size={11} />
                           </button>
                         </div>
                       ) : (
-                      <div className="relative">
-                        <button onClick={() => setMenuOpen(menuOpen === u.id ? null : u.id)}
-                          className="p-1 rounded-lg transition-colors" style={{ color: 'var(--text-faint)' }}>
-                          <MoreVertical size={16} />
-                        </button>
-                        {menuOpen === u.id && (
-                          <div className="absolute right-0 top-8 rounded-xl shadow-xl z-20 w-44 py-1"
-                            style={{ background: 'var(--bg-surface)', border: '1px solid var(--border-strong)' }}>
-                            <button onClick={() => openEdit(u)}
-                              className="flex items-center gap-2.5 w-full px-4 py-2.5 text-sm transition-all"
-                              style={{ color: 'var(--text-dim)' }}>
-                              <Edit2 size={13} /> Editar / Grupos
+                        <div className="flex items-center gap-1">
+                          {/* Botón rápido área/grupo visible en hover */}
+                          <button onClick={() => openInlineEdit(u)}
+                            title="Cambiar área y grupos"
+                            className="opacity-0 group-hover:opacity-100 w-7 h-7 rounded-lg flex items-center justify-center transition-all"
+                            style={{ background: 'var(--primary-dim)', color: 'var(--primary)', border: '1px solid var(--primary-border)' }}>
+                            <Layers size={12} />
+                          </button>
+                          {/* Menú tres puntos */}
+                          <div className="relative">
+                            <button onClick={() => setMenuOpen(menuOpen === u.id ? null : u.id)}
+                              className="w-7 h-7 rounded-lg flex items-center justify-center transition-colors"
+                              style={{ color: 'var(--text-faint)' }}>
+                              <MoreVertical size={15} />
                             </button>
-                            <button onClick={() => toggleStatus(u.id)}
-                              className="flex items-center gap-2.5 w-full px-4 py-2.5 text-sm transition-all"
-                              style={{ color: 'var(--text-dim)' }}>
-                              <CheckCircle size={13} /> {u.status === 'activo' ? 'Desactivar' : 'Activar'}
-                            </button>
-                            <div style={{ borderTop: '1px solid var(--border)', margin: '4px 0' }} />
-                            <button onClick={() => { setDeleteConfirm(u.id); setMenuOpen(null) }}
-                              className="flex items-center gap-2.5 w-full px-4 py-2.5 text-sm transition-all" style={{ color: '#FCA5A5' }}>
-                              <Trash2 size={13} /> Eliminar
-                            </button>
+                            {menuOpen === u.id && (
+                              <div className="absolute right-0 top-8 rounded-xl shadow-xl z-20 w-44 py-1"
+                                style={{ background: 'var(--bg-surface)', border: '1px solid var(--border-strong)' }}>
+                                <button onClick={() => openEdit(u)}
+                                  className="flex items-center gap-2.5 w-full px-4 py-2.5 text-sm transition-all"
+                                  style={{ color: 'var(--text-dim)' }}>
+                                  <Edit2 size={13} /> Editar datos
+                                </button>
+                                <button onClick={() => toggleStatus(u.id)}
+                                  className="flex items-center gap-2.5 w-full px-4 py-2.5 text-sm transition-all"
+                                  style={{ color: 'var(--text-dim)' }}>
+                                  <CheckCircle size={13} /> {u.status === 'activo' ? 'Desactivar' : 'Activar'}
+                                </button>
+                                <div style={{ borderTop: '1px solid var(--border)', margin: '4px 0' }} />
+                                <button onClick={() => { setDeleteConfirm(u.id); setMenuOpen(null) }}
+                                  className="flex items-center gap-2.5 w-full px-4 py-2.5 text-sm transition-all" style={{ color: '#FCA5A5' }}>
+                                  <Trash2 size={13} /> Eliminar
+                                </button>
+                              </div>
+                            )}
                           </div>
-                        )}
-                      </div>
+                        </div>
                       )}
                     </td>
-                    {/* Inline edit trigger button (shown on row hover) */}
-                    {inlineEdit !== u.id && (
-                      <td style={{ width: 0, padding: 0 }}>
-                        <button onClick={() => openInlineEdit(u)}
-                          className="opacity-0 group-hover:opacity-100 ml-1 flex items-center gap-1 px-2 py-1 rounded-lg text-[10px] font-semibold transition-all"
-                          style={{ background: 'var(--primary-dim)', color: 'var(--primary)', border: '1px solid var(--primary-border)', whiteSpace: 'nowrap' }}>
-                          <Layers size={10} /> Área/Grupo
-                        </button>
-                      </td>
-                    )}
                   </motion.tr>
                 ))}
               </AnimatePresence>
