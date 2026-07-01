@@ -226,7 +226,7 @@ export default function MyProfilePage() {
   const [data, setData]             = useState<ProfileData>({})
   const [loading, setLoading]       = useState(true)
   const [saving, setSaving]         = useState(false)
-  const [saveMsg, setSaveMsg]       = useState<'saved' | 'error' | null>(null)
+  const [saveMsg, setSaveMsg]       = useState<'saved' | 'local' | null>(null)
   const [tab, setTab]               = useState('personal')
   const [uploadingPhoto, setUploadingPhoto] = useState(false)
   const [photoError, setPhotoError] = useState<string | null>(null)
@@ -269,6 +269,8 @@ export default function MyProfilePage() {
 
   const save = async (silent = false) => {
     if (!silent) setSaving(true)
+    // Always persist locally first — data is never lost
+    localStorage.setItem(LS_KEY, JSON.stringify(data))
     try {
       const res = await fetch('/api/profile', {
         method: 'PUT',
@@ -279,10 +281,12 @@ export default function MyProfilePage() {
         localStorage.removeItem(LS_KEY)
         if (!silent) { setSaveMsg('saved'); setTimeout(() => setSaveMsg(null), 2500) }
       } else {
-        if (!silent) { setSaveMsg('error'); setTimeout(() => setSaveMsg(null), 3000) }
+        // Server error — data is safe in localStorage, show soft message
+        if (!silent) { setSaveMsg('local'); setTimeout(() => setSaveMsg(null), 3500) }
       }
     } catch {
-      if (!silent) { setSaveMsg('error'); setTimeout(() => setSaveMsg(null), 3000) }
+      // Network error — data is safe in localStorage
+      if (!silent) { setSaveMsg('local'); setTimeout(() => setSaveMsg(null), 3500) }
     } finally {
       if (!silent) setSaving(false)
     }
@@ -415,9 +419,9 @@ export default function MyProfilePage() {
           <button onClick={() => save(false)} disabled={saving}
             className="terra-btn flex-shrink-0 self-start gap-1.5"
             style={{ padding: '10px 18px', fontSize: 13,
-              background: saveMsg === 'saved' ? '#10B981' : saveMsg === 'error' ? '#EF4444' : undefined }}>
+              background: saveMsg === 'saved' ? '#10B981' : saveMsg === 'local' ? '#F59E0B' : undefined }}>
             {saving ? <Loader2 size={14} className="animate-spin" /> : saveMsg === 'saved' ? <CheckCircle size={14} /> : <Save size={14} />}
-            {saving ? 'GUARDANDO...' : saveMsg === 'saved' ? '¡GUARDADO!' : saveMsg === 'error' ? 'ERROR — REINTENTAR' : 'GUARDAR'}
+            {saving ? 'GUARDANDO...' : saveMsg === 'saved' ? '¡GUARDADO!' : saveMsg === 'local' ? '¡GUARDADO LOCALMENTE!' : 'GUARDAR'}
           </button>
         </div>
 
@@ -1087,10 +1091,10 @@ export default function MyProfilePage() {
         <button onClick={() => save(false)} disabled={saving}
           className="terra-btn shadow-xl gap-2 font-bold"
           style={{ padding: '13px 22px', fontSize: 14,
-            background: saveMsg === 'saved' ? '#10B981' : saveMsg === 'error' ? '#EF4444' : undefined,
+            background: saveMsg === 'saved' ? '#10B981' : saveMsg === 'local' ? '#F59E0B' : undefined,
             boxShadow: '0 8px 24px rgba(0,0,0,0.3)' }}>
           {saving ? <Loader2 size={16} className="animate-spin" /> : saveMsg === 'saved' ? <CheckCircle size={16} /> : <Save size={16} />}
-          {saving ? 'GUARDANDO...' : saveMsg === 'saved' ? '¡GUARDADO!' : saveMsg === 'error' ? 'ERROR — REINTENTAR' : 'GUARDAR PERFIL'}
+          {saving ? 'GUARDANDO...' : saveMsg === 'saved' ? '¡GUARDADO!' : saveMsg === 'local' ? '¡GUARDADO LOCALMENTE!' : 'GUARDAR PERFIL'}
         </button>
       </div>
     </div>
