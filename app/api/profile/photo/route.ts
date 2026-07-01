@@ -19,22 +19,21 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'La imagen no puede superar 4 MB' }, { status: 400 })
   }
 
-  const ext = file.type === 'image/png' ? 'png' : file.type === 'image/webp' ? 'webp' : 'jpg'
-  const fileName = `profiles/${user.id}.${ext}`
+  const fileName = `profiles/${user.id}.jpg`
 
   const arrayBuffer = await file.arrayBuffer()
   const buffer = Buffer.from(arrayBuffer)
 
-  // Create bucket if needed
-  await supabase.storage.createBucket('worker-photos', { public: true }).catch(() => {})
+  // Reuse existing training-covers bucket (profiles/ subfolder)
+  const BUCKET = 'training-covers'
 
   const { error: uploadError } = await supabase.storage
-    .from('worker-photos')
-    .upload(fileName, buffer, { contentType: file.type, upsert: true })
+    .from(BUCKET)
+    .upload(fileName, buffer, { contentType: 'image/jpeg', upsert: true })
 
   if (uploadError) return NextResponse.json({ error: uploadError.message }, { status: 500 })
 
-  const { data: urlData } = supabase.storage.from('worker-photos').getPublicUrl(fileName)
+  const { data: urlData } = supabase.storage.from(BUCKET).getPublicUrl(fileName)
 
   return NextResponse.json({ url: urlData.publicUrl })
 }
