@@ -3,13 +3,13 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
-  User, Camera, CheckCircle, Clock, AlertCircle, Loader2,
-  Save, ChevronDown, ChevronRight, Heart, Briefcase,
-  GraduationCap, Activity, Shield, Award, FileText, Home, Car
+  User, Camera, CheckCircle, Clock, Loader2, Save,
+  Heart, Briefcase, GraduationCap, Activity, Shield, Award,
+  FileText, Home, Car, ChevronRight, Info, AlertCircle
 } from 'lucide-react'
 
-// ── Types ─────────────────────────────────────────────────────────────
-type BoolOrNull = boolean | null
+// ─── Types ────────────────────────────────────────────────────────────
+type Nullable<T> = T | null | undefined
 interface ProfileData {
   photo_url?: string
   doc_type?: string; nombres?: string; apellidos?: string
@@ -18,117 +18,137 @@ interface ProfileData {
   ciudad_residencia?: string; depto_residencia?: string
   direccion?: string; barrio?: string; telefono?: string; email_personal?: string
   con_quien_vive?: string; num_personas_hogar?: number; num_hijos?: number
-  dependientes_economicos?: number; cabeza_hogar?: BoolOrNull
+  dependientes_economicos?: number; cabeza_hogar?: Nullable<boolean>
   contacto_emergencia?: string; parentesco_contacto?: string; tel_contacto?: string
   tipo_vivienda?: string; tenencia_vivienda?: string; estrato?: number
-  servicios_publicos?: string[]; acceso_internet?: BoolOrNull
+  servicios_publicos?: string[]; acceso_internet?: Nullable<boolean>
   nivel_educativo?: string; profesion?: string; estudios_tecnicos?: string
   estudios_tecnologicos?: string; estudios_universitarios?: string
   especializacion?: string; otros_estudios?: string; cursos_certificados?: string
-  actualmente_estudia?: BoolOrNull
+  actualmente_estudia?: Nullable<boolean>
   cargo_confirmado?: string; area_confirmada?: string; centro_trabajo?: string
   jefe_inmediato?: string; fecha_ingreso?: string; tipo_contrato?: string
   jornada_laboral?: string; horario_habitual?: string
-  realiza_horas_extras?: BoolOrNull; trabaja_fines_semana?: BoolOrNull
+  realiza_horas_extras?: Nullable<boolean>; trabaja_fines_semana?: Nullable<boolean>
   estatura_cm?: number; peso_kg?: number
   talla_camisa?: string; talla_camiseta?: string; talla_pantalon?: string
   talla_overol?: string; talla_chaqueta?: string; talla_impermeable?: string
   talla_zapato?: string; talla_botas?: string; talla_guantes?: string; obs_tallas?: string
   municipio_vivienda?: string; medio_transporte?: string
   tiempo_desplazamiento?: string; distancia_aprox?: string
-  conduce_vehiculo?: BoolOrNull; tipo_vehiculo?: string
-  realiza_actividad_fisica?: BoolOrNull; dias_actividad_fisica?: number
-  tipo_actividad_fisica?: string; horas_sueno?: number; descanso_adecuado?: BoolOrNull
-  desayuna_diariamente?: BoolOrNull; comidas_al_dia?: number
-  consume_frutas?: BoolOrNull; consume_verduras?: BoolOrNull
-  fuma?: BoolOrNull; cigarrillos_dia?: number; consumo_alcohol?: string
-  consume_energizantes?: BoolOrNull; consume_psicoactivos?: string
-  enfermedades_diagnosticadas?: string[]; hospitalizado?: BoolOrNull
-  cirugias?: BoolOrNull; cirugias_detalle?: string
-  alergias?: BoolOrNull; alergias_detalle?: string
-  medicamentos_permanentes?: BoolOrNull; medicamentos_detalle?: string
-  limitacion_fisica?: BoolOrNull; limitacion_detalle?: string
+  conduce_vehiculo?: Nullable<boolean>; tipo_vehiculo?: string
+  realiza_actividad_fisica?: Nullable<boolean>; dias_actividad_fisica?: number
+  tipo_actividad_fisica?: string; horas_sueno?: number; descanso_adecuado?: Nullable<boolean>
+  desayuna_diariamente?: Nullable<boolean>; comidas_al_dia?: number
+  consume_frutas?: Nullable<boolean>; consume_verduras?: Nullable<boolean>
+  fuma?: Nullable<boolean>; cigarrillos_dia?: number; consumo_alcohol?: string
+  consume_energizantes?: Nullable<boolean>; consume_psicoactivos?: string
+  enfermedades_diagnosticadas?: string[]; hospitalizado?: Nullable<boolean>
+  cirugias?: Nullable<boolean>; cirugias_detalle?: string
+  alergias?: Nullable<boolean>; alergias_detalle?: string
+  medicamentos_permanentes?: Nullable<boolean>; medicamentos_detalle?: string
+  limitacion_fisica?: Nullable<boolean>; limitacion_detalle?: string
   antecedentes_familiares?: string[]
-  accidentes_trabajo?: BoolOrNull; enfermedades_laborales?: BoolOrNull
-  restricciones_medicas?: BoolOrNull; restricciones_detalle?: string
-  usa_gafas?: BoolOrNull; usa_audifonos?: BoolOrNull
-  trabajo_genera_estres?: BoolOrNull; apoyo_familiar?: BoolOrNull
-  otro_empleo?: BoolOrNull; es_cuidador?: BoolOrNull
-  dificultades_economicas?: BoolOrNull; equilibrio_trabajo_vida?: BoolOrNull
-  licencia_conduccion?: BoolOrNull; categoria_licencia?: string
+  accidentes_trabajo?: Nullable<boolean>; enfermedades_laborales?: Nullable<boolean>
+  restricciones_medicas?: Nullable<boolean>; restricciones_detalle?: string
+  usa_gafas?: Nullable<boolean>; usa_audifonos?: Nullable<boolean>
+  trabajo_genera_estres?: Nullable<boolean>; apoyo_familiar?: Nullable<boolean>
+  otro_empleo?: Nullable<boolean>; es_cuidador?: Nullable<boolean>
+  dificultades_economicas?: Nullable<boolean>; equilibrio_trabajo_vida?: Nullable<boolean>
+  licencia_conduccion?: Nullable<boolean>; categoria_licencia?: string
   certificaciones?: string[]; otras_certificaciones?: string
-  autoriza_datos?: boolean; declara_veracidad?: boolean; firma_electronica?: string
+  autoriza_datos?: boolean; declara_veracidad?: boolean
   completion_pct?: number; updated_at?: string
 }
 
-// ── Helpers ───────────────────────────────────────────────────────────
-function calcCompletion(d: ProfileData) {
-  const sections: Record<string, boolean> = {
+const LS_KEY = 'sst_profile_draft'
+
+// ─── Completion calc ─────────────────────────────────────────────────
+function calcSections(d: ProfileData) {
+  return {
     'Foto':               !!d.photo_url,
-    'Información personal': !!(d.nombres && d.apellidos && d.fecha_nacimiento && d.sexo),
-    'Familiar':           !!(d.contacto_emergencia && d.tel_contacto),
+    'Datos personales':   !!(d.nombres && d.apellidos && d.fecha_nacimiento && d.sexo),
+    'Contacto emergencia':!!(d.contacto_emergencia && d.tel_contacto),
     'Vivienda':           !!d.tipo_vivienda,
     'Educación':          !!d.nivel_educativo,
-    'Laboral':            !!(d.fecha_ingreso || d.tipo_contrato),
+    'Información laboral':!!(d.fecha_ingreso || d.tipo_contrato),
     'Tallas / EPP':       !!(d.estatura_cm && d.talla_camisa && d.talla_zapato),
     'Desplazamiento':     !!d.municipio_vivienda,
-    'Estilos de vida':    d.realiza_actividad_fisica !== null && d.realiza_actividad_fisica !== undefined,
-    'Antecedentes médicos': d.hospitalizado !== null && d.hospitalizado !== undefined,
+    'Hábitos':            d.realiza_actividad_fisica != null,
+    'Antecedentes médicos': d.hospitalizado != null,
     'Ant. familiares':    !!(d.antecedentes_familiares?.length),
-    'Salud ocupacional':  d.accidentes_trabajo !== null && d.accidentes_trabajo !== undefined,
-    'Riesgo psicosocial': d.trabajo_genera_estres !== null && d.trabajo_genera_estres !== undefined,
-    'Competencias':       d.licencia_conduccion !== null && d.licencia_conduccion !== undefined,
+    'Salud ocupacional':  d.accidentes_trabajo != null,
+    'Riesgo psicosocial': d.trabajo_genera_estres != null,
+    'Competencias':       d.licencia_conduccion != null,
     'Consentimientos':    !!(d.autoriza_datos && d.declara_veracidad),
   }
-  const done = Object.values(sections).filter(Boolean).length
-  return { pct: Math.round((done / 15) * 100), sections }
+}
+function calcPct(d: ProfileData) {
+  const s = calcSections(d)
+  return Math.round((Object.values(s).filter(Boolean).length / 15) * 100)
 }
 
-function imc(e?: number, p?: number) {
-  if (!e || !p) return null
-  return (p / ((e / 100) ** 2)).toFixed(1)
+// ─── Client-side image compression ───────────────────────────────────
+async function compressImage(file: File): Promise<Blob> {
+  return new Promise((resolve, reject) => {
+    const img = new Image()
+    const url = URL.createObjectURL(file)
+    img.onload = () => {
+      URL.revokeObjectURL(url)
+      const MAX = 600
+      let { width, height } = img
+      if (width > height) { if (width > MAX) { height = Math.round(height * MAX / width); width = MAX } }
+      else { if (height > MAX) { width = Math.round(width * MAX / height); height = MAX } }
+      const canvas = document.createElement('canvas')
+      canvas.width = width; canvas.height = height
+      canvas.getContext('2d')!.drawImage(img, 0, 0, width, height)
+      canvas.toBlob(blob => blob ? resolve(blob) : reject(new Error('Compresión fallida')), 'image/jpeg', 0.72)
+    }
+    img.onerror = reject
+    img.src = url
+  })
 }
 
-function imcLabel(v: number) {
-  if (v < 18.5) return 'Bajo peso'
-  if (v < 25)   return 'Normal'
-  if (v < 30)   return 'Sobrepeso'
-  return 'Obesidad'
-}
-
-// ── Reusable form field components ────────────────────────────────────
+// ─── Tiny helpers ─────────────────────────────────────────────────────
+const UP = (s: string) => s.toUpperCase()
 const inp = 'terra-input text-sm'
 
-function Field({ label, children, half }: { label: string; children: React.ReactNode; half?: boolean }) {
+function Tip({ text }: { text: string }) {
+  return <p className="text-[11px] mt-1 flex items-center gap-1" style={{ color: 'var(--text-faint)' }}><Info size={10} />{text}</p>
+}
+
+function Field({ label, tip, span2, children }: { label: string; tip?: string; span2?: boolean; children: React.ReactNode }) {
   return (
-    <div className={half ? 'col-span-1' : 'col-span-2 sm:col-span-1'}>
+    <div className={span2 ? 'col-span-2' : ''}>
       <label className="block text-xs font-semibold mb-1.5" style={{ color: 'var(--text-dim)' }}>{label}</label>
       {children}
+      {tip && <Tip text={tip} />}
     </div>
   )
 }
 
-function BoolField({ label, value, onChange }: { label: string; value: BoolOrNull; onChange: (v: boolean) => void }) {
+function BoolField({ label, value, onChange, tip }: { label: string; value: Nullable<boolean>; onChange: (v: boolean) => void; tip?: string }) {
   return (
     <div>
       <p className="text-xs font-semibold mb-2" style={{ color: 'var(--text-dim)' }}>{label}</p>
       <div className="flex gap-2">
-        {[{ v: true, l: 'Sí' }, { v: false, l: 'No' }].map(({ v, l }) => (
+        {[{ v: true, l: '✓  SÍ' }, { v: false, l: '✗  NO' }].map(({ v, l }) => (
           <button key={l} type="button" onClick={() => onChange(v)}
-            className="flex-1 py-2 rounded-xl text-xs font-semibold transition-all"
+            className="flex-1 py-2.5 rounded-xl text-xs font-bold transition-all"
             style={value === v
-              ? { background: 'var(--primary-dim)', border: '1px solid var(--primary-border)', color: 'var(--primary)' }
-              : { background: 'var(--bg-card)', border: '1px solid var(--border)', color: 'var(--text-dim)' }}>
+              ? { background: v ? 'rgba(16,185,129,0.15)' : 'rgba(239,68,68,0.12)', border: `1px solid ${v ? 'rgba(16,185,129,0.4)' : 'rgba(239,68,68,0.35)'}`, color: v ? '#34D399' : '#F87171' }
+              : { background: 'var(--bg-card)', border: '1px solid var(--border)', color: 'var(--text-faint)' }}>
             {l}
           </button>
         ))}
       </div>
+      {tip && <Tip text={tip} />}
     </div>
   )
 }
 
-function CheckGroup({ label, options, value, onChange }: {
-  label: string; options: string[]; value: string[]; onChange: (v: string[]) => void
+function CheckGroup({ label, options, value, onChange, tip }: {
+  label: string; options: string[]; value: string[]; onChange: (v: string[]) => void; tip?: string
 }) {
   const toggle = (opt: string) =>
     onChange(value.includes(opt) ? value.filter(x => x !== opt) : [...value, opt])
@@ -138,53 +158,83 @@ function CheckGroup({ label, options, value, onChange }: {
       <div className="flex flex-wrap gap-2">
         {options.map(opt => (
           <button key={opt} type="button" onClick={() => toggle(opt)}
-            className="text-xs px-3 py-1.5 rounded-xl font-semibold transition-all"
+            className="text-xs px-3 py-2 rounded-xl font-semibold transition-all"
             style={value.includes(opt)
-              ? { background: 'var(--primary-dim)', border: '1px solid var(--primary-border)', color: 'var(--primary)' }
+              ? { background: 'rgba(59,130,246,0.15)', border: '1px solid rgba(59,130,246,0.4)', color: '#60A5FA' }
               : { background: 'var(--bg-card)', border: '1px solid var(--border)', color: 'var(--text-dim)' }}>
             {value.includes(opt) ? '✓ ' : ''}{opt}
           </button>
         ))}
       </div>
+      {tip && <Tip text={tip} />}
     </div>
   )
 }
 
-// ── TABS definition ───────────────────────────────────────────────────
-const TABS = [
-  { id: 'personal',   label: 'Personal',       icon: User },
-  { id: 'familia',    label: 'Familia',         icon: Home },
-  { id: 'laboral',    label: 'Laboral',         icon: Briefcase },
-  { id: 'tallas',     label: 'Tallas / EPP',    icon: Shield },
-  { id: 'estilos',    label: 'Estilos de vida', icon: Activity },
-  { id: 'salud',      label: 'Salud',           icon: Heart },
-  { id: 'cierre',     label: 'Cierre',          icon: Award },
-]
-
-const SECTION_KEYS: Record<string, (keyof ProfileData)[]> = {
-  personal: ['foto', 'nombres', 'apellidos', 'fecha_nacimiento', 'sexo'] as any,
-  familia:  ['contacto_emergencia', 'tel_contacto', 'tipo_vivienda'] as any,
-  laboral:  ['nivel_educativo', 'fecha_ingreso', 'tipo_contrato'] as any,
-  tallas:   ['estatura_cm', 'talla_camisa', 'talla_zapato'] as any,
-  estilos:  ['realiza_actividad_fisica'] as any,
-  salud:    ['hospitalizado', 'accidentes_trabajo', 'trabajo_genera_estres'] as any,
-  cierre:   ['licencia_conduccion', 'autoriza_datos', 'declara_veracidad'] as any,
+function SectionCard({ title, icon: Icon, children, accent }: { title: string; icon: any; children: React.ReactNode; accent?: string }) {
+  return (
+    <div className="terra-card p-5">
+      <div className="flex items-center gap-2.5 mb-5" style={{ borderBottom: '1px solid var(--border)', paddingBottom: 12 }}>
+        <div className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0"
+          style={{ background: accent ? `${accent}18` : 'var(--primary-dim)' }}>
+          <Icon size={15} style={{ color: accent ?? 'var(--primary)' }} />
+        </div>
+        <h2 className="font-bold text-sm" style={{ color: 'var(--text)' }}>{title}</h2>
+      </div>
+      {children}
+    </div>
+  )
 }
 
-// ── Main page ─────────────────────────────────────────────────────────
-export default function MyProfilePage() {
-  const [data, setData]       = useState<ProfileData>({})
-  const [loading, setLoading] = useState(true)
-  const [saving, setSaving]   = useState(false)
-  const [saved, setSaved]     = useState(false)
-  const [tab, setTab]         = useState('personal')
-  const [uploadingPhoto, setUploadingPhoto] = useState(false)
-  const photoRef = useRef<HTMLInputElement>(null)
+// ─── TABS ─────────────────────────────────────────────────────────────
+const TABS = [
+  { id: 'personal', label: 'Personal',       icon: User,          color: '#3B82F6' },
+  { id: 'familia',  label: 'Familia',         icon: Home,          color: '#8B5CF6' },
+  { id: 'laboral',  label: 'Laboral',         icon: Briefcase,     color: '#06B6D4' },
+  { id: 'tallas',   label: 'Tallas / EPP',    icon: Shield,        color: '#10B981' },
+  { id: 'estilos',  label: 'Estilos de vida', icon: Activity,      color: '#F59E0B' },
+  { id: 'salud',    label: 'Salud',           icon: Heart,         color: '#EF4444' },
+  { id: 'cierre',   label: 'Cierre',          icon: Award,         color: '#EC4899' },
+]
 
+// which sections map to each tab (for per-tab progress dot)
+const TAB_SECTIONS: Record<string, string[]> = {
+  personal: ['Foto', 'Datos personales'],
+  familia:  ['Contacto emergencia', 'Vivienda', 'Desplazamiento'],
+  laboral:  ['Educación', 'Información laboral'],
+  tallas:   ['Tallas / EPP'],
+  estilos:  ['Hábitos'],
+  salud:    ['Antecedentes médicos', 'Ant. familiares', 'Salud ocupacional', 'Riesgo psicosocial'],
+  cierre:   ['Competencias', 'Consentimientos'],
+}
+
+export default function MyProfilePage() {
+  const [data, setData]             = useState<ProfileData>({})
+  const [loading, setLoading]       = useState(true)
+  const [saving, setSaving]         = useState(false)
+  const [saveMsg, setSaveMsg]       = useState<'saved' | 'error' | null>(null)
+  const [tab, setTab]               = useState('personal')
+  const [uploadingPhoto, setUploadingPhoto] = useState(false)
+  const [photoError, setPhotoError] = useState<string | null>(null)
+  const photoRef = useRef<HTMLInputElement>(null)
+  const autoSaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  // Load: API first, fall back to localStorage draft
   useEffect(() => {
     fetch('/api/profile')
       .then(r => r.ok ? r.json() : {})
-      .then(d => { setData(d); setLoading(false) })
+      .then(remote => {
+        const remotePct = remote?.completion_pct ?? 0
+        const draft = (() => { try { return JSON.parse(localStorage.getItem(LS_KEY) ?? '{}') } catch { return {} } })()
+        const draftPct = calcPct(draft)
+        // Use whichever is more complete
+        setData(draftPct > remotePct ? { ...remote, ...draft } : remote ?? {})
+        setLoading(false)
+      })
+      .catch(() => {
+        try { const d = JSON.parse(localStorage.getItem(LS_KEY) ?? '{}'); setData(d) } catch {}
+        setLoading(false)
+      })
   }, [])
 
   const set = useCallback((key: keyof ProfileData, val: any) =>
@@ -193,125 +243,207 @@ export default function MyProfilePage() {
   const setArr = useCallback((key: keyof ProfileData, val: string[]) =>
     setData(prev => ({ ...prev, [key]: val })), [])
 
-  const save = async () => {
-    setSaving(true)
-    await fetch('/api/profile', {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(data),
-    })
-    setSaving(false)
-    setSaved(true)
-    setTimeout(() => setSaved(false), 2500)
+  // Auto-save to localStorage on every change (debounced 800ms)
+  useEffect(() => {
+    if (loading) return
+    if (autoSaveTimer.current) clearTimeout(autoSaveTimer.current)
+    autoSaveTimer.current = setTimeout(() => {
+      localStorage.setItem(LS_KEY, JSON.stringify(data))
+    }, 800)
+    return () => { if (autoSaveTimer.current) clearTimeout(autoSaveTimer.current) }
+  }, [data, loading])
+
+  const save = async (silent = false) => {
+    if (!silent) setSaving(true)
+    try {
+      const res = await fetch('/api/profile', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data),
+      })
+      if (res.ok) {
+        localStorage.removeItem(LS_KEY)
+        if (!silent) { setSaveMsg('saved'); setTimeout(() => setSaveMsg(null), 2500) }
+      } else {
+        if (!silent) { setSaveMsg('error'); setTimeout(() => setSaveMsg(null), 3000) }
+      }
+    } catch {
+      if (!silent) { setSaveMsg('error'); setTimeout(() => setSaveMsg(null), 3000) }
+    } finally {
+      if (!silent) setSaving(false)
+    }
   }
 
+  // Save to server when switching tabs
+  const switchTab = (t: string) => {
+    save(true)
+    setTab(t)
+  }
+
+  // Photo upload with client-side compression
   const uploadPhoto = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
     if (!file) return
-    if (file.size > 5 * 1024 * 1024) { alert('Máximo 5 MB'); return }
-    setUploadingPhoto(true)
-    const form = new FormData()
-    form.append('file', file)
-    form.append('bucket', 'profiles')
-    const res = await fetch('/api/trainings/cover', { method: 'POST', body: form })
-    if (res.ok) {
-      const { url } = await res.json()
-      set('photo_url', url)
+    setPhotoError(null)
+
+    const allowed = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp']
+    if (!allowed.includes(file.type)) {
+      setPhotoError('Solo se aceptan imágenes JPG, PNG o WEBP')
+      if (photoRef.current) photoRef.current.value = ''
+      return
     }
-    setUploadingPhoto(false)
-    if (photoRef.current) photoRef.current.value = ''
+
+    setUploadingPhoto(true)
+    try {
+      // Compress on client before sending
+      const compressed = await compressImage(file)
+      const form = new FormData()
+      form.append('file', compressed, 'photo.jpg')
+      const res = await fetch('/api/profile/photo', { method: 'POST', body: form })
+      if (res.ok) {
+        const { url } = await res.json()
+        set('photo_url', url)
+      } else {
+        const err = await res.json()
+        setPhotoError(err.error ?? 'Error al subir la foto')
+      }
+    } catch {
+      setPhotoError('Error al procesar la imagen')
+    } finally {
+      setUploadingPhoto(false)
+      if (photoRef.current) photoRef.current.value = ''
+    }
   }
 
-  const { pct, sections } = calcCompletion(data)
-  const imcVal = imc(data.estatura_cm, data.peso_kg)
+  const sections = calcSections(data)
+  const pct      = calcPct(data)
+  const doneCount = Object.values(sections).filter(Boolean).length
 
   if (loading) return (
-    <div className="flex items-center justify-center h-full py-32">
+    <div className="flex flex-col items-center justify-center h-full py-32 gap-3">
       <Loader2 size={28} className="animate-spin" style={{ color: 'var(--primary)' }} />
+      <p className="text-sm" style={{ color: 'var(--text-dim)' }}>Cargando tu perfil...</p>
     </div>
   )
 
   return (
-    <div className="max-w-4xl mx-auto p-6">
+    <div className="max-w-3xl mx-auto p-4 pb-24">
 
-      {/* ── Header ── */}
-      <div className="terra-card p-5 mb-6">
-        <div className="flex items-start gap-5 flex-wrap">
+      {/* ── Header card ── */}
+      <div className="terra-card p-5 mb-5">
+        <div className="flex items-start gap-4 flex-wrap">
 
-          {/* Avatar / foto */}
+          {/* Avatar */}
           <div className="relative flex-shrink-0">
             <div className="w-20 h-20 rounded-2xl overflow-hidden flex items-center justify-center"
               style={{ background: 'var(--primary-dim)', border: '2px solid var(--primary-border)' }}>
               {data.photo_url
-                ? <img src={data.photo_url} alt="foto" className="w-full h-full object-cover" />
-                : <User size={32} style={{ color: 'var(--primary)' }} />}
+                ? <img src={data.photo_url} alt="foto de perfil" className="w-full h-full object-cover" />
+                : (
+                  <div className="flex flex-col items-center gap-1">
+                    <User size={26} style={{ color: 'var(--primary)' }} />
+                    <span className="text-[9px] font-semibold" style={{ color: 'var(--primary)' }}>SIN FOTO</span>
+                  </div>
+                )}
             </div>
             <button onClick={() => photoRef.current?.click()}
-              className="absolute -bottom-1.5 -right-1.5 w-7 h-7 rounded-full flex items-center justify-center transition-all"
+              className="absolute -bottom-2 -right-2 w-8 h-8 rounded-full flex items-center justify-center shadow-lg transition-all hover:scale-110"
               style={{ background: 'var(--primary)', border: '2px solid var(--bg-surface)' }}
-              title="Cambiar foto">
-              {uploadingPhoto ? <Loader2 size={12} className="animate-spin text-white" /> : <Camera size={12} className="text-white" />}
+              title="Cambiar foto de perfil">
+              {uploadingPhoto
+                ? <Loader2 size={13} className="animate-spin text-white" />
+                : <Camera size={13} className="text-white" />}
             </button>
-            <input ref={photoRef} type="file" accept="image/jpg,image/jpeg,image/png,image/webp" onChange={uploadPhoto} className="hidden" />
+            <input ref={photoRef} type="file" accept=".jpg,.jpeg,.png,.webp" onChange={uploadPhoto} className="hidden" />
           </div>
 
-          {/* Info + progress */}
+          {/* Name + progress */}
           <div className="flex-1 min-w-0">
-            <h1 className="text-lg font-bold" style={{ color: 'var(--text)' }}>
-              {data.nombres && data.apellidos ? `${data.nombres} ${data.apellidos}` : 'Mi Perfil Integral'}
+            <h1 className="text-base font-bold leading-tight" style={{ color: 'var(--text)' }}>
+              {data.nombres && data.apellidos
+                ? `${data.nombres} ${data.apellidos}`
+                : <span style={{ color: 'var(--text-faint)' }}>COMPLETA TU NOMBRE EN LA PESTAÑA PERSONAL</span>}
             </h1>
-            <p className="text-xs mb-3" style={{ color: 'var(--text-dim)' }}>
-              {data.updated_at
-                ? `Última actualización: ${new Date(data.updated_at).toLocaleDateString('es-CO', { day: 'numeric', month: 'long', year: 'numeric' })}`
-                : 'Completa tu perfil para que el área de SST pueda apoyarte mejor'}
-            </p>
+            {data.cargo_confirmado && (
+              <p className="text-xs mt-0.5" style={{ color: 'var(--text-dim)' }}>{data.cargo_confirmado}</p>
+            )}
 
             {/* Progress bar */}
-            <div className="flex items-center gap-3 mb-2">
-              <div className="flex-1 h-2 rounded-full overflow-hidden" style={{ background: 'var(--bg-card)' }}>
+            <div className="mt-3 mb-2">
+              <div className="flex justify-between items-center mb-1.5">
+                <span className="text-xs font-semibold" style={{ color: 'var(--text-dim)' }}>
+                  Perfil completado — {doneCount} de 15 secciones
+                </span>
+                <span className="text-sm font-bold" style={{ color: pct >= 80 ? '#10B981' : pct >= 50 ? '#F59E0B' : '#EF4444' }}>{pct}%</span>
+              </div>
+              <div className="h-2.5 rounded-full overflow-hidden" style={{ background: 'var(--bg-card)' }}>
                 <motion.div className="h-full rounded-full"
                   initial={{ width: 0 }} animate={{ width: `${pct}%` }}
-                  transition={{ duration: 0.8, ease: 'easeOut' }}
-                  style={{ background: pct >= 80 ? '#10B981' : pct >= 50 ? '#F59E0B' : 'var(--primary)' }} />
+                  transition={{ duration: 0.9, ease: 'easeOut' }}
+                  style={{ background: pct >= 80 ? '#10B981' : pct >= 50 ? '#F59E0B' : '#EF4444' }} />
               </div>
-              <span className="text-sm font-bold w-10 text-right" style={{ color: pct >= 80 ? '#10B981' : pct >= 50 ? '#F59E0B' : 'var(--primary)' }}>{pct}%</span>
             </div>
 
-            {/* Section badges */}
-            <div className="flex flex-wrap gap-1.5">
-              {Object.entries(sections).map(([name, done]) => (
-                <span key={name} className="text-[10px] px-2 py-0.5 rounded-full flex items-center gap-1"
-                  style={done
-                    ? { background: 'rgba(16,185,129,0.1)', color: '#34D399', border: '1px solid rgba(16,185,129,0.2)' }
-                    : { background: 'var(--bg-card)', color: 'var(--text-faint)', border: '1px solid var(--border)' }}>
-                  {done ? <CheckCircle size={9} /> : <Clock size={9} />} {name}
-                </span>
-              ))}
-            </div>
+            {photoError && (
+              <p className="text-xs mt-1 flex items-center gap-1" style={{ color: '#F87171' }}>
+                <AlertCircle size={11} />{photoError}
+              </p>
+            )}
+            {!data.photo_url && !photoError && (
+              <p className="text-[11px] mt-1 flex items-center gap-1 cursor-pointer hover:underline"
+                style={{ color: 'var(--primary)' }} onClick={() => photoRef.current?.click()}>
+                <Camera size={11} />Toca aquí para agregar tu foto — JPG/PNG, máximo 5 MB
+              </p>
+            )}
           </div>
 
           {/* Save button */}
-          <button onClick={save} disabled={saving}
-            className="terra-btn flex-shrink-0 self-start"
-            style={{ padding: '10px 20px' }}>
-            {saving ? <Loader2 size={14} className="animate-spin" /> : saved ? <CheckCircle size={14} /> : <Save size={14} />}
-            {saved ? '¡Guardado!' : saving ? 'Guardando...' : 'Guardar'}
+          <button onClick={() => save(false)} disabled={saving}
+            className="terra-btn flex-shrink-0 self-start gap-1.5"
+            style={{ padding: '10px 18px', fontSize: 13,
+              background: saveMsg === 'saved' ? '#10B981' : saveMsg === 'error' ? '#EF4444' : undefined }}>
+            {saving ? <Loader2 size={14} className="animate-spin" /> : saveMsg === 'saved' ? <CheckCircle size={14} /> : <Save size={14} />}
+            {saving ? 'GUARDANDO...' : saveMsg === 'saved' ? '¡GUARDADO!' : saveMsg === 'error' ? 'ERROR — REINTENTAR' : 'GUARDAR'}
           </button>
+        </div>
+
+        {/* Section status chips */}
+        <div className="flex flex-wrap gap-1.5 mt-4 pt-3" style={{ borderTop: '1px solid var(--border)' }}>
+          {Object.entries(sections).map(([name, done]) => (
+            <span key={name}
+              className="text-[10px] px-2 py-1 rounded-full flex items-center gap-1 font-semibold"
+              style={done
+                ? { background: 'rgba(16,185,129,0.1)', color: '#34D399', border: '1px solid rgba(16,185,129,0.25)' }
+                : { background: 'var(--bg-card)', color: 'var(--text-faint)', border: '1px solid var(--border)' }}>
+              {done ? <CheckCircle size={9} /> : <Clock size={9} />} {name}
+            </span>
+          ))}
         </div>
       </div>
 
       {/* ── Tab bar ── */}
-      <div className="flex gap-1 mb-5 overflow-x-auto pb-1" style={{ scrollbarWidth: 'none' }}>
+      <div className="flex gap-1.5 mb-4 overflow-x-auto pb-1" style={{ scrollbarWidth: 'none' }}>
         {TABS.map(t => {
           const Icon = t.icon
+          const tabSecs = TAB_SECTIONS[t.id] ?? []
+          const done = tabSecs.every(s => sections[s as keyof typeof sections])
+          const partial = !done && tabSecs.some(s => sections[s as keyof typeof sections])
           return (
-            <button key={t.id} onClick={() => setTab(t.id)}
-              className="flex items-center gap-1.5 px-3.5 py-2.5 rounded-xl text-xs font-semibold whitespace-nowrap transition-all flex-shrink-0"
+            <button key={t.id} onClick={() => switchTab(t.id)}
+              className="flex items-center gap-1.5 px-3 py-2.5 rounded-xl text-xs font-bold whitespace-nowrap transition-all flex-shrink-0 relative"
               style={tab === t.id
-                ? { background: 'var(--primary)', color: '#fff' }
+                ? { background: t.color, color: '#fff', boxShadow: `0 4px 12px ${t.color}40` }
                 : { background: 'var(--bg-card)', border: '1px solid var(--border)', color: 'var(--text-dim)' }}>
               <Icon size={13} />
               {t.label}
+              {done && (
+                <span className="w-2 h-2 rounded-full absolute -top-0.5 -right-0.5"
+                  style={{ background: '#10B981', border: '1px solid var(--bg-surface)' }} />
+              )}
+              {partial && !done && (
+                <span className="w-2 h-2 rounded-full absolute -top-0.5 -right-0.5"
+                  style={{ background: '#F59E0B', border: '1px solid var(--bg-surface)' }} />
+              )}
             </button>
           )
         })}
@@ -320,561 +452,647 @@ export default function MyProfilePage() {
       {/* ── Tab content ── */}
       <AnimatePresence mode="wait">
         <motion.div key={tab}
-          initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }}
-          exit={{ opacity: 0, y: -8 }} transition={{ duration: 0.18 }}>
+          initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}
+          exit={{ opacity: 0, y: -10 }} transition={{ duration: 0.16 }}>
 
-          {/* ── PERSONAL ── */}
+          {/* ════ PERSONAL ════ */}
           {tab === 'personal' && (
-            <div className="space-y-6">
-              <Section title="Información personal" icon={User}>
-                <div className="grid grid-cols-2 gap-4">
-                  <Field label="Tipo de documento">
-                    <select value={data.doc_type ?? ''} onChange={e => set('doc_type', e.target.value)} className={inp}>
-                      <option value="">Seleccionar</option>
-                      {['Cédula de ciudadanía','Cédula de extranjería','Tarjeta de identidad','Pasaporte','NIT'].map(o => <option key={o}>{o}</option>)}
-                    </select>
-                  </Field>
-                  <Field label="Nombres *">
-                    <input className={inp} value={data.nombres ?? ''} onChange={e => set('nombres', e.target.value.toUpperCase())} placeholder="NOMBRES" />
-                  </Field>
-                  <Field label="Apellidos *">
-                    <input className={inp} value={data.apellidos ?? ''} onChange={e => set('apellidos', e.target.value.toUpperCase())} placeholder="APELLIDOS" />
-                  </Field>
-                  <Field label="Fecha de nacimiento *">
-                    <input type="date" className={inp} value={data.fecha_nacimiento ?? ''} onChange={e => set('fecha_nacimiento', e.target.value)} />
-                  </Field>
-                  <Field label="Sexo *">
-                    <select value={data.sexo ?? ''} onChange={e => set('sexo', e.target.value)} className={inp}>
-                      <option value="">Seleccionar</option>
-                      {['Masculino','Femenino','No binario','Prefiero no indicar'].map(o => <option key={o}>{o}</option>)}
-                    </select>
-                  </Field>
-                  <Field label="Estado civil">
-                    <select value={data.estado_civil ?? ''} onChange={e => set('estado_civil', e.target.value)} className={inp}>
-                      <option value="">Seleccionar</option>
-                      {['Soltero/a','Casado/a','Unión libre','Divorciado/a','Viudo/a','Separado/a'].map(o => <option key={o}>{o}</option>)}
-                    </select>
-                  </Field>
-                  <Field label="Nacionalidad">
-                    <input className={inp} value={data.nacionalidad ?? 'Colombiana'} onChange={e => set('nacionalidad', e.target.value)} />
-                  </Field>
-                  <Field label="Ciudad de nacimiento">
-                    <input className={inp} value={data.ciudad_nacimiento ?? ''} onChange={e => set('ciudad_nacimiento', e.target.value)} placeholder="Ciudad" />
-                  </Field>
-                  <Field label="Departamento de nacimiento">
-                    <input className={inp} value={data.depto_nacimiento ?? ''} onChange={e => set('depto_nacimiento', e.target.value)} placeholder="Departamento" />
-                  </Field>
-                  <Field label="Ciudad de residencia">
-                    <input className={inp} value={data.ciudad_residencia ?? ''} onChange={e => set('ciudad_residencia', e.target.value)} placeholder="Ciudad" />
-                  </Field>
-                  <Field label="Departamento de residencia">
-                    <input className={inp} value={data.depto_residencia ?? ''} onChange={e => set('depto_residencia', e.target.value)} placeholder="Departamento" />
-                  </Field>
-                  <Field label="Dirección">
-                    <input className={inp} value={data.direccion ?? ''} onChange={e => set('direccion', e.target.value)} placeholder="Dirección completa" />
-                  </Field>
-                  <Field label="Barrio">
-                    <input className={inp} value={data.barrio ?? ''} onChange={e => set('barrio', e.target.value)} placeholder="Barrio" />
-                  </Field>
-                  <Field label="Teléfono / Celular">
-                    <input className={inp} value={data.telefono ?? ''} onChange={e => set('telefono', e.target.value)} placeholder="3XX XXX XXXX" />
-                  </Field>
-                  <Field label="Correo personal">
-                    <input type="email" className={inp} value={data.email_personal ?? ''} onChange={e => set('email_personal', e.target.value)} placeholder="correo@ejemplo.com" />
-                  </Field>
-                </div>
-              </Section>
-            </div>
+            <SectionCard title="Información personal" icon={User} accent="#3B82F6">
+              <div className="grid grid-cols-2 gap-4">
+                <Field label="TIPO DE DOCUMENTO">
+                  <select value={data.doc_type ?? ''} onChange={e => set('doc_type', e.target.value)} className={inp}>
+                    <option value="">— Seleccionar —</option>
+                    {['CÉDULA DE CIUDADANÍA','CÉDULA DE EXTRANJERÍA','TARJETA DE IDENTIDAD','PASAPORTE','NIT'].map(o => <option key={o}>{o}</option>)}
+                  </select>
+                </Field>
+                <Field label="NOMBRES *" tip="Escribe exactamente como aparece en tu documento">
+                  <input className={inp} value={data.nombres ?? ''}
+                    onChange={e => set('nombres', UP(e.target.value))}
+                    placeholder="TUS NOMBRES" autoComplete="given-name" spellCheck={false} />
+                </Field>
+                <Field label="APELLIDOS *" tip="Escribe exactamente como aparece en tu documento">
+                  <input className={inp} value={data.apellidos ?? ''}
+                    onChange={e => set('apellidos', UP(e.target.value))}
+                    placeholder="TUS APELLIDOS" autoComplete="family-name" spellCheck={false} />
+                </Field>
+                <Field label="FECHA DE NACIMIENTO *">
+                  <input type="date" className={inp} value={data.fecha_nacimiento ?? ''}
+                    onChange={e => set('fecha_nacimiento', e.target.value)} />
+                </Field>
+                <Field label="SEXO *">
+                  <select value={data.sexo ?? ''} onChange={e => set('sexo', e.target.value)} className={inp}>
+                    <option value="">— Seleccionar —</option>
+                    {['MASCULINO','FEMENINO','NO BINARIO','PREFIERO NO INDICAR'].map(o => <option key={o}>{o}</option>)}
+                  </select>
+                </Field>
+                <Field label="ESTADO CIVIL">
+                  <select value={data.estado_civil ?? ''} onChange={e => set('estado_civil', e.target.value)} className={inp}>
+                    <option value="">— Seleccionar —</option>
+                    {['SOLTERO/A','CASADO/A','UNIÓN LIBRE','DIVORCIADO/A','VIUDO/A','SEPARADO/A'].map(o => <option key={o}>{o}</option>)}
+                  </select>
+                </Field>
+                <Field label="NACIONALIDAD">
+                  <input className={inp} value={data.nacionalidad ?? 'COLOMBIANA'}
+                    onChange={e => set('nacionalidad', UP(e.target.value))} spellCheck={false} />
+                </Field>
+                <Field label="CIUDAD DE NACIMIENTO">
+                  <input className={inp} value={data.ciudad_nacimiento ?? ''}
+                    onChange={e => set('ciudad_nacimiento', UP(e.target.value))} placeholder="EJ: BOGOTÁ" spellCheck={false} />
+                </Field>
+                <Field label="DEPARTAMENTO DE NACIMIENTO">
+                  <input className={inp} value={data.depto_nacimiento ?? ''}
+                    onChange={e => set('depto_nacimiento', UP(e.target.value))} placeholder="EJ: CUNDINAMARCA" spellCheck={false} />
+                </Field>
+                <Field label="CIUDAD DE RESIDENCIA ACTUAL">
+                  <input className={inp} value={data.ciudad_residencia ?? ''}
+                    onChange={e => set('ciudad_residencia', UP(e.target.value))} placeholder="EJ: MEDELLÍN" spellCheck={false} />
+                </Field>
+                <Field label="DEPARTAMENTO DE RESIDENCIA">
+                  <input className={inp} value={data.depto_residencia ?? ''}
+                    onChange={e => set('depto_residencia', UP(e.target.value))} placeholder="EJ: ANTIOQUIA" spellCheck={false} />
+                </Field>
+                <Field label="DIRECCIÓN COMPLETA" span2>
+                  <input className={inp} value={data.direccion ?? ''}
+                    onChange={e => set('direccion', UP(e.target.value))} placeholder="EJ: CALLE 45 # 23-10 APTO 301" spellCheck={false} />
+                </Field>
+                <Field label="BARRIO">
+                  <input className={inp} value={data.barrio ?? ''}
+                    onChange={e => set('barrio', UP(e.target.value))} placeholder="NOMBRE DEL BARRIO" spellCheck={false} />
+                </Field>
+                <Field label="TELÉFONO / CELULAR" tip="Número de 10 dígitos">
+                  <input className={inp} value={data.telefono ?? ''}
+                    onChange={e => set('telefono', e.target.value)} placeholder="300 123 4567"
+                    type="tel" inputMode="numeric" maxLength={15} />
+                </Field>
+                <Field label="CORREO ELECTRÓNICO PERSONAL" span2>
+                  <input type="email" className={inp} value={data.email_personal ?? ''}
+                    onChange={e => set('email_personal', e.target.value.toLowerCase())} placeholder="correo@ejemplo.com"
+                    autoComplete="email" />
+                </Field>
+              </div>
+              <TabNav onNext={() => switchTab('familia')} nextLabel="Siguiente: Familia" />
+            </SectionCard>
           )}
 
-          {/* ── FAMILIA ── */}
+          {/* ════ FAMILIA ════ */}
           {tab === 'familia' && (
-            <div className="space-y-6">
-              <Section title="Información familiar" icon={Home}>
+            <div className="space-y-5">
+              <SectionCard title="Composición familiar" icon={Home} accent="#8B5CF6">
                 <div className="grid grid-cols-2 gap-4">
-                  <Field label="¿Con quién vive?">
+                  <Field label="¿CON QUIÉN VIVE?">
                     <select value={data.con_quien_vive ?? ''} onChange={e => set('con_quien_vive', e.target.value)} className={inp}>
-                      <option value="">Seleccionar</option>
-                      {['Solo/a','Con pareja','Con pareja e hijos','Con padres','Con familia extendida','Con compañeros de habitación','Otra situación'].map(o => <option key={o}>{o}</option>)}
+                      <option value="">— Seleccionar —</option>
+                      {['SOLO/A','CON PAREJA','CON PAREJA E HIJOS','CON PADRES','CON FAMILIA EXTENDIDA','CON COMPAÑEROS DE HABITACIÓN','OTRA SITUACIÓN'].map(o => <option key={o}>{o}</option>)}
                     </select>
                   </Field>
-                  <Field label="Personas en el hogar">
-                    <input type="number" min={1} className={inp} value={data.num_personas_hogar ?? ''} onChange={e => set('num_personas_hogar', +e.target.value)} />
+                  <Field label="N.° DE PERSONAS EN EL HOGAR">
+                    <input type="number" min={1} max={20} className={inp} value={data.num_personas_hogar ?? ''}
+                      onChange={e => set('num_personas_hogar', +e.target.value)} inputMode="numeric" />
                   </Field>
-                  <Field label="Número de hijos">
-                    <input type="number" min={0} className={inp} value={data.num_hijos ?? ''} onChange={e => set('num_hijos', +e.target.value)} />
+                  <Field label="N.° DE HIJOS">
+                    <input type="number" min={0} max={20} className={inp} value={data.num_hijos ?? ''}
+                      onChange={e => set('num_hijos', +e.target.value)} inputMode="numeric" />
                   </Field>
-                  <Field label="Personas que dependen económicamente">
-                    <input type="number" min={0} className={inp} value={data.dependientes_economicos ?? ''} onChange={e => set('dependientes_economicos', +e.target.value)} />
+                  <Field label="PERSONAS QUE DEPENDEN ECONÓMICAMENTE DE USTED">
+                    <input type="number" min={0} max={20} className={inp} value={data.dependientes_economicos ?? ''}
+                      onChange={e => set('dependientes_economicos', +e.target.value)} inputMode="numeric" />
                   </Field>
                   <div className="col-span-2">
-                    <BoolField label="¿Es cabeza de hogar?" value={data.cabeza_hogar ?? null} onChange={v => set('cabeza_hogar', v)} />
+                    <BoolField label="¿ES CABEZA DE HOGAR?" value={data.cabeza_hogar ?? null} onChange={v => set('cabeza_hogar', v)}
+                      tip="Persona que aporta el ingreso principal del hogar" />
                   </div>
-                  <Field label="Contacto de emergencia *">
-                    <input className={inp} value={data.contacto_emergencia ?? ''} onChange={e => set('contacto_emergencia', e.target.value.toUpperCase())} placeholder="NOMBRE COMPLETO" />
+                </div>
+              </SectionCard>
+
+              <SectionCard title="Contacto de emergencia *" icon={AlertCircle} accent="#EF4444">
+                <div className="grid grid-cols-2 gap-4">
+                  <Field label="NOMBRE COMPLETO DEL CONTACTO *">
+                    <input className={inp} value={data.contacto_emergencia ?? ''}
+                      onChange={e => set('contacto_emergencia', UP(e.target.value))} placeholder="NOMBRE COMPLETO" spellCheck={false} />
                   </Field>
-                  <Field label="Parentesco">
+                  <Field label="PARENTESCO O RELACIÓN *">
                     <select value={data.parentesco_contacto ?? ''} onChange={e => set('parentesco_contacto', e.target.value)} className={inp}>
-                      <option value="">Seleccionar</option>
-                      {['Cónyuge/Pareja','Madre','Padre','Hijo/a','Hermano/a','Otro familiar','Amigo/a'].map(o => <option key={o}>{o}</option>)}
+                      <option value="">— Seleccionar —</option>
+                      {['CÓNYUGE / PAREJA','MADRE','PADRE','HIJO/A','HERMANO/A','OTRO FAMILIAR','AMIGO/A'].map(o => <option key={o}>{o}</option>)}
                     </select>
                   </Field>
-                  <Field label="Teléfono de emergencia *">
-                    <input className={inp} value={data.tel_contacto ?? ''} onChange={e => set('tel_contacto', e.target.value)} placeholder="3XX XXX XXXX" />
+                  <Field label="TELÉFONO DE EMERGENCIA *" tip="Debe ser diferente al tuyo">
+                    <input className={inp} value={data.tel_contacto ?? ''}
+                      onChange={e => set('tel_contacto', e.target.value)} placeholder="300 123 4567"
+                      type="tel" inputMode="numeric" maxLength={15} />
                   </Field>
                 </div>
-              </Section>
+              </SectionCard>
 
-              <Section title="Vivienda" icon={Home}>
+              <SectionCard title="Información de vivienda" icon={Home} accent="#8B5CF6">
                 <div className="grid grid-cols-2 gap-4">
-                  <Field label="Tipo de vivienda *">
+                  <Field label="TIPO DE VIVIENDA *">
                     <select value={data.tipo_vivienda ?? ''} onChange={e => set('tipo_vivienda', e.target.value)} className={inp}>
-                      <option value="">Seleccionar</option>
-                      {['Casa','Apartamento','Cuarto','Finca','Otro'].map(o => <option key={o}>{o}</option>)}
+                      <option value="">— Seleccionar —</option>
+                      {['CASA','APARTAMENTO','CUARTO','FINCA','OTRO'].map(o => <option key={o}>{o}</option>)}
                     </select>
                   </Field>
-                  <Field label="La vivienda es">
+                  <Field label="LA VIVIENDA ES…">
                     <select value={data.tenencia_vivienda ?? ''} onChange={e => set('tenencia_vivienda', e.target.value)} className={inp}>
-                      <option value="">Seleccionar</option>
-                      {['Propia pagada','Propia en crédito','Arrendada','Familiar','Otra'].map(o => <option key={o}>{o}</option>)}
+                      <option value="">— Seleccionar —</option>
+                      {['PROPIA PAGADA','PROPIA EN CRÉDITO','ARRENDADA','FAMILIAR','OTRA'].map(o => <option key={o}>{o}</option>)}
                     </select>
                   </Field>
-                  <Field label="Estrato socioeconómico">
+                  <Field label="ESTRATO SOCIOECONÓMICO">
                     <select value={data.estrato ?? ''} onChange={e => set('estrato', +e.target.value)} className={inp}>
-                      <option value="">Seleccionar</option>
-                      {[1,2,3,4,5,6].map(n => <option key={n} value={n}>Estrato {n}</option>)}
+                      <option value="">— Seleccionar —</option>
+                      {[1,2,3,4,5,6].map(n => <option key={n} value={n}>ESTRATO {n}</option>)}
                     </select>
                   </Field>
                   <div className="col-span-2">
-                    <BoolField label="¿Tiene acceso a internet en casa?" value={data.acceso_internet ?? null} onChange={v => set('acceso_internet', v)} />
+                    <BoolField label="¿TIENE INTERNET EN CASA?" value={data.acceso_internet ?? null} onChange={v => set('acceso_internet', v)} />
                   </div>
-                  <CheckGroup label="Servicios públicos disponibles"
-                    options={['Agua','Luz','Gas','Alcantarillado','Internet','Teléfono fijo']}
+                  <CheckGroup label="SERVICIOS PÚBLICOS DISPONIBLES EN SU VIVIENDA"
+                    options={['AGUA','LUZ','GAS','ALCANTARILLADO','INTERNET','TELÉFONO FIJO']}
                     value={data.servicios_publicos ?? []}
                     onChange={v => setArr('servicios_publicos', v)} />
                 </div>
-              </Section>
+              </SectionCard>
 
-              <Section title="Desplazamiento al trabajo" icon={Car}>
+              <SectionCard title="Desplazamiento al trabajo" icon={Car} accent="#06B6D4">
                 <div className="grid grid-cols-2 gap-4">
-                  <Field label="Municipio donde vive">
-                    <input className={inp} value={data.municipio_vivienda ?? ''} onChange={e => set('municipio_vivienda', e.target.value)} placeholder="Municipio" />
+                  <Field label="MUNICIPIO DONDE VIVE *" tip="Ciudad o municipio desde donde se desplaza al trabajo">
+                    <input className={inp} value={data.municipio_vivienda ?? ''}
+                      onChange={e => set('municipio_vivienda', UP(e.target.value))} placeholder="EJ: ITAGÜÍ" spellCheck={false} />
                   </Field>
-                  <Field label="Medio de transporte">
+                  <Field label="MEDIO DE TRANSPORTE PRINCIPAL">
                     <select value={data.medio_transporte ?? ''} onChange={e => set('medio_transporte', e.target.value)} className={inp}>
-                      <option value="">Seleccionar</option>
-                      {['A pie','Bicicleta','Moto propia','Carro propio','Transporte público','Servicio empresa','Taxi/Uber','Combinado'].map(o => <option key={o}>{o}</option>)}
+                      <option value="">— Seleccionar —</option>
+                      {['A PIE','BICICLETA','MOTO PROPIA','CARRO PROPIO','TRANSPORTE PÚBLICO','SERVICIO DE LA EMPRESA','TAXI / UBER','COMBINADO'].map(o => <option key={o}>{o}</option>)}
                     </select>
                   </Field>
-                  <Field label="Tiempo promedio de desplazamiento">
+                  <Field label="TIEMPO PROMEDIO DE DESPLAZAMIENTO">
                     <select value={data.tiempo_desplazamiento ?? ''} onChange={e => set('tiempo_desplazamiento', e.target.value)} className={inp}>
-                      <option value="">Seleccionar</option>
-                      {['Menos de 15 min','15-30 min','30-60 min','1-2 horas','Más de 2 horas'].map(o => <option key={o}>{o}</option>)}
+                      <option value="">— Seleccionar —</option>
+                      {['MENOS DE 15 MIN','15 - 30 MIN','30 - 60 MIN','1 A 2 HORAS','MÁS DE 2 HORAS'].map(o => <option key={o}>{o}</option>)}
                     </select>
                   </Field>
-                  <Field label="Distancia aproximada">
-                    <input className={inp} value={data.distancia_aprox ?? ''} onChange={e => set('distancia_aprox', e.target.value)} placeholder="ej. 5 km" />
+                  <Field label="DISTANCIA APROXIMADA">
+                    <input className={inp} value={data.distancia_aprox ?? ''}
+                      onChange={e => set('distancia_aprox', UP(e.target.value))} placeholder="EJ: 5 KM" spellCheck={false} />
                   </Field>
                   <div className="col-span-2">
-                    <BoolField label="¿Conduce vehículo propio?" value={data.conduce_vehiculo ?? null} onChange={v => set('conduce_vehiculo', v)} />
+                    <BoolField label="¿CONDUCE UN VEHÍCULO PROPIO PARA IR AL TRABAJO?" value={data.conduce_vehiculo ?? null} onChange={v => set('conduce_vehiculo', v)} />
                   </div>
                   {data.conduce_vehiculo && (
-                    <Field label="Tipo de vehículo">
+                    <Field label="TIPO DE VEHÍCULO">
                       <select value={data.tipo_vehiculo ?? ''} onChange={e => set('tipo_vehiculo', e.target.value)} className={inp}>
-                        <option value="">Seleccionar</option>
-                        {['Moto','Automóvil','Camioneta','Otro'].map(o => <option key={o}>{o}</option>)}
+                        <option value="">— Seleccionar —</option>
+                        {['MOTO','AUTOMÓVIL','CAMIONETA','OTRO'].map(o => <option key={o}>{o}</option>)}
                       </select>
                     </Field>
                   )}
                 </div>
-              </Section>
+              </SectionCard>
+              <TabNav onPrev={() => switchTab('personal')} onNext={() => switchTab('laboral')} nextLabel="Siguiente: Laboral" />
             </div>
           )}
 
-          {/* ── LABORAL ── */}
+          {/* ════ LABORAL ════ */}
           {tab === 'laboral' && (
-            <div className="space-y-6">
-              <Section title="Educación" icon={GraduationCap}>
+            <div className="space-y-5">
+              <SectionCard title="Nivel educativo" icon={GraduationCap} accent="#06B6D4">
                 <div className="grid grid-cols-2 gap-4">
-                  <Field label="Nivel educativo *">
+                  <Field label="NIVEL EDUCATIVO MÁS ALTO ALCANZADO *">
                     <select value={data.nivel_educativo ?? ''} onChange={e => set('nivel_educativo', e.target.value)} className={inp}>
-                      <option value="">Seleccionar</option>
-                      {['Primaria','Secundaria','Bachillerato','Técnico','Tecnólogo','Universitario','Especialización','Maestría','Doctorado','Ninguno'].map(o => <option key={o}>{o}</option>)}
+                      <option value="">— Seleccionar —</option>
+                      {['PRIMARIA','SECUNDARIA','BACHILLERATO','TÉCNICO','TECNÓLOGO','UNIVERSITARIO','ESPECIALIZACIÓN','MAESTRÍA','DOCTORADO','NINGUNO'].map(o => <option key={o}>{o}</option>)}
                     </select>
                   </Field>
-                  <Field label="Profesión / Título">
-                    <input className={inp} value={data.profesion ?? ''} onChange={e => set('profesion', e.target.value)} placeholder="ej. Ingeniero Industrial" />
+                  <Field label="PROFESIÓN / TÍTULO OBTENIDO" tip="Si no tiene título, deje en blanco">
+                    <input className={inp} value={data.profesion ?? ''}
+                      onChange={e => set('profesion', UP(e.target.value))} placeholder="EJ: INGENIERO INDUSTRIAL" spellCheck={false} />
                   </Field>
-                  <Field label="Estudios técnicos">
-                    <input className={inp} value={data.estudios_tecnicos ?? ''} onChange={e => set('estudios_tecnicos', e.target.value)} placeholder="Nombre del programa" />
+                  <Field label="ESTUDIOS TÉCNICOS (SI APLICA)">
+                    <input className={inp} value={data.estudios_tecnicos ?? ''}
+                      onChange={e => set('estudios_tecnicos', UP(e.target.value))} placeholder="NOMBRE DEL PROGRAMA" spellCheck={false} />
                   </Field>
-                  <Field label="Estudios tecnológicos">
-                    <input className={inp} value={data.estudios_tecnologicos ?? ''} onChange={e => set('estudios_tecnologicos', e.target.value)} placeholder="Nombre del programa" />
+                  <Field label="ESTUDIOS TECNOLÓGICOS (SI APLICA)">
+                    <input className={inp} value={data.estudios_tecnologicos ?? ''}
+                      onChange={e => set('estudios_tecnologicos', UP(e.target.value))} placeholder="NOMBRE DEL PROGRAMA" spellCheck={false} />
                   </Field>
-                  <Field label="Estudios universitarios">
-                    <input className={inp} value={data.estudios_universitarios ?? ''} onChange={e => set('estudios_universitarios', e.target.value)} placeholder="Carrera" />
+                  <Field label="CARRERA UNIVERSITARIA (SI APLICA)">
+                    <input className={inp} value={data.estudios_universitarios ?? ''}
+                      onChange={e => set('estudios_universitarios', UP(e.target.value))} placeholder="NOMBRE DE LA CARRERA" spellCheck={false} />
                   </Field>
-                  <Field label="Especialización / Posgrado">
-                    <input className={inp} value={data.especializacion ?? ''} onChange={e => set('especializacion', e.target.value)} placeholder="Nombre" />
+                  <Field label="ESPECIALIZACIÓN / POSGRADO (SI APLICA)">
+                    <input className={inp} value={data.especializacion ?? ''}
+                      onChange={e => set('especializacion', UP(e.target.value))} placeholder="NOMBRE" spellCheck={false} />
                   </Field>
-                  <Field label="Cursos y certificados relevantes">
-                    <textarea className={`${inp} resize-none`} rows={2} value={data.cursos_certificados ?? ''} onChange={e => set('cursos_certificados', e.target.value)} placeholder="Lista los más importantes" />
+                  <Field label="CURSOS Y CERTIFICADOS RELEVANTES" span2 tip="Lista los más importantes, separados por coma">
+                    <textarea className={`${inp} resize-none`} rows={2}
+                      value={data.cursos_certificados ?? ''}
+                      onChange={e => set('cursos_certificados', UP(e.target.value))}
+                      placeholder="EJ: PRIMEROS AUXILIOS, TRABAJO EN ALTURAS, EXCEL AVANZADO" spellCheck={false} />
                   </Field>
                   <div className="col-span-2">
-                    <BoolField label="¿Actualmente estudia?" value={data.actualmente_estudia ?? null} onChange={v => set('actualmente_estudia', v)} />
+                    <BoolField label="¿ACTUALMENTE ESTÁ ESTUDIANDO?" value={data.actualmente_estudia ?? null} onChange={v => set('actualmente_estudia', v)} />
                   </div>
                 </div>
-              </Section>
+              </SectionCard>
 
-              <Section title="Información laboral" icon={Briefcase}>
+              <SectionCard title="Información del cargo actual" icon={Briefcase} accent="#06B6D4">
                 <div className="grid grid-cols-2 gap-4">
-                  <Field label="Cargo actual">
-                    <input className={inp} value={data.cargo_confirmado ?? ''} onChange={e => set('cargo_confirmado', e.target.value.toUpperCase())} placeholder="CARGO" />
+                  <Field label="CARGO ACTUAL">
+                    <input className={inp} value={data.cargo_confirmado ?? ''}
+                      onChange={e => set('cargo_confirmado', UP(e.target.value))} placeholder="EJ: OPERARIO DE PRODUCCIÓN" spellCheck={false} />
                   </Field>
-                  <Field label="Área">
-                    <input className={inp} value={data.area_confirmada ?? ''} onChange={e => set('area_confirmada', e.target.value.toUpperCase())} placeholder="ÁREA" />
+                  <Field label="ÁREA O DEPARTAMENTO">
+                    <input className={inp} value={data.area_confirmada ?? ''}
+                      onChange={e => set('area_confirmada', UP(e.target.value))} placeholder="EJ: LOGÍSTICA" spellCheck={false} />
                   </Field>
-                  <Field label="Centro de trabajo / Sede">
-                    <input className={inp} value={data.centro_trabajo ?? ''} onChange={e => set('centro_trabajo', e.target.value)} placeholder="Sede o lugar" />
+                  <Field label="SEDE / CENTRO DE TRABAJO">
+                    <input className={inp} value={data.centro_trabajo ?? ''}
+                      onChange={e => set('centro_trabajo', UP(e.target.value))} placeholder="EJ: PLANTA NORTE" spellCheck={false} />
                   </Field>
-                  <Field label="Jefe inmediato">
-                    <input className={inp} value={data.jefe_inmediato ?? ''} onChange={e => set('jefe_inmediato', e.target.value.toUpperCase())} placeholder="NOMBRE COMPLETO" />
+                  <Field label="NOMBRE DEL JEFE INMEDIATO">
+                    <input className={inp} value={data.jefe_inmediato ?? ''}
+                      onChange={e => set('jefe_inmediato', UP(e.target.value))} placeholder="NOMBRE COMPLETO" spellCheck={false} />
                   </Field>
-                  <Field label="Fecha de ingreso">
+                  <Field label="FECHA DE INGRESO A LA EMPRESA *">
                     <input type="date" className={inp} value={data.fecha_ingreso ?? ''} onChange={e => set('fecha_ingreso', e.target.value)} />
                   </Field>
-                  <Field label="Tipo de contrato">
+                  <Field label="TIPO DE CONTRATO *">
                     <select value={data.tipo_contrato ?? ''} onChange={e => set('tipo_contrato', e.target.value)} className={inp}>
-                      <option value="">Seleccionar</option>
-                      {['Término indefinido','Término fijo','Obra o labor','Prestación de servicios','Aprendizaje','Temporal'].map(o => <option key={o}>{o}</option>)}
+                      <option value="">— Seleccionar —</option>
+                      {['TÉRMINO INDEFINIDO','TÉRMINO FIJO','OBRA O LABOR','PRESTACIÓN DE SERVICIOS','APRENDIZAJE','TEMPORAL'].map(o => <option key={o}>{o}</option>)}
                     </select>
                   </Field>
-                  <Field label="Jornada laboral">
+                  <Field label="JORNADA LABORAL">
                     <select value={data.jornada_laboral ?? ''} onChange={e => set('jornada_laboral', e.target.value)} className={inp}>
-                      <option value="">Seleccionar</option>
-                      {['Diurna','Nocturna','Mixta','Por turnos','Flexible','Teletrabajo'].map(o => <option key={o}>{o}</option>)}
+                      <option value="">— Seleccionar —</option>
+                      {['DIURNA','NOCTURNA','MIXTA','POR TURNOS','FLEXIBLE','TELETRABAJO'].map(o => <option key={o}>{o}</option>)}
                     </select>
                   </Field>
-                  <Field label="Horario habitual">
-                    <input className={inp} value={data.horario_habitual ?? ''} onChange={e => set('horario_habitual', e.target.value)} placeholder="ej. 7:00am - 5:00pm" />
+                  <Field label="HORARIO HABITUAL" tip="Ej: Lunes a viernes 7am - 5pm">
+                    <input className={inp} value={data.horario_habitual ?? ''}
+                      onChange={e => set('horario_habitual', UP(e.target.value))} placeholder="EJ: LUN-VIE 7AM - 5PM" spellCheck={false} />
                   </Field>
-                  <div className="col-span-2 grid grid-cols-2 gap-4">
-                    <BoolField label="¿Realiza horas extras?" value={data.realiza_horas_extras ?? null} onChange={v => set('realiza_horas_extras', v)} />
-                    <BoolField label="¿Trabaja fines de semana?" value={data.trabaja_fines_semana ?? null} onChange={v => set('trabaja_fines_semana', v)} />
-                  </div>
+                  <BoolField label="¿HACE HORAS EXTRAS CON FRECUENCIA?" value={data.realiza_horas_extras ?? null} onChange={v => set('realiza_horas_extras', v)} />
+                  <BoolField label="¿TRABAJA FINES DE SEMANA?" value={data.trabaja_fines_semana ?? null} onChange={v => set('trabaja_fines_semana', v)} />
                 </div>
-              </Section>
+              </SectionCard>
+              <TabNav onPrev={() => switchTab('familia')} onNext={() => switchTab('tallas')} nextLabel="Siguiente: Tallas / EPP" />
             </div>
           )}
 
-          {/* ── TALLAS ── */}
+          {/* ════ TALLAS ════ */}
           {tab === 'tallas' && (
-            <Section title="Perfil físico y tallas de dotación" icon={Shield}>
+            <SectionCard title="Medidas físicas y tallas de dotación" icon={Shield} accent="#10B981">
               <div className="grid grid-cols-2 gap-4">
-
-                {/* Antropometría */}
-                <div className="col-span-2">
-                  <p className="text-xs font-bold uppercase tracking-wider mb-3" style={{ color: 'var(--text-dim)' }}>Antropometría</p>
-                  <div className="grid grid-cols-3 gap-4">
-                    <Field label="Estatura (cm) *">
-                      <input type="number" className={inp} value={data.estatura_cm ?? ''} onChange={e => set('estatura_cm', +e.target.value)} placeholder="170" />
-                    </Field>
-                    <Field label="Peso (kg)">
-                      <input type="number" className={inp} value={data.peso_kg ?? ''} onChange={e => set('peso_kg', +e.target.value)} placeholder="70" />
-                    </Field>
-                    <Field label="IMC (calculado)">
-                      <div className="terra-input flex items-center justify-between"
-                        style={{ background: 'var(--bg-card)', cursor: 'default' }}>
-                        {imcVal ? (
-                          <>
-                            <span className="font-bold text-sm" style={{ color: 'var(--text)' }}>{imcVal}</span>
-                            <span className="text-[10px] px-2 py-0.5 rounded-full font-semibold"
-                              style={{ background: +imcVal < 25 ? 'rgba(16,185,129,0.1)' : 'rgba(245,158,11,0.1)', color: +imcVal < 25 ? '#34D399' : '#FBBF24' }}>
-                              {imcLabel(+imcVal)}
-                            </span>
-                          </>
-                        ) : <span style={{ color: 'var(--text-faint)' }}>— Ingresa estatura y peso</span>}
-                      </div>
-                    </Field>
-                  </div>
+                <div className="col-span-2 p-3 rounded-xl text-xs" style={{ background: 'rgba(16,185,129,0.07)', border: '1px solid rgba(16,185,129,0.2)', color: '#34D399' }}>
+                  <strong>¿Para qué sirve esto?</strong> La empresa usa esta información para comprar la dotación exacta que necesitas. ¡Llénala con cuidado para que te quede bien!
                 </div>
 
-                <div className="col-span-2"><div style={{ borderTop: '1px solid var(--border)', margin: '4px 0' }} /></div>
+                <p className="col-span-2 text-[11px] font-bold uppercase tracking-wider pt-2" style={{ color: 'var(--text-faint)' }}>📏 Medidas corporales</p>
+                <Field label="ESTATURA EN CENTÍMETROS *" tip="Ej: 170 para 1.70 m">
+                  <input type="number" min={100} max={220} className={inp} value={data.estatura_cm ?? ''}
+                    onChange={e => set('estatura_cm', +e.target.value)} placeholder="170" inputMode="numeric" />
+                </Field>
+                <Field label="PESO EN KILOGRAMOS">
+                  <input type="number" min={30} max={200} className={inp} value={data.peso_kg ?? ''}
+                    onChange={e => set('peso_kg', +e.target.value)} placeholder="70" inputMode="numeric" />
+                </Field>
+                {data.estatura_cm && data.peso_kg && (() => {
+                  const imc = (data.peso_kg! / ((data.estatura_cm! / 100) ** 2))
+                  const label = imc < 18.5 ? 'BAJO PESO' : imc < 25 ? 'PESO NORMAL' : imc < 30 ? 'SOBREPESO' : 'OBESIDAD'
+                  const col   = imc < 25 ? '#10B981' : imc < 30 ? '#F59E0B' : '#EF4444'
+                  return (
+                    <div className="col-span-2 flex items-center gap-2 px-3 py-2 rounded-xl text-xs"
+                      style={{ background: `${col}10`, border: `1px solid ${col}30` }}>
+                      <span style={{ color: 'var(--text-dim)' }}>IMC CALCULADO:</span>
+                      <span className="font-bold text-base" style={{ color: col }}>{imc.toFixed(1)}</span>
+                      <span className="font-semibold" style={{ color: col }}>{label}</span>
+                    </div>
+                  )
+                })()}
 
-                {/* Tallas */}
-                <div className="col-span-2">
-                  <p className="text-xs font-bold uppercase tracking-wider mb-3" style={{ color: 'var(--text-dim)' }}>Tallas de dotación</p>
-                  <div className="grid grid-cols-3 gap-4">
-                    {[
-                      ['talla_camisa',     'Camisa *',       ['XS','S','M','L','XL','XXL','XXXL']],
-                      ['talla_camiseta',   'Camiseta',       ['XS','S','M','L','XL','XXL','XXXL']],
-                      ['talla_pantalon',   'Pantalón',       ['28','30','32','34','36','38','40','42','44']],
-                      ['talla_overol',     'Overol',         ['XS','S','M','L','XL','XXL','XXXL']],
-                      ['talla_chaqueta',   'Chaqueta',       ['XS','S','M','L','XL','XXL','XXXL']],
-                      ['talla_impermeable','Impermeable',    ['XS','S','M','L','XL','XXL','XXXL']],
-                      ['talla_zapato',     'Zapato *',       ['34','35','36','37','38','39','40','41','42','43','44','45','46']],
-                      ['talla_botas',      'Botas',          ['34','35','36','37','38','39','40','41','42','43','44','45','46']],
-                      ['talla_guantes',    'Guantes',        ['XS','S','M','L','XL']],
-                    ].map(([key, label, opts]) => (
-                      <Field key={key as string} label={label as string}>
-                        <select value={(data as any)[key as string] ?? ''} onChange={e => set(key as keyof ProfileData, e.target.value)} className={inp}>
-                          <option value="">— Talla</option>
-                          {(opts as string[]).map(o => <option key={o}>{o}</option>)}
-                        </select>
-                      </Field>
-                    ))}
-                  </div>
-                </div>
+                <div className="col-span-2" style={{ borderTop: '1px solid var(--border)', marginTop: 4 }} />
+                <p className="col-span-2 text-[11px] font-bold uppercase tracking-wider" style={{ color: 'var(--text-faint)' }}>👕 Ropa de trabajo</p>
 
-                <Field label="Observaciones de tallas">
-                  <textarea className={`${inp} resize-none`} rows={3}
-                    value={data.obs_tallas ?? ''} onChange={e => set('obs_tallas', e.target.value)}
-                    placeholder="Necesidades especiales, restricciones, preferencias..." />
+                {([
+                  ['talla_camisa',      'TALLA CAMISA / CAMISETA *',  ['XS','S','M','L','XL','XXL','XXXL']],
+                  ['talla_pantalon',    'TALLA PANTALÓN',              ['28','30','32','34','36','38','40','42','44','46']],
+                  ['talla_overol',      'TALLA OVEROL / MONO',         ['XS','S','M','L','XL','XXL','XXXL']],
+                  ['talla_chaqueta',    'TALLA CHAQUETA / CHALECO',    ['XS','S','M','L','XL','XXL','XXXL']],
+                  ['talla_impermeable', 'TALLA IMPERMEABLE / ROPA LLUVIA', ['XS','S','M','L','XL','XXL','XXXL']],
+                ] as [keyof ProfileData, string, string[]][]).map(([key, label, opts]) => (
+                  <Field key={key} label={label}>
+                    <select value={(data[key] as string) ?? ''} onChange={e => set(key, e.target.value)} className={inp}>
+                      <option value="">— TALLA —</option>
+                      {opts.map(o => <option key={o}>{o}</option>)}
+                    </select>
+                  </Field>
+                ))}
+
+                <div className="col-span-2" style={{ borderTop: '1px solid var(--border)', marginTop: 4 }} />
+                <p className="col-span-2 text-[11px] font-bold uppercase tracking-wider" style={{ color: 'var(--text-faint)' }}>👟 Calzado y guantes</p>
+
+                {([
+                  ['talla_zapato', 'TALLA ZAPATO DE SEGURIDAD *', ['34','35','36','37','38','39','40','41','42','43','44','45','46']],
+                  ['talla_botas',  'TALLA BOTAS',                  ['34','35','36','37','38','39','40','41','42','43','44','45','46']],
+                  ['talla_guantes','TALLA GUANTES',                 ['XS','S','M','L','XL']],
+                ] as [keyof ProfileData, string, string[]][]).map(([key, label, opts]) => (
+                  <Field key={key} label={label}>
+                    <select value={(data[key] as string) ?? ''} onChange={e => set(key, e.target.value)} className={inp}>
+                      <option value="">— TALLA —</option>
+                      {opts.map(o => <option key={o}>{o}</option>)}
+                    </select>
+                  </Field>
+                ))}
+
+                <Field label="OBSERVACIONES SOBRE TALLAS" span2 tip="Si tienes alguna particularidad (pie ancho, manga larga, etc.) escríbela aquí">
+                  <textarea className={`${inp} resize-none`} rows={2} value={data.obs_tallas ?? ''}
+                    onChange={e => set('obs_tallas', UP(e.target.value))}
+                    placeholder="EJ: PREFIERO MANGA LARGA, PIE ANCHO" spellCheck={false} />
                 </Field>
               </div>
-            </Section>
+              <TabNav onPrev={() => switchTab('laboral')} onNext={() => switchTab('estilos')} nextLabel="Siguiente: Estilos de vida" />
+            </SectionCard>
           )}
 
-          {/* ── ESTILOS DE VIDA ── */}
+          {/* ════ ESTILOS ════ */}
           {tab === 'estilos' && (
-            <div className="space-y-6">
-              <Section title="Actividad física" icon={Activity}>
+            <div className="space-y-5">
+              <div className="p-3 rounded-xl text-xs" style={{ background: 'rgba(245,158,11,0.08)', border: '1px solid rgba(245,158,11,0.2)', color: '#FBBF24' }}>
+                <strong>CONFIDENCIAL:</strong> Esta información es para que el área de SST pueda apoyar tu bienestar. Responde con sinceridad.
+              </div>
+
+              <SectionCard title="Actividad física y descanso" icon={Activity} accent="#F59E0B">
                 <div className="grid grid-cols-2 gap-4">
                   <div className="col-span-2">
-                    <BoolField label="¿Realiza actividad física regularmente?" value={data.realiza_actividad_fisica ?? null} onChange={v => set('realiza_actividad_fisica', v)} />
+                    <BoolField label="¿HACE ACTIVIDAD FÍSICA O EJERCICIO REGULARMENTE?" value={data.realiza_actividad_fisica ?? null} onChange={v => set('realiza_actividad_fisica', v)}
+                      tip="Mínimo 30 minutos, al menos 2 veces por semana" />
                   </div>
                   {data.realiza_actividad_fisica && (
                     <>
-                      <Field label="Días por semana">
+                      <Field label="¿CUÁNTOS DÍAS A LA SEMANA?">
                         <select value={data.dias_actividad_fisica ?? ''} onChange={e => set('dias_actividad_fisica', +e.target.value)} className={inp}>
-                          <option value="">Seleccionar</option>
-                          {[1,2,3,4,5,6,7].map(n => <option key={n} value={n}>{n} día{n > 1 ? 's' : ''}</option>)}
+                          <option value="">— Seleccionar —</option>
+                          {[1,2,3,4,5,6,7].map(n => <option key={n} value={n}>{n} DÍA{n > 1 ? 'S' : ''}</option>)}
                         </select>
                       </Field>
-                      <Field label="Actividad que practica">
-                        <input className={inp} value={data.tipo_actividad_fisica ?? ''} onChange={e => set('tipo_actividad_fisica', e.target.value)} placeholder="ej. Natación, fútbol, ciclismo" />
+                      <Field label="¿QUÉ ACTIVIDAD PRACTICA?">
+                        <input className={inp} value={data.tipo_actividad_fisica ?? ''}
+                          onChange={e => set('tipo_actividad_fisica', UP(e.target.value))} placeholder="EJ: NATACIÓN, FÚTBOL, GYM" spellCheck={false} />
                       </Field>
                     </>
                   )}
-                </div>
-              </Section>
-
-              <Section title="Sueño y descanso" icon={Activity}>
-                <div className="grid grid-cols-2 gap-4">
-                  <Field label="Horas de sueño diarias">
+                  <Field label="¿CUÁNTAS HORAS DUERME NORMALMENTE?" tip="En una noche normal de sueño">
                     <select value={data.horas_sueno ?? ''} onChange={e => set('horas_sueno', +e.target.value)} className={inp}>
-                      <option value="">Seleccionar</option>
-                      {[4,5,6,7,8,9,10].map(n => <option key={n} value={n}>{n} horas</option>)}
+                      <option value="">— Seleccionar —</option>
+                      {[4,5,6,7,8,9,10].map(n => <option key={n} value={n}>{n} HORAS</option>)}
                     </select>
                   </Field>
                   <div>
-                    <BoolField label="¿Considera que descansa adecuadamente?" value={data.descanso_adecuado ?? null} onChange={v => set('descanso_adecuado', v)} />
+                    <BoolField label="¿SE SIENTE DESCANSADO AL DESPERTAR?" value={data.descanso_adecuado ?? null} onChange={v => set('descanso_adecuado', v)} />
                   </div>
                 </div>
-              </Section>
+              </SectionCard>
 
-              <Section title="Alimentación" icon={Activity}>
+              <SectionCard title="Alimentación" icon={Activity} accent="#F59E0B">
                 <div className="grid grid-cols-2 gap-4">
-                  <BoolField label="¿Desayuna diariamente?" value={data.desayuna_diariamente ?? null} onChange={v => set('desayuna_diariamente', v)} />
-                  <Field label="Comidas al día">
+                  <BoolField label="¿DESAYUNA TODOS LOS DÍAS?" value={data.desayuna_diariamente ?? null} onChange={v => set('desayuna_diariamente', v)} />
+                  <Field label="¿CUÁNTAS COMIDAS HACE AL DÍA?">
                     <select value={data.comidas_al_dia ?? ''} onChange={e => set('comidas_al_dia', +e.target.value)} className={inp}>
-                      <option value="">Seleccionar</option>
-                      {[1,2,3,4,5,6].map(n => <option key={n} value={n}>{n}</option>)}
+                      <option value="">— Seleccionar —</option>
+                      {[1,2,3,4,5,6].map(n => <option key={n} value={n}>{n} COMIDA{n > 1 ? 'S' : ''}</option>)}
                     </select>
                   </Field>
-                  <BoolField label="¿Consume frutas diariamente?" value={data.consume_frutas ?? null} onChange={v => set('consume_frutas', v)} />
-                  <BoolField label="¿Consume verduras diariamente?" value={data.consume_verduras ?? null} onChange={v => set('consume_verduras', v)} />
+                  <BoolField label="¿CONSUME FRUTAS A DIARIO?" value={data.consume_frutas ?? null} onChange={v => set('consume_frutas', v)} />
+                  <BoolField label="¿CONSUME VERDURAS A DIARIO?" value={data.consume_verduras ?? null} onChange={v => set('consume_verduras', v)} />
                 </div>
-              </Section>
+              </SectionCard>
 
-              <Section title="Hábitos" icon={Activity}>
+              <SectionCard title="Hábitos" icon={Activity} accent="#F59E0B">
                 <div className="grid grid-cols-2 gap-4">
-                  <BoolField label="¿Fuma?" value={data.fuma ?? null} onChange={v => set('fuma', v)} />
+                  <BoolField label="¿FUMA CIGARRILLOS?" value={data.fuma ?? null} onChange={v => set('fuma', v)} />
                   {data.fuma && (
-                    <Field label="Cigarrillos por día">
-                      <input type="number" min={1} className={inp} value={data.cigarrillos_dia ?? ''} onChange={e => set('cigarrillos_dia', +e.target.value)} />
+                    <Field label="¿CUÁNTOS CIGARRILLOS AL DÍA?">
+                      <input type="number" min={1} max={100} className={inp} value={data.cigarrillos_dia ?? ''}
+                        onChange={e => set('cigarrillos_dia', +e.target.value)} inputMode="numeric" />
                     </Field>
                   )}
-                  <Field label="Consumo de bebidas alcohólicas">
+                  <Field label="CONSUMO DE BEBIDAS ALCOHÓLICAS" span2>
                     <select value={data.consumo_alcohol ?? ''} onChange={e => set('consumo_alcohol', e.target.value)} className={inp}>
-                      <option value="">Seleccionar</option>
-                      {['Nunca','Ocasionalmente','Semanalmente','Frecuentemente'].map(o => <option key={o}>{o}</option>)}
+                      <option value="">— Seleccionar —</option>
+                      {['NUNCA','OCASIONALMENTE (MENOS DE 1 VEZ/MES)','MENSUALMENTE','SEMANALMENTE','FRECUENTEMENTE (VARIOS DÍAS A LA SEMANA)'].map(o => <option key={o}>{o}</option>)}
                     </select>
                   </Field>
-                  <BoolField label="¿Consume bebidas energizantes?" value={data.consume_energizantes ?? null} onChange={v => set('consume_energizantes', v)} />
-                  <Field label="¿Consume sustancias psicoactivas?">
+                  <BoolField label="¿CONSUME BEBIDAS ENERGIZANTES REGULARMENTE?" value={data.consume_energizantes ?? null} onChange={v => set('consume_energizantes', v)} />
+                  <Field label="¿CONSUME SUSTANCIAS PSICOACTIVAS?" tip="Respuesta confidencial y sin consecuencias disciplinarias">
                     <select value={data.consume_psicoactivos ?? ''} onChange={e => set('consume_psicoactivos', e.target.value)} className={inp}>
-                      <option value="">Seleccionar</option>
-                      {['Sí','No','Prefiero no responder'].map(o => <option key={o}>{o}</option>)}
+                      <option value="">— Seleccionar —</option>
+                      {['NO','SÍ','PREFIERO NO RESPONDER'].map(o => <option key={o}>{o}</option>)}
                     </select>
                   </Field>
                 </div>
-              </Section>
+              </SectionCard>
+              <TabNav onPrev={() => switchTab('tallas')} onNext={() => switchTab('salud')} nextLabel="Siguiente: Salud" />
             </div>
           )}
 
-          {/* ── SALUD ── */}
+          {/* ════ SALUD ════ */}
           {tab === 'salud' && (
-            <div className="space-y-6">
-              <Section title="Antecedentes médicos personales" icon={Heart}>
+            <div className="space-y-5">
+              <div className="p-3 rounded-xl text-xs" style={{ background: 'rgba(239,68,68,0.07)', border: '1px solid rgba(239,68,68,0.2)', color: '#F87171' }}>
+                <strong>INFORMACIÓN MÉDICA CONFIDENCIAL.</strong> Solo la verá el área de SST y Medicina del Trabajo. Es importante para proteger tu salud en el trabajo.
+              </div>
+
+              <SectionCard title="Antecedentes médicos personales" icon={Heart} accent="#EF4444">
                 <div className="grid grid-cols-2 gap-4">
-                  <CheckGroup label="Enfermedades diagnosticadas (seleccione las que aplican)"
-                    options={['Hipertensión','Diabetes','Enf. cardiovasculares','Enf. respiratorias','Enf. osteomusculares','Enf. neurológicas','Alteraciones visuales','Alteraciones auditivas','Enf. mentales','Otra']}
+                  <CheckGroup label="¿LE HAN DIAGNOSTICADO ALGUNA DE ESTAS ENFERMEDADES? (SELECCIONA TODAS LAS QUE APLIQUEN)"
+                    options={['HIPERTENSIÓN','DIABETES','ENF. CARDIOVASCULARES','ENF. RESPIRATORIAS','ENF. OSTEOMUSCULARES (COLUMNA, ARTICULACIONES)','ENF. NEUROLÓGICAS','PROBLEMAS VISUALES','PROBLEMAS AUDITIVOS','ENF. MENTALES / PSIQUIÁTRICAS','OTRA']}
                     value={data.enfermedades_diagnosticadas ?? []}
                     onChange={v => setArr('enfermedades_diagnosticadas', v)} />
-                  <BoolField label="¿Ha sido hospitalizado?" value={data.hospitalizado ?? null} onChange={v => set('hospitalizado', v)} />
-                  <BoolField label="¿Ha tenido cirugías?" value={data.cirugias ?? null} onChange={v => set('cirugias', v)} />
+                  <div className="col-span-2 grid grid-cols-2 gap-4">
+                    <BoolField label="¿HA SIDO HOSPITALIZADO ALGUNA VEZ?" value={data.hospitalizado ?? null} onChange={v => set('hospitalizado', v)} />
+                    <BoolField label="¿HA TENIDO CIRUGÍAS?" value={data.cirugias ?? null} onChange={v => set('cirugias', v)} />
+                  </div>
                   {data.cirugias && (
-                    <Field label="¿Cuáles cirugías y en qué año?">
-                      <textarea className={`${inp} resize-none`} rows={2} value={data.cirugias_detalle ?? ''} onChange={e => set('cirugias_detalle', e.target.value)} placeholder="ej. Apendicectomía 2019" />
+                    <Field label="¿QUÉ CIRUGÍAS Y EN QUÉ AÑO?" span2>
+                      <textarea className={`${inp} resize-none`} rows={2} value={data.cirugias_detalle ?? ''}
+                        onChange={e => set('cirugias_detalle', UP(e.target.value))} placeholder="EJ: APENDICECTOMÍA 2019, RODILLA DERECHA 2022" spellCheck={false} />
                     </Field>
                   )}
-                  <BoolField label="¿Presenta alergias?" value={data.alergias ?? null} onChange={v => set('alergias', v)} />
+                  <BoolField label="¿TIENE ALERGIAS CONOCIDAS?" value={data.alergias ?? null} onChange={v => set('alergias', v)} />
                   {data.alergias && (
-                    <Field label="Describa sus alergias">
-                      <textarea className={`${inp} resize-none`} rows={2} value={data.alergias_detalle ?? ''} onChange={e => set('alergias_detalle', e.target.value)} placeholder="Medicamentos, alimentos, materiales..." />
+                    <Field label="¿A QUÉ ES ALÉRGICO/A?">
+                      <input className={inp} value={data.alergias_detalle ?? ''}
+                        onChange={e => set('alergias_detalle', UP(e.target.value))} placeholder="EJ: PENICILINA, POLVO, LÁTEX" spellCheck={false} />
                     </Field>
                   )}
-                  <BoolField label="¿Toma medicamentos permanentemente?" value={data.medicamentos_permanentes ?? null} onChange={v => set('medicamentos_permanentes', v)} />
+                  <BoolField label="¿TOMA MEDICAMENTOS DE FORMA PERMANENTE?" value={data.medicamentos_permanentes ?? null} onChange={v => set('medicamentos_permanentes', v)} />
                   {data.medicamentos_permanentes && (
-                    <Field label="¿Cuáles medicamentos?">
-                      <input className={inp} value={data.medicamentos_detalle ?? ''} onChange={e => set('medicamentos_detalle', e.target.value)} placeholder="Nombre de medicamentos" />
+                    <Field label="¿CUÁLES MEDICAMENTOS?">
+                      <input className={inp} value={data.medicamentos_detalle ?? ''}
+                        onChange={e => set('medicamentos_detalle', UP(e.target.value))} placeholder="NOMBRE DE LOS MEDICAMENTOS" spellCheck={false} />
                     </Field>
                   )}
-                  <BoolField label="¿Presenta alguna limitación física?" value={data.limitacion_fisica ?? null} onChange={v => set('limitacion_fisica', v)} />
+                  <div className="col-span-2">
+                    <BoolField label="¿TIENE ALGUNA LIMITACIÓN FÍSICA O SENSORIAL?" value={data.limitacion_fisica ?? null} onChange={v => set('limitacion_fisica', v)}
+                      tip="Limitación en movilidad, visión, audición, etc." />
+                  </div>
                   {data.limitacion_fisica && (
-                    <Field label="Describa la limitación">
-                      <textarea className={`${inp} resize-none`} rows={2} value={data.limitacion_detalle ?? ''} onChange={e => set('limitacion_detalle', e.target.value)} />
+                    <Field label="DESCRIBA LA LIMITACIÓN" span2>
+                      <textarea className={`${inp} resize-none`} rows={2} value={data.limitacion_detalle ?? ''}
+                        onChange={e => set('limitacion_detalle', UP(e.target.value))} placeholder="DESCRIPCIÓN DE LA LIMITACIÓN" spellCheck={false} />
                     </Field>
                   )}
+                  <div className="col-span-2 grid grid-cols-2 gap-4">
+                    <BoolField label="¿USA GAFAS FORMULADAS?" value={data.usa_gafas ?? null} onChange={v => set('usa_gafas', v)} />
+                    <BoolField label="¿USA AUDÍFONOS?" value={data.usa_audifonos ?? null} onChange={v => set('usa_audifonos', v)} />
+                  </div>
                 </div>
-              </Section>
+              </SectionCard>
 
-              <Section title="Antecedentes familiares" icon={Heart}>
-                <CheckGroup label="Seleccione si existen antecedentes de:"
-                  options={['Diabetes','Hipertensión','Cáncer','Enf. cardiovasculares','Enf. mentales','Otros']}
+              <SectionCard title="Antecedentes familiares" icon={Heart} accent="#EF4444">
+                <CheckGroup label="¿ALGÚN FAMILIAR DIRECTO (PADRES, HERMANOS, HIJOS) HA TENIDO ALGUNA DE ESTAS ENFERMEDADES?"
+                  options={['DIABETES','HIPERTENSIÓN','CÁNCER','ENF. CARDIOVASCULARES','ENF. MENTALES','ARTRITIS / REUMATISMO','OTRA']}
                   value={data.antecedentes_familiares ?? []}
-                  onChange={v => setArr('antecedentes_familiares', v)} />
-              </Section>
+                  onChange={v => setArr('antecedentes_familiares', v)}
+                  tip="Selecciona todas las que apliquen" />
+              </SectionCard>
 
-              <Section title="Salud ocupacional" icon={Shield}>
+              <SectionCard title="Salud ocupacional" icon={Shield} accent="#F59E0B">
                 <div className="grid grid-cols-2 gap-4">
-                  <BoolField label="¿Ha sufrido accidentes de trabajo anteriormente?" value={data.accidentes_trabajo ?? null} onChange={v => set('accidentes_trabajo', v)} />
-                  <BoolField label="¿Ha tenido enfermedades laborales?" value={data.enfermedades_laborales ?? null} onChange={v => set('enfermedades_laborales', v)} />
-                  <BoolField label="¿Tiene restricciones médicas laborales?" value={data.restricciones_medicas ?? null} onChange={v => set('restricciones_medicas', v)} />
+                  <BoolField label="¿HA SUFRIDO ACCIDENTES DE TRABAJO ANTERIORMENTE?" value={data.accidentes_trabajo ?? null} onChange={v => set('accidentes_trabajo', v)} />
+                  <BoolField label="¿HA TENIDO ENFERMEDADES LABORALES RECONOCIDAS?" value={data.enfermedades_laborales ?? null} onChange={v => set('enfermedades_laborales', v)} />
+                  <div className="col-span-2">
+                    <BoolField label="¿TIENE RESTRICCIONES MÉDICAS PARA CIERTAS ACTIVIDADES LABORALES?" value={data.restricciones_medicas ?? null} onChange={v => set('restricciones_medicas', v)} />
+                  </div>
                   {data.restricciones_medicas && (
-                    <Field label="Describa las restricciones">
-                      <textarea className={`${inp} resize-none`} rows={2} value={data.restricciones_detalle ?? ''} onChange={e => set('restricciones_detalle', e.target.value)} />
+                    <Field label="DESCRIBA LAS RESTRICCIONES" span2>
+                      <textarea className={`${inp} resize-none`} rows={2} value={data.restricciones_detalle ?? ''}
+                        onChange={e => set('restricciones_detalle', UP(e.target.value))}
+                        placeholder="EJ: NO PUEDE LEVANTAR MÁS DE 10 KG, NO PUEDE TRABAJAR EN ALTURAS" spellCheck={false} />
                     </Field>
                   )}
-                  <BoolField label="¿Usa gafas formuladas?" value={data.usa_gafas ?? null} onChange={v => set('usa_gafas', v)} />
-                  <BoolField label="¿Usa audífonos?" value={data.usa_audifonos ?? null} onChange={v => set('usa_audifonos', v)} />
                 </div>
-              </Section>
+              </SectionCard>
 
-              <Section title="Riesgo psicosocial" icon={Heart}>
+              <SectionCard title="Factores psicosociales" icon={Heart} accent="#8B5CF6">
                 <div className="grid grid-cols-2 gap-4">
-                  <BoolField label="¿Considera que su trabajo le genera estrés?" value={data.trabajo_genera_estres ?? null} onChange={v => set('trabajo_genera_estres', v)} />
-                  <BoolField label="¿Cuenta con apoyo familiar?" value={data.apoyo_familiar ?? null} onChange={v => set('apoyo_familiar', v)} />
-                  <BoolField label="¿Tiene otro empleo?" value={data.otro_empleo ?? null} onChange={v => set('otro_empleo', v)} />
-                  <BoolField label="¿Es cuidador de otra persona?" value={data.es_cuidador ?? null} onChange={v => set('es_cuidador', v)} />
-                  <BoolField label="¿Tiene dificultades económicas importantes?" value={data.dificultades_economicas ?? null} onChange={v => set('dificultades_economicas', v)} />
-                  <BoolField label="¿Considera adecuado el equilibrio trabajo/vida?" value={data.equilibrio_trabajo_vida ?? null} onChange={v => set('equilibrio_trabajo_vida', v)} />
+                  <BoolField label="¿SU TRABAJO LE GENERA ESTRÉS FRECUENTEMENTE?" value={data.trabajo_genera_estres ?? null} onChange={v => set('trabajo_genera_estres', v)} />
+                  <BoolField label="¿CUENTA CON APOYO EMOCIONAL DE SU FAMILIA?" value={data.apoyo_familiar ?? null} onChange={v => set('apoyo_familiar', v)} />
+                  <BoolField label="¿TIENE OTRO EMPLEO ADEMÁS DE ESTE?" value={data.otro_empleo ?? null} onChange={v => set('otro_empleo', v)} />
+                  <BoolField label="¿ES CUIDADOR DE UN FAMILIAR ENFERMO O CON DISCAPACIDAD?" value={data.es_cuidador ?? null} onChange={v => set('es_cuidador', v)} />
+                  <BoolField label="¿TIENE DIFICULTADES ECONÓMICAS IMPORTANTES?" value={data.dificultades_economicas ?? null} onChange={v => set('dificultades_economicas', v)} />
+                  <BoolField label="¿SIENTE QUE TIENE BUEN EQUILIBRIO ENTRE TRABAJO Y VIDA PERSONAL?" value={data.equilibrio_trabajo_vida ?? null} onChange={v => set('equilibrio_trabajo_vida', v)} />
                 </div>
-              </Section>
+              </SectionCard>
+              <TabNav onPrev={() => switchTab('estilos')} onNext={() => switchTab('cierre')} nextLabel="Siguiente: Cierre" />
             </div>
           )}
 
-          {/* ── CIERRE ── */}
+          {/* ════ CIERRE ════ */}
           {tab === 'cierre' && (
-            <div className="space-y-6">
-              <Section title="Competencias y certificaciones" icon={Award}>
+            <div className="space-y-5">
+              <SectionCard title="Competencias y certificaciones" icon={Award} accent="#EC4899">
                 <div className="grid grid-cols-2 gap-4">
-                  <BoolField label="¿Tiene licencia de conducción?" value={data.licencia_conduccion ?? null} onChange={v => set('licencia_conduccion', v)} />
+                  <BoolField label="¿TIENE LICENCIA DE CONDUCCIÓN VIGENTE?" value={data.licencia_conduccion ?? null} onChange={v => set('licencia_conduccion', v)} />
                   {data.licencia_conduccion && (
-                    <Field label="Categoría de licencia">
+                    <Field label="CATEGORÍA DE LA LICENCIA">
                       <select value={data.categoria_licencia ?? ''} onChange={e => set('categoria_licencia', e.target.value)} className={inp}>
-                        <option value="">Seleccionar</option>
-                        {['A1','A2','B1','B2','B3','C1','C2','C3'].map(o => <option key={o}>{o}</option>)}
+                        <option value="">— Seleccionar —</option>
+                        {['A1 - MOTO HASTA 125CC','A2 - MOTO MÁS DE 125CC','B1 - AUTOMÓVIL','B2 - CAMIÓN','B3 - BUS','C1 - VEHÍCULO ARTICULADO','C2 - TRACTOCAMIÓN','C3 - COMBINACIÓN'].map(o => <option key={o}>{o}</option>)}
                       </select>
                     </Field>
                   )}
-                  <CheckGroup label="Certificaciones y competencias que posee:"
-                    options={['Trabajo en alturas','Brigadista','Primeros auxilios','Montacargas','Espacios confinados','Manejo de químicos','Soldadura','Cargue y descargue']}
+                  <CheckGroup label="¿CUÁL DE ESTAS CERTIFICACIONES TIENE VIGENTES? (SELECCIONA TODAS LAS QUE APLICAN)"
+                    options={['TRABAJO EN ALTURAS','BRIGADISTA DE EMERGENCIAS','PRIMEROS AUXILIOS','OPERACIÓN DE MONTACARGAS','ESPACIOS CONFINADOS','MANEJO DE QUÍMICOS PELIGROSOS','SOLDADURA','CARGUE Y DESCARGUE','MANEJO SEGURO DE MAQUINARIA']}
                     value={data.certificaciones ?? []}
                     onChange={v => setArr('certificaciones', v)} />
-                  <Field label="Otras certificaciones">
-                    <textarea className={`${inp} resize-none`} rows={2} value={data.otras_certificaciones ?? ''} onChange={e => set('otras_certificaciones', e.target.value)} placeholder="Otras certificaciones no listadas..." />
+                  <Field label="OTRAS CERTIFICACIONES NO LISTADAS" span2>
+                    <textarea className={`${inp} resize-none`} rows={2} value={data.otras_certificaciones ?? ''}
+                      onChange={e => set('otras_certificaciones', UP(e.target.value))}
+                      placeholder="EJ: CURSO BÁSICO DE ELECTRICIDAD 2023" spellCheck={false} />
                   </Field>
                 </div>
-              </Section>
+              </SectionCard>
 
-              <Section title="Consentimientos" icon={FileText}>
+              <SectionCard title="Autorización y consentimientos *" icon={FileText} accent="#EC4899">
                 <div className="space-y-4">
-                  <div className="p-4 rounded-xl text-sm" style={{ background: 'var(--bg-card)', border: '1px solid var(--border)' }}>
-                    <p style={{ color: 'var(--text-dim)' }}>
-                      La información registrada en este formulario será utilizada exclusivamente por el área de
-                      Talento Humano y Seguridad y Salud en el Trabajo de su empresa, para fines de gestión del
-                      bienestar, prevención de riesgos y cumplimiento legal. Sus datos son confidenciales y
-                      están protegidos según la Ley 1581 de 2012 (Habeas Data).
-                    </p>
+                  <div className="p-4 rounded-xl text-sm leading-relaxed" style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', color: 'var(--text-dim)' }}>
+                    La información registrada en este formulario será utilizada <strong style={{ color: 'var(--text)' }}>exclusivamente</strong> por el área de Talento Humano y Seguridad y Salud en el Trabajo de su empresa, para fines de gestión del bienestar, prevención de riesgos y cumplimiento de la normatividad colombiana (Decreto 1072 de 2015 y Ley 1581 de 2012 — Habeas Data). Sus datos son <strong style={{ color: 'var(--text)' }}>confidenciales</strong>.
                   </div>
 
                   {[
-                    { key: 'autoriza_datos',    label: 'Autorizo el tratamiento de mis datos personales conforme a la política de privacidad de la empresa.' },
-                    { key: 'declara_veracidad', label: 'Declaro que la información suministrada es verídica y me comprometo a actualizarla cuando haya cambios.' },
-                  ].map(({ key, label }) => (
-                    <label key={key} className="flex items-start gap-3 cursor-pointer p-4 rounded-xl transition-all"
-                      style={{ background: (data as any)[key] ? 'rgba(16,185,129,0.06)' : 'var(--bg-card)', border: `1px solid ${(data as any)[key] ? 'rgba(16,185,129,0.2)' : 'var(--border)'}` }}>
-                      <input type="checkbox" checked={(data as any)[key] ?? false}
-                        onChange={e => set(key as keyof ProfileData, e.target.checked)}
-                        className="mt-0.5 w-4 h-4 accent-green-500 flex-shrink-0" />
-                      <span className="text-sm" style={{ color: 'var(--text-dim)' }}>{label}</span>
-                    </label>
-                  ))}
+                    { key: 'autoriza_datos', label: 'Autorizo el tratamiento de mis datos personales conforme a la política de privacidad de la empresa y a la Ley 1581 de 2012.' },
+                    { key: 'declara_veracidad', label: 'Declaro bajo juramento que toda la información suministrada es verídica, completa y actualizada. Me comprometo a notificar cualquier cambio.' },
+                  ].map(({ key, label }) => {
+                    const checked = !!(data as any)[key]
+                    return (
+                      <label key={key}
+                        className="flex items-start gap-3 cursor-pointer p-4 rounded-xl transition-all"
+                        style={{ background: checked ? 'rgba(16,185,129,0.07)' : 'var(--bg-card)', border: `1px solid ${checked ? 'rgba(16,185,129,0.25)' : 'var(--border)'}` }}>
+                        <div className="mt-0.5 w-5 h-5 rounded flex items-center justify-center flex-shrink-0 transition-all"
+                          style={{ background: checked ? '#10B981' : 'var(--bg-surface)', border: `2px solid ${checked ? '#10B981' : 'var(--border)'}` }}>
+                          {checked && <CheckCircle size={13} className="text-white" />}
+                        </div>
+                        <input type="checkbox" checked={checked}
+                          onChange={e => set(key as keyof ProfileData, e.target.checked)} className="sr-only" />
+                        <span className="text-sm leading-relaxed" style={{ color: checked ? 'var(--text)' : 'var(--text-dim)' }}>{label}</span>
+                      </label>
+                    )
+                  })}
 
                   {data.autoriza_datos && data.declara_veracidad && (
-                    <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }}
-                      className="p-4 rounded-xl text-center"
-                      style={{ background: 'rgba(16,185,129,0.06)', border: '1px solid rgba(16,185,129,0.2)' }}>
-                      <CheckCircle size={28} className="mx-auto mb-2" style={{ color: '#34D399' }} />
-                      <p className="font-semibold text-sm" style={{ color: '#34D399' }}>Consentimientos aceptados</p>
-                      <p className="text-xs mt-1" style={{ color: 'rgba(52,211,153,0.7)' }}>
-                        Haz clic en <strong>Guardar</strong> para finalizar tu perfil
+                    <motion.div initial={{ opacity: 0, scale: 0.97 }} animate={{ opacity: 1, scale: 1 }}
+                      className="p-5 rounded-xl text-center"
+                      style={{ background: 'rgba(16,185,129,0.08)', border: '1px solid rgba(16,185,129,0.25)' }}>
+                      <CheckCircle size={30} className="mx-auto mb-2" style={{ color: '#34D399' }} />
+                      <p className="font-bold" style={{ color: '#34D399' }}>¡TODO LISTO!</p>
+                      <p className="text-xs mt-1" style={{ color: 'rgba(52,211,153,0.75)' }}>
+                        Haz clic en <strong>GUARDAR</strong> para enviar tu perfil al área de SST.
                       </p>
                     </motion.div>
                   )}
                 </div>
-              </Section>
+              </SectionCard>
+
+              <TabNav onPrev={() => switchTab('salud')} />
             </div>
           )}
         </motion.div>
       </AnimatePresence>
 
-      {/* Floating save */}
-      <div className="fixed bottom-6 right-6 z-30">
-        <button onClick={save} disabled={saving}
-          className="terra-btn shadow-lg"
-          style={{ padding: '12px 24px', fontSize: 14 }}>
-          {saving ? <Loader2 size={16} className="animate-spin" /> : saved ? <CheckCircle size={16} /> : <Save size={16} />}
-          {saved ? '¡Guardado!' : saving ? 'Guardando...' : 'Guardar perfil'}
+      {/* ── Floating save ── */}
+      <div className="fixed bottom-5 right-5 z-40">
+        <button onClick={() => save(false)} disabled={saving}
+          className="terra-btn shadow-xl gap-2 font-bold"
+          style={{ padding: '13px 22px', fontSize: 14,
+            background: saveMsg === 'saved' ? '#10B981' : saveMsg === 'error' ? '#EF4444' : undefined,
+            boxShadow: '0 8px 24px rgba(0,0,0,0.3)' }}>
+          {saving ? <Loader2 size={16} className="animate-spin" /> : saveMsg === 'saved' ? <CheckCircle size={16} /> : <Save size={16} />}
+          {saving ? 'GUARDANDO...' : saveMsg === 'saved' ? '¡GUARDADO!' : saveMsg === 'error' ? 'ERROR — REINTENTAR' : 'GUARDAR PERFIL'}
         </button>
       </div>
     </div>
   )
 }
 
-// ── Section wrapper ───────────────────────────────────────────────────
-function Section({ title, icon: Icon, children }: { title: string; icon: any; children: React.ReactNode }) {
+// ─── Tab navigation helper ────────────────────────────────────────────
+function TabNav({ onPrev, onNext, nextLabel }: { onPrev?: () => void; onNext?: () => void; nextLabel?: string }) {
   return (
-    <div className="terra-card p-5">
-      <div className="flex items-center gap-2.5 mb-5" style={{ borderBottom: '1px solid var(--border)', paddingBottom: 14 }}>
-        <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: 'var(--primary-dim)' }}>
-          <Icon size={15} style={{ color: 'var(--primary)' }} />
-        </div>
-        <h2 className="font-bold text-sm" style={{ color: 'var(--text)' }}>{title}</h2>
-      </div>
-      {children}
+    <div className="flex justify-between mt-6 pt-4" style={{ borderTop: '1px solid var(--border)' }}>
+      {onPrev
+        ? <button onClick={onPrev} className="flex items-center gap-1.5 text-xs font-semibold px-4 py-2.5 rounded-xl transition-all"
+            style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', color: 'var(--text-dim)' }}>
+            ← ANTERIOR
+          </button>
+        : <span />}
+      {onNext && (
+        <button onClick={onNext} className="flex items-center gap-1.5 text-xs font-bold px-4 py-2.5 rounded-xl transition-all"
+          style={{ background: 'var(--primary)', color: '#fff' }}>
+          {nextLabel ?? 'SIGUIENTE'} <ChevronRight size={14} />
+        </button>
+      )}
     </div>
   )
 }
