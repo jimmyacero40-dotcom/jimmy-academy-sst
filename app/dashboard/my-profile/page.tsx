@@ -223,7 +223,7 @@ export default function MyProfilePage() {
   useEffect(() => {
     fetch('/api/profile')
       .then(r => r.ok ? r.json() : {})
-      .then(remote => {
+      .then((remote: ProfileData) => {
         const remotePct = remote?.completion_pct ?? 0
         const draft = (() => { try { return JSON.parse(localStorage.getItem(LS_KEY) ?? '{}') } catch { return {} } })()
         const draftPct = calcPct(draft)
