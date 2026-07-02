@@ -1,121 +1,63 @@
 'use client'
 
-import { useState, useEffect, useRef } from 'react'
-import { motion } from 'framer-motion'
+import { useState, useEffect } from 'react'
+import { motion, AnimatePresence } from 'framer-motion'
 import {
-  Users, TrendingUp, Heart, Shirt, Activity, Download,
-  CheckCircle, Clock, FileText, BarChart2, Award, Home,
-  Car, Briefcase, GraduationCap, Shield, Loader2, Search, AlertCircle
+  Users, TrendingUp, Heart, Shirt, Activity, FileSpreadsheet,
+  FileText, BarChart2, Award, Home, Car, Briefcase,
+  GraduationCap, Shield, Loader2, Search, ChevronUp, ChevronDown,
+  AlertTriangle, CheckCircle, Eye
 } from 'lucide-react'
+import { computeAnalytics, type WP, type FreqRow, type Analytics } from '@/lib/profile-analytics'
+import { exportToExcel } from './export-excel'
+import { exportToPDF } from './export-pdf'
 
-// ── Types ──────────────────────────────────────────────────────────────
-interface WP {
-  id: string; user_id: string; completion_pct: number; updated_at: string
-  // personal
-  nombres?: string; apellidos?: string; fecha_nacimiento?: string; sexo?: string
-  estado_civil?: string; ciudad_residencia?: string; depto_residencia?: string; nacionalidad?: string
-  // vivienda
-  tipo_vivienda?: string; tenencia_vivienda?: string; estrato?: number
-  servicios_publicos?: string[]; acceso_internet?: boolean
-  // familia
-  num_hijos?: number; cabeza_hogar?: boolean; con_quien_vive?: string
-  num_personas_hogar?: number; dependientes_economicos?: number
-  // educacion
-  nivel_educativo?: string; profesion?: string; actualmente_estudia?: boolean
-  // laboral
-  cargo_confirmado?: string; area_confirmada?: string; tipo_contrato?: string
-  jornada_laboral?: string; fecha_ingreso?: string; centro_trabajo?: string
-  realiza_horas_extras?: boolean; trabaja_fines_semana?: boolean; horario_habitual?: string
-  // desplazamiento
-  medio_transporte?: string; tiempo_desplazamiento?: string; conduce_vehiculo?: boolean; tipo_vehiculo?: string
-  municipio_vivienda?: string
-  // tallas
-  estatura_cm?: number; peso_kg?: number
-  talla_camisa?: string; talla_camiseta?: string; talla_pantalon?: string
-  talla_overol?: string; talla_chaqueta?: string; talla_impermeable?: string
-  talla_zapato?: string; talla_botas?: string; talla_guantes?: string
-  // estilos
-  realiza_actividad_fisica?: boolean; dias_actividad_fisica?: number; tipo_actividad_fisica?: string
-  horas_sueno?: number; descanso_adecuado?: boolean; desayuna_diariamente?: boolean
-  comidas_al_dia?: number; consume_frutas?: boolean; consume_verduras?: boolean
-  fuma?: boolean; cigarrillos_dia?: number; consumo_alcohol?: string
-  consume_energizantes?: boolean; consume_psicoactivos?: string
-  // salud
-  enfermedades_diagnosticadas?: string[]; hospitalizado?: boolean
-  cirugias?: boolean; alergias?: boolean; medicamentos_permanentes?: boolean
-  limitacion_fisica?: boolean; antecedentes_familiares?: string[]
-  // salud ocupacional
-  accidentes_trabajo?: boolean; enfermedades_laborales?: boolean
-  restricciones_medicas?: boolean; usa_gafas?: boolean; usa_audifonos?: boolean
-  // psicosocial
-  trabajo_genera_estres?: boolean; apoyo_familiar?: boolean; otro_empleo?: boolean
-  es_cuidador?: boolean; dificultades_economicas?: boolean; equilibrio_trabajo_vida?: boolean
-  // competencias
-  licencia_conduccion?: boolean; categoria_licencia?: string
-  certificaciones?: string[]; otras_certificaciones?: string
-  // consentimientos
-  autoriza_datos?: boolean; declara_veracidad?: boolean
-  users?: { name?: string; cedula?: string; email?: string; area?: string }
+// ── Chart primitives ──────────────────────────────────────────────────
+const PAL = ['#3B82F6','#10B981','#F59E0B','#8B5CF6','#EF4444','#06B6D4','#F97316','#EC4899','#14B8A6','#A78BFA']
+
+function HBar({ label, n, pct, max, color = '#3B82F6', total }: FreqRow & { max: number; total: number; color?: string }) {
+  return (
+    <div className="flex items-center gap-2 text-xs">
+      <span className="flex-shrink-0 truncate text-right" style={{ width: 130, color: 'var(--text-dim)' }} title={label}>{label}</span>
+      <div className="flex-1 h-6 rounded-lg overflow-hidden relative" style={{ background: 'var(--bg-card)' }}>
+        <motion.div className="h-full rounded-lg flex items-center pl-2"
+          initial={{ width: 0 }} animate={{ width: `${max ? (n / max) * 100 : 0}%` }}
+          transition={{ duration: 0.6, ease: 'easeOut' }} style={{ background: color }}>
+          {max > 0 && (n / max) > 0.15 && <span className="text-white font-bold text-[10px]">{n}</span>}
+        </motion.div>
+      </div>
+      <span className="font-bold text-[11px] flex-shrink-0 w-6 text-right" style={{ color: 'var(--text)' }}>{n}</span>
+      <span className="text-[10px] flex-shrink-0 w-9 text-right" style={{ color: 'var(--text-faint)' }}>{pct}%</span>
+    </div>
+  )
 }
 
-// ── Helpers ───────────────────────────────────────────────────────────
-const n0 = (v: unknown) => (v === null || v === undefined || v === '')
-
-function age(dob?: string) {
-  if (!dob) return null
-  return Math.floor((Date.now() - new Date(dob).getTime()) / (365.25 * 24 * 3600 * 1000))
-}
-function imc(e?: number, p?: number) {
-  if (!e || !p) return null
-  return +(p / ((e / 100) ** 2)).toFixed(1)
-}
-function pct(n: number, total: number) { return total ? Math.round((n * 100) / total) : 0 }
-function freq(arr: (string | undefined | null)[]) {
-  const m: Record<string, number> = {}
-  arr.forEach(v => { if (v) m[v] = (m[v] ?? 0) + 1 })
-  return Object.entries(m).sort((a, b) => b[1] - a[1])
-}
-function flatFreq(arrays: (string[] | undefined | null)[]) {
-  const all: string[] = arrays.flatMap(a => a ?? [])
-  return freq(all)
-}
-function countBool(arr: WP[], fn: (w: WP) => boolean | undefined | null) {
-  return arr.filter(w => fn(w) === true).length
-}
-
-// ── Mini chart components ─────────────────────────────────────────────
-const PALETTE = ['#3B82F6','#10B981','#F59E0B','#8B5CF6','#EF4444','#06B6D4','#F97316','#EC4899','#14B8A6','#A78BFA']
-
-function DonutChart({ data, size = 120 }: { data: { label: string; value: number }[]; size?: number }) {
-  const total = data.reduce((s, d) => s + d.value, 0)
-  if (!total) return <p className="text-xs text-center py-4" style={{ color: 'var(--text-faint)' }}>Sin datos</p>
-  let angle = -90
-  const r = 40; const cx = size / 2; const cy = size / 2
-  const slices = data.map((d, i) => {
-    const sweep = (d.value / total) * 360
-    const rad1 = (angle * Math.PI) / 180
-    const rad2 = ((angle + sweep) * Math.PI) / 180
-    const x1 = cx + r * Math.cos(rad1); const y1 = cy + r * Math.sin(rad1)
-    const x2 = cx + r * Math.cos(rad2); const y2 = cy + r * Math.sin(rad2)
-    const large = sweep > 180 ? 1 : 0
-    const path = `M ${cx} ${cy} L ${x1} ${y1} A ${r} ${r} 0 ${large} 1 ${x2} ${y2} Z`
+function DonutChart({ data, size = 130 }: { data: FreqRow[]; size?: number }) {
+  const total = data.reduce((s, d) => s + d.n, 0)
+  if (!total) return <p className="text-xs py-6 text-center" style={{ color: 'var(--text-faint)' }}>Sin datos aún</p>
+  let angle = -90; const r = 44; const cx = size / 2; const cy = size / 2
+  const slices = data.slice(0, 8).map((d, i) => {
+    const sweep = (d.n / total) * 360
+    const r1 = (angle * Math.PI) / 180
+    const r2 = ((angle + sweep) * Math.PI) / 180
+    const path = `M${cx} ${cy} L${cx + r * Math.cos(r1)} ${cy + r * Math.sin(r1)} A${r} ${r} 0 ${sweep > 180 ? 1 : 0} 1 ${cx + r * Math.cos(r2)} ${cy + r * Math.sin(r2)}Z`
     angle += sweep
-    return { path, color: PALETTE[i % PALETTE.length], label: d.label, value: d.value }
+    return { path, color: PAL[i % PAL.length], label: d.label, n: d.n, pct: d.pct }
   })
   return (
-    <div className="flex items-center gap-4 flex-wrap">
+    <div className="flex items-center gap-5 flex-wrap">
       <svg width={size} height={size} className="flex-shrink-0">
         {slices.map((s, i) => <path key={i} d={s.path} fill={s.color} stroke="var(--bg-surface)" strokeWidth={2} />)}
-        <circle cx={cx} cy={cy} r={20} fill="var(--bg-surface)" />
-        <text x={cx} y={cy + 5} textAnchor="middle" fontSize={11} fontWeight="bold" fill="var(--text)" style={{ fontFamily: 'inherit' }}>{total}</text>
+        <circle cx={cx} cy={cy} r={22} fill="var(--bg-surface)" />
+        <text x={cx} y={cy + 4} textAnchor="middle" fontSize={11} fontWeight="bold" fill="var(--text-color, #fff)">{total}</text>
       </svg>
-      <div className="flex flex-col gap-1.5 flex-1 min-w-0">
+      <div className="flex-1 space-y-1.5 min-w-0">
         {slices.map((s, i) => (
-          <div key={i} className="flex items-center gap-2 text-xs">
+          <div key={i} className="flex items-center gap-2 text-[11px]">
             <span className="w-2.5 h-2.5 rounded-sm flex-shrink-0" style={{ background: s.color }} />
-            <span className="truncate flex-1" style={{ color: 'var(--text-dim)' }} title={s.label}>{s.label}</span>
-            <span className="font-bold flex-shrink-0" style={{ color: 'var(--text)' }}>{s.value}</span>
-            <span className="w-8 text-right flex-shrink-0" style={{ color: 'var(--text-faint)' }}>{pct(s.value, total)}%</span>
+            <span className="truncate" style={{ color: 'var(--text-dim)' }}>{s.label}</span>
+            <span className="font-bold ml-auto flex-shrink-0" style={{ color: 'var(--text)' }}>{s.n}</span>
+            <span className="w-8 text-right flex-shrink-0" style={{ color: 'var(--text-faint)' }}>{s.pct}%</span>
           </div>
         ))}
       </div>
@@ -123,66 +65,31 @@ function DonutChart({ data, size = 120 }: { data: { label: string; value: number
   )
 }
 
-function HBar({ label, value, max, color = '#3B82F6', total }: { label: string; value: number; max: number; color?: string; total: number }) {
-  return (
-    <div className="flex items-center gap-2 text-xs">
-      <span className="flex-shrink-0 text-right" style={{ width: 130, color: 'var(--text-dim)' }} title={label}>{label.length > 18 ? label.slice(0, 17) + '…' : label}</span>
-      <div className="flex-1 h-5 rounded overflow-hidden relative" style={{ background: 'var(--bg-card)' }}>
-        <motion.div className="h-full rounded flex items-center px-1.5"
-          initial={{ width: 0 }} animate={{ width: `${pct(value, max)}%` }}
-          transition={{ duration: 0.7, ease: 'easeOut' }} style={{ background: color }}>
-          {pct(value, max) > 15 && <span className="text-white font-bold text-[10px]">{value}</span>}
-        </motion.div>
-      </div>
-      <span className="font-bold w-6 flex-shrink-0" style={{ color: 'var(--text)' }}>{value}</span>
-      <span className="w-8 text-right flex-shrink-0" style={{ color: 'var(--text-faint)' }}>{pct(value, total)}%</span>
-    </div>
-  )
-}
-
-function BoolBar({ label, trueCount, total, colorT = '#10B981', colorF = '#EF4444' }: { label: string; trueCount: number; total: number; colorT?: string; colorF?: string }) {
-  const falseCount = total - trueCount
+function BoolBar({ label, si, no, pctSi, colorT = '#10B981', colorF = '#EF4444' }: { label: string; si: number; no: number; pctSi: number; colorT?: string; colorF?: string }) {
   return (
     <div>
       <div className="flex justify-between text-xs mb-1">
         <span style={{ color: 'var(--text-dim)' }}>{label}</span>
-        <span className="font-semibold" style={{ color: 'var(--text)' }}>{pct(trueCount, total)}% Sí</span>
+        <span className="font-bold" style={{ color: pctSi >= 50 ? colorT : colorF }}>{pctSi}% SÍ</span>
       </div>
-      <div className="h-4 rounded overflow-hidden flex">
-        <motion.div initial={{ width: 0 }} animate={{ width: `${pct(trueCount, total)}%` }}
-          transition={{ duration: 0.7 }} style={{ background: colorT }} className="flex items-center justify-center">
-          {pct(trueCount, total) > 10 && <span className="text-white text-[9px] font-bold">{trueCount}</span>}
+      <div className="h-5 rounded-lg overflow-hidden flex">
+        <motion.div initial={{ width: 0 }} animate={{ width: `${pctSi}%` }}
+          transition={{ duration: 0.6 }} className="flex items-center justify-center"
+          style={{ background: colorT }}>
+          {pctSi > 10 && <span className="text-white text-[9px] font-bold">{si}</span>}
         </motion.div>
         <div className="flex-1 flex items-center justify-center" style={{ background: colorF }}>
-          {falseCount > 0 && pct(falseCount, total) > 10 && <span className="text-white text-[9px] font-bold">{falseCount}</span>}
+          {(100 - pctSi) > 10 && <span className="text-white text-[9px] font-bold">{no}</span>}
         </div>
-      </div>
-      <div className="flex gap-3 mt-1">
-        <span className="text-[10px] flex items-center gap-1" style={{ color: colorT }}><span className="w-2 h-2 rounded-sm inline-block" style={{ background: colorT }} /> SÍ: {trueCount}</span>
-        <span className="text-[10px] flex items-center gap-1" style={{ color: colorF }}><span className="w-2 h-2 rounded-sm inline-block" style={{ background: colorF }} /> NO: {falseCount}</span>
       </div>
     </div>
   )
 }
 
-// ── Section wrapper ────────────────────────────────────────────────────
-function Sec({ title, icon: Icon, children, id }: { title: string; icon: any; children: React.ReactNode; id?: string }) {
+function KPI({ label, value, sub, color = 'var(--primary)', alert }: { label: string; value: string | number; sub?: string; color?: string; alert?: boolean }) {
   return (
-    <div id={id} className="terra-card p-5 print-section">
-      <div className="flex items-center gap-2 mb-4 pb-3" style={{ borderBottom: '1px solid var(--border)' }}>
-        <div className="w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0" style={{ background: 'var(--primary-dim)' }}>
-          <Icon size={14} style={{ color: 'var(--primary)' }} />
-        </div>
-        <h2 className="font-bold text-sm" style={{ color: 'var(--text)' }}>{title}</h2>
-      </div>
-      {children}
-    </div>
-  )
-}
-
-function KPI({ label, value, sub, color = 'var(--primary)' }: { label: string; value: string | number; sub?: string; color?: string }) {
-  return (
-    <div className="terra-card p-4 text-center">
+    <div className="terra-card p-4 relative overflow-hidden">
+      {alert && <div className="absolute top-2 right-2"><AlertTriangle size={14} style={{ color: '#F59E0B' }} /></div>}
       <p className="text-2xl font-black" style={{ color }}>{value}</p>
       <p className="text-xs font-semibold mt-0.5" style={{ color: 'var(--text)' }}>{label}</p>
       {sub && <p className="text-[10px] mt-0.5" style={{ color: 'var(--text-faint)' }}>{sub}</p>}
@@ -190,552 +97,566 @@ function KPI({ label, value, sub, color = 'var(--primary)' }: { label: string; v
   )
 }
 
-// ── Main page ─────────────────────────────────────────────────────────
+function Sec({ title, children, accent = 'var(--primary)' }: { title: string; children: React.ReactNode; accent?: string }) {
+  return (
+    <div className="terra-card p-5">
+      <div className="flex items-center gap-2 mb-4 pb-3" style={{ borderBottom: '1px solid var(--border)' }}>
+        <div className="h-5 w-1 rounded-full flex-shrink-0" style={{ background: accent }} />
+        <h3 className="font-bold text-sm" style={{ color: 'var(--text)' }}>{title}</h3>
+      </div>
+      {children}
+    </div>
+  )
+}
+
+function FreqTable({ data, color = '#3B82F6' }: { data: FreqRow[]; color?: string }) {
+  if (!data.length) return <p className="text-xs py-4" style={{ color: 'var(--text-faint)' }}>Sin datos aún</p>
+  const max = data[0]?.n ?? 1
+  return <div className="space-y-2">{data.slice(0, 10).map((r, i) => <HBar key={r.label} {...r} max={max} total={data.reduce((s, d) => s + d.n, 0)} color={PAL[i % PAL.length] ?? color} />)}</div>
+}
+
+// ── Tabs ──────────────────────────────────────────────────────────────
+const TABS = [
+  { id: 'resumen',     label: 'Resumen',         icon: BarChart2 },
+  { id: 'demografia',  label: 'Demografía',       icon: Users },
+  { id: 'laboral',     label: 'Laboral',          icon: Briefcase },
+  { id: 'salud',       label: 'Salud',            icon: Heart },
+  { id: 'estilos',     label: 'Estilos de vida',  icon: Activity },
+  { id: 'dotacion',    label: 'Dotación / EPP',   icon: Shirt },
+  { id: 'competencias',label: 'Competencias',     icon: Award },
+  { id: 'tabla',       label: 'Detalle',          icon: Eye },
+]
+
+// ── Main ──────────────────────────────────────────────────────────────
 export default function WorkerProfilesPage() {
   const [profiles, setProfiles] = useState<WP[]>([])
-  const [loading, setLoading] = useState(true)
-  const [search, setSearch] = useState('')
-  const reportRef = useRef<HTMLDivElement>(null)
+  const [loading, setLoading]   = useState(true)
+  const [tab, setTab]           = useState('resumen')
+  const [company, setCompany]   = useState('Organización')
+  const [exporting, setExporting] = useState<'excel' | 'pdf' | null>(null)
+
+  // Table state
+  const [search, setSearch]   = useState('')
+  const [sortCol, setSortCol] = useState<string>('completion_pct')
+  const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc')
+  const [page, setPage]       = useState(1)
+  const [selectedId, setSelectedId] = useState<string | null>(null)
+  const PER = 15
 
   useEffect(() => {
     fetch('/api/worker-profiles')
       .then(r => r.ok ? r.json() : [])
       .then((d: WP[]) => { setProfiles(d); setLoading(false) })
+    fetch('/api/companies').then(r => r.json()).then((d: any[]) => {
+      if (d?.[0]?.name) setCompany(d[0].name)
+    }).catch(() => {})
   }, [])
 
-  if (loading) return (
-    <div className="flex items-center justify-center h-full py-32">
-      <Loader2 size={28} className="animate-spin" style={{ color: 'var(--primary)' }} />
-    </div>
-  )
+  const a: Analytics = computeAnalytics(profiles)
 
-  const n = profiles.length
-  const ages = profiles.map(p => age(p.fecha_nacimiento)).filter(Boolean) as number[]
-  const avgAge = ages.length ? Math.round(ages.reduce((a, b) => a + b, 0) / ages.length) : null
-  const avgPct = n ? Math.round(profiles.reduce((s, p) => s + (p.completion_pct ?? 0), 0) / n) : 0
-
-  // ── Export Excel ────────────────────────────────────────────────────
-  const exportExcel = async () => {
-    const XLSX = (await import('xlsx')).default
-    const rows = profiles.map(p => ({
-      'NOMBRE COMPLETO':             p.users?.name ?? `${p.nombres ?? ''} ${p.apellidos ?? ''}`.trim(),
-      'CÉDULA':                      p.users?.cedula ?? '',
-      'EMAIL':                       p.users?.email ?? '',
-      'FECHA NACIMIENTO':            p.fecha_nacimiento ?? '',
-      'EDAD':                        age(p.fecha_nacimiento) ?? '',
-      'SEXO':                        p.sexo ?? '',
-      'ESTADO CIVIL':                p.estado_civil ?? '',
-      'CIUDAD RESIDENCIA':           p.ciudad_residencia ?? '',
-      'DEPTO RESIDENCIA':            p.depto_residencia ?? '',
-      'MUNICIPIO VIVIENDA':          p.municipio_vivienda ?? '',
-      'TIPO VIVIENDA':               p.tipo_vivienda ?? '',
-      'TENENCIA VIVIENDA':           p.tenencia_vivienda ?? '',
-      'ESTRATO':                     p.estrato ?? '',
-      'ACCESO INTERNET':             p.acceso_internet === true ? 'SÍ' : p.acceso_internet === false ? 'NO' : '',
-      'CON QUIÉN VIVE':              p.con_quien_vive ?? '',
-      'PERSONAS EN HOGAR':           p.num_personas_hogar ?? '',
-      'NÚMERO DE HIJOS':             p.num_hijos ?? '',
-      'DEPENDIENTES ECONÓMICOS':     p.dependientes_economicos ?? '',
-      'CABEZA DE HOGAR':             p.cabeza_hogar === true ? 'SÍ' : p.cabeza_hogar === false ? 'NO' : '',
-      'NIVEL EDUCATIVO':             p.nivel_educativo ?? '',
-      'PROFESIÓN':                   p.profesion ?? '',
-      'ESTUDIA ACTUALMENTE':         p.actualmente_estudia === true ? 'SÍ' : p.actualmente_estudia === false ? 'NO' : '',
-      'CARGO':                       p.cargo_confirmado ?? '',
-      'ÁREA':                        p.area_confirmada ?? p.users?.area ?? '',
-      'CENTRO TRABAJO':              p.centro_trabajo ?? '',
-      'TIPO CONTRATO':               p.tipo_contrato ?? '',
-      'JORNADA LABORAL':             p.jornada_laboral ?? '',
-      'HORARIO HABITUAL':            p.horario_habitual ?? '',
-      'HORAS EXTRAS':                p.realiza_horas_extras === true ? 'SÍ' : p.realiza_horas_extras === false ? 'NO' : '',
-      'TRABAJA FINES SEMANA':        p.trabaja_fines_semana === true ? 'SÍ' : p.trabaja_fines_semana === false ? 'NO' : '',
-      'FECHA INGRESO':               p.fecha_ingreso ?? '',
-      'MEDIO TRANSPORTE':            p.medio_transporte ?? '',
-      'TIEMPO DESPLAZAMIENTO':       p.tiempo_desplazamiento ?? '',
-      'CONDUCE VEHÍCULO':            p.conduce_vehiculo === true ? 'SÍ' : p.conduce_vehiculo === false ? 'NO' : '',
-      'TIPO VEHÍCULO':               p.tipo_vehiculo ?? '',
-      'ESTATURA (cm)':               p.estatura_cm ?? '',
-      'PESO (kg)':                   p.peso_kg ?? '',
-      'IMC':                         imc(p.estatura_cm, p.peso_kg) ?? '',
-      'TALLA CAMISA':                p.talla_camisa ?? '',
-      'TALLA CAMISETA':              p.talla_camiseta ?? '',
-      'TALLA PANTALÓN':              p.talla_pantalon ?? '',
-      'TALLA OVEROL':                p.talla_overol ?? '',
-      'TALLA CHAQUETA':              p.talla_chaqueta ?? '',
-      'TALLA IMPERMEABLE':           p.talla_impermeable ?? '',
-      'TALLA ZAPATO':                p.talla_zapato ?? '',
-      'TALLA BOTAS':                 p.talla_botas ?? '',
-      'TALLA GUANTES':               p.talla_guantes ?? '',
-      'ACTIVIDAD FÍSICA':            p.realiza_actividad_fisica === true ? 'SÍ' : p.realiza_actividad_fisica === false ? 'NO' : '',
-      'DÍAS ACTIVIDAD FÍSICA/SEM':   p.dias_actividad_fisica ?? '',
-      'TIPO ACTIVIDAD':              p.tipo_actividad_fisica ?? '',
-      'HORAS DE SUEÑO':              p.horas_sueno ?? '',
-      'DESCANSO ADECUADO':           p.descanso_adecuado === true ? 'SÍ' : p.descanso_adecuado === false ? 'NO' : '',
-      'DESAYUNA DIARIO':             p.desayuna_diariamente === true ? 'SÍ' : p.desayuna_diariamente === false ? 'NO' : '',
-      'COMIDAS AL DÍA':              p.comidas_al_dia ?? '',
-      'CONSUME FRUTAS':              p.consume_frutas === true ? 'SÍ' : p.consume_frutas === false ? 'NO' : '',
-      'CONSUME VERDURAS':            p.consume_verduras === true ? 'SÍ' : p.consume_verduras === false ? 'NO' : '',
-      'FUMA':                        p.fuma === true ? 'SÍ' : p.fuma === false ? 'NO' : '',
-      'CIGARRILLOS/DÍA':             p.cigarrillos_dia ?? '',
-      'CONSUMO ALCOHOL':             p.consumo_alcohol ?? '',
-      'CONSUME ENERGIZANTES':        p.consume_energizantes === true ? 'SÍ' : p.consume_energizantes === false ? 'NO' : '',
-      'CONSUME PSICOACTIVOS':        p.consume_psicoactivos ?? '',
-      'ENFERMEDADES DIAGNOSTICADAS': (p.enfermedades_diagnosticadas ?? []).join(', '),
-      'HOSPITALIZADO':               p.hospitalizado === true ? 'SÍ' : p.hospitalizado === false ? 'NO' : '',
-      'CIRUGÍAS':                    p.cirugias === true ? 'SÍ' : p.cirugias === false ? 'NO' : '',
-      'ALERGIAS':                    p.alergias === true ? 'SÍ' : p.alergias === false ? 'NO' : '',
-      'MEDICAMENTOS PERMANENTES':    p.medicamentos_permanentes === true ? 'SÍ' : p.medicamentos_permanentes === false ? 'NO' : '',
-      'LIMITACIÓN FÍSICA':           p.limitacion_fisica === true ? 'SÍ' : p.limitacion_fisica === false ? 'NO' : '',
-      'ANTECEDENTES FAMILIARES':     (p.antecedentes_familiares ?? []).join(', '),
-      'ACCIDENTES DE TRABAJO':       p.accidentes_trabajo === true ? 'SÍ' : p.accidentes_trabajo === false ? 'NO' : '',
-      'ENFERMEDADES LABORALES':      p.enfermedades_laborales === true ? 'SÍ' : p.enfermedades_laborales === false ? 'NO' : '',
-      'RESTRICCIONES MÉDICAS':       p.restricciones_medicas === true ? 'SÍ' : p.restricciones_medicas === false ? 'NO' : '',
-      'USA GAFAS':                   p.usa_gafas === true ? 'SÍ' : p.usa_gafas === false ? 'NO' : '',
-      'USA AUDÍFONOS':               p.usa_audifonos === true ? 'SÍ' : p.usa_audifonos === false ? 'NO' : '',
-      'TRABAJO GENERA ESTRÉS':       p.trabajo_genera_estres === true ? 'SÍ' : p.trabajo_genera_estres === false ? 'NO' : '',
-      'APOYO FAMILIAR':              p.apoyo_familiar === true ? 'SÍ' : p.apoyo_familiar === false ? 'NO' : '',
-      'OTRO EMPLEO':                 p.otro_empleo === true ? 'SÍ' : p.otro_empleo === false ? 'NO' : '',
-      'ES CUIDADOR':                 p.es_cuidador === true ? 'SÍ' : p.es_cuidador === false ? 'NO' : '',
-      'DIFICULTADES ECONÓMICAS':     p.dificultades_economicas === true ? 'SÍ' : p.dificultades_economicas === false ? 'NO' : '',
-      'EQUILIBRIO TRABAJO/VIDA':     p.equilibrio_trabajo_vida === true ? 'SÍ' : p.equilibrio_trabajo_vida === false ? 'NO' : '',
-      'LICENCIA CONDUCCIÓN':         p.licencia_conduccion === true ? 'SÍ' : p.licencia_conduccion === false ? 'NO' : '',
-      'CATEGORÍA LICENCIA':          p.categoria_licencia ?? '',
-      'CERTIFICACIONES':             (p.certificaciones ?? []).join(', '),
-      'OTRAS CERTIFICACIONES':       p.otras_certificaciones ?? '',
-      'COMPLETITUD (%)':             p.completion_pct ?? 0,
-      'ÚLTIMA ACTUALIZACIÓN':        p.updated_at ? new Date(p.updated_at).toLocaleDateString('es-CO') : '',
-    }))
-
-    const ws = XLSX.utils.json_to_sheet(rows)
-    const wb = XLSX.utils.book_new()
-    XLSX.utils.book_append_sheet(wb, ws, 'Perfiles')
-    XLSX.writeFile(wb, `perfiles_integrales_${new Date().toISOString().slice(0,10)}.xlsx`)
+  const doExcelExport = async () => {
+    setExporting('excel')
+    await exportToExcel(profiles, a, company).finally(() => setExporting(null))
+  }
+  const doPdfExport = async () => {
+    setExporting('pdf')
+    await exportToPDF(a, company).finally(() => setExporting(null))
   }
 
-  // ── Export PDF via print ─────────────────────────────────────────────
-  const exportPDF = () => { window.print() }
+  // ── Table ──────────────────────────────────────────────────────────
+  function imc(e?: number, p?: number) { return e && p ? +(p / ((e / 100) ** 2)).toFixed(1) : null }
+  function ageOf(dob?: string) { return dob ? Math.floor((Date.now() - new Date(dob).getTime()) / (365.25 * 24 * 3600 * 1000)) : null }
 
-  // ── Computed stats ──────────────────────────────────────────────────
   const filtered = profiles.filter(p => {
     const q = search.toLowerCase()
     return !q || (p.users?.name ?? '').toLowerCase().includes(q)
       || (p.users?.cedula ?? '').includes(q)
       || (p.area_confirmada ?? '').toLowerCase().includes(q)
       || (p.cargo_confirmado ?? '').toLowerCase().includes(q)
+      || (p.sexo ?? '').toLowerCase().includes(q)
   })
+  const sorted = [...filtered].sort((a, b) => {
+    const av = (a as any)[sortCol] ?? ''
+    const bv = (b as any)[sortCol] ?? ''
+    return sortDir === 'asc' ? (av > bv ? 1 : -1) : (av < bv ? 1 : -1)
+  })
+  const paged = sorted.slice((page - 1) * PER, page * PER)
+  const totalPages = Math.ceil(sorted.length / PER)
+
+  function toggleSort(col: string) {
+    if (sortCol === col) setSortDir(d => d === 'asc' ? 'desc' : 'asc')
+    else { setSortCol(col); setSortDir('desc') }
+  }
+
+  const SortIcon = ({ col }: { col: string }) => sortCol === col
+    ? (sortDir === 'asc' ? <ChevronUp size={11} /> : <ChevronDown size={11} />)
+    : null
+
+  const selected = profiles.find(p => p.id === selectedId)
+
+  if (loading) return (
+    <div className="flex items-center justify-center h-full py-40">
+      <Loader2 size={32} className="animate-spin" style={{ color: 'var(--primary)' }} />
+    </div>
+  )
+
+  if (!profiles.length) return (
+    <div className="flex flex-col items-center justify-center h-full py-40 gap-4">
+      <Users size={48} style={{ color: 'var(--text-faint)' }} />
+      <p className="text-lg font-bold" style={{ color: 'var(--text)' }}>Sin perfiles aún</p>
+      <p className="text-sm text-center max-w-xs" style={{ color: 'var(--text-dim)' }}>Los trabajadores deben completar su Perfil Integral desde el menú "Mi Perfil".</p>
+    </div>
+  )
 
   return (
-    <>
-      {/* Print-only styles */}
-      <style>{`
-        @media print {
-          body * { visibility: hidden !important; }
-          #print-report, #print-report * { visibility: visible !important; }
-          #print-report { position: fixed; top: 0; left: 0; width: 100%; }
-          .no-print { display: none !important; }
-          .print-section { break-inside: avoid; page-break-inside: avoid; margin-bottom: 16px; }
-        }
-      `}</style>
+    <div className="p-5 max-w-7xl mx-auto space-y-4">
 
-      <div className="p-5 max-w-7xl mx-auto space-y-5">
-
-        {/* ── Header ── */}
-        <div className="flex items-center justify-between flex-wrap gap-3 no-print">
-          <div>
-            <h1 className="text-xl font-bold" style={{ color: 'var(--text)' }}>Perfiles Integrales — Tablero de Analítica</h1>
-            <p className="text-xs mt-0.5" style={{ color: 'var(--text-dim)' }}>{n} perfil{n !== 1 ? 'es' : ''} registrado{n !== 1 ? 's' : ''} · Generado {new Date().toLocaleDateString('es-CO', { day: 'numeric', month: 'long', year: 'numeric' })}</p>
-          </div>
-          <div className="flex gap-2">
-            <button onClick={exportExcel} className="terra-btn" style={{ padding: '8px 14px', fontSize: 12, background: '#10B981' }}>
-              <Download size={13} /> Excel
-            </button>
-            <button onClick={exportPDF} className="terra-btn" style={{ padding: '8px 14px', fontSize: 12, background: '#EF4444' }}>
-              <FileText size={13} /> PDF
-            </button>
-          </div>
+      {/* ── Header ── */}
+      <div className="flex items-start justify-between gap-3 flex-wrap">
+        <div>
+          <h1 className="text-xl font-black" style={{ color: 'var(--text)' }}>Centro de Inteligencia Sociodemográfica</h1>
+          <p className="text-xs mt-0.5" style={{ color: 'var(--text-dim)' }}>
+            {a.total} trabajador{a.total !== 1 ? 'es' : ''} · Completitud promedio: <strong>{a.avgPct}%</strong> · Última actualización: {a.lastUpdate ? new Date(a.lastUpdate).toLocaleDateString('es-CO') : '—'}
+          </p>
         </div>
+        <div className="flex gap-2">
+          <button onClick={doExcelExport} disabled={!!exporting}
+            className="terra-btn text-xs" style={{ padding: '8px 14px', background: '#059669' }}>
+            {exporting === 'excel' ? <Loader2 size={13} className="animate-spin" /> : <FileSpreadsheet size={13} />}
+            Excel
+          </button>
+          <button onClick={doPdfExport} disabled={!!exporting}
+            className="terra-btn text-xs" style={{ padding: '8px 14px', background: '#DC2626' }}>
+            {exporting === 'pdf' ? <Loader2 size={13} className="animate-spin" /> : <FileText size={13} />}
+            PDF
+          </button>
+        </div>
+      </div>
 
-        {/* ── Printable report ── */}
-        <div id="print-report" ref={reportRef}>
+      {/* ── Tabs ── */}
+      <div className="flex gap-1 overflow-x-auto pb-1" style={{ scrollbarWidth: 'none' }}>
+        {TABS.map(t => {
+          const Icon = t.icon
+          return (
+            <button key={t.id} onClick={() => setTab(t.id)}
+              className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-semibold whitespace-nowrap transition-all flex-shrink-0"
+              style={tab === t.id
+                ? { background: 'var(--primary)', color: '#fff' }
+                : { background: 'var(--bg-card)', border: '1px solid var(--border)', color: 'var(--text-dim)' }}>
+              <Icon size={12} />{t.label}
+            </button>
+          )
+        })}
+      </div>
 
-          {/* ── KPIs ── */}
-          <div className="grid grid-cols-2 lg:grid-cols-5 gap-3">
-            <KPI label="Trabajadores" value={n} />
-            <KPI label="Completitud promedio" value={`${avgPct}%`} color={avgPct >= 80 ? '#10B981' : '#F59E0B'} />
-            <KPI label="Edad promedio" value={avgAge ? `${avgAge} a` : '—'} color="#8B5CF6" />
-            <KPI label="Con estrés laboral" value={`${pct(countBool(profiles, p => p.trabajo_genera_estres), n)}%`} color="#F59E0B" sub={`${countBool(profiles, p => p.trabajo_genera_estres)} de ${n}`} />
-            <KPI label="Completitud 100%" value={profiles.filter(p => (p.completion_pct ?? 0) === 100).length} color="#10B981" />
-          </div>
+      {/* ── Content ── */}
+      <AnimatePresence mode="wait">
+        <motion.div key={tab} initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} transition={{ duration: 0.15 }}>
 
-          {/* ══ SECCIÓN 1: DEMOGRAFÍA ══ */}
-          <div className="grid lg:grid-cols-2 gap-5">
-
-            <Sec title="Distribución por sexo" icon={Users} id="sec-sexo">
-              <DonutChart data={freq(profiles.map(p => p.sexo)).map(([l, v]) => ({ label: l, value: v }))} />
-            </Sec>
-
-            <Sec title="Estado civil" icon={Users} id="sec-civil">
-              <DonutChart data={freq(profiles.map(p => p.estado_civil)).map(([l, v]) => ({ label: l, value: v }))} />
-            </Sec>
-          </div>
-
-          <div className="grid lg:grid-cols-2 gap-5">
-            <Sec title="Distribución por edad" icon={Users} id="sec-edad">
-              {(() => {
-                const groups = [
-                  { label: '18-25 años', fn: (a: number) => a >= 18 && a <= 25 },
-                  { label: '26-35 años', fn: (a: number) => a >= 26 && a <= 35 },
-                  { label: '36-45 años', fn: (a: number) => a >= 36 && a <= 45 },
-                  { label: '46-55 años', fn: (a: number) => a >= 46 && a <= 55 },
-                  { label: '56+ años',   fn: (a: number) => a >= 56 },
-                ]
-                const aged = profiles.map(p => age(p.fecha_nacimiento)).filter(Boolean) as number[]
-                const max = Math.max(...groups.map(g => aged.filter(g.fn).length), 1)
-                return (
-                  <div className="space-y-2">
-                    {groups.map((g, i) => {
-                      const val = aged.filter(g.fn).length
-                      return <HBar key={g.label} label={g.label} value={val} max={max} total={aged.length || 1} color={PALETTE[i]} />
-                    })}
-                  </div>
-                )
-              })()}
-            </Sec>
-
-            <Sec title="Ciudad de residencia" icon={Home} id="sec-ciudad">
-              {(() => {
-                const data = freq(profiles.map(p => p.ciudad_residencia || p.municipio_vivienda))
-                const max = Math.max(...data.map(d => d[1]), 1)
-                return <div className="space-y-2">{data.slice(0, 8).map(([l, v], i) => <HBar key={l} label={l} value={v} max={max} total={n} color={PALETTE[i % PALETTE.length]} />)}</div>
-              })()}
-            </Sec>
-          </div>
-
-          {/* ══ SECCIÓN 2: VIVIENDA ══ */}
-          <div className="grid lg:grid-cols-3 gap-5">
-            <Sec title="Tipo de vivienda" icon={Home} id="sec-vivienda">
-              <DonutChart size={100} data={freq(profiles.map(p => p.tipo_vivienda)).map(([l, v]) => ({ label: l, value: v }))} />
-            </Sec>
-            <Sec title="Tenencia de vivienda" icon={Home} id="sec-tenencia">
-              <DonutChart size={100} data={freq(profiles.map(p => p.tenencia_vivienda)).map(([l, v]) => ({ label: l, value: v }))} />
-            </Sec>
-            <Sec title="Estrato socioeconómico" icon={Home} id="sec-estrato">
-              {(() => {
-                const data = freq(profiles.map(p => p.estrato ? `Estrato ${p.estrato}` : undefined))
-                const max = Math.max(...data.map(d => d[1]), 1)
-                return <div className="space-y-2">{data.map(([l, v], i) => <HBar key={l} label={l} value={v} max={max} total={n} color={PALETTE[i]} />)}</div>
-              })()}
-            </Sec>
-          </div>
-
-          <div className="grid lg:grid-cols-2 gap-5">
-            <Sec title="Composición del hogar" icon={Home} id="sec-hogar">
-              <div className="space-y-3">
-                <BoolBar label="Cabeza de hogar" trueCount={countBool(profiles, p => p.cabeza_hogar)} total={n} />
-                <BoolBar label="Acceso a internet en casa" trueCount={countBool(profiles, p => p.acceso_internet)} total={n} />
-                <div className="pt-2 grid grid-cols-3 gap-3 text-center text-xs">
-                  {[
-                    { label: 'Promedio hijos', val: profiles.filter(p => p.num_hijos !== undefined).length ? (profiles.reduce((s, p) => s + (p.num_hijos ?? 0), 0) / n).toFixed(1) : '—' },
-                    { label: 'Promedio personas/hogar', val: profiles.filter(p => p.num_personas_hogar).length ? (profiles.reduce((s, p) => s + (p.num_personas_hogar ?? 0), 0) / n).toFixed(1) : '—' },
-                    { label: 'Promedio dependientes', val: profiles.filter(p => p.dependientes_economicos !== undefined).length ? (profiles.reduce((s, p) => s + (p.dependientes_economicos ?? 0), 0) / n).toFixed(1) : '—' },
-                  ].map(({ label, val }) => (
-                    <div key={label} className="p-2 rounded-lg" style={{ background: 'var(--bg-card)' }}>
-                      <p className="text-base font-black" style={{ color: 'var(--primary)' }}>{val}</p>
-                      <p style={{ color: 'var(--text-faint)' }}>{label}</p>
-                    </div>
-                  ))}
-                </div>
+          {/* ════ RESUMEN ════ */}
+          {tab === 'resumen' && (
+            <div className="space-y-4">
+              <div className="grid grid-cols-2 lg:grid-cols-5 gap-3">
+                <KPI label="Trabajadores" value={a.total} />
+                <KPI label="Completitud prom." value={`${a.avgPct}%`} color={a.avgPct >= 80 ? '#10B981' : '#F59E0B'} sub={`${a.complete80} al 80%+`} />
+                <KPI label="Edad promedio" value={a.avgAge ? `${a.avgAge} a` : '—'} color="#8B5CF6" />
+                <KPI label="Antigüedad prom." value={a.avgAntiguedad ? `${a.avgAntiguedad} a` : '—'} color="#06B6D4" />
+                <KPI label="Áreas" value={a.areas.length} color="#F59E0B" />
               </div>
-            </Sec>
-            <Sec title="¿Con quién vive?" icon={Home} id="sec-convivencia">
-              <DonutChart size={100} data={freq(profiles.map(p => p.con_quien_vive)).map(([l, v]) => ({ label: l, value: v }))} />
-            </Sec>
-          </div>
+              <div className="grid grid-cols-2 lg:grid-cols-5 gap-3">
+                <KPI label="Estrés laboral" value={`${a.estres.pctSi}%`} color={a.estres.pctSi >= 40 ? '#EF4444' : '#10B981'} sub={`${a.estres.si} personas`} alert={a.estres.pctSi >= 40} />
+                <KPI label="Actividad física" value={`${a.actividadFisica.pctSi}%`} color={a.actividadFisica.pctSi >= 50 ? '#10B981' : '#F59E0B'} />
+                <KPI label="Fumadores" value={`${a.fuma.pctSi}%`} color={a.fuma.pctSi >= 20 ? '#EF4444' : '#10B981'} alert={a.fuma.pctSi >= 20} />
+                <KPI label="Acc. laborales" value={`${a.accidentesTrabajo.pctSi}%`} color={a.accidentesTrabajo.pctSi > 0 ? '#EF4444' : '#10B981'} alert={a.accidentesTrabajo.pctSi > 0} />
+                <KPI label="IMC promedio" value={a.avgImc ?? '—'} color={a.avgImc && a.avgImc >= 30 ? '#EF4444' : a.avgImc && a.avgImc >= 25 ? '#F59E0B' : '#10B981'} sub={a.avgImc ? (a.avgImc >= 30 ? 'Obesidad' : a.avgImc >= 25 ? 'Sobrepeso' : 'Normal') : ''} />
+              </div>
 
-          {/* ══ SECCIÓN 3: EDUCACIÓN ══ */}
-          <Sec title="Nivel educativo" icon={GraduationCap} id="sec-edu">
-            {(() => {
-              const data = freq(profiles.map(p => p.nivel_educativo))
-              const max = Math.max(...data.map(d => d[1]), 1)
-              return (
-                <div className="grid lg:grid-cols-2 gap-6">
-                  <div className="space-y-2">{data.map(([l, v], i) => <HBar key={l} label={l} value={v} max={max} total={n} color={PALETTE[i % PALETTE.length]} />)}</div>
+              {/* Alerts */}
+              {a.estres.pctSi >= 40 && (
+                <div className="terra-card p-4 flex items-start gap-3" style={{ borderLeft: '3px solid #F59E0B' }}>
+                  <AlertTriangle size={16} style={{ color: '#F59E0B', flexShrink: 0, marginTop: 2 }} />
+                  <div>
+                    <p className="text-sm font-bold" style={{ color: 'var(--text)' }}>Alerta de riesgo psicosocial</p>
+                    <p className="text-xs mt-0.5" style={{ color: 'var(--text-dim)' }}>El {a.estres.pctSi}% de los trabajadores manifiesta estrés laboral. Se recomienda revisar cargas de trabajo e implementar pausas activas.</p>
+                  </div>
+                </div>
+              )}
+              {a.actividadFisica.pctSi < 40 && (
+                <div className="terra-card p-4 flex items-start gap-3" style={{ borderLeft: '3px solid #3B82F6' }}>
+                  <Activity size={16} style={{ color: '#3B82F6', flexShrink: 0, marginTop: 2 }} />
+                  <div>
+                    <p className="text-sm font-bold" style={{ color: 'var(--text)' }}>Sedentarismo elevado</p>
+                    <p className="text-xs mt-0.5" style={{ color: 'var(--text-dim)' }}>Solo el {a.actividadFisica.pctSi}% realiza actividad física. Promover programas de bienestar físico y deporte.</p>
+                  </div>
+                </div>
+              )}
+
+              <div className="grid lg:grid-cols-3 gap-4">
+                <Sec title="Distribución por sexo"><DonutChart data={a.sexo} /></Sec>
+                <Sec title="Nivel educativo" accent="#8B5CF6"><FreqTable data={a.nivelEducativo} color="#8B5CF6" /></Sec>
+                <Sec title="Tipo de contrato" accent="#10B981"><FreqTable data={a.tipoContrato} color="#10B981" /></Sec>
+              </div>
+            </div>
+          )}
+
+          {/* ════ DEMOGRAFÍA ════ */}
+          {tab === 'demografia' && (
+            <div className="space-y-4">
+              <div className="grid lg:grid-cols-2 gap-4">
+                <Sec title="Distribución por sexo"><DonutChart data={a.sexo} size={150} /></Sec>
+                <Sec title="Estado civil" accent="#F59E0B"><FreqTable data={a.estadoCivil} color="#F59E0B" /></Sec>
+              </div>
+              <Sec title="Grupos de edad"><FreqTable data={a.ageGroups} color="#3B82F6" /></Sec>
+              <Sec title="Ciudad de residencia (top 10)" accent="#06B6D4"><FreqTable data={a.ciudad} color="#06B6D4" /></Sec>
+              <div className="grid lg:grid-cols-3 gap-4">
+                <Sec title="Tipo de vivienda"><FreqTable data={a.tipoVivienda} /></Sec>
+                <Sec title="Tenencia de vivienda" accent="#10B981"><FreqTable data={a.tenenciaVivienda} color="#10B981" /></Sec>
+                <Sec title="Estrato socioeconómico" accent="#F59E0B"><FreqTable data={a.estrato} color="#F59E0B" /></Sec>
+              </div>
+              <div className="grid lg:grid-cols-2 gap-4">
+                <Sec title="Con quién vive" accent="#8B5CF6"><FreqTable data={a.conQuienVive} color="#8B5CF6" /></Sec>
+                <Sec title="Indicadores del hogar">
+                  <div className="grid grid-cols-3 gap-3 mb-4">
+                    {[
+                      { l: 'Hijos promedio', v: a.avgHijos },
+                      { l: 'Personas/hogar', v: a.avgPersonasHogar },
+                      { l: 'Cabeza de hogar', v: `${a.cabezaHogar.pctSi}%` },
+                    ].map(({ l, v }) => (
+                      <div key={l} className="p-3 rounded-xl text-center" style={{ background: 'var(--bg-card)' }}>
+                        <p className="text-xl font-black" style={{ color: 'var(--primary)' }}>{v}</p>
+                        <p className="text-[10px]" style={{ color: 'var(--text-faint)' }}>{l}</p>
+                      </div>
+                    ))}
+                  </div>
+                  <BoolBar label="Acceso a internet en casa" si={profiles.filter(p => p.acceso_internet === true).length} no={profiles.filter(p => p.acceso_internet === false).length} pctSi={profiles.filter(p => p.acceso_internet !== undefined).length ? Math.round(profiles.filter(p => p.acceso_internet === true).length / profiles.filter(p => p.acceso_internet !== undefined).length * 100) : 0} />
+                </Sec>
+              </div>
+            </div>
+          )}
+
+          {/* ════ LABORAL ════ */}
+          {tab === 'laboral' && (
+            <div className="space-y-4">
+              <div className="grid lg:grid-cols-2 gap-4">
+                <Sec title="Distribución por área"><FreqTable data={a.areas} /></Sec>
+                <Sec title="Distribución por cargo" accent="#8B5CF6"><FreqTable data={a.cargos} color="#8B5CF6" /></Sec>
+              </div>
+              <div className="grid lg:grid-cols-2 gap-4">
+                <Sec title="Tipo de contrato" accent="#10B981"><DonutChart data={a.tipoContrato} /></Sec>
+                <Sec title="Jornada laboral" accent="#F59E0B"><DonutChart data={a.jornadaLaboral} /></Sec>
+              </div>
+              <Sec title="Nivel educativo" accent="#06B6D4"><FreqTable data={a.nivelEducativo} color="#06B6D4" /></Sec>
+              <Sec title="Condiciones de trabajo">
+                <div className="grid lg:grid-cols-2 gap-4">
                   <div className="space-y-3">
-                    <BoolBar label="Estudia actualmente" trueCount={countBool(profiles, p => p.actualmente_estudia)} total={n} colorT="#8B5CF6" colorF="var(--bg-card)" />
-                    <div>
-                      <p className="text-xs font-semibold mb-2" style={{ color: 'var(--text-dim)' }}>Profesiones más frecuentes</p>
-                      {freq(profiles.map(p => p.profesion)).slice(0, 5).map(([l, v]) => (
-                        <div key={l} className="flex justify-between text-xs py-1" style={{ borderBottom: '1px solid var(--border)' }}>
-                          <span style={{ color: 'var(--text-dim)' }}>{l}</span>
-                          <span className="font-bold" style={{ color: 'var(--text)' }}>{v}</span>
-                        </div>
-                      ))}
-                    </div>
+                    <BoolBar label="Realiza horas extras" si={a.horasExtras.si} no={a.horasExtras.no} pctSi={a.horasExtras.pctSi} colorT="#F59E0B" colorF="var(--bg-card)" />
+                    <BoolBar label="Trabaja fines de semana" si={a.trabFinesSemana.si} no={a.trabFinesSemana.no} pctSi={a.trabFinesSemana.pctSi} colorT="#F97316" colorF="var(--bg-card)" />
+                    <BoolBar label="Actualmente estudia" si={a.estudiaActualmente.si} no={a.estudiaActualmente.no} pctSi={a.estudiaActualmente.pctSi} colorT="#8B5CF6" colorF="var(--bg-card)" />
                   </div>
-                </div>
-              )
-            })()}
-          </Sec>
-
-          {/* ══ SECCIÓN 4: LABORAL ══ */}
-          <div className="grid lg:grid-cols-2 gap-5">
-            <Sec title="Tipo de contrato" icon={Briefcase} id="sec-contrato">
-              <DonutChart data={freq(profiles.map(p => p.tipo_contrato)).map(([l, v]) => ({ label: l, value: v }))} />
-            </Sec>
-            <Sec title="Jornada laboral" icon={Briefcase} id="sec-jornada">
-              <DonutChart data={freq(profiles.map(p => p.jornada_laboral)).map(([l, v]) => ({ label: l, value: v }))} />
-            </Sec>
-          </div>
-
-          <Sec title="Distribución por área / cargo" icon={Briefcase} id="sec-area">
-            <div className="grid lg:grid-cols-2 gap-6">
-              <div>
-                <p className="text-xs font-bold uppercase tracking-wider mb-3" style={{ color: 'var(--text-faint)' }}>Por área</p>
-                {(() => {
-                  const data = freq(profiles.map(p => p.area_confirmada || p.users?.area))
-                  const max = Math.max(...data.map(d => d[1]), 1)
-                  return <div className="space-y-2">{data.map(([l, v], i) => <HBar key={l} label={l} value={v} max={max} total={n} color={PALETTE[i % PALETTE.length]} />)}</div>
-                })()}
-              </div>
-              <div>
-                <p className="text-xs font-bold uppercase tracking-wider mb-3" style={{ color: 'var(--text-faint)' }}>Condiciones laborales</p>
-                <div className="space-y-3">
-                  <BoolBar label="Realiza horas extras" trueCount={countBool(profiles, p => p.realiza_horas_extras)} total={n} colorT="#F59E0B" colorF="var(--bg-card)" />
-                  <BoolBar label="Trabaja fines de semana" trueCount={countBool(profiles, p => p.trabaja_fines_semana)} total={n} colorT="#F97316" colorF="var(--bg-card)" />
-                </div>
-              </div>
-            </div>
-          </Sec>
-
-          {/* ══ SECCIÓN 5: DESPLAZAMIENTO ══ */}
-          <div className="grid lg:grid-cols-2 gap-5">
-            <Sec title="Medio de transporte" icon={Car} id="sec-transporte">
-              <DonutChart data={freq(profiles.map(p => p.medio_transporte)).map(([l, v]) => ({ label: l, value: v }))} />
-            </Sec>
-            <Sec title="Desplazamiento y conducción" icon={Car} id="sec-desplaz">
-              {(() => {
-                const data = freq(profiles.map(p => p.tiempo_desplazamiento))
-                const max = Math.max(...data.map(d => d[1]), 1)
-                return (
                   <div className="space-y-3">
-                    <p className="text-xs font-bold uppercase tracking-wider" style={{ color: 'var(--text-faint)' }}>Tiempo de desplazamiento</p>
-                    <div className="space-y-2">{data.map(([l, v], i) => <HBar key={l} label={l} value={v} max={max} total={n} color={PALETTE[i]} />)}</div>
-                    <BoolBar label="Conduce vehículo propio" trueCount={countBool(profiles, p => p.conduce_vehiculo)} total={n} colorT="#06B6D4" colorF="var(--bg-card)" />
+                    {a.avgAntiguedad !== null && (
+                      <div className="p-4 rounded-xl text-center" style={{ background: 'var(--bg-card)' }}>
+                        <p className="text-2xl font-black" style={{ color: '#06B6D4' }}>{a.avgAntiguedad} años</p>
+                        <p className="text-xs" style={{ color: 'var(--text-faint)' }}>Antigüedad promedio</p>
+                      </div>
+                    )}
                   </div>
-                )
-              })()}
-            </Sec>
-          </div>
-
-          {/* ══ SECCIÓN 6: TALLAS EPP ══ */}
-          <Sec title="Tallas de dotación y perfil físico" icon={Shirt} id="sec-tallas">
-            <div className="grid lg:grid-cols-4 gap-4 mb-4">
-              {[
-                { label: 'Promedio estatura', val: profiles.filter(p => p.estatura_cm).length ? (profiles.reduce((s, p) => s + (p.estatura_cm ?? 0), 0) / profiles.filter(p => p.estatura_cm).length).toFixed(0) + ' cm' : '—' },
-                { label: 'Promedio peso', val: profiles.filter(p => p.peso_kg).length ? (profiles.reduce((s, p) => s + (p.peso_kg ?? 0), 0) / profiles.filter(p => p.peso_kg).length).toFixed(1) + ' kg' : '—' },
-                { label: 'Promedio IMC', val: (() => { const vals = profiles.map(p => imc(p.estatura_cm, p.peso_kg)).filter(Boolean) as number[]; return vals.length ? (vals.reduce((a, b) => a + b, 0) / vals.length).toFixed(1) : '—' })() },
-                { label: 'Con limitación física', val: `${countBool(profiles, p => p.limitacion_fisica)} (${pct(countBool(profiles, p => p.limitacion_fisica), n)}%)` },
-              ].map(({ label, val }) => (
-                <div key={label} className="p-3 rounded-xl text-center" style={{ background: 'var(--bg-card)' }}>
-                  <p className="text-lg font-black" style={{ color: 'var(--primary)' }}>{val}</p>
-                  <p className="text-[11px]" style={{ color: 'var(--text-faint)' }}>{label}</p>
                 </div>
-              ))}
-            </div>
-            <div className="grid lg:grid-cols-3 gap-6">
-              {[
-                { title: 'Camisa / Camiseta', key: 'talla_camisa' as keyof WP },
-                { title: 'Pantalón', key: 'talla_pantalon' as keyof WP },
-                { title: 'Calzado (Zapato)', key: 'talla_zapato' as keyof WP },
-              ].map(({ title, key }) => {
-                const data = freq(profiles.map(p => p[key] as string | undefined))
-                const max = Math.max(...data.map(d => d[1]), 1)
-                return (
-                  <div key={title}>
-                    <p className="text-xs font-bold uppercase tracking-wider mb-2" style={{ color: 'var(--text-faint)' }}>{title}</p>
-                    <div className="space-y-1.5">{data.map(([l, v], i) => <HBar key={l} label={l} value={v} max={max} total={n} color={PALETTE[i % PALETTE.length]} />)}</div>
+              </Sec>
+              <div className="grid lg:grid-cols-2 gap-4">
+                <Sec title="Medio de transporte" accent="#06B6D4"><FreqTable data={a.medioTransporte} color="#06B6D4" /></Sec>
+                <Sec title="Tiempo de desplazamiento" accent="#F59E0B">
+                  <FreqTable data={a.tiempoDesplaz} color="#F59E0B" />
+                  <div className="mt-3">
+                    <BoolBar label="Conduce vehículo propio" si={a.conduceVehiculo.si} no={a.conduceVehiculo.no} pctSi={a.conduceVehiculo.pctSi} colorT="#06B6D4" colorF="var(--bg-card)" />
                   </div>
-                )
-              })}
+                </Sec>
+              </div>
             </div>
-          </Sec>
+          )}
 
-          {/* ══ SECCIÓN 7: ESTILOS DE VIDA ══ */}
-          <Sec title="Estilos de vida y hábitos" icon={Activity} id="sec-estilos">
-            <div className="grid lg:grid-cols-2 gap-6">
-              <div className="space-y-3">
-                <p className="text-xs font-bold uppercase tracking-wider" style={{ color: 'var(--text-faint)' }}>Actividad física y sueño</p>
-                <BoolBar label="Realiza actividad física" trueCount={countBool(profiles, p => p.realiza_actividad_fisica)} total={n} colorT="#10B981" colorF="#EF4444" />
-                <BoolBar label="Descanso adecuado" trueCount={countBool(profiles, p => p.descanso_adecuado)} total={n} colorT="#10B981" colorF="#EF4444" />
-                <BoolBar label="Desayuna diariamente" trueCount={countBool(profiles, p => p.desayuna_diariamente)} total={n} colorT="#10B981" colorF="#EF4444" />
-                <BoolBar label="Consume frutas diariamente" trueCount={countBool(profiles, p => p.consume_frutas)} total={n} colorT="#10B981" colorF="#EF4444" />
-                <BoolBar label="Consume verduras diariamente" trueCount={countBool(profiles, p => p.consume_verduras)} total={n} colorT="#10B981" colorF="#EF4444" />
-                {profiles.filter(p => p.horas_sueno).length > 0 && (
-                  <div className="p-3 rounded-lg text-center" style={{ background: 'var(--bg-card)' }}>
-                    <p className="text-lg font-black" style={{ color: '#8B5CF6' }}>
-                      {(profiles.filter(p => p.horas_sueno).reduce((s, p) => s + (p.horas_sueno ?? 0), 0) / profiles.filter(p => p.horas_sueno).length).toFixed(1)}h
-                    </p>
-                    <p className="text-xs" style={{ color: 'var(--text-faint)' }}>Horas de sueño promedio</p>
+          {/* ════ SALUD ════ */}
+          {tab === 'salud' && (
+            <div className="space-y-4">
+              <div className="grid lg:grid-cols-2 gap-4">
+                <Sec title="Antecedentes médicos personales" accent="#EF4444">
+                  <div className="space-y-3">
+                    {[
+                      { l: 'Hospitalizado anteriormente', b: a.hospitalizado },
+                      { l: 'Ha tenido cirugías', b: a.cirugias },
+                      { l: 'Presenta alergias', b: a.alergias },
+                      { l: 'Medicamentos permanentes', b: a.medicamentosPerm },
+                      { l: 'Limitación física', b: a.limitacionFisica },
+                      { l: 'USA gafas formuladas', b: a.usaGafas },
+                      { l: 'USA audífonos', b: a.usaAudifonos },
+                    ].map(({ l, b }) => <BoolBar key={l} label={l} si={b.si} no={b.no} pctSi={b.pctSi} />)}
+                  </div>
+                </Sec>
+                <Sec title="Enfermedades más frecuentes" accent="#EF4444">
+                  <FreqTable data={a.enfermedades} color="#EF4444" />
+                </Sec>
+              </div>
+              <Sec title="Antecedentes familiares" accent="#8B5CF6">
+                <FreqTable data={a.antecedentes} color="#8B5CF6" />
+              </Sec>
+              <div className="grid lg:grid-cols-2 gap-4">
+                <Sec title="Salud ocupacional" accent="#F59E0B">
+                  <div className="space-y-3">
+                    <BoolBar label="Accidentes de trabajo previos" si={a.accidentesTrabajo.si} no={a.accidentesTrabajo.no} pctSi={a.accidentesTrabajo.pctSi} />
+                    <BoolBar label="Enfermedades laborales" si={a.enfermedadesLaborales.si} no={a.enfermedadesLaborales.no} pctSi={a.enfermedadesLaborales.pctSi} />
+                    <BoolBar label="Restricciones médicas" si={a.restriccionesMedicas.si} no={a.restriccionesMedicas.no} pctSi={a.restriccionesMedicas.pctSi} />
+                  </div>
+                </Sec>
+                <Sec title="Riesgo psicosocial" accent="#EF4444">
+                  <div className="space-y-3">
+                    {[
+                      { l: 'Trabajo genera estrés', b: a.estres },
+                      { l: 'Apoyo familiar', b: a.apoyoFamiliar },
+                      { l: 'Tiene otro empleo', b: a.otroEmpleo },
+                      { l: 'Es cuidador de otra persona', b: a.esCuidador },
+                      { l: 'Dificultades económicas', b: a.dificultadesEconomicas },
+                      { l: 'Equilibrio trabajo/vida', b: a.equilibrioVida },
+                    ].map(({ l, b }) => (
+                      <BoolBar key={l} label={l} si={b.si} no={b.no} pctSi={b.pctSi}
+                        colorT={l === 'Apoyo familiar' || l === 'Equilibrio trabajo/vida' ? '#10B981' : '#EF4444'}
+                        colorF={l === 'Apoyo familiar' || l === 'Equilibrio trabajo/vida' ? '#EF4444' : '#10B981'} />
+                    ))}
+                  </div>
+                </Sec>
+              </div>
+            </div>
+          )}
+
+          {/* ════ ESTILOS DE VIDA ════ */}
+          {tab === 'estilos' && (
+            <div className="space-y-4">
+              <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+                <KPI label="Realizan actividad física" value={`${a.actividadFisica.pctSi}%`} color={a.actividadFisica.pctSi >= 50 ? '#10B981' : '#EF4444'} sub={`${a.actividadFisica.si} personas`} />
+                <KPI label="Horas de sueño prom." value={a.avgHorasSueno ? `${a.avgHorasSueno}h` : '—'} color={a.avgHorasSueno && a.avgHorasSueno >= 7 ? '#10B981' : '#F59E0B'} />
+                <KPI label="Fumadores" value={`${a.fuma.pctSi}%`} color={a.fuma.pctSi >= 20 ? '#EF4444' : '#10B981'} alert={a.fuma.pctSi >= 20} />
+                <KPI label="Consumen energizantes" value={`${a.consumeEnergizantes.pctSi}%`} color="#F59E0B" />
+              </div>
+              <div className="grid lg:grid-cols-2 gap-4">
+                <Sec title="Actividad física y descanso" accent="#10B981">
+                  <div className="space-y-3">
+                    <BoolBar label="Realiza actividad física regularmente" si={a.actividadFisica.si} no={a.actividadFisica.no} pctSi={a.actividadFisica.pctSi} />
+                    <BoolBar label="Considera que descansa adecuadamente" si={a.descansoAdecuado.si} no={a.descansoAdecuado.no} pctSi={a.descansoAdecuado.pctSi} />
+                  </div>
+                </Sec>
+                <Sec title="Alimentación" accent="#10B981">
+                  <div className="space-y-3">
+                    <BoolBar label="Desayuna diariamente" si={a.desayunaDisario.si} no={a.desayunaDisario.no} pctSi={a.desayunaDisario.pctSi} />
+                    <BoolBar label="Consume frutas diariamente" si={a.consumeFrutas.si} no={a.consumeFrutas.no} pctSi={a.consumeFrutas.pctSi} />
+                    <BoolBar label="Consume verduras diariamente" si={a.consumeVerduras.si} no={a.consumeVerduras.no} pctSi={a.consumeVerduras.pctSi} />
+                  </div>
+                </Sec>
+              </div>
+              <div className="grid lg:grid-cols-2 gap-4">
+                <Sec title="Hábitos de riesgo" accent="#EF4444">
+                  <div className="space-y-3">
+                    <BoolBar label="Fuma tabaco" si={a.fuma.si} no={a.fuma.no} pctSi={a.fuma.pctSi} />
+                    <BoolBar label="Consume bebidas energizantes" si={a.consumeEnergizantes.si} no={a.consumeEnergizantes.no} pctSi={a.consumeEnergizantes.pctSi} colorT="#F59E0B" colorF="#10B981" />
+                  </div>
+                </Sec>
+                <Sec title="Consumo de alcohol" accent="#F59E0B">
+                  <FreqTable data={a.consumoAlcohol} color="#F59E0B" />
+                </Sec>
+              </div>
+            </div>
+          )}
+
+          {/* ════ DOTACIÓN ════ */}
+          {tab === 'dotacion' && (
+            <div className="space-y-4">
+              <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+                <KPI label="Estatura promedio" value={a.avgEstatura ? `${a.avgEstatura}cm` : '—'} />
+                <KPI label="Peso promedio" value={a.avgPeso ? `${a.avgPeso}kg` : '—'} />
+                <KPI label="IMC promedio" value={a.avgImc ?? '—'} color={a.avgImc && a.avgImc >= 30 ? '#EF4444' : a.avgImc && a.avgImc >= 25 ? '#F59E0B' : '#10B981'} sub={a.avgImc ? (a.avgImc >= 30 ? 'Obesidad' : a.avgImc >= 25 ? 'Sobrepeso' : 'Normal') : ''} />
+                <KPI label="Con limitación física" value={`${a.limitacionFisica.pctSi}%`} color={a.limitacionFisica.pctSi > 0 ? '#F59E0B' : '#10B981'} />
+              </div>
+              <div className="grid lg:grid-cols-2 xl:grid-cols-3 gap-4">
+                {[
+                  { title: 'Camisa', data: a.tallaCamisa },
+                  { title: 'Camiseta', data: a.tallaCamiseta },
+                  { title: 'Pantalón', data: a.tallaPantalon },
+                  { title: 'Overol', data: a.tallaOverol },
+                  { title: 'Chaqueta', data: a.tallaChaqueta },
+                  { title: 'Impermeable', data: a.tallaImpermeable },
+                  { title: 'Zapato', data: a.tallaZapato },
+                  { title: 'Botas', data: a.tallaBotas },
+                  { title: 'Guantes', data: a.tallaGuantes },
+                ].filter(t => t.data.length > 0).map(({ title, data }, i) => (
+                  <Sec key={title} title={`Talla ${title}`} accent={PAL[i % PAL.length]}>
+                    <FreqTable data={data} color={PAL[i % PAL.length]} />
+                  </Sec>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* ════ COMPETENCIAS ════ */}
+          {tab === 'competencias' && (
+            <div className="space-y-4">
+              <Sec title="Licencias de conducción">
+                <BoolBar label="Tiene licencia de conducción" si={a.licenciaConduccion.si} no={a.licenciaConduccion.no} pctSi={a.licenciaConduccion.pctSi} colorT="#10B981" colorF="var(--bg-card)" />
+                {a.categoriaLicencia.length > 0 && <div className="mt-4"><FreqTable data={a.categoriaLicencia} /></div>}
+              </Sec>
+              <Sec title="Certificaciones y competencias" accent="#10B981">
+                <FreqTable data={a.certificaciones} color="#10B981" />
+              </Sec>
+            </div>
+          )}
+
+          {/* ════ TABLA DETALLE ════ */}
+          {tab === 'tabla' && (
+            <div className="space-y-3">
+              <div className="flex gap-2 items-center flex-wrap">
+                <div className="relative flex-1 min-w-48">
+                  <Search size={13} className="absolute left-3 top-1/2 -translate-y-1/2" style={{ color: 'var(--text-faint)' }} />
+                  <input className="terra-input text-xs pl-9 w-full" placeholder="Buscar nombre, cédula, área, cargo..."
+                    value={search} onChange={e => { setSearch(e.target.value); setPage(1) }} />
+                </div>
+                <span className="text-xs" style={{ color: 'var(--text-dim)' }}>{filtered.length} resultado{filtered.length !== 1 ? 's' : ''}</span>
+              </div>
+
+              <div className="terra-card overflow-hidden">
+                <div className="overflow-x-auto">
+                  <table className="w-full text-xs" style={{ tableLayout: 'fixed', minWidth: 1000 }}>
+                    <colgroup>
+                      <col style={{ width: '18%' }} /><col style={{ width: '10%' }} />
+                      <col style={{ width: '12%' }} /><col style={{ width: '12%' }} />
+                      <col style={{ width: '8%' }} /><col style={{ width: '8%' }} />
+                      <col style={{ width: '10%' }} /><col style={{ width: '10%' }} />
+                      <col style={{ width: '7%' }} /><col style={{ width: '5%' }} />
+                    </colgroup>
+                    <thead>
+                      <tr style={{ background: 'var(--bg-card)', borderBottom: '1px solid var(--border)' }}>
+                        {[
+                          { label: 'Trabajador',   col: 'nombres' },
+                          { label: 'Cédula',        col: 'cedula' },
+                          { label: 'Área',          col: 'area_confirmada' },
+                          { label: 'Cargo',         col: 'cargo_confirmado' },
+                          { label: 'Edad',          col: 'fecha_nacimiento' },
+                          { label: 'Sexo',          col: 'sexo' },
+                          { label: 'Educación',     col: 'nivel_educativo' },
+                          { label: 'Contrato',      col: 'tipo_contrato' },
+                          { label: 'Completitud',   col: 'completion_pct' },
+                          { label: 'Ver',           col: '' },
+                        ].map(({ label, col }) => (
+                          <th key={label} className="text-left px-3 py-2.5 font-semibold select-none"
+                            style={{ color: 'var(--text-dim)', cursor: col ? 'pointer' : 'default' }}
+                            onClick={() => col && toggleSort(col)}>
+                            <span className="flex items-center gap-1">{label}{col && <SortIcon col={col} />}</span>
+                          </th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {paged.length === 0 && (
+                        <tr><td colSpan={10} className="text-center py-12" style={{ color: 'var(--text-faint)' }}>Sin resultados</td></tr>
+                      )}
+                      {paged.map((p, i) => {
+                        const a2 = ageOf(p.fecha_nacimiento)
+                        const cp = p.completion_pct ?? 0
+                        const cc = cp >= 80 ? '#10B981' : cp >= 40 ? '#F59E0B' : '#EF4444'
+                        return (
+                          <tr key={p.id} style={{ borderBottom: '1px solid var(--border)', background: i % 2 ? 'rgba(255,255,255,0.01)' : 'transparent' }}>
+                            <td className="px-3 py-2">
+                              <p className="font-semibold truncate" style={{ color: 'var(--text)' }} title={p.users?.name}>{p.users?.name || `${p.nombres ?? ''} ${p.apellidos ?? ''}`.trim() || '—'}</p>
+                            </td>
+                            <td className="px-3 py-2 truncate" style={{ color: 'var(--text-dim)' }}>{p.users?.cedula ?? '—'}</td>
+                            <td className="px-3 py-2 truncate" style={{ color: 'var(--text-dim)' }}>{p.area_confirmada ?? p.users?.area ?? '—'}</td>
+                            <td className="px-3 py-2 truncate" style={{ color: 'var(--text-dim)' }}>{p.cargo_confirmado ?? '—'}</td>
+                            <td className="px-3 py-2" style={{ color: 'var(--text-dim)' }}>{a2 ?? '—'}</td>
+                            <td className="px-3 py-2" style={{ color: 'var(--text-dim)' }}>{p.sexo ?? '—'}</td>
+                            <td className="px-3 py-2 truncate" style={{ color: 'var(--text-dim)' }}>{p.nivel_educativo ?? '—'}</td>
+                            <td className="px-3 py-2 truncate" style={{ color: 'var(--text-dim)' }}>{p.tipo_contrato ?? '—'}</td>
+                            <td className="px-3 py-2">
+                              <div className="flex items-center gap-1">
+                                <div className="flex-1 h-1.5 rounded-full overflow-hidden" style={{ background: 'var(--bg-card)' }}>
+                                  <div className="h-full rounded-full" style={{ width: `${cp}%`, background: cc }} />
+                                </div>
+                                <span className="text-[10px] font-bold flex-shrink-0" style={{ color: cc }}>{cp}%</span>
+                              </div>
+                            </td>
+                            <td className="px-3 py-2">
+                              <button onClick={() => setSelectedId(selectedId === p.id ? null : p.id)}
+                                className="w-7 h-7 rounded-lg flex items-center justify-center transition-all"
+                                style={{ background: selectedId === p.id ? 'var(--primary)' : 'var(--bg-card)', border: '1px solid var(--border)' }}>
+                                <Eye size={12} style={{ color: selectedId === p.id ? '#fff' : 'var(--text-dim)' }} />
+                              </button>
+                            </td>
+                          </tr>
+                        )
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+
+                {/* Pagination */}
+                {totalPages > 1 && (
+                  <div className="flex items-center justify-between px-4 py-3" style={{ borderTop: '1px solid var(--border)' }}>
+                    <span className="text-xs" style={{ color: 'var(--text-dim)' }}>Página {page} de {totalPages} · {filtered.length} registros</span>
+                    <div className="flex gap-1">
+                      {Array.from({ length: Math.min(totalPages, 7) }, (_, i) => {
+                        const pg = totalPages <= 7 ? i + 1 : i === 0 ? 1 : i === 6 ? totalPages : page - 3 + i
+                        return (
+                          <button key={pg} onClick={() => setPage(pg)}
+                            className="w-7 h-7 rounded-lg text-xs font-semibold transition-all"
+                            style={pg === page ? { background: 'var(--primary)', color: '#fff' } : { background: 'var(--bg-card)', border: '1px solid var(--border)', color: 'var(--text-dim)' }}>
+                            {pg}
+                          </button>
+                        )
+                      })}
+                    </div>
                   </div>
                 )}
               </div>
-              <div className="space-y-3">
-                <p className="text-xs font-bold uppercase tracking-wider" style={{ color: 'var(--text-faint)' }}>Hábitos de riesgo</p>
-                <BoolBar label="Fumadores" trueCount={countBool(profiles, p => p.fuma)} total={n} colorT="#EF4444" colorF="#10B981" />
-                <BoolBar label="Consume bebidas energizantes" trueCount={countBool(profiles, p => p.consume_energizantes)} total={n} colorT="#F59E0B" colorF="var(--bg-card)" />
-                <div>
-                  <p className="text-xs font-semibold mb-2" style={{ color: 'var(--text-dim)' }}>Consumo de alcohol</p>
-                  {(() => {
-                    const data = freq(profiles.map(p => p.consumo_alcohol))
-                    const max = Math.max(...data.map(d => d[1]), 1)
-                    return <div className="space-y-1.5">{data.map(([l, v], i) => <HBar key={l} label={l} value={v} max={max} total={n} color={PALETTE[i]} />)}</div>
-                  })()}
-                </div>
-              </div>
-            </div>
-          </Sec>
 
-          {/* ══ SECCIÓN 8: SALUD ══ */}
-          <Sec title="Antecedentes médicos personales" icon={Heart} id="sec-salud">
-            <div className="grid lg:grid-cols-2 gap-6">
-              <div className="space-y-3">
-                <p className="text-xs font-bold uppercase tracking-wider" style={{ color: 'var(--text-faint)' }}>Condiciones médicas</p>
-                <BoolBar label="Ha sido hospitalizado" trueCount={countBool(profiles, p => p.hospitalizado)} total={n} colorT="#EF4444" colorF="#10B981" />
-                <BoolBar label="Ha tenido cirugías" trueCount={countBool(profiles, p => p.cirugias)} total={n} colorT="#F97316" colorF="#10B981" />
-                <BoolBar label="Presenta alergias" trueCount={countBool(profiles, p => p.alergias)} total={n} colorT="#F59E0B" colorF="#10B981" />
-                <BoolBar label="Medicamentos permanentes" trueCount={countBool(profiles, p => p.medicamentos_permanentes)} total={n} colorT="#EF4444" colorF="#10B981" />
-                <BoolBar label="USA gafas formuladas" trueCount={countBool(profiles, p => p.usa_gafas)} total={n} colorT="#8B5CF6" colorF="var(--bg-card)" />
-                <BoolBar label="USA audífonos" trueCount={countBool(profiles, p => p.usa_audifonos)} total={n} colorT="#8B5CF6" colorF="var(--bg-card)" />
-              </div>
-              <div>
-                <p className="text-xs font-bold uppercase tracking-wider mb-3" style={{ color: 'var(--text-faint)' }}>Enfermedades más frecuentes</p>
-                {(() => {
-                  const data = flatFreq(profiles.map(p => p.enfermedades_diagnosticadas))
-                  const max = Math.max(...data.map(d => d[1]), 1)
-                  return data.length
-                    ? <div className="space-y-1.5">{data.map(([l, v], i) => <HBar key={l} label={l} value={v} max={max} total={n} color={PALETTE[i % PALETTE.length]} />)}</div>
-                    : <p className="text-xs" style={{ color: 'var(--text-faint)' }}>Sin datos</p>
-                })()}
-                <p className="text-xs font-bold uppercase tracking-wider mb-3 mt-4" style={{ color: 'var(--text-faint)' }}>Antecedentes familiares</p>
-                {(() => {
-                  const data = flatFreq(profiles.map(p => p.antecedentes_familiares))
-                  const max = Math.max(...data.map(d => d[1]), 1)
-                  return data.length
-                    ? <div className="space-y-1.5">{data.map(([l, v], i) => <HBar key={l} label={l} value={v} max={max} total={n} color={PALETTE[i % PALETTE.length]} />)}</div>
-                    : <p className="text-xs" style={{ color: 'var(--text-faint)' }}>Sin datos</p>
-                })()}
-              </div>
+              {/* ── Ficha expandida ── */}
+              <AnimatePresence>
+                {selected && (
+                  <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} exit={{ opacity: 0, height: 0 }}
+                    className="terra-card overflow-hidden">
+                    <div className="p-4" style={{ borderBottom: '1px solid var(--border)' }}>
+                      <div className="flex items-center justify-between">
+                        <h3 className="font-bold" style={{ color: 'var(--text)' }}>{selected.users?.name ?? `${selected.nombres ?? ''} ${selected.apellidos ?? ''}`}</h3>
+                        <button onClick={() => setSelectedId(null)} className="text-xs px-2 py-1 rounded-lg" style={{ background: 'var(--bg-card)', color: 'var(--text-dim)' }}>Cerrar</button>
+                      </div>
+                    </div>
+                    <div className="p-4 grid grid-cols-2 lg:grid-cols-4 gap-x-6 gap-y-1 text-xs">
+                      {[
+                        ['Cédula', selected.users?.cedula],
+                        ['Sexo', selected.sexo],
+                        ['Estado civil', selected.estado_civil],
+                        ['Edad', ageOf(selected.fecha_nacimiento) ? `${ageOf(selected.fecha_nacimiento)} años` : undefined],
+                        ['Ciudad', selected.ciudad_residencia],
+                        ['Tipo vivienda', selected.tipo_vivienda],
+                        ['Estrato', selected.estrato ? `Estrato ${selected.estrato}` : undefined],
+                        ['Área', selected.area_confirmada ?? selected.users?.area],
+                        ['Cargo', selected.cargo_confirmado],
+                        ['Contrato', selected.tipo_contrato],
+                        ['Jornada', selected.jornada_laboral],
+                        ['Educación', selected.nivel_educativo],
+                        ['Transporte', selected.medio_transporte],
+                        ['Talla camisa', selected.talla_camisa],
+                        ['Talla zapato', selected.talla_zapato],
+                        ['IMC', imc(selected.estatura_cm, selected.peso_kg) ? `${imc(selected.estatura_cm, selected.peso_kg)}` : undefined],
+                      ].map(([k, v]) => v ? (
+                        <div key={k as string}>
+                          <span style={{ color: 'var(--text-faint)' }}>{k}: </span>
+                          <span className="font-semibold" style={{ color: 'var(--text)' }}>{v}</span>
+                        </div>
+                      ) : null)}
+                    </div>
+                  </motion.div>
+                )}
+              </AnimatePresence>
             </div>
-          </Sec>
+          )}
 
-          {/* ══ SECCIÓN 9: SALUD OCUPACIONAL ══ */}
-          <Sec title="Salud ocupacional y riesgo psicosocial" icon={Shield} id="sec-ocup">
-            <div className="grid lg:grid-cols-2 gap-6">
-              <div className="space-y-3">
-                <p className="text-xs font-bold uppercase tracking-wider" style={{ color: 'var(--text-faint)' }}>Salud ocupacional</p>
-                <BoolBar label="Ha sufrido accidentes de trabajo" trueCount={countBool(profiles, p => p.accidentes_trabajo)} total={n} colorT="#EF4444" colorF="#10B981" />
-                <BoolBar label="Ha tenido enfermedades laborales" trueCount={countBool(profiles, p => p.enfermedades_laborales)} total={n} colorT="#EF4444" colorF="#10B981" />
-                <BoolBar label="Tiene restricciones médicas" trueCount={countBool(profiles, p => p.restricciones_medicas)} total={n} colorT="#F59E0B" colorF="#10B981" />
-              </div>
-              <div className="space-y-3">
-                <p className="text-xs font-bold uppercase tracking-wider" style={{ color: 'var(--text-faint)' }}>Riesgo psicosocial</p>
-                <BoolBar label="El trabajo genera estrés" trueCount={countBool(profiles, p => p.trabajo_genera_estres)} total={n} colorT="#EF4444" colorF="#10B981" />
-                <BoolBar label="Cuenta con apoyo familiar" trueCount={countBool(profiles, p => p.apoyo_familiar)} total={n} colorT="#10B981" colorF="#EF4444" />
-                <BoolBar label="Tiene otro empleo" trueCount={countBool(profiles, p => p.otro_empleo)} total={n} colorT="#F59E0B" colorF="var(--bg-card)" />
-                <BoolBar label="Es cuidador de otra persona" trueCount={countBool(profiles, p => p.es_cuidador)} total={n} colorT="#F97316" colorF="var(--bg-card)" />
-                <BoolBar label="Dificultades económicas" trueCount={countBool(profiles, p => p.dificultades_economicas)} total={n} colorT="#EF4444" colorF="#10B981" />
-                <BoolBar label="Buen equilibrio trabajo/vida" trueCount={countBool(profiles, p => p.equilibrio_trabajo_vida)} total={n} colorT="#10B981" colorF="#EF4444" />
-              </div>
-            </div>
-          </Sec>
-
-          {/* ══ SECCIÓN 10: COMPETENCIAS ══ */}
-          <Sec title="Competencias y certificaciones" icon={Award} id="sec-certs">
-            <div className="grid lg:grid-cols-2 gap-6">
-              <div>
-                <BoolBar label="Tiene licencia de conducción" trueCount={countBool(profiles, p => p.licencia_conduccion)} total={n} colorT="#10B981" colorF="var(--bg-card)" />
-                <p className="text-xs font-bold uppercase tracking-wider mt-4 mb-2" style={{ color: 'var(--text-faint)' }}>Tipo de licencia</p>
-                <DonutChart size={100} data={freq(profiles.filter(p => p.licencia_conduccion).map(p => p.categoria_licencia)).map(([l, v]) => ({ label: l, value: v }))} />
-              </div>
-              <div>
-                <p className="text-xs font-bold uppercase tracking-wider mb-3" style={{ color: 'var(--text-faint)' }}>Certificaciones más frecuentes</p>
-                {(() => {
-                  const data = flatFreq(profiles.map(p => p.certificaciones))
-                  const max = Math.max(...data.map(d => d[1]), 1)
-                  return data.length
-                    ? <div className="space-y-1.5">{data.map(([l, v], i) => <HBar key={l} label={l} value={v} max={max} total={n} color={PALETTE[i % PALETTE.length]} />)}</div>
-                    : <p className="text-xs" style={{ color: 'var(--text-faint)' }}>Sin datos</p>
-                })()}
-              </div>
-            </div>
-          </Sec>
-
-          {/* ══ TABLA INDIVIDUAL ══ */}
-          <div className="terra-card overflow-hidden no-print">
-            <div className="p-4 flex items-center justify-between gap-3" style={{ borderBottom: '1px solid var(--border)' }}>
-              <h2 className="font-bold text-sm" style={{ color: 'var(--text)' }}>Detalle individual ({filtered.length})</h2>
-              <div className="relative">
-                <Search size={13} className="absolute left-2.5 top-1/2 -translate-y-1/2" style={{ color: 'var(--text-faint)' }} />
-                <input className="terra-input text-xs py-2 pl-8" style={{ width: 220 }}
-                  placeholder="Buscar..." value={search} onChange={e => setSearch(e.target.value)} />
-              </div>
-            </div>
-            <div className="overflow-x-auto">
-              <table className="w-full text-xs" style={{ tableLayout: 'fixed', minWidth: 900 }}>
-                <colgroup>
-                  <col style={{ width: '20%' }} /><col style={{ width: '10%' }} />
-                  <col style={{ width: '13%' }} /><col style={{ width: '13%' }} />
-                  <col style={{ width: '8%' }} /><col style={{ width: '10%' }} />
-                  <col style={{ width: '8%' }} /><col style={{ width: '9%' }} /><col style={{ width: '9%' }} />
-                </colgroup>
-                <thead>
-                  <tr style={{ background: 'var(--bg-card)', borderBottom: '1px solid var(--border)' }}>
-                    {['Trabajador','Edad','Área','Cargo','Contrato','Educación','IMC','Completitud','Actualizado'].map(h => (
-                      <th key={h} className="text-left px-3 py-2.5 font-semibold text-[11px]" style={{ color: 'var(--text-dim)' }}>{h}</th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody>
-                  {filtered.length === 0 && (
-                    <tr><td colSpan={9} className="text-center py-10" style={{ color: 'var(--text-faint)' }}>Sin resultados</td></tr>
-                  )}
-                  {filtered.map((p, i) => {
-                    const a = age(p.fecha_nacimiento)
-                    const im = imc(p.estatura_cm, p.peso_kg)
-                    const cp = p.completion_pct ?? 0
-                    const cc = cp >= 80 ? '#10B981' : cp >= 40 ? '#F59E0B' : '#EF4444'
-                    return (
-                      <tr key={p.id} style={{ borderBottom: '1px solid var(--border)', background: i % 2 ? 'rgba(255,255,255,0.01)' : 'transparent' }}>
-                        <td className="px-3 py-2.5">
-                          <p className="font-semibold truncate" style={{ color: 'var(--text)' }}>{p.users?.name || `${p.nombres ?? ''} ${p.apellidos ?? ''}`.trim() || '—'}</p>
-                          <p className="truncate" style={{ color: 'var(--text-faint)' }}>{p.users?.cedula ?? ''}</p>
-                        </td>
-                        <td className="px-3 py-2.5" style={{ color: 'var(--text-dim)' }}>{a ?? '—'}</td>
-                        <td className="px-3 py-2.5 truncate" style={{ color: 'var(--text-dim)' }}>{p.area_confirmada ?? p.users?.area ?? '—'}</td>
-                        <td className="px-3 py-2.5 truncate" style={{ color: 'var(--text-dim)' }}>{p.cargo_confirmado ?? '—'}</td>
-                        <td className="px-3 py-2.5 truncate" style={{ color: 'var(--text-dim)' }}>{p.tipo_contrato ?? '—'}</td>
-                        <td className="px-3 py-2.5 truncate" style={{ color: 'var(--text-dim)' }}>{p.nivel_educativo ?? '—'}</td>
-                        <td className="px-3 py-2.5" style={{ color: im ? (im < 25 ? '#34D399' : im < 30 ? '#FBBF24' : '#F87171') : 'var(--text-dim)' }}>{im ?? '—'}</td>
-                        <td className="px-3 py-2.5">
-                          <div className="flex items-center gap-1.5">
-                            <div className="flex-1 h-1.5 rounded-full overflow-hidden" style={{ background: 'var(--bg-card)' }}>
-                              <div className="h-full rounded-full" style={{ width: `${cp}%`, background: cc }} />
-                            </div>
-                            <span className="font-bold text-[10px]" style={{ color: cc }}>{cp}%</span>
-                          </div>
-                        </td>
-                        <td className="px-3 py-2.5" style={{ color: 'var(--text-faint)' }}>
-                          {p.updated_at ? new Date(p.updated_at).toLocaleDateString('es-CO') : '—'}
-                        </td>
-                      </tr>
-                    )
-                  })}
-                </tbody>
-              </table>
-            </div>
-          </div>
-
-        </div>{/* end print-report */}
-      </div>
-    </>
+        </motion.div>
+      </AnimatePresence>
+    </div>
   )
 }
