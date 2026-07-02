@@ -227,6 +227,7 @@ export default function MyProfilePage() {
   const [loading, setLoading]       = useState(true)
   const [saving, setSaving]         = useState(false)
   const [saveMsg, setSaveMsg]       = useState<'saved' | 'local' | null>(null)
+  const [serverErr, setServerErr]   = useState<string | null>(null)
   const [tab, setTab]               = useState('personal')
   const [uploadingPhoto, setUploadingPhoto] = useState(false)
   const [photoError, setPhotoError] = useState<string | null>(null)
@@ -279,13 +280,16 @@ export default function MyProfilePage() {
       })
       if (res.ok) {
         localStorage.removeItem(LS_KEY)
+        setServerErr(null)
         if (!silent) { setSaveMsg('saved'); setTimeout(() => setSaveMsg(null), 2500) }
       } else {
-        // Server error — data is safe in localStorage, show soft message
+        const body = await res.json().catch(() => ({}))
+        const msg = body?.error ?? `HTTP ${res.status}`
+        setServerErr(msg)
         if (!silent) { setSaveMsg('local'); setTimeout(() => setSaveMsg(null), 3500) }
       }
-    } catch {
-      // Network error — data is safe in localStorage
+    } catch (e: any) {
+      setServerErr(e?.message ?? 'Error de red')
       if (!silent) { setSaveMsg('local'); setTimeout(() => setSaveMsg(null), 3500) }
     } finally {
       if (!silent) setSaving(false)
@@ -406,6 +410,13 @@ export default function MyProfilePage() {
               <p className="text-xs mt-1 flex items-center gap-1" style={{ color: '#F87171' }}>
                 <AlertCircle size={11} />{photoError}
               </p>
+            )}
+            {serverErr && (
+              <div className="mt-2 px-3 py-2 rounded-lg text-xs flex items-start gap-2"
+                style={{ background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.25)', color: '#FCA5A5' }}>
+                <AlertCircle size={12} className="flex-shrink-0 mt-0.5" />
+                <span><strong>Error al guardar en servidor:</strong> {serverErr}</span>
+              </div>
             )}
             {!data.photo_url && !photoError && (
               <p className="text-[11px] mt-1 flex items-center gap-1 cursor-pointer hover:underline"
