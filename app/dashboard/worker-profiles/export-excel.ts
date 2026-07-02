@@ -16,7 +16,11 @@ function antig(fi?: string) {
 }
 
 export async function exportToExcel(profiles: WP[], analytics: Analytics, company = 'Empresa') {
-  const XLSX = (await import('xlsx')).default
+  const _mod = await import('xlsx')
+  // webpack (browser) wraps CJS modules so the real object is at .default;
+  // in Node.js native ESM .default is undefined, so fall back to the namespace itself.
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const XLSX = (_mod as any).default ?? _mod
 
   // ── HOJA 1: BASE COMPLETA ────────────────────────────────────────────
   const base = profiles.map(p => ({

@@ -62,9 +62,11 @@ export default function MySignaturePage() {
     const ctx = canvas.getContext('2d')
     if (!ctx) return
     const rect = canvas.getBoundingClientRect()
-    canvas.width = rect.width * 2
-    canvas.height = rect.height * 2
-    ctx.scale(2, 2)
+    if (rect.width === 0) return
+    const dpr = window.devicePixelRatio || 1
+    canvas.width = rect.width * dpr
+    canvas.height = rect.height * dpr
+    ctx.scale(dpr, dpr)
     ctx.lineCap = 'round'
     ctx.lineJoin = 'round'
     ctx.lineWidth = 2.5
@@ -72,18 +74,27 @@ export default function MySignaturePage() {
   }, [])
 
   useEffect(() => {
-    if (mode === 'draw') {
-      setTimeout(initCanvas, 100)
-    }
+    if (mode !== 'draw') return
+    const timer = setTimeout(initCanvas, 100)
+    // Re-init when canvas container resizes (sidebar toggle, window resize)
+    const canvas = canvasRef.current
+    if (!canvas) return () => clearTimeout(timer)
+    const ro = new ResizeObserver(() => initCanvas())
+    ro.observe(canvas)
+    return () => { clearTimeout(timer); ro.disconnect() }
   }, [mode, initCanvas])
 
   const getPos = (e: React.MouseEvent | React.TouchEvent) => {
     const canvas = canvasRef.current!
     const rect = canvas.getBoundingClientRect()
-    if ('touches' in e) {
-      return { x: e.touches[0].clientX - rect.left, y: e.touches[0].clientY - rect.top }
+    const clientX = 'touches' in e ? e.touches[0].clientX : e.clientX
+    const clientY = 'touches' in e ? e.touches[0].clientY : e.clientY
+    // Normalize to CSS pixels accounting for actual canvas-to-display ratio
+    const dpr = window.devicePixelRatio || 1
+    return {
+      x: (clientX - rect.left) * (canvas.width / rect.width) / dpr,
+      y: (clientY - rect.top) * (canvas.height / rect.height) / dpr,
     }
-    return { x: e.clientX - rect.left, y: e.clientY - rect.top }
   }
 
   const startDraw = (e: React.MouseEvent | React.TouchEvent) => {

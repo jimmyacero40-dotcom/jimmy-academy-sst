@@ -58,9 +58,6 @@ export default function AreasPage() {
   const [addSearch, setAddSearch]           = useState('')
   const [savingMember, setSavingMember]     = useState<string | null>(null)
 
-  // Count workers per area
-  const [memberCounts, setMemberCounts] = useState<Record<string, number>>({})
-
   const loadAreas = async () => {
     setLoading(true)
     const res = await fetch('/api/areas')
@@ -71,14 +68,7 @@ export default function AreasPage() {
 
   const loadAllUsers = async () => {
     const res = await fetch('/api/users')
-    if (res.ok) {
-      const data: any[] = await res.json()
-      setAllUsers(data)
-      // Build member counts
-      const counts: Record<string, number> = {}
-      data.forEach(u => { if (u.area_id) counts[u.area_id] = (counts[u.area_id] || 0) + 1 })
-      setMemberCounts(counts)
-    }
+    if (res.ok) setAllUsers(await res.json())
   }
 
   useEffect(() => { loadAreas(); loadAllUsers() }, [])
@@ -88,7 +78,8 @@ export default function AreasPage() {
     const res = await fetch('/api/users')
     if (res.ok) {
       const data: any[] = await res.json()
-      setMembers(data.filter(u => u.area_id === areaId || u.area === areas.find(a => a.id === areaId)?.name))
+      const areaName = areas.find(a => a.id === areaId)?.name
+      setMembers(data.filter((u: any) => u.area === areaName))
     }
     setLoadingMembers(false)
   }, [areas])
@@ -107,17 +98,14 @@ export default function AreasPage() {
     await fetch('/api/users', {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ id: userId, area: activeArea.name, area_id: activeArea.id }),
+      body: JSON.stringify({ id: userId, area: activeArea.name }),
     })
     // Refresh
     const res = await fetch('/api/users')
     if (res.ok) {
       const data: any[] = await res.json()
       setAllUsers(data)
-      setMembers(data.filter(u => u.area_id === activeArea.id || u.area === activeArea.name))
-      const counts: Record<string, number> = {}
-      data.forEach(u => { if (u.area_id) counts[u.area_id] = (counts[u.area_id] || 0) + 1 })
-      setMemberCounts(counts)
+      setMembers(data.filter((u: any) => u.area === activeArea.name))
     }
     setSavingMember(null)
   }
@@ -128,18 +116,13 @@ export default function AreasPage() {
     await fetch('/api/users', {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ id: userId, area: '', area_id: null }),
+      body: JSON.stringify({ id: userId, area: '' }),
     })
     const res = await fetch('/api/users')
     if (res.ok) {
       const data: any[] = await res.json()
       setAllUsers(data)
-      if (activeArea) {
-        setMembers(data.filter(u => u.area_id === activeArea.id || u.area === activeArea.name))
-        const counts: Record<string, number> = {}
-        data.forEach(u => { if (u.area_id) counts[u.area_id] = (counts[u.area_id] || 0) + 1 })
-        setMemberCounts(counts)
-      }
+      if (activeArea) setMembers(data.filter((u: any) => u.area === activeArea.name))
     }
     setSavingMember(null)
   }
@@ -173,8 +156,8 @@ export default function AreasPage() {
   }
 
   // Users NOT in this area (candidates to add)
-  const candidates = allUsers.filter(u => {
-    const inArea = u.area === activeArea?.name || (u as any).area_id === activeArea?.id
+  const candidates = allUsers.filter((u: any) => {
+    const inArea = u.area === activeArea?.name
     if (inArea) return false
     if (!addSearch.trim()) return true
     return u.name.toLowerCase().includes(addSearch.toLowerCase()) || u.cedula.includes(addSearch)
@@ -235,7 +218,7 @@ export default function AreasPage() {
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             {areas.map((area, i) => {
-              const count = memberCounts[area.id] || 0
+              const count = allUsers.filter((u: any) => u.area === area.name).length
               const isActive = activeArea?.id === area.id
               return (
                 <motion.button key={area.id}

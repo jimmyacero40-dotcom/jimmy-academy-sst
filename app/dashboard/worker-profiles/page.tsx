@@ -156,7 +156,14 @@ export default function WorkerProfilesPage() {
 
   const doExcelExport = async () => {
     setExporting('excel')
-    await exportToExcel(profiles, a, company).finally(() => setExporting(null))
+    try {
+      await exportToExcel(profiles, a, company)
+    } catch (err) {
+      console.error('[Excel export error]', err)
+      alert('Error al exportar Excel: ' + String(err))
+    } finally {
+      setExporting(null)
+    }
   }
   const doPdfExport = async () => {
     setExporting('pdf')
