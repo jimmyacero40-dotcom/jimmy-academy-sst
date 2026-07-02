@@ -64,12 +64,13 @@ export default function MySignaturePage() {
     const rect = canvas.getBoundingClientRect()
     if (rect.width === 0) return
     const dpr = window.devicePixelRatio || 1
-    canvas.width = rect.width * dpr
-    canvas.height = rect.height * dpr
-    ctx.scale(dpr, dpr)
+    // Set internal buffer to physical pixels. No ctx.scale — we work in raw
+    // canvas pixels so getPos can always use canvas.width/rect.width directly.
+    canvas.width = Math.round(rect.width * dpr)
+    canvas.height = Math.round(rect.height * dpr)
     ctx.lineCap = 'round'
     ctx.lineJoin = 'round'
-    ctx.lineWidth = 2.5
+    ctx.lineWidth = 2.5 * dpr
     ctx.strokeStyle = '#1A1207'
   }, [])
 
@@ -89,11 +90,11 @@ export default function MySignaturePage() {
     const rect = canvas.getBoundingClientRect()
     const clientX = 'touches' in e ? e.touches[0].clientX : e.clientX
     const clientY = 'touches' in e ? e.touches[0].clientY : e.clientY
-    // Normalize to CSS pixels accounting for actual canvas-to-display ratio
-    const dpr = window.devicePixelRatio || 1
+    // canvas.width / rect.width = actual pixels-per-CSS-pixel ratio at this instant.
+    // Using the live ratio (not a stored dpr) guarantees alignment after any resize.
     return {
-      x: (clientX - rect.left) * (canvas.width / rect.width) / dpr,
-      y: (clientY - rect.top) * (canvas.height / rect.height) / dpr,
+      x: (clientX - rect.left) * (canvas.width / rect.width),
+      y: (clientY - rect.top) * (canvas.height / rect.height),
     }
   }
 
