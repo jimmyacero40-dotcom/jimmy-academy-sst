@@ -5,8 +5,9 @@ import { motion, AnimatePresence } from 'framer-motion'
 import * as XLSX from 'xlsx'
 import {
   CalendarDays, Plus, Trash2, X, Loader2, AlertCircle,
-  BookOpen, ChevronRight, Zap, CheckCircle, Edit2, Users, Layers, UserCheck,
-  LayoutGrid, List, FileSpreadsheet, Upload
+  BookOpen, ChevronRight, Zap, CheckCircle, Users, Layers, UserCheck,
+  LayoutGrid, List, FileSpreadsheet, TrendingUp, Clock, Target,
+  MapPin, Monitor, Wind, Award
 } from 'lucide-react'
 
 interface Plan {
@@ -22,6 +23,7 @@ interface Plan {
 interface PlanItem {
   id: string
   month: number
+  scheduled_date: string | null
   periodicity: string
   required: boolean
   valid_days: number
@@ -43,12 +45,19 @@ const MONTH_COLORS = [
 const PERIODICITIES = [
   { value: 'once',           label: 'Una vez'           },
   { value: 'monthly',        label: 'Mensual'           },
-  { value: 'bimestral',      label: 'Bimestral (c/2m)' },
+  { value: 'bimestral',      label: 'Bimestral (c/2m)'  },
   { value: 'trimestral',     label: 'Trimestral (c/3m)' },
   { value: 'cuatrimestral',  label: 'Cuatrimestral (c/4m)' },
-  { value: 'semestral',      label: 'Semestral (c/6m)' },
+  { value: 'semestral',      label: 'Semestral (c/6m)'  },
   { value: 'anual',          label: 'Anual'             },
   { value: 'cada_dos_anos',  label: 'Cada 2 años'       },
+]
+
+const MODALITIES = [
+  { value: 'presencial', label: 'Presencial',  icon: MapPin,   color: '#10B981' },
+  { value: 'virtual',    label: 'Virtual',     icon: Monitor,  color: '#60A5FA' },
+  { value: 'mixto',      label: 'Mixto',       icon: Wind,     color: '#A78BFA' },
+  { value: 'campo',      label: 'En campo',    icon: Award,    color: '#F59E0B' },
 ]
 
 const STATUS_STYLES: Record<string, { bg: string; color: string; label: string }> = {
@@ -58,17 +67,16 @@ const STATUS_STYLES: Record<string, { bg: string; color: string; label: string }
 }
 
 const EMPTY_PLAN = { name: '', year: new Date().getFullYear() }
-const EMPTY_ITEM = { training_id: '', month: 1, periodicity: 'once', required: true, valid_days: 365, target_type: 'all', target_id: '' }
+const EMPTY_ITEM = {
+  training_id: '', month: 1, scheduled_date: '', periodicity: 'once',
+  required: true, valid_days: 365, target_type: 'all', target_id: '', modality: 'presencial',
+}
 
 // Excel import parser for PLAN DE FORMACIÓN HSE format
-// Handles merged cells, combined headers and P/E subcolumns
 function parsePlanExcel(buffer: ArrayBuffer): { title: string; month: number; periodicity: string; population: string }[] {
   const wb = XLSX.read(buffer, { type: 'array', cellDates: true })
   const ws = wb.Sheets[wb.SheetNames[0]]
 
-  // ── STEP 1: Expand all merged cell ranges ──────────────────────────
-  // XLSX only fills the top-left cell of a merge; we replicate that value
-  // into every cell of the range so we can read them as normal cells.
   const merges: XLSX.Range[] = (ws['!merges'] as XLSX.Range[]) || []
   for (const merge of merges) {
     const topLeft = XLSX.utils.encode_cell({ r: merge.s.r, c: merge.s.c })
@@ -82,37 +90,30 @@ function parsePlanExcel(buffer: ArrayBuffer): { title: string; month: number; pe
     }
   }
 
-  // ── STEP 2: Read as 2-D array ──────────────────────────────────────
   const raw = XLSX.utils.sheet_to_json<any[]>(ws, { header: 1, defval: '' }) as any[][]
-
   const MONTH_ABBR = ['ENE','FEB','MAR','ABR','MAY','JUN','JUL','AGO','SEP','OCT','NOV','DIC']
   const results: { title: string; month: number; periodicity: string; population: string }[] = []
 
-  // ── STEP 3: Find the row that contains the 12 month names ──────────
   let monthHeaderRow = -1
-  // monthColMap[0..11] = column index of the P (programado) sub-column for that month
   const monthColMap: Record<number, number> = {}
 
   for (let r = 0; r < Math.min(25, raw.length); r++) {
     const row = raw[r]
-    const found: Record<number, number> = {} // monthIndex → first col seen
+    const found: Record<number, number> = {}
     row.forEach((cell: any, ci: number) => {
       const s = String(cell ?? '').toUpperCase().trim()
       const mi = MONTH_ABBR.indexOf(s)
       if (mi >= 0 && !(mi in found)) found[mi] = ci
     })
-    if (Object.keys(found).length >= 6) {   // at least 6 months found
+    if (Object.keys(found).length >= 6) {
       monthHeaderRow = r
       Object.assign(monthColMap, found)
       break
     }
   }
 
-  if (monthHeaderRow < 0) return results   // couldn't find month row → bail
+  if (monthHeaderRow < 0) return results
 
-  // ── STEP 4: Find the P/E sub-row (one or two rows below month row) ──
-  // The sub-row has "P" and "E" labels. We want the "P" (Programado) column
-  // for each month. If there is no P/E row, we use the month column itself.
   let pRowIndex = -1
   for (let r = monthHeaderRow + 1; r <= monthHeaderRow + 3 && r < raw.length; r++) {
     const row = raw[r]
@@ -124,11 +125,9 @@ function parsePlanExcel(buffer: ArrayBuffer): { title: string; month: number; pe
   }
 
   if (pRowIndex >= 0) {
-    // Re-map: for each month, find the "P" column at or after the month column
     const peRow = raw[pRowIndex]
     Object.entries(monthColMap).forEach(([miStr, startCol]) => {
       const mi = parseInt(miStr)
-      // Search from startCol onward for the first "P"
       for (let c = startCol; c <= startCol + 3; c++) {
         const s = String(peRow[c] ?? '').toUpperCase().trim()
         if (s === 'P') { monthColMap[mi] = c; break }
@@ -136,9 +135,6 @@ function parsePlanExcel(buffer: ArrayBuffer): { title: string; month: number; pe
     })
   }
 
-  // ── STEP 5: Find where actual data rows start ──────────────────────
-  // Skip header/sub-header rows (anything before the first row that has
-  // a title in column B with length > 3 and is not a known header keyword)
   const SKIP_KEYWORDS = ['ACTIVIDAD','CAPACITACIÓN','CAPACITACION','RECURSOS','RESPONSABLE','OBSERV','TOTAL','FUENTE','P','E']
   const dataStart = (() => {
     for (let r = monthHeaderRow + 1; r < raw.length; r++) {
@@ -148,7 +144,6 @@ function parsePlanExcel(buffer: ArrayBuffer): { title: string; month: number; pe
     return monthHeaderRow + 2
   })()
 
-  // ── STEP 6: Parse data rows ────────────────────────────────────────
   let currentPopulation = 'all'
 
   for (let r = dataStart; r < raw.length; r++) {
@@ -156,7 +151,6 @@ function parsePlanExcel(buffer: ArrayBuffer): { title: string; month: number; pe
     const col0 = String(row[0] ?? '').trim()
     const col1 = String(row[1] ?? '').trim()
 
-    // Update population whenever col 0 has content (now always set due to merge expansion)
     if (col0) {
       const up = col0.toUpperCase()
       if (up.includes('TODOS') || up.includes('COLABOR'))     currentPopulation = 'all'
@@ -167,13 +161,10 @@ function parsePlanExcel(buffer: ArrayBuffer): { title: string; month: number; pe
       else if (col0.length > 3)                                currentPopulation = col0
     }
 
-    // Skip rows without a valid title in col B
     if (!col1 || col1.length < 3) continue
     if (SKIP_KEYWORDS.some(k => col1.toUpperCase().startsWith(k))) continue
 
     const title = col1
-
-    // Frequency — look in columns 2, 3, 4 for a frequency keyword
     let periodicity = 'once'
     for (let fc = 2; fc <= 5; fc++) {
       const f = String(row[fc] ?? '').toUpperCase().trim()
@@ -186,15 +177,12 @@ function parsePlanExcel(buffer: ArrayBuffer): { title: string; month: number; pe
       if (f.includes('MENSUAL'))    { periodicity = 'monthly';      break }
     }
 
-    // Check planned months: value in P column > 0 means this training is scheduled that month
     MONTH_ABBR.forEach((_m, mi) => {
       const colIdx = monthColMap[mi]
       if (colIdx === undefined) return
       const val = row[colIdx]
       const num = typeof val === 'number' ? val : parseFloat(String(val ?? '').replace(',', '.')) || 0
-      if (num > 0) {
-        results.push({ title, month: mi + 1, periodicity, population: currentPopulation })
-      }
+      if (num > 0) results.push({ title, month: mi + 1, periodicity, population: currentPopulation })
     })
   }
 
@@ -287,8 +275,13 @@ export default function PlanPage() {
     const res = await fetch(`/api/plans/${activePlan.id}/items`, {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        ...itemForm,
         training_id: Number(itemForm.training_id),
+        month: itemForm.month,
+        scheduled_date: itemForm.scheduled_date || null,
+        periodicity: itemForm.periodicity,
+        required: itemForm.required,
+        valid_days: itemForm.valid_days,
+        target_type: itemForm.target_type,
         target_id: itemForm.target_type !== 'all' ? itemForm.target_id || null : null,
       }),
     })
@@ -339,47 +332,27 @@ export default function PlanPage() {
       const rows = parsePlanExcel(buf)
       if (!rows.length) { setError('No se encontraron actividades en el archivo'); setImporting(false); return }
 
-      // Build a local map title→id (existing + newly created)
       const titleMap: Record<string, number> = {}
       trainings.forEach(t => { titleMap[t.title.trim().toLowerCase()] = t.id })
 
-      // Get unique titles from the Excel
       const uniqueTitles = [...new Set(rows.map(r => r.title.trim()))]
-
       let created = 0
       for (const title of uniqueTitles) {
         const key = title.toLowerCase()
-        // Try to find existing training (fuzzy match)
         const existing = Object.entries(titleMap).find(([k]) =>
           k.includes(key.slice(0, 25)) || key.includes(k.slice(0, 25))
         )
-        if (existing) {
-          titleMap[key] = existing[1]
-          continue
-        }
-        // Create new training from the Excel title
+        if (existing) { titleMap[key] = existing[1]; continue }
         const res = await fetch('/api/trainings', {
           method: 'POST', headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            title,
-            category: 'SST',
-            duration: '8h',
-            description: `Capacitación SST: ${title}`,
-            status: 'activo',
-          }),
+          body: JSON.stringify({ title, category: 'SST', duration: '8h', description: `Capacitación SST: ${title}`, status: 'activo' }),
         })
-        if (res.ok) {
-          const t = await res.json()
-          titleMap[key] = t.id
-          created++
-        }
+        if (res.ok) { const t = await res.json(); titleMap[key] = t.id; created++ }
       }
 
-      // Refresh trainings list in state
       const freshTrainings = await fetch('/api/trainings').then(r => r.ok ? r.json() : trainings)
       setTrainings(freshTrainings)
 
-      // Create plan items
       let added = 0
       for (const row of rows) {
         const key = row.title.trim().toLowerCase()
@@ -387,31 +360,17 @@ export default function PlanPage() {
           k.includes(key.slice(0, 25)) || key.includes(k.slice(0, 25))
         )?.[1]
         if (!trainingId) continue
-
         const res = await fetch(`/api/plans/${activePlan.id}/items`, {
           method: 'POST', headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            training_id: trainingId,
-            month: row.month,
-            periodicity: row.periodicity,
-            required: true,
-            valid_days: 365,
-            target_type: 'all',
-            target_id: null,
-          }),
+          body: JSON.stringify({ training_id: trainingId, month: row.month, periodicity: row.periodicity, required: true, valid_days: 365, target_type: 'all', target_id: null }),
         })
         if (res.ok) added++
       }
 
       await loadItems(activePlan.id)
       setPlans(prev => prev.map(p => p.id === activePlan!.id ? { ...p, item_count: p.item_count + added } : p))
-      alert(
-        `✅ Importación completa:\n` +
-        `• ${created} capacitación(es) nueva(s) creada(s)\n` +
-        `• ${added} ítem(s) agregados al plan\n\n` +
-        `Puedes editar las capacitaciones en Menú → Capacitaciones.`
-      )
-    } catch (err) { setError('Error al leer el archivo') }
+      alert(`✅ Importación completa:\n• ${created} capacitación(es) nueva(s) creada(s)\n• ${added} ítem(s) agregados al plan`)
+    } catch { setError('Error al leer el archivo') }
     setImporting(false)
     if (importRef.current) importRef.current.value = ''
   }
@@ -432,26 +391,34 @@ export default function PlanPage() {
     itemsByMonth[item.month].push(item)
   })
 
+  // Derived stats
+  const monthsWithItems   = Object.keys(itemsByMonth).length
+  const totalItems        = items.length
+  const allTargeted       = items.filter(i => !i.plan_item_targets?.[0] || i.plan_item_targets[0].target_type === 'all').length
+  const areaTargeted      = items.filter(i => i.plan_item_targets?.[0]?.target_type === 'area').length
+  const groupTargeted     = items.filter(i => i.plan_item_targets?.[0]?.target_type === 'group').length
+  const currentMonth      = new Date().getMonth() + 1
+  const itemsThisMonth    = (itemsByMonth[currentMonth] ?? []).length
+
   return (
-    <div className="p-6 max-w-7xl mx-auto">
+    <div className="p-4 sm:p-6 max-w-7xl mx-auto">
 
       {/* Header */}
-      <div className="flex items-center justify-between mb-8">
-        <div>
-          <div className="flex items-center gap-3 mb-1">
-            <div className="w-9 h-9 rounded-xl flex items-center justify-center" style={{ background: 'rgba(139,92,246,0.12)' }}>
-              <CalendarDays size={18} style={{ color: '#8B5CF6' }} />
-            </div>
-            <h1 className="text-xl font-bold" style={{ color: 'var(--text)' }}>Plan Anual de Capacitación</h1>
+      <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} className="mb-6">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <div>
+            <h1 className="text-2xl font-black mb-1" style={{ color: 'var(--text)', fontFamily: 'var(--font-display)' }}>
+              Plan Anual de Capacitación
+            </h1>
+            <p className="text-sm" style={{ color: 'var(--text-dim)' }}>
+              Programa los cursos del año y asígnalos automáticamente a tus trabajadores
+            </p>
           </div>
-          <p className="text-sm ml-12" style={{ color: 'var(--text-dim)' }}>
-            Programa los cursos del año y asígnalos automáticamente a tus trabajadores
-          </p>
+          <button onClick={() => setShowPlanModal(true)} className="terra-btn self-start" style={{ padding: '10px 18px', fontSize: 13 }}>
+            <Plus size={15} /> Nuevo plan
+          </button>
         </div>
-        <button onClick={() => setShowPlanModal(true)} className="terra-btn" style={{ padding: '10px 18px', fontSize: 13 }}>
-          <Plus size={15} /> Nuevo plan
-        </button>
-      </div>
+      </motion.div>
 
       {error && (
         <div className="flex items-center gap-2 p-3 rounded-lg mb-6 text-sm"
@@ -461,7 +428,7 @@ export default function PlanPage() {
         </div>
       )}
 
-      <div className="flex gap-5">
+      <div className="flex gap-5 flex-col lg:flex-row">
 
         {/* Plans list */}
         <div style={{ width: 280, flexShrink: 0 }}>
@@ -486,14 +453,13 @@ export default function PlanPage() {
             <div className="space-y-2">
               {plans.map((plan, i) => {
                 const s = STATUS_STYLES[plan.status]
-                const isActive = activePlan?.id === plan.id
+                const isSelected = activePlan?.id === plan.id
                 return (
                   <motion.div key={plan.id}
-                    initial={{ opacity: 0, x: -10 }} animate={{ opacity: 1, x: 0 }}
-                    transition={{ delay: i * 0.05 }}
-                    onClick={() => setActivePlan(isActive ? null : plan)}
+                    initial={{ opacity: 0, x: -10 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: i * 0.05 }}
+                    onClick={() => setActivePlan(isSelected ? null : plan)}
                     className="terra-card p-3.5 cursor-pointer group"
-                    style={{ borderColor: isActive ? 'var(--primary-border)' : undefined, background: isActive ? 'var(--primary-dim)' : undefined }}>
+                    style={{ borderColor: isSelected ? 'var(--primary-border)' : undefined, background: isSelected ? 'var(--primary-dim)' : undefined }}>
                     <div className="flex items-start justify-between gap-2">
                       <div className="flex-1 min-w-0">
                         <div className="text-sm font-semibold truncate" style={{ color: 'var(--text)' }}>{plan.name}</div>
@@ -514,7 +480,7 @@ export default function PlanPage() {
                       </div>
                     </div>
                     <ChevronRight size={13} className="mt-1.5"
-                      style={{ color: 'var(--text-faint)', transform: isActive ? 'rotate(90deg)' : 'none', transition: 'transform .2s' }} />
+                      style={{ color: 'var(--text-faint)', transform: isSelected ? 'rotate(90deg)' : 'none', transition: 'transform .2s' }} />
                   </motion.div>
                 )
               })}
@@ -527,6 +493,45 @@ export default function PlanPage() {
           {activePlan && (
             <motion.div className="flex-1 min-w-0"
               initial={{ opacity: 0, x: 16 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: 16 }}>
+
+              {/* Coverage stats */}
+              {totalItems > 0 && (
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-4">
+                  {[
+                    { icon: BookOpen,   color: '#8B5CF6', label: 'Total ítems',    value: totalItems },
+                    { icon: CalendarDays, color: '#F59E0B', label: 'Meses cubiertos', value: `${monthsWithItems}/12` },
+                    { icon: Clock,      color: '#60A5FA', label: MONTHS[currentMonth - 1],  value: itemsThisMonth },
+                    { icon: Target,     color: '#10B981', label: 'Solo grupos/áreas', value: areaTargeted + groupTargeted },
+                  ].map(({ icon: Icon, color, label, value }) => (
+                    <div key={label} className="terra-card p-3">
+                      <div className="flex items-center gap-2 mb-1">
+                        <Icon size={13} style={{ color }} />
+                        <span className="text-[10px]" style={{ color: 'var(--text-faint)' }}>{label}</span>
+                      </div>
+                      <div className="text-xl font-black" style={{ color }}>{value}</div>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {/* Target breakdown bar */}
+              {totalItems > 0 && (
+                <div className="terra-card p-3 mb-4">
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-xs font-semibold" style={{ color: 'var(--text-dim)' }}>Distribución por audiencia</span>
+                    <div className="flex items-center gap-3 text-[10px]" style={{ color: 'var(--text-faint)' }}>
+                      <span className="flex items-center gap-1"><Users size={9} className="text-emerald-400" /> Todos: {allTargeted}</span>
+                      <span className="flex items-center gap-1"><Layers size={9} className="text-blue-400" /> Áreas: {areaTargeted}</span>
+                      <span className="flex items-center gap-1"><UserCheck size={9} className="text-violet-400" /> Grupos: {groupTargeted}</span>
+                    </div>
+                  </div>
+                  <div className="h-2 rounded-full overflow-hidden flex" style={{ background: 'var(--bg-card)' }}>
+                    {allTargeted > 0 && <div className="h-full bg-emerald-500 transition-all" style={{ width: `${(allTargeted/totalItems)*100}%` }} />}
+                    {areaTargeted > 0 && <div className="h-full bg-blue-500 transition-all" style={{ width: `${(areaTargeted/totalItems)*100}%` }} />}
+                    {groupTargeted > 0 && <div className="h-full bg-violet-500 transition-all" style={{ width: `${(groupTargeted/totalItems)*100}%` }} />}
+                  </div>
+                </div>
+              )}
 
               <div className="rounded-2xl overflow-hidden" style={{ background: 'var(--bg-surface)', border: '1px solid var(--border)' }}>
 
@@ -557,24 +562,18 @@ export default function PlanPage() {
 
                     {activePlan.status === 'draft' && (
                       <>
-                        {/* Import Excel */}
                         <label className="terra-btn-outline cursor-pointer"
                           style={{ padding: '7px 12px', fontSize: 12, display: 'flex', alignItems: 'center', gap: 6 }}>
                           {importing ? <Loader2 size={12} className="animate-spin" /> : <FileSpreadsheet size={12} />}
                           Importar Excel
                           <input ref={importRef} type="file" accept=".xlsx,.xls" onChange={handleImportExcel} className="hidden" />
                         </label>
-                        <button
-                          onClick={() => { setShowItemForm(true); setItemForm(EMPTY_ITEM) }}
-                          className="terra-btn-outline"
-                          style={{ padding: '7px 14px', fontSize: 12 }}>
+                        <button onClick={() => { setShowItemForm(true); setItemForm(EMPTY_ITEM) }}
+                          className="terra-btn-outline" style={{ padding: '7px 14px', fontSize: 12 }}>
                           <Plus size={13} /> Agregar ítem
                         </button>
-                        <button
-                          onClick={handleActivate}
-                          disabled={activating || items.length === 0}
-                          className="terra-btn"
-                          style={{ padding: '7px 14px', fontSize: 12, background: 'linear-gradient(135deg, #8B5CF6, #10B981)' }}>
+                        <button onClick={handleActivate} disabled={activating || items.length === 0}
+                          className="terra-btn" style={{ padding: '7px 14px', fontSize: 12, background: 'linear-gradient(135deg, #8B5CF6, #10B981)' }}>
                           {activating ? <Loader2 size={13} className="animate-spin" /> : <Zap size={13} />}
                           Activar plan
                         </button>
@@ -604,7 +603,9 @@ export default function PlanPage() {
                             <select value={itemForm.training_id} onChange={e => setItemForm({ ...itemForm, training_id: e.target.value })}
                               className="terra-input" required>
                               <option value="">Selecciona un curso...</option>
-                              {trainings.map(t => <option key={t.id} value={t.id}>{t.title}</option>)}
+                              {trainings.filter(t => (t as any).status !== 'archivado').map(t => (
+                                <option key={t.id} value={t.id}>{t.title}</option>
+                              ))}
                             </select>
                           </div>
                           <div>
@@ -615,11 +616,32 @@ export default function PlanPage() {
                             </select>
                           </div>
                           <div>
+                            <label className="block text-xs font-semibold mb-1.5" style={{ color: 'var(--text-dim)' }}>Fecha específica <span style={{ color: 'var(--text-faint)', fontWeight: 400 }}>(opcional)</span></label>
+                            <input type="date" value={itemForm.scheduled_date}
+                              onChange={e => setItemForm({ ...itemForm, scheduled_date: e.target.value })}
+                              className="terra-input" style={{ colorScheme: 'dark' }} />
+                          </div>
+                          <div>
                             <label className="block text-xs font-semibold mb-1.5" style={{ color: 'var(--text-dim)' }}>Periodicidad</label>
                             <select value={itemForm.periodicity} onChange={e => setItemForm({ ...itemForm, periodicity: e.target.value })}
                               className="terra-input">
                               {PERIODICITIES.map(p => <option key={p.value} value={p.value}>{p.label}</option>)}
                             </select>
+                          </div>
+                          <div>
+                            <label className="block text-xs font-semibold mb-1.5" style={{ color: 'var(--text-dim)' }}>Modalidad</label>
+                            <div className="grid grid-cols-2 gap-1.5">
+                              {MODALITIES.map(m => (
+                                <button key={m.value} type="button"
+                                  onClick={() => setItemForm({ ...itemForm, modality: m.value })}
+                                  className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-semibold transition-all"
+                                  style={itemForm.modality === m.value
+                                    ? { background: `${m.color}20`, border: `1px solid ${m.color}50`, color: m.color }
+                                    : { background: 'var(--bg-card)', border: '1px solid var(--border)', color: 'var(--text-dim)' }}>
+                                  <m.icon size={11} /> {m.label}
+                                </button>
+                              ))}
+                            </div>
                           </div>
                           <div>
                             <label className="block text-xs font-semibold mb-1.5" style={{ color: 'var(--text-dim)' }}>Aplica a</label>
@@ -658,10 +680,10 @@ export default function PlanPage() {
                           </div>
                         </div>
                         <div className="flex gap-2 justify-end">
-                          <button type="button" onClick={() => setShowItemForm(false)} className="terra-btn-outline" style={{ padding: '7px 14px', fontSize: 12 }}>
-                            Cancelar
-                          </button>
-                          <button type="submit" disabled={savingItem || !itemForm.training_id} className="terra-btn" style={{ padding: '7px 14px', fontSize: 12 }}>
+                          <button type="button" onClick={() => setShowItemForm(false)}
+                            className="terra-btn-outline" style={{ padding: '7px 14px', fontSize: 12 }}>Cancelar</button>
+                          <button type="submit" disabled={savingItem || !itemForm.training_id}
+                            className="terra-btn" style={{ padding: '7px 14px', fontSize: 12 }}>
                             {savingItem ? <Loader2 size={12} className="animate-spin" /> : <Plus size={12} />}
                             Agregar
                           </button>
@@ -678,11 +700,23 @@ export default function PlanPage() {
                   </div>
                 ) : items.length === 0 ? (
                   <div className="flex flex-col items-center justify-center py-16 text-center">
-                    <BookOpen size={28} className="mb-3" style={{ color: 'var(--text-faint)' }} />
-                    <p className="text-sm font-semibold" style={{ color: 'var(--text)' }}>Sin ítems</p>
+                    <CalendarDays size={28} className="mb-3" style={{ color: 'var(--text-faint)' }} />
+                    <p className="text-sm font-semibold" style={{ color: 'var(--text)' }}>Sin ítems en este plan</p>
                     <p className="text-xs mt-1 mb-4" style={{ color: 'var(--text-dim)' }}>
                       Agrega ítems manualmente o importa desde el Excel del plan HSE
                     </p>
+                    {activePlan.status === 'draft' && (
+                      <div className="flex gap-2">
+                        <button onClick={() => { setShowItemForm(true); setItemForm(EMPTY_ITEM) }}
+                          className="terra-btn" style={{ padding: '8px 16px', fontSize: 12 }}>
+                          <Plus size={13} /> Agregar ítem
+                        </button>
+                        <label className="terra-btn-outline cursor-pointer" style={{ padding: '8px 14px', fontSize: 12, display: 'flex', alignItems: 'center', gap: 6 }}>
+                          <FileSpreadsheet size={12} /> Importar Excel
+                          <input ref={importRef} type="file" accept=".xlsx,.xls" onChange={handleImportExcel} className="hidden" />
+                        </label>
+                      </div>
+                    )}
                   </div>
                 ) : view === 'list' ? (
 
@@ -692,51 +726,61 @@ export default function PlanPage() {
                       {Array.from({ length: 12 }, (_, mi) => mi + 1).map(month => {
                         const monthItems = itemsByMonth[month]
                         if (!monthItems?.length) return null
+                        const color = MONTH_COLORS[month - 1]
+                        const pct = Math.round((monthItems.length / Math.max(totalItems, 1)) * 100)
                         return (
                           <div key={month}>
-                            <div className="flex items-center gap-2 mb-2 mt-1">
-                              <div className="w-5 h-5 rounded-md flex items-center justify-center text-[9px] font-bold text-white flex-shrink-0"
-                                style={{ background: MONTH_COLORS[month - 1] }}>
+                            <div className="flex items-center gap-2 mb-2 mt-2">
+                              <div className="w-6 h-6 rounded-md flex items-center justify-center text-[9px] font-bold text-white flex-shrink-0"
+                                style={{ background: color }}>
                                 {month}
                               </div>
-                              <span className="text-[10px] font-bold uppercase tracking-widest"
-                                style={{ color: 'var(--text-faint)' }}>{MONTHS[month - 1]}</span>
+                              <span className="text-[10px] font-bold uppercase tracking-widest" style={{ color: 'var(--text-faint)' }}>
+                                {MONTHS[month - 1]}
+                              </span>
                               <span className="text-[10px]" style={{ color: 'var(--text-faint)' }}>· {monthItems.length} ítem{monthItems.length !== 1 ? 's' : ''}</span>
+                              <div className="ml-auto flex items-center gap-2">
+                                <div className="w-20 h-1.5 rounded-full overflow-hidden" style={{ background: 'var(--bg-card)' }}>
+                                  <div className="h-full rounded-full transition-all" style={{ width: `${pct}%`, background: color }} />
+                                </div>
+                                <span className="text-[10px]" style={{ color: 'var(--text-faint)' }}>{pct}%</span>
+                              </div>
                             </div>
-                            <div className="space-y-1.5 ml-7">
-                              {monthItems.map(item => (
-                                <motion.div key={item.id}
-                                  initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }}
-                                  className="flex items-center gap-3 px-3 py-2.5 rounded-xl group"
-                                  style={{ background: 'var(--bg-card)', border: '1px solid var(--border)' }}>
-                                  <div className="w-6 h-6 rounded-lg flex items-center justify-center flex-shrink-0"
-                                    style={{ background: `${MONTH_COLORS[month - 1]}20` }}>
-                                    <BookOpen size={11} style={{ color: MONTH_COLORS[month - 1] }} />
-                                  </div>
-                                  <div className="flex-1 min-w-0">
-                                    <div className="text-xs font-semibold truncate" style={{ color: 'var(--text)' }}>
-                                      {item.trainings?.title}
+                            <div className="space-y-1.5 ml-8">
+                              {monthItems.map(item => {
+                                const tgt = item.plan_item_targets?.[0]
+                                return (
+                                  <motion.div key={item.id}
+                                    initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }}
+                                    className="flex items-center gap-3 px-3 py-2.5 rounded-xl group"
+                                    style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', borderLeft: `3px solid ${color}` }}>
+                                    <div className="flex-1 min-w-0">
+                                      <div className="text-xs font-semibold truncate" style={{ color: 'var(--text)' }}>
+                                        {item.trainings?.title}
+                                      </div>
+                                      <div className="text-[10px] flex items-center gap-2 mt-0.5 flex-wrap" style={{ color: 'var(--text-faint)' }}>
+                                        <span>{perioLabel(item.periodicity)}</span>
+                                        {item.scheduled_date && (
+                                          <><span>·</span><span className="text-amber-400">{item.scheduled_date}</span></>
+                                        )}
+                                        <span>·</span>
+                                        <span className="flex items-center gap-1">
+                                          {!tgt || tgt.target_type === 'all' ? <Users size={9} /> :
+                                           tgt.target_type === 'area' ? <Layers size={9} /> : <UserCheck size={9} />}
+                                          {targetLabel(item)}
+                                        </span>
+                                      </div>
                                     </div>
-                                    <div className="text-[10px] flex items-center gap-2 mt-0.5" style={{ color: 'var(--text-faint)' }}>
-                                      <span>{perioLabel(item.periodicity)}</span>
-                                      <span>·</span>
-                                      <span className="flex items-center gap-1">
-                                        {item.plan_item_targets?.[0]?.target_type === 'all' ? <Users size={9} /> :
-                                         item.plan_item_targets?.[0]?.target_type === 'area' ? <Layers size={9} /> :
-                                         <UserCheck size={9} />}
-                                        {targetLabel(item)}
-                                      </span>
-                                    </div>
-                                  </div>
-                                  {activePlan.status === 'draft' && (
-                                    <button onClick={() => handleDeleteItem(item.id)} disabled={deletingItem === item.id}
-                                      className="w-6 h-6 rounded flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
-                                      style={{ color: '#FCA5A5' }}>
-                                      {deletingItem === item.id ? <Loader2 size={11} className="animate-spin" /> : <Trash2 size={11} />}
-                                    </button>
-                                  )}
-                                </motion.div>
-                              ))}
+                                    {activePlan.status === 'draft' && (
+                                      <button onClick={() => handleDeleteItem(item.id)} disabled={deletingItem === item.id}
+                                        className="w-6 h-6 rounded flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0"
+                                        style={{ color: '#FCA5A5' }}>
+                                        {deletingItem === item.id ? <Loader2 size={11} className="animate-spin" /> : <Trash2 size={11} />}
+                                      </button>
+                                    )}
+                                  </motion.div>
+                                )
+                              })}
                             </div>
                           </div>
                         )
@@ -746,50 +790,78 @@ export default function PlanPage() {
 
                 ) : (
 
-                  /* ── BOARD VIEW ── */
+                  /* ── BOARD / CALENDAR VIEW ── */
                   <div className="p-4 overflow-x-auto">
+                    {/* Mini year heatmap */}
+                    <div className="flex gap-1 mb-4 px-1">
+                      {Array.from({ length: 12 }, (_, mi) => mi + 1).map(month => {
+                        const count = (itemsByMonth[month] ?? []).length
+                        const color = MONTH_COLORS[month - 1]
+                        const isCurrent = month === currentMonth
+                        return (
+                          <div key={month} className="flex-1 text-center" title={`${MONTHS[month-1]}: ${count} ítems`}>
+                            <div className="text-[9px] mb-1" style={{ color: 'var(--text-faint)' }}>{MONTHS[month-1]}</div>
+                            <div className="h-8 rounded-lg flex items-center justify-center text-[10px] font-bold transition-all"
+                              style={{
+                                background: count > 0 ? `${color}${Math.min(30 + count * 15, 80).toString(16).padStart(2,'0')}` : 'var(--bg-card)',
+                                border: isCurrent ? `1px solid ${color}` : '1px solid transparent',
+                                color: count > 0 ? color : 'var(--text-faint)',
+                              }}>
+                              {count || '·'}
+                            </div>
+                          </div>
+                        )
+                      })}
+                    </div>
+
                     <div className="flex gap-3" style={{ minWidth: 1100 }}>
                       {Array.from({ length: 12 }, (_, mi) => mi + 1).map(month => {
                         const monthItems = itemsByMonth[month] ?? []
                         const color = MONTH_COLORS[month - 1]
+                        const isCurrent = month === currentMonth
                         return (
                           <div key={month} className="flex-1 min-w-0" style={{ minWidth: 140 }}>
-                            {/* Column header */}
                             <div className="rounded-xl px-3 py-2 mb-2 text-center"
-                              style={{ background: `${color}18`, border: `1px solid ${color}30` }}>
-                              <div className="text-xs font-bold" style={{ color }}>{MONTHS[month - 1]}</div>
+                              style={{ background: `${color}18`, border: `1px solid ${isCurrent ? color : color + '30'}` }}>
+                              <div className="text-xs font-bold" style={{ color }}>
+                                {MONTHS[month - 1]}{isCurrent && ' ●'}
+                              </div>
                               <div className="text-[10px] mt-0.5" style={{ color: 'var(--text-faint)' }}>
                                 {monthItems.length} ítem{monthItems.length !== 1 ? 's' : ''}
                               </div>
                             </div>
-                            {/* Cards */}
                             <div className="space-y-2">
                               <AnimatePresence>
-                                {monthItems.map(item => (
-                                  <motion.div key={item.id}
-                                    initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }}
-                                    exit={{ opacity: 0, scale: 0.95 }}
-                                    className="rounded-xl p-2.5 group relative"
-                                    style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', borderLeft: `3px solid ${color}` }}>
-                                    <div className="text-[11px] font-semibold leading-snug mb-1" style={{ color: 'var(--text)' }}>
-                                      {item.trainings?.title}
-                                    </div>
-                                    <div className="text-[9px] flex items-center gap-1" style={{ color: 'var(--text-faint)' }}>
-                                      {item.plan_item_targets?.[0]?.target_type === 'all' ? <Users size={8} /> :
-                                       item.plan_item_targets?.[0]?.target_type === 'area' ? <Layers size={8} /> :
-                                       <UserCheck size={8} />}
-                                      <span>{targetLabel(item)}</span>
-                                      <span className="ml-auto opacity-70">{perioLabel(item.periodicity).split(' ')[0]}</span>
-                                    </div>
-                                    {activePlan.status === 'draft' && (
-                                      <button onClick={() => handleDeleteItem(item.id)} disabled={deletingItem === item.id}
-                                        className="absolute top-1.5 right-1.5 w-5 h-5 rounded flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
-                                        style={{ background: 'var(--red-dim)', color: '#FCA5A5' }}>
-                                        {deletingItem === item.id ? <Loader2 size={9} className="animate-spin" /> : <X size={9} />}
-                                      </button>
-                                    )}
-                                  </motion.div>
-                                ))}
+                                {monthItems.map(item => {
+                                  const tgt = item.plan_item_targets?.[0]
+                                  return (
+                                    <motion.div key={item.id}
+                                      initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }}
+                                      exit={{ opacity: 0, scale: 0.95 }}
+                                      className="rounded-xl p-2.5 group relative"
+                                      style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', borderLeft: `3px solid ${color}` }}>
+                                      <div className="text-[11px] font-semibold leading-snug mb-1" style={{ color: 'var(--text)' }}>
+                                        {item.trainings?.title}
+                                      </div>
+                                      <div className="text-[9px] flex items-center gap-1 flex-wrap" style={{ color: 'var(--text-faint)' }}>
+                                        {!tgt || tgt.target_type === 'all' ? <Users size={8} className="text-emerald-400" /> :
+                                         tgt.target_type === 'area' ? <Layers size={8} className="text-blue-400" /> :
+                                         <UserCheck size={8} className="text-violet-400" />}
+                                        <span>{targetLabel(item)}</span>
+                                        {item.scheduled_date && (
+                                          <span className="ml-auto text-amber-400">{item.scheduled_date.slice(5)}</span>
+                                        )}
+                                      </div>
+                                      {activePlan.status === 'draft' && (
+                                        <button onClick={() => handleDeleteItem(item.id)} disabled={deletingItem === item.id}
+                                          className="absolute top-1.5 right-1.5 w-5 h-5 rounded flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
+                                          style={{ background: 'var(--red-dim)', color: '#FCA5A5' }}>
+                                          {deletingItem === item.id ? <Loader2 size={9} className="animate-spin" /> : <X size={9} />}
+                                        </button>
+                                      )}
+                                    </motion.div>
+                                  )
+                                })}
                               </AnimatePresence>
                             </div>
                           </div>
