@@ -26,6 +26,12 @@ interface AreaMember {
   active: boolean
 }
 
+interface AreaStats {
+  total: number
+  completed: number
+  pct: number
+}
+
 const PRESET_COLORS = [
   '#3B82F6', '#10B981', '#8B5CF6', '#F59E0B',
   '#EF4444', '#EC4899', '#06B6D4', '#84CC16',
@@ -49,6 +55,9 @@ export default function AreasPage() {
   const [saving, setSaving]       = useState(false)
   const [deleting, setDeleting]   = useState<string | null>(null)
 
+  // Enrollment stats per area
+  const [areaStats, setAreaStats] = useState<Record<string, AreaStats>>({})
+
   // Members panel
   const [activeArea, setActiveArea]         = useState<Area | null>(null)
   const [members, setMembers]               = useState<AreaMember[]>([])
@@ -71,7 +80,22 @@ export default function AreasPage() {
     if (res.ok) setAllUsers(await res.json())
   }
 
-  useEffect(() => { loadAreas(); loadAllUsers() }, [])
+  const loadEnrollmentStats = async () => {
+    const res = await fetch('/api/enrollments')
+    if (!res.ok) return
+    const enrollments: any[] = await res.json()
+    const map: Record<string, AreaStats> = {}
+    enrollments.forEach(e => {
+      const area = e.users?.area || 'Sin área'
+      if (!map[area]) map[area] = { total: 0, completed: 0, pct: 0 }
+      map[area].total++
+      if (e.status === 'completed') map[area].completed++
+    })
+    Object.values(map).forEach(s => { s.pct = s.total > 0 ? Math.round((s.completed / s.total) * 100) : 0 })
+    setAreaStats(map)
+  }
+
+  useEffect(() => { loadAreas(); loadAllUsers(); loadEnrollmentStats() }, [])
 
   const loadMembers = useCallback(async (areaId: string) => {
     setLoadingMembers(true)
@@ -219,6 +243,10 @@ export default function AreasPage() {
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             {areas.map((area, i) => {
               const count = allUsers.filter((u: any) => u.area === area.name).length
+              const stats = areaStats[area.name]
+              const pct   = stats?.pct ?? null
+              const color = area.color || '#3B82F6'
+              const pctColor = pct === null ? 'var(--text-faint)' : pct >= 80 ? '#10B981' : pct >= 50 ? '#F59E0B' : '#EF4444'
               const isActive = activeArea?.id === area.id
               return (
                 <motion.button key={area.id}
@@ -226,16 +254,16 @@ export default function AreasPage() {
                   transition={{ delay: i * 0.04 }}
                   onClick={() => openPanel(area)}
                   className="terra-card p-5 text-left group relative w-full transition-all"
-                  style={isActive ? { border: `1px solid ${area.color || '#3B82F6'}60`, boxShadow: `0 0 0 1px ${area.color || '#3B82F6'}40` } : {}}>
+                  style={isActive ? { border: `1px solid ${color}60`, boxShadow: `0 0 0 1px ${color}40` } : {}}>
 
                   {/* Color stripe */}
-                  <div className="absolute top-0 left-0 right-0 h-1 rounded-t-[20px]" style={{ background: area.color || '#3B82F6' }} />
+                  <div className="absolute top-0 left-0 right-0 h-1 rounded-t-[20px]" style={{ background: color }} />
 
                   <div className="flex items-start justify-between mt-2">
                     <div className="flex items-center gap-3 flex-1 min-w-0">
                       <div className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0"
-                        style={{ background: `${area.color || '#3B82F6'}20` }}>
-                        <Layers size={16} style={{ color: area.color || '#3B82F6' }} />
+                        style={{ background: `${color}20` }}>
+                        <Layers size={16} style={{ color }} />
                       </div>
                       <div className="min-w-0">
                         <div className="font-semibold text-sm" style={{ color: 'var(--text)' }}>{area.name}</div>
@@ -245,7 +273,15 @@ export default function AreasPage() {
                       </div>
                     </div>
 
-                    {/* Edit/delete (stop propagation) */}
+                    {/* Compliance badge */}
+                    {pct !== null && (
+                      <span className="text-xs font-bold px-2 py-1 rounded-full flex-shrink-0 ml-2"
+                        style={{ background: `${pctColor}18`, color: pctColor }}>
+                        {pct}%
+                      </span>
+                    )}
+
+                    {/* Edit/delete */}
                     <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity ml-2 flex-shrink-0">
                       <button onClick={e => { e.stopPropagation(); openEdit(area) }}
                         className="w-7 h-7 rounded-lg flex items-center justify-center"
@@ -264,10 +300,32 @@ export default function AreasPage() {
                     </div>
                   </div>
 
-                  <div className="mt-4 pt-3 flex items-center justify-between" style={{ borderTop: '1px solid var(--border)' }}>
+                  {/* Progress bar (only when enrollment data exists) */}
+                  {pct !== null && (
+                    <div className="mt-3">
+                      <div className="h-1.5 rounded-full overflow-hidden" style={{ background: 'var(--border)' }}>
+                        <motion.div
+                          initial={{ width: 0 }} animate={{ width: `${pct}%` }}
+                          transition={{ duration: 0.8, delay: i * 0.06, ease: 'easeOut' }}
+                          className="h-full rounded-full"
+                          style={{ background: pctColor }}
+                        />
+                      </div>
+                      <div className="flex items-center justify-between mt-1">
+                        <span className="text-[10px]" style={{ color: 'var(--text-faint)' }}>
+                          {stats.completed}/{stats.total} capacitaciones
+                        </span>
+                        <span className="text-[10px] font-semibold" style={{ color: pctColor }}>
+                          {pct >= 80 ? 'Excelente' : pct >= 50 ? 'En progreso' : 'Requiere atención'}
+                        </span>
+                      </div>
+                    </div>
+                  )}
+
+                  <div className="mt-3 pt-3 flex items-center justify-between" style={{ borderTop: '1px solid var(--border)' }}>
                     <div className="flex items-center gap-1.5">
-                      <Users size={12} style={{ color: area.color || 'var(--text-faint)' }} />
-                      <span className="text-xs font-semibold" style={{ color: area.color || 'var(--text-faint)' }}>
+                      <Users size={12} style={{ color }} />
+                      <span className="text-xs font-semibold" style={{ color }}>
                         {count} {count === 1 ? 'trabajador' : 'trabajadores'}
                       </span>
                     </div>

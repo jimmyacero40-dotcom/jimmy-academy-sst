@@ -2,16 +2,30 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Users, Plus, Edit2, Trash2, X, Loader2, AlertCircle, UserPlus, UserMinus, ChevronRight } from 'lucide-react'
+import { Users, Plus, Edit2, Trash2, X, Loader2, AlertCircle, UserPlus, UserMinus, ChevronRight, Search, Shield, Flame, Car, HardHat, Stethoscope, GraduationCap } from 'lucide-react'
 
 interface Group {
   id: string
   name: string
   description: string | null
+  color?: string
   member_count: number
   company_id: string
   created_at: string
 }
+
+const GROUP_COLORS = ['#3B82F6','#10B981','#8B5CF6','#F59E0B','#EF4444','#EC4899','#06B6D4','#84CC16']
+
+const SUGGESTED_GROUPS = [
+  { name: 'Brigadistas', description: 'Brigada de emergencias y primera respuesta', color: '#EF4444' },
+  { name: 'COPASST', description: 'Comité Paritario de Seguridad y Salud en el Trabajo', color: '#3B82F6' },
+  { name: 'Comité de Convivencia', description: 'Comité de Convivencia Laboral', color: '#8B5CF6' },
+  { name: 'Conductores', description: 'Personal que conduce vehículos de la empresa', color: '#F59E0B' },
+  { name: 'Trabajo en Alturas', description: 'Personal con permiso de trabajo en alturas', color: '#06B6D4' },
+  { name: 'Nuevos Ingresos', description: 'Trabajadores en proceso de inducción', color: '#10B981' },
+  { name: 'Supervisores', description: 'Jefes y supervisores de área', color: '#EC4899' },
+  { name: 'Primeros Auxilios', description: 'Personal capacitado en primeros auxilios', color: '#84CC16' },
+]
 
 interface Member {
   id: string
@@ -35,7 +49,7 @@ interface AppUser {
   role: string
 }
 
-const EMPTY_FORM = { name: '', description: '' }
+const EMPTY_FORM = { name: '', description: '', color: '#3B82F6' }
 
 export default function GroupsPage() {
   const [groups, setGroups] = useState<Group[]>([])
@@ -46,6 +60,7 @@ export default function GroupsPage() {
   const [form, setForm] = useState(EMPTY_FORM)
   const [saving, setSaving] = useState(false)
   const [deleting, setDeleting] = useState<string | null>(null)
+  const [search, setSearch] = useState('')
 
   // Members panel
   const [activeGroup, setActiveGroup] = useState<Group | null>(null)
@@ -80,15 +95,23 @@ export default function GroupsPage() {
     if (activeGroup) loadMembers(activeGroup.id)
   }, [activeGroup, loadMembers])
 
-  const openCreate = () => { setEditItem(null); setForm(EMPTY_FORM); setShowModal(true) }
-  const openEdit = (g: Group) => { setEditItem(g); setForm({ name: g.name, description: g.description || '' }); setShowModal(true) }
+  const openCreate = (prefill?: Partial<typeof EMPTY_FORM>) => {
+    setEditItem(null)
+    setForm({ ...EMPTY_FORM, ...prefill })
+    setShowModal(true)
+  }
+  const openEdit = (g: Group) => {
+    setEditItem(g)
+    setForm({ name: g.name, description: g.description || '', color: g.color || '#3B82F6' })
+    setShowModal(true)
+  }
 
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!form.name.trim()) return
     setSaving(true)
     const method = editItem ? 'PUT' : 'POST'
-    const body = editItem ? { id: editItem.id, ...form } : form
+    const body = editItem ? { id: editItem.id, ...form } : { ...form }
     const res = await fetch('/api/groups', { method, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
     if (res.ok) { await loadGroups(); setShowModal(false) }
     else { const err = await res.json(); setError(err.error || 'Error al guardar') }
@@ -152,7 +175,7 @@ export default function GroupsPage() {
             Crea grupos de aprendizaje para asignar capacitaciones en conjunto
           </p>
         </div>
-        <button onClick={openCreate} className="terra-btn" style={{ padding: '10px 18px', fontSize: 13 }}>
+        <button onClick={() => openCreate()} className="terra-btn" style={{ padding: '10px 18px', fontSize: 13 }}>
           <Plus size={15} />
           Nuevo grupo
         </button>
@@ -174,66 +197,103 @@ export default function GroupsPage() {
               <Loader2 size={24} className="animate-spin" style={{ color: 'var(--primary)' }} />
             </div>
           ) : groups.length === 0 ? (
-            <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }}
-              className="flex flex-col items-center justify-center py-24 text-center">
-              <div className="w-14 h-14 rounded-2xl flex items-center justify-center mb-4" style={{ background: 'var(--primary-dim)' }}>
-                <Users size={24} style={{ color: 'var(--primary)' }} />
+            <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }}>
+              <div className="text-center py-8">
+                <div className="w-14 h-14 rounded-2xl flex items-center justify-center mb-3 mx-auto" style={{ background: 'var(--primary-dim)' }}>
+                  <Users size={24} style={{ color: 'var(--primary)' }} />
+                </div>
+                <h3 className="font-semibold mb-1" style={{ color: 'var(--text)' }}>Sin grupos creados</h3>
+                <p className="text-sm mb-6" style={{ color: 'var(--text-dim)' }}>Crea grupos o usa las sugerencias del SG-SST</p>
               </div>
-              <h3 className="font-semibold mb-1" style={{ color: 'var(--text)' }}>Sin grupos</h3>
-              <p className="text-sm mb-6" style={{ color: 'var(--text-dim)' }}>Crea el primer grupo para organizar capacitaciones</p>
-              <button onClick={openCreate} className="terra-btn" style={{ padding: '10px 18px', fontSize: 13 }}>
-                <Plus size={15} /> Crear primer grupo
-              </button>
+              <div className="mb-3">
+                <p className="text-xs font-bold uppercase tracking-widest mb-3" style={{ color: 'var(--text-faint)' }}>
+                  Grupos sugeridos para SG-SST
+                </p>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                  {SUGGESTED_GROUPS.map(sg => (
+                    <button key={sg.name}
+                      onClick={() => openCreate(sg)}
+                      className="flex items-center gap-3 p-3 rounded-xl text-left transition-all"
+                      style={{ background: 'var(--bg-card)', border: '1px solid var(--border)' }}
+                      onMouseEnter={e => { (e.currentTarget as HTMLElement).style.borderColor = sg.color + '60' }}
+                      onMouseLeave={e => { (e.currentTarget as HTMLElement).style.borderColor = 'var(--border)' }}>
+                      <div className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0"
+                        style={{ background: sg.color + '18' }}>
+                        <Users size={14} style={{ color: sg.color }} />
+                      </div>
+                      <div className="min-w-0">
+                        <div className="text-xs font-semibold" style={{ color: 'var(--text)' }}>{sg.name}</div>
+                        <div className="text-[10px] line-clamp-1" style={{ color: 'var(--text-faint)' }}>{sg.description}</div>
+                      </div>
+                      <Plus size={13} className="ml-auto flex-shrink-0" style={{ color: sg.color }} />
+                    </button>
+                  ))}
+                </div>
+              </div>
             </motion.div>
           ) : (
+            <>
+              {/* Search */}
+              {groups.length > 4 && (
+                <div className="relative mb-4">
+                  <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2" style={{ color: 'var(--text-faint)' }} />
+                  <input type="text" placeholder="Buscar grupo..." value={search}
+                    onChange={e => setSearch(e.target.value)}
+                    className="terra-input pl-9 py-2 text-sm" />
+                </div>
+              )}
             <div className="space-y-2">
-              {groups.map((group, i) => (
-                <motion.div key={group.id}
-                  initial={{ opacity: 0, x: -12 }} animate={{ opacity: 1, x: 0 }}
-                  transition={{ delay: i * 0.04 }}
-                  onClick={() => setActiveGroup(activeGroup?.id === group.id ? null : group)}
-                  className="terra-card p-4 cursor-pointer group"
-                  style={{ borderColor: activeGroup?.id === group.id ? 'var(--primary-border)' : undefined,
-                           background: activeGroup?.id === group.id ? 'var(--primary-dim)' : undefined }}>
-                  <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0"
-                      style={{ background: 'var(--primary-dim)' }}>
-                      <Users size={16} style={{ color: 'var(--primary)' }} />
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <div className="font-semibold text-sm" style={{ color: 'var(--text)' }}>{group.name}</div>
-                      {group.description && (
-                        <div className="text-xs truncate mt-0.5" style={{ color: 'var(--text-dim)' }}>{group.description}</div>
-                      )}
-                    </div>
+              {groups.filter(g => !search || g.name.toLowerCase().includes(search.toLowerCase())).map((group, i) => {
+                const color = group.color || GROUP_COLORS[i % GROUP_COLORS.length]
+                return (
+                  <motion.div key={group.id}
+                    initial={{ opacity: 0, x: -12 }} animate={{ opacity: 1, x: 0 }}
+                    transition={{ delay: i * 0.04 }}
+                    onClick={() => setActiveGroup(activeGroup?.id === group.id ? null : group)}
+                    className="terra-card p-4 cursor-pointer group"
+                    style={{ borderColor: activeGroup?.id === group.id ? color + '60' : undefined,
+                             background: activeGroup?.id === group.id ? color + '08' : undefined }}>
                     <div className="flex items-center gap-3">
-                      <span className="text-xs px-2 py-1 rounded-full font-semibold"
-                        style={{ background: 'var(--primary-dim)', color: 'var(--primary)' }}>
-                        {group.member_count} miembro{group.member_count !== 1 ? 's' : ''}
-                      </span>
-                      <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity"
-                        onClick={e => e.stopPropagation()}>
-                        <button onClick={() => openEdit(group)}
-                          className="w-7 h-7 rounded-lg flex items-center justify-center"
-                          style={{ color: 'var(--text-faint)' }}
-                          onMouseEnter={e => { e.currentTarget.style.color = 'var(--primary)'; e.currentTarget.style.background = 'var(--primary-dim)' }}
-                          onMouseLeave={e => { e.currentTarget.style.color = 'var(--text-faint)'; e.currentTarget.style.background = 'transparent' }}>
-                          <Edit2 size={13} />
-                        </button>
-                        <button onClick={() => handleDelete(group.id)} disabled={deleting === group.id}
-                          className="w-7 h-7 rounded-lg flex items-center justify-center"
-                          style={{ color: 'var(--text-faint)' }}
-                          onMouseEnter={e => { e.currentTarget.style.color = '#FCA5A5'; e.currentTarget.style.background = 'var(--red-dim)' }}
-                          onMouseLeave={e => { e.currentTarget.style.color = 'var(--text-faint)'; e.currentTarget.style.background = 'transparent' }}>
-                          {deleting === group.id ? <Loader2 size={13} className="animate-spin" /> : <Trash2 size={13} />}
-                        </button>
+                      <div className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0"
+                        style={{ background: color + '18' }}>
+                        <Users size={16} style={{ color }} />
                       </div>
-                      <ChevronRight size={14} style={{ color: 'var(--text-faint)', transform: activeGroup?.id === group.id ? 'rotate(90deg)' : 'none', transition: 'transform .2s' }} />
+                      <div className="flex-1 min-w-0">
+                        <div className="font-semibold text-sm" style={{ color: 'var(--text)' }}>{group.name}</div>
+                        {group.description && (
+                          <div className="text-xs truncate mt-0.5" style={{ color: 'var(--text-dim)' }}>{group.description}</div>
+                        )}
+                      </div>
+                      <div className="flex items-center gap-3">
+                        <span className="text-xs px-2.5 py-1 rounded-full font-semibold"
+                          style={{ background: color + '18', color }}>
+                          {group.member_count} {group.member_count === 1 ? 'miembro' : 'miembros'}
+                        </span>
+                        <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity"
+                          onClick={e => e.stopPropagation()}>
+                          <button onClick={() => openEdit(group)}
+                            className="w-7 h-7 rounded-lg flex items-center justify-center"
+                            style={{ color: 'var(--text-faint)' }}
+                            onMouseEnter={e => { e.currentTarget.style.color = 'var(--primary)'; e.currentTarget.style.background = 'var(--primary-dim)' }}
+                            onMouseLeave={e => { e.currentTarget.style.color = 'var(--text-faint)'; e.currentTarget.style.background = 'transparent' }}>
+                            <Edit2 size={13} />
+                          </button>
+                          <button onClick={() => handleDelete(group.id)} disabled={deleting === group.id}
+                            className="w-7 h-7 rounded-lg flex items-center justify-center"
+                            style={{ color: 'var(--text-faint)' }}
+                            onMouseEnter={e => { e.currentTarget.style.color = '#FCA5A5'; e.currentTarget.style.background = 'var(--red-dim)' }}
+                            onMouseLeave={e => { e.currentTarget.style.color = 'var(--text-faint)'; e.currentTarget.style.background = 'transparent' }}>
+                            {deleting === group.id ? <Loader2 size={13} className="animate-spin" /> : <Trash2 size={13} />}
+                          </button>
+                        </div>
+                        <ChevronRight size={14} style={{ color: 'var(--text-faint)', transform: activeGroup?.id === group.id ? 'rotate(90deg)' : 'none', transition: 'transform .2s' }} />
+                      </div>
                     </div>
-                  </div>
-                </motion.div>
-              ))}
+                  </motion.div>
+                )
+              })}
             </div>
+            </>
           )}
         </div>
 
@@ -378,6 +438,16 @@ export default function GroupsPage() {
                       rows={2}
                       className="terra-input resize-none"
                     />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-semibold mb-2" style={{ color: 'var(--text-dim)' }}>Color</label>
+                    <div className="flex gap-2 flex-wrap">
+                      {GROUP_COLORS.map(c => (
+                        <button key={c} type="button" onClick={() => setForm({ ...form, color: c })}
+                          className="w-7 h-7 rounded-lg transition-all"
+                          style={{ background: c, outline: form.color === c ? `2px solid ${c}` : 'none', outlineOffset: 2, transform: form.color === c ? 'scale(1.15)' : 'scale(1)' }} />
+                      ))}
+                    </div>
                   </div>
                   <div className="flex gap-3 pt-2">
                     <button type="button" onClick={() => setShowModal(false)} className="terra-btn-outline flex-1">Cancelar</button>
