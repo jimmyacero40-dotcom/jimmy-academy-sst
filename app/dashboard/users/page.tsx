@@ -1,13 +1,14 @@
 'use client'
 
 import { useState, useEffect, useRef } from 'react'
+import { useRouter } from 'next/navigation'
 import { motion, AnimatePresence } from 'framer-motion'
 import * as XLSX from 'xlsx'
 import {
   Users, Search, MoreVertical, CheckCircle, Clock,
   Building2, X, Edit2, Trash2, Download, ChevronDown,
   UserPlus, FileSpreadsheet, AlertCircle, Loader2,
-  Layers, UserCheck, Tag, ChevronRight, Plus
+  Layers, UserCheck, Tag, ChevronRight, Plus, BookOpen
 } from 'lucide-react'
 
 type UserStatus = 'activo' | 'inactivo'
@@ -93,6 +94,7 @@ function downloadTemplate() {
 }
 
 export default function UsersPage() {
+  const router = useRouter()
   const [users, setUsers]     = useState<AppUser[]>([])
   const [areas, setAreas]     = useState<Area[]>([])
   const [groups, setGroups]   = useState<Group[]>([])
@@ -573,6 +575,11 @@ export default function UsersPage() {
                             {menuOpen === u.id && (
                               <div className="absolute right-0 top-8 rounded-xl shadow-xl z-20 w-44 py-1"
                                 style={{ background: 'var(--bg-surface)', border: '1px solid var(--border-strong)' }}>
+                                <button onClick={() => { setMenuOpen(null); router.push(`/dashboard/users/${u.id}`) }}
+                                  className="flex items-center gap-2.5 w-full px-4 py-2.5 text-sm transition-all"
+                                  style={{ color: 'var(--text-dim)' }}>
+                                  <BookOpen size={13} /> Ver hoja de vida
+                                </button>
                                 <button onClick={() => openEdit(u)}
                                   className="flex items-center gap-2.5 w-full px-4 py-2.5 text-sm transition-all"
                                   style={{ color: 'var(--text-dim)' }}>
@@ -638,7 +645,9 @@ export default function UsersPage() {
                 </div>
               </div>
               {menuOpen === u.id && (
-                <div className="flex gap-2 mt-3">
+                <div className="flex gap-2 mt-3 flex-wrap">
+                  <button onClick={() => { setMenuOpen(null); router.push(`/dashboard/users/${u.id}`) }}
+                    className="terra-btn flex-1 text-xs py-2 justify-center"><BookOpen size={12} /> Hoja de vida</button>
                   <button onClick={() => openEdit(u)} className="terra-btn-outline flex-1 text-xs py-2 justify-center"><Edit2 size={12} /> Editar</button>
                   <button onClick={() => toggleStatus(u.id)} className="terra-btn-outline flex-1 text-xs py-2 justify-center"><CheckCircle size={12} /> {u.status === 'activo' ? 'Desactivar' : 'Activar'}</button>
                   <button onClick={() => setDeleteConfirm(u.id)} className="px-3 py-2 rounded-lg text-xs font-semibold" style={{ background: 'var(--red-dim)', color: '#FCA5A5' }}>
