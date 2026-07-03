@@ -8,7 +8,8 @@ import { extractPPTXImages, extractPPTXTexts, getCourseData, getCustomQuestions 
 import {
   BookOpen, Plus, Search, Clock, CheckCircle, AlertCircle,
   Users, Star, Play, Upload, ChevronRight, X, Award, Zap,
-  FileText, Video, Layers, Trash2, Loader2, Calendar, Edit3, Save, Download, ImagePlus
+  FileText, Layers, Trash2, Loader2, Calendar, Save, Download,
+  ImagePlus, Copy, Archive, ArchiveRestore, Tag, Filter, RotateCcw
 } from 'lucide-react'
 
 const GRADIENTS = [
@@ -16,19 +17,15 @@ const GRADIENTS = [
   'from-amber-600 to-orange-500', 'from-emerald-500 to-teal-500', 'from-yellow-500 to-amber-500',
   'from-violet-500 to-purple-500', 'from-cyan-500 to-blue-500',
 ]
-const COVERS = [
-  'https://images.unsplash.com/photo-1504307651254-35680f356dfd?w=800&q=80',
-  'https://images.unsplash.com/photo-1559757148-5c350d0d3c56?w=800&q=80',
-  'https://images.unsplash.com/photo-1578328819058-b69f3a3b0f6b?w=800&q=80',
-  'https://images.unsplash.com/photo-1581092335397-9583eb92d232?w=800&q=80',
-  'https://images.unsplash.com/photo-1552664730-d307ca884978?w=800&q=80',
-  'https://images.unsplash.com/photo-1555664424-778a1e5e1b48?w=800&q=80',
-]
+
+const CATEGORIES = ['Obligatorio', 'Especializado', 'Induccion', 'Reinduccion', 'Complementario']
+const RISK_TYPES = ['Alto riesgo', 'Riesgo físico', 'Riesgo químico', 'Riesgo biomecánico', 'Riesgo psicosocial', 'General']
 
 const statusStyles: Record<string, { label: string; color: string; bg: string; border: string }> = {
-  activo:     { label: 'En curso',    color: '#60A5FA', bg: 'rgba(96,165,250,0.1)', border: 'rgba(96,165,250,0.25)' },
-  completado: { label: 'Completado',  color: '#6EE7B7', bg: 'rgba(16,185,129,0.1)', border: 'rgba(16,185,129,0.25)' },
-  vencido:    { label: 'Vencido',     color: '#FCA5A5', bg: 'rgba(239,68,68,0.1)',  border: 'rgba(239,68,68,0.25)' },
+  activo:     { label: 'Vigente',     color: '#60A5FA', bg: 'rgba(96,165,250,0.1)',   border: 'rgba(96,165,250,0.25)' },
+  completado: { label: 'Completado',  color: '#6EE7B7', bg: 'rgba(16,185,129,0.1)',  border: 'rgba(16,185,129,0.25)' },
+  vencido:    { label: 'Vencido',     color: '#FCA5A5', bg: 'rgba(239,68,68,0.1)',   border: 'rgba(239,68,68,0.25)' },
+  archivado:  { label: 'Archivado',   color: '#94A3B8', bg: 'rgba(148,163,184,0.1)', border: 'rgba(148,163,184,0.25)' },
 }
 
 async function downloadAttendanceList(training: any) {
@@ -115,24 +112,25 @@ async function downloadAttendanceList(training: any) {
   }
 }
 
-export default function TrainingsPage() {
+export default function BibliotecaPage() {
   const router = useRouter()
   const { data: session } = useSession()
   const userRole = (session?.user as any)?.role || 'worker'
-  const isAdmin = userRole === 'superadmin'
+  const isAdmin = userRole === 'superadmin' || userRole === 'admin'
   const [trainings, setTrainings] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
-  const [filter, setFilter] = useState('todos')
+  const [statusFilter, setStatusFilter] = useState('activos')
+  const [categoryFilter, setCategoryFilter] = useState('todos')
   const [showModal, setShowModal] = useState(false)
-  const [newCourse, setNewCourse] = useState({ name: '', duration: '', description: '', category: 'Obligatorio', valid_from: '', valid_until: '' })
+  const [newCourse, setNewCourse] = useState({ name: '', duration: '', description: '', category: 'Obligatorio', risk_type: '', valid_from: '', valid_until: '' })
   const [uploadedFile, setUploadedFile] = useState<File | null>(null)
   const [creating, setCreating] = useState(false)
+  const [uploadProgress, setUploadProgress] = useState('')
   const fileInputRef = useRef<HTMLInputElement>(null)
-
   const [migrating, setMigrating] = useState(false)
+  const [duplicating, setDuplicating] = useState<number | null>(null)
 
-  // Edit validity modal
   const [editingTraining, setEditingTraining] = useState<any>(null)
   const [editValidFrom, setEditValidFrom] = useState('')
   const [editValidUntil, setEditValidUntil] = useState('')
@@ -140,7 +138,6 @@ export default function TrainingsPage() {
 
   useEffect(() => {
     async function loadAndMigrate() {
-      // 1. Load from API
       let apiTrainings: any[] = []
       try {
         const res = await fetch('/api/trainings')
@@ -148,7 +145,6 @@ export default function TrainingsPage() {
         if (Array.isArray(data)) apiTrainings = data
       } catch (_) {}
 
-      // 2. Check if there's local data to migrate
       try {
         const saved = localStorage.getItem('sst-trainings')
         if (saved) {
@@ -163,31 +159,21 @@ export default function TrainingsPage() {
                 slides = courseData.images || []
                 texts = courseData.texts || []
               } catch (_) {}
-
               let questions: any[] = []
               try {
                 const customQ = await getCustomQuestions(t.id)
                 if (customQ.length > 0) questions = customQ
               } catch (_) {}
-
               try {
                 const res = await fetch('/api/trainings', {
                   method: 'POST',
                   headers: { 'Content-Type': 'application/json' },
                   body: JSON.stringify({
-                    title: t.title,
-                    category: t.category || 'Obligatorio',
-                    duration: t.duration || '8h',
-                    description: t.description || '',
-                    status: t.status || 'activo',
-                    slides_count: slides.length || t.slides || 0,
-                    questions_count: t.questions || 5,
-                    cover_url: slides[0] || t.cover || null,
-                    color: t.color || null,
-                    file_name: t.fileName || null,
-                    slides,
-                    texts,
-                    questions,
+                    title: t.title, category: t.category || 'Obligatorio',
+                    duration: t.duration || '8h', description: t.description || '',
+                    status: t.status || 'activo', slides_count: slides.length || t.slides || 0,
+                    questions_count: t.questions || 5, cover_url: slides[0] || t.cover || null,
+                    color: t.color || null, file_name: t.fileName || null, slides, texts, questions,
                   }),
                 })
                 const created = await res.json()
@@ -212,8 +198,6 @@ export default function TrainingsPage() {
     e.target.value = ''
   }
 
-  const [uploadProgress, setUploadProgress] = useState('')
-
   const handleCreateCourse = async () => {
     if (!newCourse.name.trim()) return
     setCreating(true)
@@ -226,21 +210,16 @@ export default function TrainingsPage() {
       try {
         slides = await extractPPTXImages(uploadedFile)
         texts = await extractPPTXTexts(uploadedFile)
-      } catch (e) {
-        console.error('Error extracting PPTX:', e)
-      }
+      } catch (e) { console.error('Error extracting PPTX:', e) }
     } else if (uploadedFile && /\.pdf$/i.test(uploadedFile.name)) {
       try {
         setUploadProgress('Extrayendo páginas del PDF...')
         const { extractPDFImages } = await import('@/lib/pdf-extractor')
         slides = await extractPDFImages(uploadedFile)
-      } catch (e) {
-        console.error('Error extracting PDF:', e)
-      }
+      } catch (e) { console.error('Error extracting PDF:', e) }
     }
 
     try {
-      // Step 1: Create training with metadata only (no slides - too large for single request)
       setUploadProgress('Creando curso...')
       const res = await fetch('/api/trainings', {
         method: 'POST',
@@ -266,7 +245,6 @@ export default function TrainingsPage() {
         return
       }
 
-      // Step 2: Upload slides one by one
       if (slides.length > 0) {
         for (let i = 0; i < slides.length; i++) {
           setUploadProgress(`Subiendo diapositiva ${i + 1} de ${slides.length}...`)
@@ -275,26 +253,19 @@ export default function TrainingsPage() {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({
-                training_id: training.id,
-                slide_index: i,
-                image_data: slides[i],
-                slide_text: texts[i] || '',
+                training_id: training.id, slide_index: i,
+                image_data: slides[i], slide_text: texts[i] || '',
               }),
             })
-          } catch (e) {
-            console.error(`Error uploading slide ${i}:`, e)
-          }
+          } catch (e) { console.error(`Error uploading slide ${i}:`, e) }
         }
       }
 
-      // Update cover with first slide if available
-      if (slides[0]) {
-        training.cover_url = slides[0]
-      }
+      if (slides[0]) training.cover_url = slides[0]
 
       setTrainings(prev => [training, ...prev])
       setShowModal(false)
-      setNewCourse({ name: '', duration: '', description: '', category: 'Obligatorio', valid_from: '', valid_until: '' })
+      setNewCourse({ name: '', duration: '', description: '', category: 'Obligatorio', risk_type: '', valid_from: '', valid_until: '' })
       setUploadedFile(null)
     } catch (e) {
       console.error('Error creating course:', e)
@@ -306,9 +277,55 @@ export default function TrainingsPage() {
   }
 
   const handleDeleteCourse = async (id: number) => {
+    if (!confirm('¿Eliminar este curso de la biblioteca? Esta acción no se puede deshacer.')) return
     try {
       await fetch(`/api/trainings?id=${id}`, { method: 'DELETE' })
       setTrainings(prev => prev.filter(t => t.id !== id))
+    } catch (_) {}
+  }
+
+  const handleDuplicateCourse = async (e: React.MouseEvent, t: any) => {
+    e.stopPropagation()
+    setDuplicating(t.id)
+    try {
+      const res = await fetch('/api/trainings', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          title: `${t.title} (copia)`,
+          category: t.category,
+          duration: t.duration,
+          description: t.description,
+          slides_count: t.slides_count,
+          questions_count: t.questions_count,
+          cover_url: t.cover_url,
+          color: t.color,
+          file_name: t.file_name,
+          valid_from: t.valid_from,
+          valid_until: t.valid_until,
+          status: 'activo',
+        }),
+      })
+      if (res.ok) {
+        const created = await res.json()
+        setTrainings(prev => [created, ...prev])
+      }
+    } catch (_) {}
+    setDuplicating(null)
+  }
+
+  const handleArchiveCourse = async (e: React.MouseEvent, t: any) => {
+    e.stopPropagation()
+    const newStatus = t.status === 'archivado' ? 'activo' : 'archivado'
+    try {
+      const res = await fetch('/api/trainings', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: t.id, status: newStatus }),
+      })
+      if (res.ok) {
+        setTrainings(prev => prev.map(tr => tr.id === t.id ? { ...tr, status: newStatus } : tr))
+      }
     } catch (_) {}
   }
 
@@ -342,11 +359,30 @@ export default function TrainingsPage() {
     setSavingValidity(false)
   }
 
+  const now = new Date().toISOString().split('T')[0]
+
   const filtered = trainings.filter(t => {
     if (!t || !t.title) return false
-    const matchSearch = (t.title || '').toLowerCase().includes(search.toLowerCase()) || (t.category || '').toLowerCase().includes(search.toLowerCase())
-    return matchSearch && (filter === 'todos' || t.status === filter)
+    const q = search.toLowerCase()
+    const matchSearch = !q
+      || (t.title || '').toLowerCase().includes(q)
+      || (t.category || '').toLowerCase().includes(q)
+      || (t.description || '').toLowerCase().includes(q)
+      || (t.risk_type || '').toLowerCase().includes(q)
+
+    const effectiveStatus = t.valid_until && t.valid_until < now ? 'vencido' : (t.status || 'activo')
+    const matchStatus = statusFilter === 'archivados'
+      ? t.status === 'archivado'
+      : statusFilter === 'activos'
+        ? t.status !== 'archivado'
+        : effectiveStatus === statusFilter
+
+    const matchCategory = categoryFilter === 'todos' || t.category === categoryFilter
+    return matchSearch && matchStatus && matchCategory
   })
+
+  const activeTrainings = trainings.filter(t => t.status !== 'archivado')
+  const archivedCount = trainings.filter(t => t.status === 'archivado').length
 
   return (
     <div className="p-4 sm:p-6 max-w-7xl mx-auto">
@@ -355,27 +391,35 @@ export default function TrainingsPage() {
       <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} className="mb-6">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div>
-            <h1 className="text-2xl font-black mb-1" style={{ color: 'var(--text)', fontFamily: 'var(--font-display)' }}>Capacitaciones</h1>
-            <p className="text-sm" style={{ color: 'var(--text-dim)' }}>{trainings.length} cursos disponibles · evaluacion y certificado automatico</p>
+            <h1 className="text-2xl font-black mb-1" style={{ color: 'var(--text)', fontFamily: 'var(--font-display)' }}>
+              Biblioteca de Cursos
+            </h1>
+            <p className="text-sm" style={{ color: 'var(--text-dim)' }}>
+              {activeTrainings.length} cursos activos
+              {archivedCount > 0 && ` · ${archivedCount} archivados`}
+              {' · '}evaluación y certificado automático
+            </p>
           </div>
-          {isAdmin && <div className="flex gap-2 flex-wrap">
-            <button onClick={() => router.push('/dashboard/trainings/create')} className="terra-btn text-sm py-2.5 px-4">
-              <Zap size={15} /> Generar con IA
-            </button>
-            <button onClick={() => setShowModal(true)} className="terra-btn-outline text-sm py-2.5 px-4">
-              <Plus size={16} /> Subir Capacitacion
-            </button>
-          </div>}
+          {isAdmin && (
+            <div className="flex gap-2 flex-wrap">
+              <button onClick={() => router.push('/dashboard/trainings/create')} className="terra-btn text-sm py-2.5 px-4">
+                <Zap size={15} /> Generar con IA
+              </button>
+              <button onClick={() => setShowModal(true)} className="terra-btn-outline text-sm py-2.5 px-4">
+                <Plus size={16} /> Agregar Curso
+              </button>
+            </div>
+          )}
         </div>
       </motion.div>
 
       {/* Stats */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-6">
         {[
-          { label: 'Total cursos', value: trainings.length, icon: BookOpen, color: 'var(--amber)' },
-          { label: 'Completados', value: trainings.filter(t => t.status === 'completado').length, icon: CheckCircle, color: '#10B981' },
-          { label: 'En curso', value: trainings.filter(t => t.status === 'activo').length, icon: Clock, color: '#60A5FA' },
-          { label: 'Vencidos', value: trainings.filter(t => t.status === 'vencido').length, icon: AlertCircle, color: '#FCA5A5' },
+          { label: 'Total activos',  value: activeTrainings.length,                                       icon: BookOpen,      color: 'var(--amber)' },
+          { label: 'Completados',    value: activeTrainings.filter(t => t.status === 'completado').length, icon: CheckCircle,   color: '#10B981' },
+          { label: 'Vigentes',       value: activeTrainings.filter(t => t.status === 'activo').length,     icon: Clock,         color: '#60A5FA' },
+          { label: 'Archivados',     value: archivedCount,                                                 icon: Archive,       color: '#94A3B8' },
         ].map(({ label, value, icon: Icon, color }, i) => (
           <motion.div key={label} initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.05 }}
             className="terra-card p-4">
@@ -389,23 +433,60 @@ export default function TrainingsPage() {
         ))}
       </div>
 
-      {/* Filters */}
-      <div className="flex flex-col sm:flex-row gap-3 mb-6">
-        <div className="relative flex-1">
+      {/* Search + Filters */}
+      <div className="flex flex-col gap-3 mb-6">
+        <div className="relative">
           <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2" style={{ color: 'var(--text-faint)' }} />
-          <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Buscar capacitacion..."
+          <input value={search} onChange={e => setSearch(e.target.value)}
+            placeholder="Buscar por nombre, categoría, descripción, tipo de riesgo..."
             className="terra-input pl-9" />
+          {search && (
+            <button onClick={() => setSearch('')} className="absolute right-3 top-1/2 -translate-y-1/2"
+              style={{ color: 'var(--text-faint)' }}><X size={14} /></button>
+          )}
         </div>
-        <div className="flex gap-2 flex-wrap">
-          {['todos', 'activo', 'completado', 'vencido'].map(f => (
-            <button key={f} onClick={() => setFilter(f)}
-              className="px-3 py-2 rounded-xl text-xs font-semibold capitalize transition-all"
-              style={filter === f
+
+        <div className="flex flex-wrap gap-2 items-center">
+          <span className="text-xs flex items-center gap-1 mr-1" style={{ color: 'var(--text-faint)' }}>
+            <Filter size={11} /> Estado:
+          </span>
+          {[
+            { key: 'activos',    label: 'Activos' },
+            { key: 'vencido',    label: 'Vencidos' },
+            { key: 'completado', label: 'Completados' },
+            { key: 'archivados', label: 'Archivados' },
+          ].map(f => (
+            <button key={f.key} onClick={() => setStatusFilter(f.key)}
+              className="px-3 py-1.5 rounded-xl text-xs font-semibold transition-all"
+              style={statusFilter === f.key
                 ? { background: 'rgba(245,158,11,0.12)', border: '1px solid rgba(245,158,11,0.3)', color: '#FCD34D' }
                 : { background: 'var(--bg-card)', border: '1px solid var(--border)', color: 'var(--text-dim)' }}>
-              {f}
+              {f.label}
             </button>
           ))}
+
+          <div className="w-px h-4 mx-1" style={{ background: 'var(--border)' }} />
+
+          <span className="text-xs flex items-center gap-1 mr-1" style={{ color: 'var(--text-faint)' }}>
+            <Tag size={11} /> Categoría:
+          </span>
+          {['todos', ...CATEGORIES].map(c => (
+            <button key={c} onClick={() => setCategoryFilter(c)}
+              className="px-3 py-1.5 rounded-xl text-xs font-semibold transition-all"
+              style={categoryFilter === c
+                ? { background: 'rgba(16,185,129,0.12)', border: '1px solid rgba(16,185,129,0.3)', color: '#6EE7B7' }
+                : { background: 'var(--bg-card)', border: '1px solid var(--border)', color: 'var(--text-dim)' }}>
+              {c === 'todos' ? 'Todos' : c}
+            </button>
+          ))}
+
+          {(search || statusFilter !== 'activos' || categoryFilter !== 'todos') && (
+            <button onClick={() => { setSearch(''); setStatusFilter('activos'); setCategoryFilter('todos') }}
+              className="px-2.5 py-1.5 rounded-xl text-xs font-semibold flex items-center gap-1 ml-auto transition-all"
+              style={{ background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.2)', color: '#FCA5A5' }}>
+              <RotateCcw size={11} /> Limpiar
+            </button>
+          )}
         </div>
       </div>
 
@@ -425,25 +506,32 @@ export default function TrainingsPage() {
       {loading && !migrating && (
         <div className="py-16 text-center">
           <Loader2 size={32} className="mx-auto mb-3 animate-spin" style={{ color: 'var(--amber)' }} />
-          <p style={{ color: 'var(--text-dim)' }}>Cargando capacitaciones...</p>
+          <p style={{ color: 'var(--text-dim)' }}>Cargando biblioteca...</p>
         </div>
+      )}
+
+      {/* Search result count */}
+      {!loading && search && (
+        <p className="text-xs mb-4" style={{ color: 'var(--text-faint)' }}>
+          {filtered.length} resultado{filtered.length !== 1 ? 's' : ''} para &ldquo;{search}&rdquo;
+        </p>
       )}
 
       {/* Cards Grid */}
       {!loading && (
         <div className="grid sm:grid-cols-2 xl:grid-cols-3 gap-5">
           {filtered.map((t, i) => {
-            const now = new Date().toISOString().split('T')[0]
             const isExpired = t.valid_until && t.valid_until < now
             const notYetValid = t.valid_from && t.valid_from > now
             const effectiveStatus = isExpired ? 'vencido' : (t.status || 'activo')
             const st = statusStyles[effectiveStatus as keyof typeof statusStyles] || statusStyles.activo
             const progress = (t.enrolled || 0) > 0 ? Math.round(((t.completed || 0) / t.enrolled) * 100) : 0
             const gradColor = t.color || GRADIENTS[t.id % GRADIENTS.length]
+            const isArchived = t.status === 'archivado'
             return (
-              <motion.div key={t.id} initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.07 }}
-                className="terra-card terra-card-lift overflow-hidden cursor-pointer group"
-                onClick={() => router.push(`/dashboard/trainings/${t.id}`)}>
+              <motion.div key={t.id} initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.06 }}
+                className={`terra-card terra-card-lift overflow-hidden cursor-pointer group ${isArchived ? 'opacity-60' : ''}`}
+                onClick={() => !isArchived && router.push(`/dashboard/trainings/${t.id}`)}>
 
                 <div className="relative h-44 overflow-hidden">
                   {t.cover_url && t.cover_url.startsWith('http') ? (
@@ -455,11 +543,19 @@ export default function TrainingsPage() {
                   )}
                   <div className="absolute inset-0" style={{ background: 'linear-gradient(to top, var(--bg-surface), rgba(17,9,0,0.4), transparent)' }} />
 
-                  <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
-                    <div className="w-14 h-14 rounded-full bg-white/20 backdrop-blur-sm border border-white/30 flex items-center justify-center">
-                      <Play size={22} className="text-white ml-1" fill="white" />
+                  {!isArchived && (
+                    <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                      <div className="w-14 h-14 rounded-full bg-white/20 backdrop-blur-sm border border-white/30 flex items-center justify-center">
+                        <Play size={22} className="text-white ml-1" fill="white" />
+                      </div>
                     </div>
-                  </div>
+                  )}
+
+                  {isArchived && (
+                    <div className="absolute inset-0 flex items-center justify-center bg-black/40">
+                      <Archive size={36} className="text-white/40" />
+                    </div>
+                  )}
 
                   <div className="absolute top-3 right-3">
                     <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-semibold backdrop-blur-sm"
@@ -467,8 +563,14 @@ export default function TrainingsPage() {
                       {st.label}
                     </span>
                   </div>
-                  <div className="absolute top-3 left-3">
+                  <div className="absolute top-3 left-3 flex items-center gap-1.5 flex-wrap">
                     <span className="badge-amber">{t.category}</span>
+                    {t.risk_type && (
+                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg text-[10px] font-semibold backdrop-blur-sm"
+                        style={{ background: 'rgba(139,92,246,0.2)', border: '1px solid rgba(139,92,246,0.35)', color: '#C4B5FD' }}>
+                        <Tag size={8} />{t.risk_type}
+                      </span>
+                    )}
                   </div>
                   <div className="absolute bottom-3 left-4 right-4 flex items-center justify-between">
                     <div className="flex items-center gap-1.5 text-white/80 text-xs"><Layers size={11} /> {t.slides_count || 0} diapositivas</div>
@@ -477,13 +579,15 @@ export default function TrainingsPage() {
                 </div>
 
                 <div className="p-4">
-                  <h3 className="font-bold text-[15px] mb-1.5 leading-snug transition-colors" style={{ color: 'var(--text)' }}>{t.title}</h3>
+                  <h3 className="font-bold text-[15px] mb-1.5 leading-snug" style={{ color: 'var(--text)' }}>{t.title}</h3>
                   <p className="text-xs mb-3 line-clamp-2 leading-relaxed" style={{ color: 'var(--text-dim)' }}>{t.description}</p>
 
                   {(t.valid_from || t.valid_until) && (
                     <div className="text-[10px] mb-2 px-2 py-1 rounded-lg inline-block"
-                      style={{ background: isExpired ? 'rgba(239,68,68,0.1)' : notYetValid ? 'rgba(245,158,11,0.1)' : 'rgba(16,185,129,0.1)',
-                               color: isExpired ? '#FCA5A5' : notYetValid ? '#FCD34D' : '#6EE7B7' }}>
+                      style={{
+                        background: isExpired ? 'rgba(239,68,68,0.1)' : notYetValid ? 'rgba(245,158,11,0.1)' : 'rgba(16,185,129,0.1)',
+                        color: isExpired ? '#FCA5A5' : notYetValid ? '#FCD34D' : '#6EE7B7'
+                      }}>
                       Vigencia: {t.valid_from || '...'} → {t.valid_until || '...'}
                     </div>
                   )}
@@ -491,7 +595,7 @@ export default function TrainingsPage() {
                     <div className="flex items-center gap-1"><Clock size={11} /> {t.duration}</div>
                     <div className="flex items-center gap-1"><Users size={11} /> {t.enrolled || 0}</div>
                     <div className="flex items-center gap-1 ml-auto">
-                      <Star size={11} className="fill-amber-400 text-amber-400" />
+                      <Award size={11} className="text-amber-400" />
                       <span className="text-white font-semibold">{t.rating || 0}</span>
                     </div>
                   </div>
@@ -509,12 +613,14 @@ export default function TrainingsPage() {
 
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-1.5">
-                      <Award size={13} className="text-amber-400" />
+                      <CheckCircle size={13} className="text-emerald-400" />
                       <span className="text-xs" style={{ color: 'var(--text-dim)' }}>Certificado al completar</span>
                     </div>
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-1">
                       {isAdmin && <>
-                        <label onClick={(e) => e.stopPropagation()} className="p-1.5 rounded-lg hover:bg-blue-500/15 transition-colors cursor-pointer" title="Subir portada">
+                        {/* Upload cover */}
+                        <label onClick={(e) => e.stopPropagation()}
+                          className="p-1.5 rounded-lg hover:bg-blue-500/15 transition-colors cursor-pointer" title="Subir portada">
                           <ImagePlus size={13} className="text-blue-400" />
                           <input type="file" accept="image/*" className="hidden" onChange={async (e) => {
                             const file = e.target.files?.[0]; if (!file) return
@@ -524,22 +630,48 @@ export default function TrainingsPage() {
                             else { const d = await res.json().catch(()=>({})); alert('Error al subir portada: ' + (d.error || res.status)) }
                           }} />
                         </label>
+
+                        {/* Duplicate */}
+                        <button onClick={(e) => handleDuplicateCourse(e, t)} disabled={duplicating === t.id}
+                          className="p-1.5 rounded-lg hover:bg-violet-500/15 transition-colors" title="Duplicar curso">
+                          {duplicating === t.id
+                            ? <Loader2 size={13} className="animate-spin text-violet-400" />
+                            : <Copy size={13} className="text-violet-400" />}
+                        </button>
+
+                        {/* Download attendance */}
                         <button onClick={(e) => { e.stopPropagation(); downloadAttendanceList(t) }}
-                          className="p-1.5 rounded-lg hover:bg-emerald-500/15 transition-colors" title="Descargar lista de asistencia">
+                          className="p-1.5 rounded-lg hover:bg-emerald-500/15 transition-colors" title="Lista de asistencia PDF">
                           <Download size={13} className="text-emerald-400" />
                         </button>
+
+                        {/* Edit validity */}
                         <button onClick={(e) => openEditValidity(e, t)}
                           className="p-1.5 rounded-lg hover:bg-amber-500/15 transition-colors" title="Editar vigencia">
                           <Calendar size={13} className="text-amber-400" />
                         </button>
+
+                        {/* Archive / restore */}
+                        <button onClick={(e) => handleArchiveCourse(e, t)}
+                          className="p-1.5 rounded-lg transition-colors"
+                          style={{ color: isArchived ? '#6EE7B7' : '#94A3B8' }}
+                          onMouseEnter={e => { e.currentTarget.style.background = isArchived ? 'rgba(16,185,129,0.12)' : 'rgba(148,163,184,0.12)' }}
+                          onMouseLeave={e => { e.currentTarget.style.background = 'transparent' }}
+                          title={isArchived ? 'Restaurar curso' : 'Archivar curso'}>
+                          {isArchived ? <ArchiveRestore size={13} /> : <Archive size={13} />}
+                        </button>
+
+                        {/* Delete */}
                         <button onClick={(e) => { e.stopPropagation(); handleDeleteCourse(t.id) }}
                           className="p-1.5 rounded-lg hover:bg-red-500/15 transition-colors" title="Eliminar curso">
                           <Trash2 size={13} className="text-red-400" />
                         </button>
                       </>}
-                      <button className="flex items-center gap-1 text-xs font-bold transition-colors text-amber-400 hover:text-amber-300">
-                        Iniciar <ChevronRight size={13} />
-                      </button>
+                      {!isArchived && (
+                        <button className="flex items-center gap-0.5 text-xs font-bold text-amber-400 hover:text-amber-300 ml-1">
+                          Ver <ChevronRight size={13} />
+                        </button>
+                      )}
                     </div>
                   </div>
                 </div>
@@ -552,11 +684,16 @@ export default function TrainingsPage() {
       {!loading && filtered.length === 0 && (
         <div className="py-16 text-center">
           <BookOpen size={32} className="mx-auto mb-3 opacity-30" style={{ color: 'var(--text-faint)' }} />
-          <p style={{ color: 'var(--text-faint)' }}>No hay capacitaciones{search ? ' que coincidan con la búsqueda' : ''}</p>
+          <p style={{ color: 'var(--text-faint)' }}>
+            {search ? `Sin resultados para "${search}"` : 'No hay cursos en esta vista'}
+          </p>
+          {statusFilter === 'archivados' && (
+            <p className="text-xs mt-1" style={{ color: 'var(--text-faint)' }}>Los cursos archivados aparecen aquí</p>
+          )}
         </div>
       )}
 
-      {/* Upload Modal */}
+      {/* Create Course Modal */}
       {showModal && (
         <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-4">
           <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }}
@@ -566,11 +703,11 @@ export default function TrainingsPage() {
               <div className="flex items-center gap-2.5">
                 <div className="w-8 h-8 rounded-lg flex items-center justify-center"
                   style={{ background: 'rgba(245,158,11,0.1)', border: '1px solid rgba(245,158,11,0.2)' }}>
-                  <Upload size={15} style={{ color: 'var(--amber)' }} />
+                  <Plus size={15} style={{ color: 'var(--amber)' }} />
                 </div>
-                <h2 className="font-bold" style={{ color: 'var(--text)' }}>Subir Capacitacion</h2>
+                <h2 className="font-bold" style={{ color: 'var(--text)' }}>Agregar Curso a la Biblioteca</h2>
               </div>
-              <button onClick={() => { setShowModal(false); setUploadedFile(null); setNewCourse({ name: '', duration: '', description: '', category: 'Obligatorio', valid_from: '', valid_until: '' }) }}
+              <button onClick={() => { setShowModal(false); setUploadedFile(null); setNewCourse({ name: '', duration: '', description: '', category: 'Obligatorio', risk_type: '', valid_from: '', valid_until: '' }) }}
                 style={{ color: 'var(--text-dim)' }}><X size={18} /></button>
             </div>
             <div className="p-6 space-y-4">
@@ -581,37 +718,41 @@ export default function TrainingsPage() {
                   onChange={e => setNewCourse({ ...newCourse, name: e.target.value })}
                   className="terra-input" />
               </div>
-              <div>
-                <label className="text-xs font-semibold mb-1.5 block" style={{ color: 'var(--text-dim)' }}>Duración estimada</label>
-                <select
-                  value={newCourse.duration}
-                  onChange={e => setNewCourse({ ...newCourse, duration: e.target.value })}
-                  className="terra-input"
-                  style={{ backgroundColor: '#1a1207', color: '#e8d5b5' }}>
-                  <option value="" style={{ backgroundColor: '#1a1207', color: '#e8d5b5' }}>Seleccionar duración</option>
-                  <option value="2h" style={{ backgroundColor: '#1a1207', color: '#e8d5b5' }}>2 horas</option>
-                  <option value="4h" style={{ backgroundColor: '#1a1207', color: '#e8d5b5' }}>4 horas</option>
-                  <option value="6h" style={{ backgroundColor: '#1a1207', color: '#e8d5b5' }}>6 horas</option>
-                  <option value="8h" style={{ backgroundColor: '#1a1207', color: '#e8d5b5' }}>8 horas</option>
-                  <option value="12h" style={{ backgroundColor: '#1a1207', color: '#e8d5b5' }}>12 horas</option>
-                  <option value="16h" style={{ backgroundColor: '#1a1207', color: '#e8d5b5' }}>16 horas</option>
-                  <option value="20h" style={{ backgroundColor: '#1a1207', color: '#e8d5b5' }}>20 horas</option>
-                  <option value="24h" style={{ backgroundColor: '#1a1207', color: '#e8d5b5' }}>24 horas</option>
-                  <option value="40h" style={{ backgroundColor: '#1a1207', color: '#e8d5b5' }}>40 horas</option>
-                </select>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="text-xs font-semibold mb-1.5 block" style={{ color: 'var(--text-dim)' }}>Duración</label>
+                  <select value={newCourse.duration} onChange={e => setNewCourse({ ...newCourse, duration: e.target.value })}
+                    className="terra-input" style={{ backgroundColor: '#1a1207', color: '#e8d5b5' }}>
+                    <option value="" style={{ backgroundColor: '#1a1207' }}>Seleccionar</option>
+                    {['2h','4h','6h','8h','12h','16h','20h','24h','40h'].map(d => (
+                      <option key={d} value={d} style={{ backgroundColor: '#1a1207', color: '#e8d5b5' }}>{d}</option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="text-xs font-semibold mb-1.5 block" style={{ color: 'var(--text-dim)' }}>Categoría</label>
+                  <select className="terra-input" value={newCourse.category}
+                    onChange={e => setNewCourse({ ...newCourse, category: e.target.value })}>
+                    {CATEGORIES.map(c => (
+                      <option key={c} style={{ background: 'var(--bg-surface)' }}>{c}</option>
+                    ))}
+                  </select>
+                </div>
               </div>
               <div>
-                <label className="text-xs font-semibold mb-1.5 block" style={{ color: 'var(--text-dim)' }}>Categoria</label>
-                <select className="terra-input"
-                  value={newCourse.category}
-                  onChange={e => setNewCourse({ ...newCourse, category: e.target.value })}>
-                  {['Obligatorio', 'Especializado', 'Induccion', 'Reinduccion'].map(c => (
-                    <option key={c} style={{ background: 'var(--bg-surface)' }}>{c}</option>
+                <label className="text-xs font-semibold mb-1.5 block" style={{ color: 'var(--text-dim)' }}>
+                  Tipo de riesgo <span style={{ color: 'var(--text-faint)', fontWeight: 400 }}>(opcional)</span>
+                </label>
+                <select className="terra-input" value={newCourse.risk_type}
+                  onChange={e => setNewCourse({ ...newCourse, risk_type: e.target.value })}>
+                  <option value="" style={{ background: 'var(--bg-surface)' }}>Sin clasificar</option>
+                  {RISK_TYPES.map(r => (
+                    <option key={r} style={{ background: 'var(--bg-surface)' }}>{r}</option>
                   ))}
                 </select>
               </div>
               <div>
-                <label className="text-xs font-semibold mb-1.5 block" style={{ color: 'var(--text-dim)' }}>Descripcion</label>
+                <label className="text-xs font-semibold mb-1.5 block" style={{ color: 'var(--text-dim)' }}>Descripción</label>
                 <textarea rows={3} placeholder="Describe el contenido del curso..."
                   value={newCourse.description}
                   onChange={e => setNewCourse({ ...newCourse, description: e.target.value })}
@@ -620,30 +761,20 @@ export default function TrainingsPage() {
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="text-xs font-semibold mb-1.5 block" style={{ color: 'var(--text-dim)' }}>Vigencia desde</label>
-                  <input type="date"
-                    value={newCourse.valid_from}
+                  <input type="date" value={newCourse.valid_from}
                     onChange={e => setNewCourse({ ...newCourse, valid_from: e.target.value })}
-                    className="terra-input"
-                    style={{ colorScheme: 'dark' }} />
+                    className="terra-input" style={{ colorScheme: 'dark' }} />
                 </div>
                 <div>
                   <label className="text-xs font-semibold mb-1.5 block" style={{ color: 'var(--text-dim)' }}>Vigencia hasta</label>
-                  <input type="date"
-                    value={newCourse.valid_until}
+                  <input type="date" value={newCourse.valid_until}
                     onChange={e => setNewCourse({ ...newCourse, valid_until: e.target.value })}
-                    className="terra-input"
-                    style={{ colorScheme: 'dark' }} />
+                    className="terra-input" style={{ colorScheme: 'dark' }} />
                 </div>
               </div>
               <div>
                 <label className="text-xs font-semibold mb-1.5 block" style={{ color: 'var(--text-dim)' }}>Material del curso</label>
-                <input
-                  ref={fileInputRef}
-                  type="file"
-                  accept=".pdf,.pptx,.ppt,.mp4,.doc,.docx"
-                  className="hidden"
-                  onChange={handleFileUpload}
-                />
+                <input ref={fileInputRef} type="file" accept=".pdf,.pptx,.ppt,.mp4,.doc,.docx" className="hidden" onChange={handleFileUpload} />
                 {uploadedFile ? (
                   <div className="rounded-xl p-4 flex items-center justify-between"
                     style={{ background: 'rgba(16,185,129,0.08)', border: '1px solid rgba(16,185,129,0.25)' }}>
@@ -651,20 +782,15 @@ export default function TrainingsPage() {
                       <FileText size={20} style={{ color: '#6EE7B7' }} />
                       <div>
                         <div className="text-sm font-semibold" style={{ color: 'var(--text)' }}>{uploadedFile.name}</div>
-                        <div className="text-xs" style={{ color: 'var(--text-faint)' }}>
-                          {(uploadedFile.size / 1024 / 1024).toFixed(2)} MB
-                        </div>
+                        <div className="text-xs" style={{ color: 'var(--text-faint)' }}>{(uploadedFile.size / 1024 / 1024).toFixed(2)} MB</div>
                       </div>
                     </div>
-                    <button onClick={() => setUploadedFile(null)}
-                      className="p-1.5 rounded-lg transition-all"
-                      style={{ color: '#FCA5A5' }}>
+                    <button onClick={() => setUploadedFile(null)} className="p-1.5 rounded-lg" style={{ color: '#FCA5A5' }}>
                       <Trash2 size={16} />
                     </button>
                   </div>
                 ) : (
-                  <div
-                    onClick={() => fileInputRef.current?.click()}
+                  <div onClick={() => fileInputRef.current?.click()}
                     className="rounded-xl p-6 text-center cursor-pointer transition-all hover:opacity-80"
                     style={{ border: '2px dashed var(--border-strong)', background: 'var(--bg-card)' }}>
                     <Upload size={24} className="mx-auto mb-2" style={{ color: 'var(--amber)' }} />
@@ -675,11 +801,12 @@ export default function TrainingsPage() {
               </div>
             </div>
             <div className="px-6 pb-6 flex gap-3">
-              <button onClick={() => { setShowModal(false); setUploadedFile(null); setNewCourse({ name: '', duration: '', description: '', category: 'Obligatorio', valid_from: '', valid_until: '' }) }}
+              <button onClick={() => { setShowModal(false); setUploadedFile(null); setNewCourse({ name: '', duration: '', description: '', category: 'Obligatorio', risk_type: '', valid_from: '', valid_until: '' }) }}
                 className="terra-btn-outline flex-1 py-2.5 justify-center">Cancelar</button>
-              <button onClick={handleCreateCourse}
-                disabled={!newCourse.name.trim() || creating}
-                className="terra-btn flex-1 py-2.5 justify-center">{creating ? (uploadProgress || 'Procesando...') : 'Crear Curso'}</button>
+              <button onClick={handleCreateCourse} disabled={!newCourse.name.trim() || creating}
+                className="terra-btn flex-1 py-2.5 justify-center">
+                {creating ? (uploadProgress || 'Procesando...') : 'Agregar a Biblioteca'}
+              </button>
             </div>
           </motion.div>
         </div>
@@ -707,19 +834,16 @@ export default function TrainingsPage() {
               <div className="text-sm font-semibold" style={{ color: 'var(--text)' }}>{editingTraining.title}</div>
               <div>
                 <label className="text-xs font-semibold mb-1.5 block" style={{ color: 'var(--text-dim)' }}>Vigencia desde</label>
-                <input type="date" value={editValidFrom}
-                  onChange={e => setEditValidFrom(e.target.value)}
+                <input type="date" value={editValidFrom} onChange={e => setEditValidFrom(e.target.value)}
                   className="terra-input w-full" style={{ colorScheme: 'dark' }} />
               </div>
               <div>
                 <label className="text-xs font-semibold mb-1.5 block" style={{ color: 'var(--text-dim)' }}>Vigencia hasta</label>
-                <input type="date" value={editValidUntil}
-                  onChange={e => setEditValidUntil(e.target.value)}
+                <input type="date" value={editValidUntil} onChange={e => setEditValidUntil(e.target.value)}
                   className="terra-input w-full" style={{ colorScheme: 'dark' }} />
               </div>
               <div className="flex gap-3">
-                <button onClick={() => setEditingTraining(null)}
-                  className="terra-btn-outline flex-1 py-2.5 justify-center">Cancelar</button>
+                <button onClick={() => setEditingTraining(null)} className="terra-btn-outline flex-1 py-2.5 justify-center">Cancelar</button>
                 <button onClick={saveValidity} disabled={savingValidity}
                   className="terra-btn flex-1 py-2.5 justify-center flex items-center gap-2">
                   {savingValidity ? <Loader2 size={14} className="animate-spin" /> : <><Save size={14} /> Guardar</>}
