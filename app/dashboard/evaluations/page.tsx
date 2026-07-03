@@ -414,6 +414,31 @@ export default function EvaluationsPage() {
   const [savingQ, setSavingQ] = useState(false)
   const [menuOpen, setMenuOpen] = useState<string | null>(null)
   const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null)
+  const [modalError, setModalError] = useState<string | null>(null)
+  const [needsSetup, setNeedsSetup] = useState(false)
+  const [showSql, setShowSql] = useState(false)
+
+  const SETUP_SQL = `-- Ejecuta esto en Supabase → SQL Editor
+CREATE TABLE IF NOT EXISTS evaluations (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  company_id uuid REFERENCES companies(id) ON DELETE CASCADE,
+  training_id uuid REFERENCES trainings(id) ON DELETE SET NULL,
+  title text NOT NULL,
+  min_score integer NOT NULL DEFAULT 70,
+  time_limit integer DEFAULT NULL,
+  created_at timestamptz DEFAULT now()
+);
+
+CREATE TABLE IF NOT EXISTS questions (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  evaluation_id uuid REFERENCES evaluations(id) ON DELETE CASCADE,
+  text text NOT NULL,
+  type text NOT NULL DEFAULT 'single',
+  options jsonb NOT NULL DEFAULT '[]',
+  correct jsonb NOT NULL DEFAULT '[]',
+  points integer NOT NULL DEFAULT 1,
+  created_at timestamptz DEFAULT now()
+);`
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -422,6 +447,9 @@ export default function EvaluationsPage() {
       fetch('/api/trainings'),
     ])
     const [evData, trData] = await Promise.all([evRes.json(), trRes.json()])
+    if (evData?.error && evData.error.includes('does not exist')) {
+      setNeedsSetup(true)
+    }
     setEvals(Array.isArray(evData) ? evData : [])
     setTrainings(Array.isArray(trData) ? trData.filter((t: any) => t.status !== 'archivado') : [])
     setLoading(false)
@@ -444,6 +472,7 @@ export default function EvaluationsPage() {
 
   const createEval = async () => {
     setSaving(true)
+    setModalError(null)
     try {
       const res = await fetch('/api/evaluations', {
         method: 'POST',
@@ -461,13 +490,20 @@ export default function EvaluationsPage() {
         setShowModal(false)
         setForm(EMPTY_EVAL)
         selectEval(data)
+      } else {
+        const msg = data.error ?? 'Error desconocido'
+        setModalError(msg)
+        if (msg.includes('does not exist')) setNeedsSetup(true)
       }
+    } catch (e: any) {
+      setModalError(e.message ?? 'Error de red')
     } finally { setSaving(false) }
   }
 
   const updateEval = async () => {
     if (!editModal) return
     setSaving(true)
+    setModalError(null)
     try {
       const res = await fetch('/api/evaluations', {
         method: 'PUT',
@@ -485,7 +521,11 @@ export default function EvaluationsPage() {
         setEvals(prev => prev.map(e => e.id === data.id ? { ...e, ...data } : e))
         if (selected?.id === data.id) setSelected(s => s ? { ...s, ...data } : s)
         setEditModal(null)
+      } else {
+        setModalError(data.error ?? 'Error al guardar')
       }
+    } catch (e: any) {
+      setModalError(e.message ?? 'Error de red')
     } finally { setSaving(false) }
   }
 
@@ -542,6 +582,39 @@ export default function EvaluationsPage() {
   return (
     <div className="p-4 sm:p-6 max-w-7xl mx-auto" onClick={() => setMenuOpen(null)}>
 
+      {/* Setup banner */}
+      {needsSetup && (
+        <motion.div initial={{ opacity: 0, y: -8 }} animate={{ opacity: 1, y: 0 }}
+          className="mb-5 rounded-xl border p-4"
+          style={{ background: 'rgba(245,158,11,0.08)', borderColor: 'rgba(245,158,11,0.3)' }}>
+          <div className="flex items-start justify-between gap-3">
+            <div className="flex items-start gap-3">
+              <AlertCircle size={18} className="text-amber-400 flex-shrink-0 mt-0.5" />
+              <div>
+                <p className="text-amber-300 font-bold text-sm mb-0.5">Las tablas de evaluaciones no existen aún en Supabase</p>
+                <p className="text-amber-400/70 text-xs">Copia el SQL y ejecútalo en <strong>Supabase → SQL Editor</strong>, luego recarga la página.</p>
+              </div>
+            </div>
+            <button onClick={() => setShowSql(s => !s)}
+              className="text-xs font-semibold px-3 py-1.5 rounded-lg flex-shrink-0 transition-all"
+              style={{ background: 'rgba(245,158,11,0.2)', color: '#FCD34D' }}>
+              {showSql ? 'Ocultar SQL' : 'Ver SQL'}
+            </button>
+          </div>
+          {showSql && (
+            <div className="mt-3 relative">
+              <pre className="text-xs text-emerald-300 bg-black/40 rounded-lg p-3 overflow-x-auto leading-relaxed">{SETUP_SQL}</pre>
+              <button
+                onClick={() => navigator.clipboard.writeText(SETUP_SQL)}
+                className="absolute top-2 right-2 text-xs px-2 py-1 rounded font-semibold transition-all"
+                style={{ background: 'rgba(16,185,129,0.2)', color: '#6EE7B7' }}>
+                Copiar
+              </button>
+            </div>
+          )}
+        </motion.div>
+      )}
+
       {/* Header */}
       <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} className="mb-6">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
@@ -551,7 +624,7 @@ export default function EvaluationsPage() {
               {evals.length} evaluación{evals.length !== 1 ? 'es' : ''} · Crea y gestiona preguntas por capacitación
             </p>
           </div>
-          <button onClick={() => { setShowModal(true); setForm(EMPTY_EVAL) }}
+          <button onClick={() => { setShowModal(true); setForm(EMPTY_EVAL); setModalError(null) }}
             className="flex items-center gap-2 px-4 py-2.5 rounded-xl font-semibold text-sm transition-all self-start sm:self-auto"
             style={{ background: '#8B5CF6', color: '#fff' }}>
             <Plus size={16} /> Nueva Evaluación
@@ -767,11 +840,18 @@ export default function EvaluationsPage() {
               <h2 className="text-[var(--text)] font-bold">
                 {editModal ? 'Editar evaluación' : 'Nueva evaluación'}
               </h2>
-              <button onClick={() => { setShowModal(false); setEditModal(null) }} className="text-[var(--text-dim)] hover:text-[var(--text)]">
+              <button onClick={() => { setShowModal(false); setEditModal(null); setModalError(null) }} className="text-[var(--text-dim)] hover:text-[var(--text)]">
                 <X size={18} />
               </button>
             </div>
             <div className="p-6 space-y-4">
+              {modalError && (
+                <div className="flex items-start gap-2 p-3 rounded-xl text-sm"
+                  style={{ background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.25)', color: '#FCA5A5' }}>
+                  <AlertCircle size={15} className="flex-shrink-0 mt-0.5" />
+                  <span>{modalError.includes('does not exist') ? 'La tabla aún no existe en Supabase. Ejecuta el SQL que aparece en la parte superior de la página.' : modalError}</span>
+                </div>
+              )}
               <div>
                 <label className="text-xs font-semibold text-[var(--text-dim)] mb-1.5 block">Nombre *</label>
                 <input
