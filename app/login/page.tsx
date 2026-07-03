@@ -5,6 +5,7 @@ import { signIn } from 'next-auth/react'
 import { useRouter } from 'next/navigation'
 import { motion } from 'framer-motion'
 import { Shield, Eye, EyeOff, ArrowRight, Lock, Mail, Sun, Moon, CheckCircle } from 'lucide-react'
+import Link from 'next/link'
 
 export default function LoginPage() {
   const router = useRouter()
@@ -293,6 +294,14 @@ export default function LoginPage() {
                   </button>
                 </div>
                 {errors.password && <p className="text-xs mt-1.5 pl-1" style={{ color: t.errorText }}>{errors.password}</p>}
+              </div>
+
+              {/* Forgot password */}
+              <div className="flex justify-end -mt-2">
+                <Link href="/forgot-password" className="text-[12px] transition-colors"
+                  style={{ color: '#3b82f6' }}>
+                  ¿Olvidaste tu contraseña?
+                </Link>
               </div>
 
               {/* Submit */}
