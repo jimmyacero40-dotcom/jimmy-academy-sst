@@ -16,9 +16,12 @@ export default function DashboardPage() {
   const [trainings, setTrainings] = useState<any[]>([])
 
   useEffect(() => {
-    if (userRole !== 'superadmin') {
-      router.replace('/dashboard/trainings')
+    if (userRole === 'worker') {
+      router.replace('/dashboard/my-plan')
       return
+    }
+    if (userRole === 'admin') {
+      // admins go to dashboard (they can see it)
     }
     fetch('/api/trainings')
       .then(r => r.json())
