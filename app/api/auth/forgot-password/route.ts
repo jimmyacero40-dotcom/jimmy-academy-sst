@@ -28,8 +28,12 @@ export async function POST(req: NextRequest) {
     .update({ reset_token: token, reset_token_expires: expires })
     .eq('id', user.id)
 
-  const baseUrl = process.env.NEXTAUTH_URL || 'http://localhost:3000'
-  const resetUrl = `${baseUrl}/reset-password?token=${token}`
+  // Use the actual request origin so the link works in any environment
+  // (local, Vercel preview, production) without needing NEXTAUTH_URL configured.
+  const origin = req.headers.get('origin') || req.headers.get('x-forwarded-proto') && req.headers.get('x-forwarded-host')
+    ? `${req.headers.get('x-forwarded-proto')}://${req.headers.get('x-forwarded-host')}`
+    : process.env.NEXTAUTH_URL || 'http://localhost:3000'
+  const resetUrl = `${origin}/reset-password?token=${token}`
 
   // Send email via Resend if API key is configured
   const resendKey = process.env.RESEND_API_KEY
