@@ -2,20 +2,24 @@ import { NextRequest, NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase-admin'
 import { randomUUID } from 'crypto'
 
-// ─── Question parser ───────────────────────────────────────────────────────────
-// Supported formats in the document:
+// ─── Parser ───────────────────────────────────────────────────────────────────
 //
-// 1. ¿Pregunta aquí?
-// a) Opción incorrecta
-// b) Opción correcta *
-// c) Opción incorrecta
+// Handles any of these formats:
 //
-// 2. Afirmación verdadera o falsa
-// Verdadero *
-// Falso
+// FORMAT A (user's Word format - options on same line, concatenated):
+//   ¿Pregunta?
+//   (blank line)
+//   A. Opción.B. Opción correcta. *C. Opción.D. Opción.
 //
-// The correct answer is marked with * at the end.
-// Each question block is separated by a blank line.
+// FORMAT B (classic - each option on its own line):
+//   1. ¿Pregunta?
+//   a) Opción
+//   b) Opción correcta *
+//   c) Opción
+//
+// FORMAT C (mixed / any combination)
+//
+// Correct answer marker: * anywhere in/after the option text
 
 interface ParsedQuestion {
   text: string
@@ -24,59 +28,140 @@ interface ParsedQuestion {
   correct: string[]
 }
 
-function parseQuestions(text: string): ParsedQuestion[] {
-  const questions: ParsedQuestion[] = []
+function parseOptions(raw: string): { options: string[]; correct: string[] } {
+  const options: string[] = []
+  const correct: string[] = []
 
-  // Normalize line endings and split into blocks by blank lines
-  const normalized = text.replace(/\r\n/g, '\n').replace(/\r/g, '\n')
-  const blocks = normalized.split(/\n{2,}/).map(b => b.trim()).filter(Boolean)
+  // Try multi-choice: split on letter-dot pattern A. B. C. etc.
+  // Works for both concatenated and newline-separated options
+  const unifiedRaw = raw.replace(/\n/g, ' ')
 
-  for (const block of blocks) {
-    const lines = block.split('\n').map(l => l.trim()).filter(Boolean)
-    if (lines.length < 2) continue
+  // Match: letter (A-J), dot or paren, optional space, then text until next such pattern or end
+  const optionRegex = /[A-J][\.\)]\s*([\s\S]*?)(?=\s*[A-J][\.\)]|$)/g
+  const matches = [...unifiedRaw.matchAll(optionRegex)]
 
-    // First line: question text (strip leading number like "1." or "1)")
-    const firstLine = lines[0].replace(/^\d+[\.\)]\s*/, '').trim()
-    if (!firstLine) continue
+  if (matches.length >= 2) {
+    for (const m of matches) {
+      const rawText = m[1].trim()
+      const isCorrect = rawText.includes('*')
+      const cleaned = rawText.replace(/\*/g, '').trim().replace(/\s+/g, ' ')
+      if (cleaned) {
+        options.push(cleaned)
+        if (isCorrect) correct.push(cleaned)
+      }
+    }
+    return { options, correct }
+  }
 
-    const optionLines = lines.slice(1)
-    const options: string[] = []
-    const correct: string[] = []
-
-    // Detect true/false question
-    const tfKeywords = ['verdadero', 'falso', 'true', 'false', 'v', 'f']
-    const isTrueFalse = optionLines.length <= 2 &&
-      optionLines.every(l => tfKeywords.some(k => l.toLowerCase().replace(/[^a-záéíóúñ\s]/gi, '').trim() === k || l.toLowerCase().startsWith(k)))
-
-    for (const line of optionLines) {
-      const isCorrect = line.endsWith('*') || line.toLowerCase().includes('(correcta)') || line.toLowerCase().includes('(correct)')
-      // Strip option prefix (a), b), A., etc.) and markers
-      const cleaned = line
-        .replace(/^\s*[a-zA-Z]\s*[\.\)]\s*/, '')
-        .replace(/\*$/, '')
-        .replace(/\(correcta?\)/gi, '')
-        .trim()
-
-      if (!cleaned) continue
+  // Fallback: parse line by line (each line is an option)
+  const lines = raw.split('\n').map(l => l.trim()).filter(Boolean)
+  for (const line of lines) {
+    const isCorrect = line.includes('*')
+    const cleaned = line
+      .replace(/^\s*[a-zA-Z]\s*[\.\)]\s*/, '')
+      .replace(/\*/g, '')
+      .trim()
+    if (cleaned) {
       options.push(cleaned)
       if (isCorrect) correct.push(cleaned)
     }
+  }
+  return { options, correct }
+}
 
-    // Skip if no options extracted
-    if (options.length === 0) continue
+function isTrueFalse(raw: string): boolean {
+  const lower = raw.toLowerCase().replace(/\*/g, '').trim()
+  // Matches if all content is just true/false/verdadero/falso keywords
+  const tfWords = /^[\s\nA-Eab.\)]*?(verdadero|falso|true|false|v\b|f\b)[\s\nA-Eab.\)]*?(verdadero|falso|true|false|v\b|f\b)[\s\*]*$/i
+  return tfWords.test(lower)
+}
 
-    // Detect multiple correct answers
-    const type: ParsedQuestion['type'] = isTrueFalse
-      ? 'true_false'
-      : correct.length > 1 ? 'multiple' : 'single'
+function parseTrueFalse(raw: string): { options: string[]; correct: string[] } {
+  const options = ['Verdadero', 'Falso']
+  const correct: string[] = []
+  const lines = raw.split(/\n|(?=[A-E][\.\)])/).map(l => l.trim()).filter(Boolean)
+  for (const line of lines) {
+    if (line.includes('*')) {
+      const isTrue = /verdadero|true|^\s*v[\.\)]?\s*$/i.test(line.replace(/\*/g, ''))
+      correct.push(isTrue ? 'Verdadero' : 'Falso')
+    }
+  }
+  // Fallback: if * in raw, check which V/F has it
+  if (correct.length === 0 && raw.includes('*')) {
+    const verdaderoCorrect = /verdadero[^a-z]*\*/i.test(raw) || /\*[^a-z]*verdadero/i.test(raw)
+    correct.push(verdaderoCorrect ? 'Verdadero' : 'Falso')
+  }
+  return { options, correct }
+}
 
-    // For true/false: normalize options
-    const finalOptions = isTrueFalse ? ['Verdadero', 'Falso'] : options
-    const finalCorrect = isTrueFalse
-      ? correct.map(c => c.toLowerCase().startsWith('v') || c.toLowerCase() === 'true' ? 'Verdadero' : 'Falso')
-      : correct
+function looksLikeQuestion(text: string): boolean {
+  return text.includes('?') || /^\d+[\.\)]\s/.test(text) || text.length > 20
+}
 
-    questions.push({ text: firstLine, type, options: finalOptions, correct: finalCorrect })
+function looksLikeOptions(text: string): boolean {
+  // Starts with a letter option marker
+  return /^[A-Ja-j][\.\)]\s/.test(text.trim()) ||
+    // Or contains inline option markers like "A. ...B. ..."
+    /[A-J][\.\)]\s.{3,}[A-J][\.\)]\s/.test(text)
+}
+
+function parseQuestions(text: string): ParsedQuestion[] {
+  const questions: ParsedQuestion[] = []
+  const normalized = text.replace(/\r\n/g, '\n').replace(/\r/g, '\n')
+
+  // Split into blocks separated by blank lines
+  const blocks = normalized
+    .split(/\n{2,}/)
+    .map(b => b.trim())
+    .filter(Boolean)
+
+  let i = 0
+  while (i < blocks.length) {
+    const block = blocks[i]
+
+    // Case 1: block contains both question and options (classic format)
+    if (looksLikeQuestion(block) && looksLikeOptions(block)) {
+      const lines = block.split('\n').map(l => l.trim()).filter(Boolean)
+      // First line is question, rest are options
+      const questionText = lines[0].replace(/^\d+[\.\)]\s*/, '').trim()
+      const optionsRaw = lines.slice(1).join('\n')
+
+      if (optionsRaw && questionText) {
+        const tf = isTrueFalse(optionsRaw)
+        const { options, correct } = tf ? parseTrueFalse(optionsRaw) : parseOptions(optionsRaw)
+        if (options.length >= 2) {
+          questions.push({
+            text: questionText,
+            type: tf ? 'true_false' : correct.length > 1 ? 'multiple' : 'single',
+            options, correct,
+          })
+        }
+      }
+      i++
+      continue
+    }
+
+    // Case 2: question block followed by options block (user's Word format)
+    if (looksLikeQuestion(block) && !looksLikeOptions(block)) {
+      const questionText = block.replace(/^\d+[\.\)]\s*/, '').trim()
+      const nextBlock = i + 1 < blocks.length ? blocks[i + 1] : ''
+
+      if (nextBlock && looksLikeOptions(nextBlock)) {
+        const tf = isTrueFalse(nextBlock)
+        const { options, correct } = tf ? parseTrueFalse(nextBlock) : parseOptions(nextBlock)
+        if (options.length >= 2 && questionText) {
+          questions.push({
+            text: questionText,
+            type: tf ? 'true_false' : correct.length > 1 ? 'multiple' : 'single',
+            options, correct,
+          })
+        }
+        i += 2
+        continue
+      }
+    }
+
+    i++
   }
 
   return questions
@@ -116,14 +201,15 @@ export async function POST(req: NextRequest) {
   }
 
   const parsed = parseQuestions(rawText)
+
   if (parsed.length === 0) {
     return NextResponse.json({
-      error: 'No se encontraron preguntas. Revisa el formato: cada pregunta debe tener opciones con * marcando la correcta.',
-      raw_preview: rawText.slice(0, 500),
+      error: 'No se detectaron preguntas. Asegúrate de que las opciones usen letras (A. B. C.) y marca la correcta con *',
+      raw_preview: rawText.slice(0, 800),
     }, { status: 422 })
   }
 
-  // Get current max order for this evaluation
+  // Get current max order
   const { data: existing } = await supabaseAdmin
     .from('Question')
     .select('order')
@@ -132,7 +218,6 @@ export async function POST(req: NextRequest) {
     .limit(1)
 
   let nextOrder = ((existing?.[0] as any)?.order ?? 0) + 1
-
   const savedQuestions = []
 
   for (const q of parsed) {
@@ -146,30 +231,19 @@ export async function POST(req: NextRequest) {
     if (qErr) continue
 
     if (q.options.length > 0) {
-      const optRecords = q.options.map((opt, i) => ({
-        id: randomUUID(),
-        questionId,
-        text: opt,
-        isCorrect: q.correct.includes(opt),
-        order: i + 1,
-      }))
-      await supabaseAdmin.from('Option').insert(optRecords)
+      await supabaseAdmin.from('Option').insert(
+        q.options.map((opt, idx) => ({
+          id: randomUUID(),
+          questionId,
+          text: opt,
+          isCorrect: q.correct.includes(opt),
+          order: idx + 1,
+        }))
+      )
     }
 
-    savedQuestions.push({
-      id: questionId,
-      evaluation_id: evaluationId,
-      text: q.text,
-      type: q.type,
-      points: 1,
-      options: q.options,
-      correct: q.correct,
-    })
+    savedQuestions.push({ id: questionId, evaluation_id: evaluationId, text: q.text, type: q.type, points: 1, options: q.options, correct: q.correct })
   }
 
-  return NextResponse.json({
-    imported: savedQuestions.length,
-    total_parsed: parsed.length,
-    questions: savedQuestions,
-  })
+  return NextResponse.json({ imported: savedQuestions.length, total_parsed: parsed.length, questions: savedQuestions })
 }
