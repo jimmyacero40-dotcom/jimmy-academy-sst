@@ -6,7 +6,8 @@ import {
   FileCheck, Search, Plus, X, ChevronRight, Edit2, Trash2,
   CheckSquare, Circle, ToggleLeft, Clock, Award, BookOpen,
   MoreVertical, AlertCircle, Check, GripVertical, Tag,
-  RefreshCw, ChevronDown, ChevronUp, Layers
+  RefreshCw, ChevronDown, ChevronUp, Layers, Upload, FileText,
+  CheckCircle2
 } from 'lucide-react'
 
 // ─── Types ──────────────────────────────────────────────────────────────────
@@ -412,6 +413,9 @@ export default function EvaluationsPage() {
   const [form, setForm] = useState(EMPTY_EVAL)
   const [saving, setSaving] = useState(false)
   const [savingQ, setSavingQ] = useState(false)
+  const [importing, setImporting] = useState(false)
+  const [importResult, setImportResult] = useState<{ imported: number; error?: string } | null>(null)
+  const [showImport, setShowImport] = useState(false)
   const [menuOpen, setMenuOpen] = useState<string | null>(null)
   const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null)
   const [modalError, setModalError] = useState<string | null>(null)
@@ -559,6 +563,28 @@ CREATE TABLE IF NOT EXISTS questions (
       body: JSON.stringify({ id }),
     })
     setQuestions(prev => prev.filter(q => q.id !== id))
+  }
+
+  const handleImport = async (file: File) => {
+    if (!selected) return
+    setImporting(true)
+    setImportResult(null)
+    const fd = new FormData()
+    fd.append('file', file)
+    fd.append('evaluation_id', selected.id)
+    try {
+      const res = await fetch('/api/evaluations/import', { method: 'POST', body: fd })
+      const data = await res.json()
+      if (data.imported > 0) {
+        setQuestions(prev => [...prev, ...(data.questions ?? [])])
+        setImportResult({ imported: data.imported })
+        setTimeout(() => { setShowImport(false); setImportResult(null) }, 3000)
+      } else {
+        setImportResult({ imported: 0, error: data.error ?? 'No se encontraron preguntas en el archivo' })
+      }
+    } catch (e: any) {
+      setImportResult({ imported: 0, error: e.message })
+    } finally { setImporting(false) }
   }
 
   const openEdit = (ev: Evaluation) => {
@@ -820,6 +846,15 @@ CREATE TABLE IF NOT EXISTS questions (
                       saving={savingQ}
                     />
                   ))}
+                  {/* Import button */}
+                  <button
+                    onClick={() => { setShowImport(true); setImportResult(null) }}
+                    className="w-full py-3 rounded-xl border-2 border-dashed text-sm font-semibold transition-all flex items-center justify-center gap-2"
+                    style={{ borderColor: 'rgba(139,92,246,0.35)', color: '#A78BFA' }}
+                  >
+                    <Upload size={15} /> Importar preguntas desde Word o PDF
+                  </button>
+
                   <NewQuestionForm
                     evaluationId={selected.id}
                     onCreated={q => setQuestions(prev => [...prev, q])}
@@ -930,6 +965,89 @@ CREATE TABLE IF NOT EXISTS questions (
                 style={{ background: '#EF4444', color: '#fff' }}>
                 Eliminar
               </button>
+            </div>
+          </motion.div>
+        </div>
+      )}
+
+      {/* Import modal */}
+      {showImport && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }}
+            className="bg-[var(--bg-surface)] border border-[var(--border-strong)] rounded-2xl w-full max-w-md">
+            <div className="flex items-center justify-between px-6 py-4 border-b border-[var(--border)]">
+              <div className="flex items-center gap-2">
+                <Upload size={16} style={{ color: '#A78BFA' }} />
+                <h2 className="text-[var(--text)] font-bold">Importar preguntas</h2>
+              </div>
+              <button onClick={() => { setShowImport(false); setImportResult(null) }}
+                className="text-[var(--text-dim)] hover:text-[var(--text)]"><X size={18} /></button>
+            </div>
+
+            <div className="p-6 space-y-4">
+              {/* Format guide */}
+              <div className="rounded-xl p-4 text-xs space-y-1.5"
+                style={{ background: 'rgba(139,92,246,0.08)', border: '1px solid rgba(139,92,246,0.2)' }}>
+                <p className="font-bold text-[#A78BFA] mb-2 flex items-center gap-1.5">
+                  <FileText size={13} /> Formato del documento
+                </p>
+                <p className="text-[var(--text-dim)] font-mono leading-relaxed">
+                  {'1. Texto de la pregunta\na) Opción incorrecta\nb) Opción correcta *\nc) Opción incorrecta\n\n2. Afirmación V/F\nVerdadero *\nFalso'}
+                </p>
+                <p className="text-[var(--text-faint)] mt-2">
+                  Marca la respuesta correcta con <strong className="text-[#A78BFA]">*</strong> al final. Separa cada pregunta con una línea en blanco.
+                </p>
+              </div>
+
+              {/* Result */}
+              {importResult && (
+                <div className="rounded-xl p-3 flex items-start gap-2 text-sm"
+                  style={importResult.imported > 0
+                    ? { background: 'rgba(16,185,129,0.1)', border: '1px solid rgba(16,185,129,0.25)', color: '#6EE7B7' }
+                    : { background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.25)', color: '#FCA5A5' }
+                  }>
+                  {importResult.imported > 0
+                    ? <><CheckCircle2 size={15} className="flex-shrink-0 mt-0.5" /> <span>✓ {importResult.imported} preguntas importadas exitosamente</span></>
+                    : <><AlertCircle size={15} className="flex-shrink-0 mt-0.5" /> <span>{importResult.error}</span></>
+                  }
+                </div>
+              )}
+
+              {/* Drop zone */}
+              <label
+                className="block w-full cursor-pointer"
+                onDragOver={e => e.preventDefault()}
+                onDrop={e => {
+                  e.preventDefault()
+                  const file = e.dataTransfer.files[0]
+                  if (file) handleImport(file)
+                }}
+              >
+                <div className="w-full py-10 rounded-2xl border-2 border-dashed flex flex-col items-center justify-center gap-3 transition-all"
+                  style={{ borderColor: 'rgba(139,92,246,0.3)', background: 'rgba(139,92,246,0.04)' }}>
+                  {importing ? (
+                    <>
+                      <RefreshCw size={28} className="animate-spin" style={{ color: '#A78BFA' }} />
+                      <p className="text-sm text-[var(--text-dim)]">Procesando archivo…</p>
+                    </>
+                  ) : (
+                    <>
+                      <Upload size={28} style={{ color: '#A78BFA' }} />
+                      <div className="text-center">
+                        <p className="text-sm font-semibold text-[var(--text)]">Arrastra el archivo aquí</p>
+                        <p className="text-xs text-[var(--text-faint)] mt-0.5">o haz clic para seleccionar</p>
+                      </div>
+                      <span className="text-xs px-3 py-1 rounded-full font-semibold"
+                        style={{ background: 'rgba(139,92,246,0.15)', color: '#A78BFA' }}>
+                        .docx · .pdf · .txt
+                      </span>
+                    </>
+                  )}
+                </div>
+                <input type="file" accept=".docx,.doc,.pdf,.txt" className="hidden"
+                  onChange={e => { const f = e.target.files?.[0]; if (f) handleImport(f) }}
+                  disabled={importing} />
+              </label>
             </div>
           </motion.div>
         </div>
