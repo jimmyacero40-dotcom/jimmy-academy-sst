@@ -9,10 +9,8 @@ function trainingUuid(intId: number | string) {
 }
 
 export async function GET() {
-  const companyId = await getActiveCompanyId()
-
-  // Get evaluations via Training.companyId filter
-  let q = supabaseAdmin
+  // All evaluations — filtered client-side or show all for now
+  const { data, error } = await supabaseAdmin
     .from('Evaluation')
     .select(`
       id, title, description, timeLimit, maxAttempts, minScore,
@@ -20,12 +18,6 @@ export async function GET() {
       Training(id, title, category)
     `)
     .order('createdAt', { ascending: false })
-
-  if (companyId) {
-    q = q.eq('Training.companyId', companyId)
-  }
-
-  const { data, error } = await q
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
 
   // Normalize to snake_case for the frontend
@@ -49,14 +41,24 @@ export async function GET() {
 }
 
 export async function POST(req: NextRequest) {
-  const companyId = await getActiveCompanyId()
-  if (!companyId) return NextResponse.json({ error: 'Selecciona una empresa' }, { status: 400 })
-
   const body = await req.json()
   const { title, description, training_id, min_score, time_limit } = body
 
+  // The Prisma Company table has a different ID than our custom companies table.
+  // Fetch the correct Prisma Company.id to use as FK in Training.
+  const { data: prismaCompanies } = await supabaseAdmin
+    .from('Company')
+    .select('id')
+    .limit(1)
+    .single()
+
+  const prismaCompanyId = (prismaCompanies as any)?.id
+  if (!prismaCompanyId) return NextResponse.json({ error: 'Empresa no encontrada en el sistema' }, { status: 400 })
+
   // Upsert a Training record bridging our trainings table int id → Prisma Training uuid
   let prismaTrainingId: string
+  let trainingTitle = ''
+
   if (training_id) {
     prismaTrainingId = trainingUuid(training_id)
 
@@ -67,20 +69,26 @@ export async function POST(req: NextRequest) {
       .eq('id', training_id)
       .single()
 
-    await supabaseAdmin
+    trainingTitle = (tr as any)?.title ?? 'Capacitación'
+
+    const { error: trErr } = await supabaseAdmin
       .from('Training')
       .upsert({
         id: prismaTrainingId,
-        title: tr?.title ?? 'Capacitación',
-        category: tr?.category ?? 'SST',
+        title: trainingTitle,
+        category: (tr as any)?.category ?? 'SST',
         duration: 60,
         updatedAt: new Date().toISOString(),
-        companyId,
+        companyId: prismaCompanyId,
       }, { onConflict: 'id' })
+
+    if (trErr) return NextResponse.json({ error: `Error al crear Training puente: ${trErr.message}` }, { status: 500 })
   } else {
-    // Create a generic Training placeholder for this company
-    prismaTrainingId = trainingUuid(`${companyId.replace(/-/g, '').slice(0, 12)}`)
-    await supabaseAdmin
+    // Generic placeholder Training per company
+    prismaTrainingId = trainingUuid(prismaCompanyId.replace(/-/g, '').slice(0, 12))
+    trainingTitle = 'General'
+
+    const { error: trErr } = await supabaseAdmin
       .from('Training')
       .upsert({
         id: prismaTrainingId,
@@ -88,8 +96,10 @@ export async function POST(req: NextRequest) {
         category: 'SST',
         duration: 60,
         updatedAt: new Date().toISOString(),
-        companyId,
+        companyId: prismaCompanyId,
       }, { onConflict: 'id' })
+
+    if (trErr) return NextResponse.json({ error: `Error al crear Training genérico: ${trErr.message}` }, { status: 500 })
   }
 
   const evalId = randomUUID()
@@ -116,7 +126,7 @@ export async function POST(req: NextRequest) {
     is_active: data.isActive,
     created_at: data.createdAt,
     training_id,
-    training_title: body.training_title ?? null,
+    training_title: trainingTitle,
   })
 }
 
