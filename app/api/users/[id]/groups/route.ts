@@ -34,11 +34,7 @@ export async function PUT(req: NextRequest, { params }: { params: { id: string }
 
   // Insert new
   if (group_ids?.length) {
-    const rows = group_ids.map(gid => ({
-      user_id: params.id,
-      group_id: gid,
-      ...(companyId ? { company_id: companyId } : {}),
-    }))
+    const rows = group_ids.map(gid => ({ user_id: params.id, group_id: gid }))
     const { error } = await supabaseAdmin.from('user_groups').insert(rows)
     if (error) return NextResponse.json({ error: error.message }, { status: 500 })
   }

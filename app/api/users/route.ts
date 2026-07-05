@@ -10,13 +10,33 @@ export async function GET() {
 
   let query = supabaseAdmin
     .from('users')
-    .select('id, email, name, cedula, role, area, active, company_id, created_at, user_groups(groups(id, name, color))')
+    .select('id, email, name, cedula, role, area, active, company_id, created_at')
     .order('created_at', { ascending: false })
   if (companyId) query = query.eq('company_id', companyId)
 
   const { data, error } = await query
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
-  return NextResponse.json(data)
+
+  // Fetch all user_groups → groups in one query (FK user_groups.group_id → groups exists)
+  const userIds = (data ?? []).map((u: any) => u.id)
+  const { data: ugData } = await supabaseAdmin
+    .from('user_groups')
+    .select('user_id, groups(id, name, color)')
+    .in('user_id', userIds.length ? userIds : ['_'])
+
+  // Build a map: user_id → groups[]
+  const groupsByUser: Record<string, any[]> = {}
+  for (const row of ugData ?? []) {
+    if (!groupsByUser[row.user_id]) groupsByUser[row.user_id] = []
+    if (row.groups) groupsByUser[row.user_id].push(row.groups)
+  }
+
+  const result = (data ?? []).map((u: any) => ({
+    ...u,
+    user_groups: (groupsByUser[u.id] ?? []).map(g => ({ groups: g })),
+  }))
+
+  return NextResponse.json(result)
 }
 
 export async function POST(req: NextRequest) {
