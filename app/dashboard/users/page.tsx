@@ -118,6 +118,7 @@ export default function UsersPage() {
   const [inlineArea, setInlineArea] = useState('')
   const [inlineGroups, setInlineGroups] = useState<string[]>([])
   const [savingInline, setSavingInline] = useState(false)
+  const [groupDropOpen, setGroupDropOpen] = useState(false)
 
   const loadUsers = async () => {
     try {
@@ -313,6 +314,7 @@ export default function UsersPage() {
 
   const openInlineEdit = async (u: AppUser) => {
     setInlineEdit(u.id)
+    setGroupDropOpen(false)
     // Match area by name since area_id may not be stored in users table
     const matchedArea = areas.find(a => a.name === u.area_name)
     setInlineArea(matchedArea?.id || '')
@@ -338,6 +340,7 @@ export default function UsersPage() {
     }
     await loadUsers()
     setInlineEdit(null)
+    setGroupDropOpen(false)
     setSavingInline(false)
   }
 
@@ -501,26 +504,46 @@ export default function UsersPage() {
                       )}
                     </td>
 
-                    {/* Grupos — chips o checkboxes en modo inline */}
+                    {/* Grupos — dropdown compacto en modo inline */}
                     <td className="text-center">
                       {inlineEdit === u.id ? (
-                        <div className="flex flex-wrap gap-1 justify-center">
-                          {groups.map(g => {
-                            const on = inlineGroups.includes(g.id)
-                            return (
-                              <button key={g.id} type="button"
-                                onClick={() => setInlineGroups(prev => on ? prev.filter(x => x !== g.id) : [...prev, g.id])}
-                                className="text-[10px] px-1.5 py-0.5 rounded-full font-semibold transition-all"
-                                style={{
-                                  background: on ? 'var(--primary-dim)' : 'var(--bg-card)',
-                                  border: `1px solid ${on ? 'var(--primary-border)' : 'var(--border)'}`,
-                                  color: on ? 'var(--primary)' : 'var(--text-faint)',
-                                }}>
-                                {on ? '✓ ' : ''}{g.name}
-                              </button>
-                            )
-                          })}
-                          {groups.length === 0 && <span className="text-[10px]" style={{ color: 'var(--text-faint)' }}>Sin grupos</span>}
+                        <div className="relative inline-block">
+                          <button type="button"
+                            onClick={() => setGroupDropOpen(o => !o)}
+                            className="flex items-center gap-1 px-2 py-1 rounded-lg text-[11px] font-semibold transition-all"
+                            style={{
+                              background: 'var(--bg-card)',
+                              border: '1px solid var(--primary-border)',
+                              color: 'var(--primary)',
+                              minWidth: 100,
+                            }}>
+                            <Layers size={10} />
+                            {inlineGroups.length === 0 ? 'Sin grupo' : `${inlineGroups.length} grupo${inlineGroups.length > 1 ? 's' : ''}`}
+                            <ChevronDown size={10} className="ml-auto" />
+                          </button>
+                          {groupDropOpen && (
+                            <div className="absolute left-0 top-full mt-1 rounded-xl shadow-2xl z-50 py-1 min-w-[160px]"
+                              style={{ background: 'var(--bg-surface)', border: '1px solid var(--border-strong)' }}>
+                              {groups.length === 0
+                                ? <div className="px-3 py-2 text-[11px]" style={{ color: 'var(--text-faint)' }}>Sin grupos disponibles</div>
+                                : groups.map(g => {
+                                  const on = inlineGroups.includes(g.id)
+                                  return (
+                                    <button key={g.id} type="button"
+                                      onClick={() => setInlineGroups(prev => on ? prev.filter(x => x !== g.id) : [...prev, g.id])}
+                                      className="flex items-center gap-2 w-full px-3 py-2 text-[11px] font-medium transition-all text-left"
+                                      style={{ color: on ? 'var(--primary)' : 'var(--text-dim)', background: on ? 'var(--primary-dim)' : 'transparent' }}>
+                                      <div className="w-3 h-3 rounded flex items-center justify-center flex-shrink-0"
+                                        style={{ background: on ? 'var(--primary)' : 'transparent', border: `1px solid ${on ? 'var(--primary)' : 'var(--border-strong)'}` }}>
+                                        {on && <span className="text-white text-[8px] leading-none">✓</span>}
+                                      </div>
+                                      {g.name}
+                                    </button>
+                                  )
+                                })
+                              }
+                            </div>
+                          )}
                         </div>
                       ) : u.groups?.length ? (
                         <div className="flex flex-wrap gap-1 justify-center">
@@ -556,7 +579,7 @@ export default function UsersPage() {
                             {savingInline ? <Loader2 size={10} className="animate-spin" /> : <CheckCircle size={10} />}
                             Guardar
                           </button>
-                          <button onClick={() => setInlineEdit(null)}
+                          <button onClick={() => { setInlineEdit(null); setGroupDropOpen(false) }}
                             className="w-7 h-7 rounded-lg flex items-center justify-center"
                             style={{ color: 'var(--text-faint)', border: '1px solid var(--border)' }}>
                             <X size={11} />

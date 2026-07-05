@@ -265,6 +265,7 @@ select option {
 
 /* ── TABLE ── */
 .terra-table th { font-size: 10px; font-weight: 700; letter-spacing: 1.5px; text-transform: uppercase; color: var(--text-faint); padding: 12px 20px; text-align: left; border-bottom: 1px solid var(--border); }
+.terra-table th.text-center { text-align: center; }
 .terra-table td { padding: 14px 20px; border-bottom: 1px solid rgba(59,130,246,0.05); font-size: 13px; }
 .terra-table tr:hover td { background: rgba(59,130,246,0.02); }
 
