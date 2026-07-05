@@ -112,12 +112,10 @@ export default function UsersPage() {
   const [saving, setSaving]           = useState(false)
   const [loadingGroups, setLoadingGroups] = useState(false)
   const fileRef = useRef<HTMLInputElement>(null)
-
-  // Inline area/group edit state
-  const [inlineEdit, setInlineEdit] = useState<string | null>(null)   // user id being inline-edited
-  const [inlineArea, setInlineArea] = useState('')
-  const [inlineGroups, setInlineGroups] = useState<string[]>([])
-  const [savingInline, setSavingInline] = useState(false)
+  // Per-user saving indicator for auto-save cells
+  const [cellSaving, setCellSaving] = useState<string | null>(null)
+  // Group add dropdown open per user
+  const [groupAdd, setGroupAdd] = useState<string | null>(null)
 
   const loadUsers = async () => {
     try {
@@ -311,34 +309,24 @@ export default function UsersPage() {
     }))
   }
 
-  const openInlineEdit = async (u: AppUser) => {
-    setInlineEdit(u.id)
-    // Match area by name since area_id may not be stored in users table
-    const matchedArea = areas.find(a => a.name === u.area_name)
-    setInlineArea(matchedArea?.id || '')
-    setInlineGroups(u.groups.map(g => g.id))
+  const autoSaveArea = async (userId: string, areaName: string) => {
+    setCellSaving(userId)
+    await fetch('/api/users', {
+      method: 'PUT', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id: userId, area: areaName }),
+    })
+    await loadUsers()
+    setCellSaving(null)
   }
 
-  const saveInline = async (userId: string) => {
-    setSavingInline(true)
-    const selectedArea = areas.find(a => a.id === inlineArea)
-    const [userRes, groupRes] = await Promise.all([
-      fetch('/api/users', {
-        method: 'PUT', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ id: userId, area: selectedArea?.name || '' }),
-      }),
-      fetch(`/api/users/${userId}/groups`, {
-        method: 'PUT', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ group_ids: inlineGroups }),
-      }),
-    ])
-    if (!userRes.ok || !groupRes.ok) {
-      setSavingInline(false)
-      return
-    }
+  const autoSaveGroups = async (userId: string, groupIds: string[]) => {
+    setCellSaving(userId)
+    await fetch(`/api/users/${userId}/groups`, {
+      method: 'PUT', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ group_ids: groupIds }),
+    })
     await loadUsers()
-    setInlineEdit(null)
-    setSavingInline(false)
+    setCellSaving(null)
   }
 
   return (
@@ -430,11 +418,11 @@ export default function UsersPage() {
             <colgroup>
               <col style={{ width: 36 }} />
               <col />
-              <col style={{ width: 108 }} />
-              <col style={{ width: 120 }} />
-              <col style={{ width: 160 }} />
+              <col style={{ width: 100 }} />
+              <col style={{ width: 140 }} />
+              <col style={{ width: 200 }} />
               <col style={{ width: 76 }} />
-              <col style={{ width: 88 }} />
+              <col style={{ width: 44 }} />
             </colgroup>
             <thead>
               <tr>
@@ -482,53 +470,79 @@ export default function UsersPage() {
                       <span className="font-mono text-[11px]">{u.cedula || '—'}</span>
                     </td>
 
-                    {/* Área — dropdown en modo inline */}
-                    <td className="text-center">
-                      {inlineEdit === u.id ? (
-                        <select value={inlineArea} onChange={e => setInlineArea(e.target.value)}
-                          className="terra-input py-0.5 text-[11px] w-full">
-                          <option value="">Sin área</option>
-                          {areas.map(a => <option key={a.id} value={a.id}>{a.name}</option>)}
-                        </select>
-                      ) : u.area_name ? (
-                        <span className="inline-flex items-center gap-1 text-[11px] font-medium px-2 py-0.5 rounded-full"
-                          style={{ background: 'rgba(59,130,246,0.08)', color: 'var(--primary)' }}>
-                          <Layers size={9} />
-                          {u.area_name}
-                        </span>
-                      ) : (
-                        <span className="text-[11px]" style={{ color: 'var(--text-faint)' }}>—</span>
-                      )}
+                    {/* Área — auto-save al cambiar */}
+                    <td className="text-center" style={{ padding: '6px 8px' }}>
+                      <select
+                        value={areas.find(a => a.name === u.area_name)?.id || ''}
+                        onChange={e => {
+                          const a = areas.find(x => x.id === e.target.value)
+                          autoSaveArea(u.id, a?.name || '')
+                        }}
+                        disabled={cellSaving === u.id}
+                        className="text-[11px] font-medium rounded-lg px-2 py-1 w-full text-center"
+                        style={{
+                          background: u.area_name ? 'rgba(59,130,246,0.08)' : 'var(--bg-card)',
+                          border: '1px solid var(--border)',
+                          color: u.area_name ? 'var(--primary)' : 'var(--text-faint)',
+                          cursor: 'pointer',
+                          appearance: 'auto',
+                          colorScheme: 'dark',
+                        }}>
+                        <option value="">Sin área</option>
+                        {areas.map(a => <option key={a.id} value={a.id}>{a.name}</option>)}
+                      </select>
                     </td>
 
-                    {/* Grupos */}
-                    <td className="text-center">
-                      {inlineEdit === u.id ? (
-                        <select
-                          multiple
-                          value={inlineGroups}
-                          onChange={e => setInlineGroups(Array.from(e.target.selectedOptions, o => o.value))}
-                          className="terra-input text-[11px] w-full"
-                          style={{ height: Math.min(groups.length, 5) * 26 + 4, padding: '2px' }}>
-                          {groups.map(g => (
-                            <option key={g.id} value={g.id}>{g.name}</option>
-                          ))}
-                        </select>
-                      ) : u.groups?.length ? (
-                        <div className="flex flex-wrap gap-1 justify-center">
-                          {u.groups.slice(0, 2).map(g => (
-                            <span key={g.id} className="text-[10px] px-1.5 py-0.5 rounded-full font-semibold"
-                              style={{ background: 'var(--primary-dim)', color: 'var(--primary)', border: '1px solid var(--primary-border)' }}>
-                              {g.name}
-                            </span>
-                          ))}
-                          {u.groups.length > 2 && (
-                            <span className="text-[10px] px-1.5 py-0.5 rounded-full" style={{ background: 'var(--bg-card)', color: 'var(--text-faint)', border: '1px solid var(--border)' }}>
-                              +{u.groups.length - 2}
-                            </span>
-                          )}
-                        </div>
-                      ) : <span className="text-[11px]" style={{ color: 'var(--text-faint)' }}>—</span>}
+                    {/* Grupos — chips + dropdown para añadir, auto-save */}
+                    <td className="text-center" style={{ padding: '6px 8px' }}>
+                      <div className="flex flex-wrap gap-1 items-center justify-center">
+                        {u.groups.map(g => (
+                          <span key={g.id}
+                            className="inline-flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded-full font-semibold"
+                            style={{ background: 'var(--primary-dim)', color: 'var(--primary)', border: '1px solid var(--primary-border)' }}>
+                            {g.name}
+                            <button
+                              onClick={() => autoSaveGroups(u.id, u.groups.filter(x => x.id !== g.id).map(x => x.id))}
+                              disabled={cellSaving === u.id}
+                              className="leading-none opacity-60 hover:opacity-100 ml-0.5">×</button>
+                          </span>
+                        ))}
+                        {/* Dropdown para añadir grupo */}
+                        {groups.filter(g => !u.groups.find(ug => ug.id === g.id)).length > 0 && (
+                          <div className="relative">
+                            {groupAdd === u.id ? (
+                              <select autoFocus
+                                onChange={e => {
+                                  if (!e.target.value) { setGroupAdd(null); return }
+                                  autoSaveGroups(u.id, [...u.groups.map(g => g.id), e.target.value])
+                                  setGroupAdd(null)
+                                }}
+                                onBlur={() => setGroupAdd(null)}
+                                className="text-[11px] rounded-lg px-1.5 py-0.5 absolute right-0 top-0 z-30 min-w-[140px]"
+                                style={{ background: 'var(--bg-surface)', border: '1px solid var(--primary-border)', color: 'var(--text)', colorScheme: 'dark' }}
+                                defaultValue="">
+                                <option value="">Agregar grupo...</option>
+                                {groups.filter(g => !u.groups.find(ug => ug.id === g.id)).map(g => (
+                                  <option key={g.id} value={g.id}>{g.name}</option>
+                                ))}
+                              </select>
+                            ) : (
+                              <button
+                                onClick={() => setGroupAdd(u.id)}
+                                disabled={cellSaving === u.id}
+                                title="Agregar grupo"
+                                className="w-5 h-5 rounded-full text-[11px] font-bold leading-none flex items-center justify-center transition-all"
+                                style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', color: 'var(--text-faint)' }}>
+                                +
+                              </button>
+                            )}
+                          </div>
+                        )}
+                        {u.groups.length === 0 && groupAdd !== u.id && (
+                          <span className="text-[11px]" style={{ color: 'var(--text-faint)' }}>—</span>
+                        )}
+                        {cellSaving === u.id && <Loader2 size={10} className="animate-spin" style={{ color: 'var(--primary)' }} />}
+                      </div>
                     </td>
 
                     {/* Estado */}
@@ -540,64 +554,38 @@ export default function UsersPage() {
 
                     {/* Acciones */}
                     <td>
-                      {inlineEdit === u.id ? (
-                        <div className="flex items-center gap-1">
-                          <button onClick={() => saveInline(u.id)} disabled={savingInline}
-                            className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-[10px] font-bold transition-all"
-                            style={{ background: 'var(--primary)', color: '#fff' }}>
-                            {savingInline ? <Loader2 size={10} className="animate-spin" /> : <CheckCircle size={10} />}
-                            Guardar
-                          </button>
-                          <button onClick={() => setInlineEdit(null)}
-                            className="w-7 h-7 rounded-lg flex items-center justify-center"
-                            style={{ color: 'var(--text-faint)', border: '1px solid var(--border)' }}>
-                            <X size={11} />
-                          </button>
-                        </div>
-                      ) : (
-                        <div className="flex items-center gap-1">
-                          {/* Botón editar área/grupos — siempre visible */}
-                          <button onClick={() => openInlineEdit(u)}
-                            title="Cambiar área y grupos"
-                            className="w-7 h-7 rounded-lg flex items-center justify-center transition-all"
-                            style={{ background: 'var(--primary-dim)', color: 'var(--primary)', border: '1px solid var(--primary-border)' }}>
-                            <Layers size={12} />
-                          </button>
-                          {/* Menú tres puntos */}
-                          <div className="relative">
-                            <button onClick={() => setMenuOpen(menuOpen === u.id ? null : u.id)}
-                              className="w-7 h-7 rounded-lg flex items-center justify-center transition-colors"
-                              style={{ color: 'var(--text-faint)' }}>
-                              <MoreVertical size={15} />
+                      <div className="relative flex justify-center">
+                        <button onClick={() => setMenuOpen(menuOpen === u.id ? null : u.id)}
+                          className="w-7 h-7 rounded-lg flex items-center justify-center transition-colors"
+                          style={{ color: 'var(--text-faint)' }}>
+                          <MoreVertical size={15} />
+                        </button>
+                        {menuOpen === u.id && (
+                          <div className="absolute right-0 top-8 rounded-xl shadow-xl z-20 w-44 py-1"
+                            style={{ background: 'var(--bg-surface)', border: '1px solid var(--border-strong)' }}>
+                            <button onClick={() => { setMenuOpen(null); router.push(`/dashboard/users/${u.id}`) }}
+                              className="flex items-center gap-2.5 w-full px-4 py-2.5 text-sm transition-all hover:opacity-80"
+                              style={{ color: 'var(--text-dim)' }}>
+                              <BookOpen size={13} /> Ver hoja de vida
                             </button>
-                            {menuOpen === u.id && (
-                              <div className="absolute right-0 top-8 rounded-xl shadow-xl z-20 w-44 py-1"
-                                style={{ background: 'var(--bg-surface)', border: '1px solid var(--border-strong)' }}>
-                                <button onClick={() => { setMenuOpen(null); router.push(`/dashboard/users/${u.id}`) }}
-                                  className="flex items-center gap-2.5 w-full px-4 py-2.5 text-sm transition-all hover:opacity-80"
-                                  style={{ color: 'var(--text-dim)' }}>
-                                  <BookOpen size={13} /> Ver hoja de vida
-                                </button>
-                                <button onClick={() => openEdit(u)}
-                                  className="flex items-center gap-2.5 w-full px-4 py-2.5 text-sm transition-all hover:opacity-80"
-                                  style={{ color: 'var(--text-dim)' }}>
-                                  <Edit2 size={13} /> Editar datos
-                                </button>
-                                <button onClick={() => toggleStatus(u.id)}
-                                  className="flex items-center gap-2.5 w-full px-4 py-2.5 text-sm transition-all hover:opacity-80"
-                                  style={{ color: 'var(--text-dim)' }}>
-                                  <CheckCircle size={13} /> {u.status === 'activo' ? 'Desactivar' : 'Activar'}
-                                </button>
-                                <div style={{ borderTop: '1px solid var(--border)', margin: '4px 0' }} />
-                                <button onClick={() => { setDeleteConfirm(u.id); setMenuOpen(null) }}
-                                  className="flex items-center gap-2.5 w-full px-4 py-2.5 text-sm transition-all hover:opacity-80" style={{ color: '#FCA5A5' }}>
-                                  <Trash2 size={13} /> Eliminar
-                                </button>
-                              </div>
-                            )}
+                            <button onClick={() => openEdit(u)}
+                              className="flex items-center gap-2.5 w-full px-4 py-2.5 text-sm transition-all hover:opacity-80"
+                              style={{ color: 'var(--text-dim)' }}>
+                              <Edit2 size={13} /> Editar datos
+                            </button>
+                            <button onClick={() => toggleStatus(u.id)}
+                              className="flex items-center gap-2.5 w-full px-4 py-2.5 text-sm transition-all hover:opacity-80"
+                              style={{ color: 'var(--text-dim)' }}>
+                              <CheckCircle size={13} /> {u.status === 'activo' ? 'Desactivar' : 'Activar'}
+                            </button>
+                            <div style={{ borderTop: '1px solid var(--border)', margin: '4px 0' }} />
+                            <button onClick={() => { setDeleteConfirm(u.id); setMenuOpen(null) }}
+                              className="flex items-center gap-2.5 w-full px-4 py-2.5 text-sm transition-all hover:opacity-80" style={{ color: '#FCA5A5' }}>
+                              <Trash2 size={13} /> Eliminar
+                            </button>
                           </div>
-                        </div>
-                      )}
+                        )}
+                      </div>
                     </td>
                   </motion.tr>
                 ))}
