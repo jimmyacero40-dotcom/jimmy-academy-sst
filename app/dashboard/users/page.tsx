@@ -135,7 +135,9 @@ export default function UsersPage() {
           cedula: u.cedula || '',
           status: u.active ? 'activo' as UserStatus : 'inactivo' as UserStatus,
           createdAt: new Date(u.created_at).toLocaleDateString('es-CO'),
-          groups: [],
+          groups: (u.user_groups ?? [])
+            .map((ug: any) => ug.groups)
+            .filter(Boolean),
         })))
       }
     } catch {}
@@ -416,16 +418,15 @@ export default function UsersPage() {
         </motion.div>
       ) : (
         <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} className="terra-card overflow-hidden hidden md:block">
-          <table className="terra-table w-full" style={{ tableLayout: 'fixed' }}>
+          <table className="terra-table w-full">
             <colgroup>
               <col style={{ width: 36 }} />
-              <col style={{ width: '22%' }} />
-              <col style={{ width: '20%' }} />
+              <col />
               <col style={{ width: 110 }} />
               <col style={{ width: '18%' }} />
-              <col style={{ width: '15%' }} />
+              <col style={{ width: '20%' }} />
               <col style={{ width: 80 }} />
-              <col style={{ width: 90 }} />
+              <col style={{ width: 96 }} />
             </colgroup>
             <thead>
               <tr>
@@ -434,7 +435,6 @@ export default function UsersPage() {
                     onChange={toggleSelectAll} className="w-4 h-4 rounded accent-blue-500" />
                 </th>
                 <th>Trabajador</th>
-                <th>Correo</th>
                 <th>Cédula</th>
                 <th>Área</th>
                 <th>Grupos</th>
@@ -456,22 +456,17 @@ export default function UsersPage() {
                         className="w-4 h-4 rounded accent-blue-500" />
                     </td>
 
-                    {/* Nombre — avatar + nombre en una sola línea truncada */}
+                    {/* Nombre — avatar + nombre completo siempre visible */}
                     <td>
-                      <div className="flex items-center gap-2 min-w-0">
-                        <div className={`w-7 h-7 rounded-full bg-gradient-to-br ${colorForUser(u.id)} flex items-center justify-center text-white text-[10px] font-bold flex-shrink-0`}>
+                      <div className="flex items-center gap-3">
+                        <div className={`w-8 h-8 rounded-full bg-gradient-to-br ${colorForUser(u.id)} flex items-center justify-center text-white text-[11px] font-bold flex-shrink-0`}>
                           {getInitials(u.name)}
                         </div>
-                        <div className="min-w-0">
-                          <div className="text-xs font-semibold truncate" style={{ color: 'var(--text)' }} title={u.name}>{u.name}</div>
-                          {u.role && <div className="text-[10px] truncate" style={{ color: 'var(--text-faint)' }}>{u.role}</div>}
+                        <div>
+                          <div className="text-sm font-semibold leading-snug" style={{ color: 'var(--text)' }}>{u.name}</div>
+                          <div className="text-[11px] mt-0.5 truncate max-w-[260px]" style={{ color: 'var(--text-faint)' }}>{u.email || '—'}</div>
                         </div>
                       </div>
-                    </td>
-
-                    {/* Correo */}
-                    <td>
-                      <span className="text-xs truncate block" style={{ color: 'var(--text-dim)' }} title={u.email}>{u.email || '—'}</span>
                     </td>
 
                     {/* Cédula */}
@@ -486,9 +481,9 @@ export default function UsersPage() {
                           {areas.map(a => <option key={a.id} value={a.id}>{a.name}</option>)}
                         </select>
                       ) : u.area_name ? (
-                        <span className="flex items-center gap-1 text-xs truncate" style={{ color: 'var(--text-dim)' }} title={u.area_name}>
+                        <span className="flex items-center gap-1.5 text-xs" style={{ color: 'var(--text-dim)' }}>
                           <Layers size={10} style={{ color: 'var(--primary)', flexShrink: 0 }} />
-                          <span className="truncate">{u.area_name}</span>
+                          {u.area_name}
                         </span>
                       ) : (
                         <span className="text-xs" style={{ color: 'var(--text-faint)' }}>—</span>
@@ -518,15 +513,15 @@ export default function UsersPage() {
                         </div>
                       ) : u.groups?.length ? (
                         <div className="flex flex-wrap gap-1">
-                          {u.groups.slice(0, 2).map(g => (
+                          {u.groups.slice(0, 3).map(g => (
                             <span key={g.id} className="text-[10px] px-1.5 py-0.5 rounded-full font-semibold"
                               style={{ background: 'var(--primary-dim)', color: 'var(--primary)', border: '1px solid var(--primary-border)' }}>
                               {g.name}
                             </span>
                           ))}
-                          {u.groups.length > 2 && (
+                          {u.groups.length > 3 && (
                             <span className="text-[10px] px-1.5 py-0.5 rounded-full" style={{ background: 'var(--bg-card)', color: 'var(--text-faint)', border: '1px solid var(--border)' }}>
-                              +{u.groups.length - 2}
+                              +{u.groups.length - 3}
                             </span>
                           )}
                         </div>
@@ -545,23 +540,23 @@ export default function UsersPage() {
                       {inlineEdit === u.id ? (
                         <div className="flex items-center gap-1">
                           <button onClick={() => saveInline(u.id)} disabled={savingInline}
-                            className="flex items-center gap-1 px-2 py-1.5 rounded-lg text-[10px] font-bold transition-all"
+                            className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-[10px] font-bold transition-all"
                             style={{ background: 'var(--primary)', color: '#fff' }}>
                             {savingInline ? <Loader2 size={10} className="animate-spin" /> : <CheckCircle size={10} />}
-                            OK
+                            Guardar
                           </button>
                           <button onClick={() => setInlineEdit(null)}
-                            className="w-6 h-6 rounded-lg flex items-center justify-center"
+                            className="w-7 h-7 rounded-lg flex items-center justify-center"
                             style={{ color: 'var(--text-faint)', border: '1px solid var(--border)' }}>
                             <X size={11} />
                           </button>
                         </div>
                       ) : (
                         <div className="flex items-center gap-1">
-                          {/* Botón rápido área/grupo visible en hover */}
+                          {/* Botón editar área/grupos — siempre visible */}
                           <button onClick={() => openInlineEdit(u)}
                             title="Cambiar área y grupos"
-                            className="opacity-0 group-hover:opacity-100 w-7 h-7 rounded-lg flex items-center justify-center transition-all"
+                            className="w-7 h-7 rounded-lg flex items-center justify-center transition-all"
                             style={{ background: 'var(--primary-dim)', color: 'var(--primary)', border: '1px solid var(--primary-border)' }}>
                             <Layers size={12} />
                           </button>
@@ -576,23 +571,23 @@ export default function UsersPage() {
                               <div className="absolute right-0 top-8 rounded-xl shadow-xl z-20 w-44 py-1"
                                 style={{ background: 'var(--bg-surface)', border: '1px solid var(--border-strong)' }}>
                                 <button onClick={() => { setMenuOpen(null); router.push(`/dashboard/users/${u.id}`) }}
-                                  className="flex items-center gap-2.5 w-full px-4 py-2.5 text-sm transition-all"
+                                  className="flex items-center gap-2.5 w-full px-4 py-2.5 text-sm transition-all hover:opacity-80"
                                   style={{ color: 'var(--text-dim)' }}>
                                   <BookOpen size={13} /> Ver hoja de vida
                                 </button>
                                 <button onClick={() => openEdit(u)}
-                                  className="flex items-center gap-2.5 w-full px-4 py-2.5 text-sm transition-all"
+                                  className="flex items-center gap-2.5 w-full px-4 py-2.5 text-sm transition-all hover:opacity-80"
                                   style={{ color: 'var(--text-dim)' }}>
                                   <Edit2 size={13} /> Editar datos
                                 </button>
                                 <button onClick={() => toggleStatus(u.id)}
-                                  className="flex items-center gap-2.5 w-full px-4 py-2.5 text-sm transition-all"
+                                  className="flex items-center gap-2.5 w-full px-4 py-2.5 text-sm transition-all hover:opacity-80"
                                   style={{ color: 'var(--text-dim)' }}>
                                   <CheckCircle size={13} /> {u.status === 'activo' ? 'Desactivar' : 'Activar'}
                                 </button>
                                 <div style={{ borderTop: '1px solid var(--border)', margin: '4px 0' }} />
                                 <button onClick={() => { setDeleteConfirm(u.id); setMenuOpen(null) }}
-                                  className="flex items-center gap-2.5 w-full px-4 py-2.5 text-sm transition-all" style={{ color: '#FCA5A5' }}>
+                                  className="flex items-center gap-2.5 w-full px-4 py-2.5 text-sm transition-all hover:opacity-80" style={{ color: '#FCA5A5' }}>
                                   <Trash2 size={13} /> Eliminar
                                 </button>
                               </div>
