@@ -42,10 +42,18 @@ export async function GET(_req: NextRequest, { params }: { params: { id: string 
 
   const groups = (groupLinks || []).map((g: any) => g.groups).filter(Boolean)
 
+  // Fetch sociodemographic profile
+  const { data: workerProfile } = await supabase
+    .from('worker_profiles')
+    .select('*')
+    .eq('user_id', userId)
+    .maybeSingle()
+
   return NextResponse.json({
     user,
     enrollments: enrollments ?? [],
     certificates: certificates ?? [],
     groups,
+    workerProfile: workerProfile ?? null,
   })
 }

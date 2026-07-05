@@ -61,9 +61,9 @@ function fmtDate(d: string | null) {
 export default function UserDetailPage() {
   const { id } = useParams<{ id: string }>()
   const router = useRouter()
-  const [data, setData] = useState<{ user: UserProfile; enrollments: Enrollment[]; certificates: Certificate[]; groups: any[] } | null>(null)
+  const [data, setData] = useState<{ user: UserProfile; enrollments: Enrollment[]; certificates: Certificate[]; groups: any[]; workerProfile: any } | null>(null)
   const [loading, setLoading] = useState(true)
-  const [tab, setTab] = useState<'entrenamientos' | 'certificados'>('entrenamientos')
+  const [tab, setTab] = useState<'entrenamientos' | 'certificados' | 'perfil'>('entrenamientos')
   const [statusFilter, setStatusFilter] = useState('todos')
 
   useEffect(() => {
@@ -90,7 +90,7 @@ export default function UserDetailPage() {
     )
   }
 
-  const { user, enrollments, certificates, groups } = data
+  const { user, enrollments, certificates, groups, workerProfile } = data
 
   const total      = enrollments.length
   const completed  = enrollments.filter(e => e.status === 'completed').length
@@ -241,6 +241,7 @@ export default function UserDetailPage() {
         {[
           { key: 'entrenamientos', label: `Entrenamientos (${total})`, icon: BookOpen },
           { key: 'certificados',   label: `Certificados (${certificates.length})`, icon: Award },
+          { key: 'perfil',         label: 'Perfil Sociodemográfico', icon: User },
         ].map(({ key, label, icon: Icon }) => (
           <button key={key} onClick={() => setTab(key as any)}
             className="flex items-center gap-1.5 px-4 py-2 rounded-lg text-xs font-semibold transition-all"
@@ -312,6 +313,93 @@ export default function UserDetailPage() {
                       </span>
                     </div>
                   </motion.div>
+                )
+              })}
+            </div>
+          )}
+        </motion.div>
+      )}
+
+      {/* Perfil Sociodemográfico tab */}
+      {tab === 'perfil' && (
+        <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
+          {!workerProfile ? (
+            <div className="py-16 text-center">
+              <User size={28} className="mx-auto mb-3 opacity-30" style={{ color: 'var(--text-faint)' }} />
+              <p style={{ color: 'var(--text-faint)' }}>Este usuario aún no ha completado su perfil sociodemográfico</p>
+            </div>
+          ) : (
+            <div className="space-y-4">
+              {[
+                {
+                  title: 'Información Personal', color: '#60A5FA',
+                  fields: [
+                    ['Fecha de nacimiento', workerProfile.birth_date ? fmtDate(workerProfile.birth_date) : null],
+                    ['Género', workerProfile.gender],
+                    ['Estado civil', workerProfile.marital_status],
+                    ['Nivel educativo', workerProfile.education_level],
+                    ['Estrato socioeconómico', workerProfile.stratum != null ? `Estrato ${workerProfile.stratum}` : null],
+                    ['Municipio de residencia', workerProfile.municipality],
+                    ['Dirección', workerProfile.address],
+                  ],
+                },
+                {
+                  title: 'Núcleo Familiar', color: '#A78BFA',
+                  fields: [
+                    ['Número de personas a cargo', workerProfile.dependents != null ? String(workerProfile.dependents) : null],
+                    ['Tipo de vivienda', workerProfile.housing_type],
+                    ['Tenencia de vivienda', workerProfile.housing_tenure],
+                  ],
+                },
+                {
+                  title: 'Salud', color: '#34D399',
+                  fields: [
+                    ['Grupo sanguíneo', workerProfile.blood_type],
+                    ['EPS', workerProfile.eps],
+                    ['ARL', workerProfile.arl],
+                    ['Fondo de pensiones', workerProfile.pension_fund],
+                    ['Caja de compensación', workerProfile.compensation_fund],
+                    ['Discapacidad / Condición especial', workerProfile.disability],
+                    ['Enfermedad crónica', workerProfile.chronic_disease],
+                  ],
+                },
+                {
+                  title: 'Transporte', color: '#FCD34D',
+                  fields: [
+                    ['Medio de transporte', workerProfile.transport_type],
+                    ['Tiempo de desplazamiento', workerProfile.commute_time ? `${workerProfile.commute_time} min` : null],
+                  ],
+                },
+                {
+                  title: 'Datos Laborales', color: '#F9A8D4',
+                  fields: [
+                    ['Cargo', workerProfile.position],
+                    ['Área / Proceso', workerProfile.department],
+                    ['Tipo de contrato', workerProfile.contract_type],
+                    ['Fecha de ingreso', workerProfile.hire_date ? fmtDate(workerProfile.hire_date) : null],
+                    ['Antigüedad', workerProfile.seniority],
+                    ['Turno de trabajo', workerProfile.work_shift],
+                    ['Modalidad', workerProfile.work_modality],
+                  ],
+                },
+              ].map(({ title, color, fields }) => {
+                const visible = fields.filter(([, v]) => v)
+                if (visible.length === 0) return null
+                return (
+                  <div key={title} className="terra-card p-5">
+                    <h3 className="text-sm font-bold mb-3 flex items-center gap-2" style={{ color }}>
+                      <div className="w-2 h-2 rounded-full" style={{ background: color }} />
+                      {title}
+                    </h3>
+                    <div className="grid sm:grid-cols-2 gap-x-8 gap-y-2">
+                      {visible.map(([label, value]) => (
+                        <div key={label} className="flex items-start justify-between py-1.5 border-b border-white/5 last:border-0">
+                          <span className="text-xs" style={{ color: 'var(--text-faint)' }}>{label}</span>
+                          <span className="text-xs font-semibold text-right ml-4" style={{ color: 'var(--text)' }}>{value}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
                 )
               })}
             </div>

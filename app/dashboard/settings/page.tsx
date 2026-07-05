@@ -1,18 +1,26 @@
 'use client'
 
 import { useState } from 'react'
+import { useSession } from 'next-auth/react'
 import { motion } from 'framer-motion'
 import {
   Settings, Building2, Bell, Shield, Globe, Palette,
   Save, ChevronRight, Moon, Mail, Phone, MapPin,
-  FileText, Lock, Users, Database, CheckCircle
+  FileText, Lock, Users, Database, CheckCircle, User
 } from 'lucide-react'
 
-const SECTIONS = [
+const ADMIN_SECTIONS = [
   { id: 'empresa', label: 'Empresa', icon: Building2 },
   { id: 'notificaciones', label: 'Notificaciones', icon: Bell },
   { id: 'seguridad', label: 'Seguridad', icon: Shield },
   { id: 'sistema', label: 'Sistema', icon: Settings },
+]
+
+const WORKER_SECTIONS = [
+  { id: 'perfil', label: 'Mi Perfil', icon: User },
+  { id: 'seguridad', label: 'Seguridad', icon: Shield },
+  { id: 'notificaciones', label: 'Notificaciones', icon: Bell },
+  { id: 'sistema', label: 'Preferencias', icon: Settings },
 ]
 
 function Toggle({ defaultOn = false }: { defaultOn?: boolean }) {
@@ -28,8 +36,15 @@ function Toggle({ defaultOn = false }: { defaultOn?: boolean }) {
 }
 
 export default function SettingsPage() {
-  const [active, setActive] = useState('empresa')
+  const { data: session } = useSession()
+  const userRole = (session?.user as any)?.role || 'worker'
+  const isWorker = userRole === 'worker'
+  const SECTIONS = isWorker ? WORKER_SECTIONS : ADMIN_SECTIONS
+
+  const [active, setActive] = useState('')
   const [saved, setSaved] = useState(false)
+
+  const effectiveActive = active || (isWorker ? 'perfil' : 'empresa')
 
   const save = () => {
     setSaved(true)
@@ -41,7 +56,7 @@ export default function SettingsPage() {
 
       <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} className="mb-6">
         <h1 className="text-2xl font-black text-[var(--text)] mb-1">Configuración</h1>
-        <p className="text-[var(--text-dim)] text-sm">Ajustes del sistema SG-SST</p>
+        <p className="text-[var(--text-dim)] text-sm">{isWorker ? 'Ajustes de tu cuenta' : 'Ajustes del sistema SG-SST'}</p>
       </motion.div>
 
       <div className="grid lg:grid-cols-4 gap-5">
@@ -52,10 +67,10 @@ export default function SettingsPage() {
           <div className="bg-[var(--bg-surface)] border border-[var(--border)] rounded-2xl p-2 space-y-0.5">
             {SECTIONS.map(({ id, label, icon: Icon }) => (
               <button key={id} onClick={() => setActive(id)}
-                className={`w-full flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-sm font-medium transition-all ${active === id ? 'bg-amber-500/15 text-amber-300 border border-amber-500/25' : 'text-[var(--text-dim)] hover:bg-[var(--bg-card)] hover:text-[var(--text)]'}`}>
+                className={`w-full flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-sm font-medium transition-all ${effectiveActive === id ? 'bg-amber-500/15 text-amber-300 border border-amber-500/25' : 'text-[var(--text-dim)] hover:bg-[var(--bg-card)] hover:text-[var(--text)]'}`}>
                 <Icon size={16} />
                 <span>{label}</span>
-                {active === id && <ChevronRight size={13} className="ml-auto" />}
+                {effectiveActive === id && <ChevronRight size={13} className="ml-auto" />}
               </button>
             ))}
           </div>
@@ -65,7 +80,33 @@ export default function SettingsPage() {
         <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }}
           className="lg:col-span-3 space-y-4">
 
-          {active === 'empresa' && (
+          {effectiveActive === 'perfil' && (
+            <div className="bg-[var(--bg-surface)] border border-[var(--border)] rounded-2xl p-5">
+              <h2 className="text-[var(--text)] font-bold mb-4 flex items-center gap-2"><User size={16} className="text-amber-400" /> Información Personal</h2>
+              <div className="grid sm:grid-cols-2 gap-4">
+                {[
+                  { label: 'Nombre completo', placeholder: 'Tu nombre completo', icon: User },
+                  { label: 'Correo electrónico', placeholder: 'tu@correo.com', icon: Mail },
+                  { label: 'Teléfono', placeholder: '+57 300 000 0000', icon: Phone },
+                  { label: 'Ciudad de residencia', placeholder: 'Bogotá', icon: MapPin },
+                ].map(({ label, placeholder, icon: Icon }) => (
+                  <div key={label}>
+                    <label className="text-[var(--text-dim)] text-xs font-semibold mb-1.5 block">{label}</label>
+                    <div className="relative">
+                      <Icon size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--text-faint)]" />
+                      <input placeholder={placeholder}
+                        className="w-full bg-[var(--bg-card)] border border-[var(--border)] rounded-xl pl-8 pr-4 py-2.5 text-sm text-[var(--text)] focus:outline-none focus:border-amber-500/40 transition-all" />
+                    </div>
+                  </div>
+                ))}
+              </div>
+              <p className="text-[10px] mt-4" style={{ color: 'var(--text-faint)' }}>
+                Para actualizar tu cédula o datos laborales, contacta al administrador de tu empresa.
+              </p>
+            </div>
+          )}
+
+          {effectiveActive === 'empresa' && !isWorker && (
             <>
               <div className="bg-[var(--bg-surface)] border border-[var(--border)] rounded-2xl p-5">
                 <h2 className="text-[var(--text)] font-bold mb-4 flex items-center gap-2"><Building2 size={16} className="text-amber-400" /> Información de la Empresa</h2>
@@ -110,7 +151,7 @@ export default function SettingsPage() {
             </>
           )}
 
-          {active === 'notificaciones' && (
+          {effectiveActive === 'notificaciones' && (
             <div className="bg-[var(--bg-surface)] border border-[var(--border)] rounded-2xl p-5">
               <h2 className="text-[var(--text)] font-bold mb-4 flex items-center gap-2"><Bell size={16} className="text-amber-400" /> Preferencias de Notificación</h2>
               <div className="space-y-4">
@@ -134,7 +175,7 @@ export default function SettingsPage() {
             </div>
           )}
 
-          {active === 'seguridad' && (
+          {effectiveActive === 'seguridad' && (
             <div className="bg-[var(--bg-surface)] border border-[var(--border)] rounded-2xl p-5">
               <h2 className="text-[var(--text)] font-bold mb-4 flex items-center gap-2"><Lock size={16} className="text-amber-400" /> Seguridad de la Cuenta</h2>
               <div className="space-y-4">
@@ -166,7 +207,7 @@ export default function SettingsPage() {
             </div>
           )}
 
-          {active === 'sistema' && (
+          {effectiveActive === 'sistema' && (
             <>
               <div className="bg-[var(--bg-surface)] border border-[var(--border)] rounded-2xl p-5">
                 <h2 className="text-[var(--text)] font-bold mb-4 flex items-center gap-2"><Globe size={16} className="text-amber-400" /> Preferencias del Sistema</h2>
