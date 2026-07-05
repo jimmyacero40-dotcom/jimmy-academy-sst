@@ -67,3 +67,19 @@ export async function POST(req: NextRequest) {
 
   return NextResponse.json(data, { status: 201 })
 }
+
+export async function DELETE(req: NextRequest) {
+  const user = await getCurrentUser()
+  if (!user) return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
+
+  const { id } = await req.json()
+  if (!id) return NextResponse.json({ error: 'ID requerido' }, { status: 400 })
+
+  const companyId = await getActiveCompanyId()
+  let query = supabase.from('certificates').delete().eq('id', id)
+  if (companyId) query = query.eq('company_id', companyId)
+
+  const { error } = await query
+  if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+  return NextResponse.json({ ok: true })
+}

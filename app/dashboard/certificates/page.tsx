@@ -5,7 +5,7 @@ import { motion } from 'framer-motion'
 import Link from 'next/link'
 import {
   Award, Search, Plus, Download, CheckCircle, Clock,
-  AlertCircle, Calendar, User, X, QrCode, Shield, Loader2
+  AlertCircle, Calendar, User, X, QrCode, Shield, Loader2, Trash2
 } from 'lucide-react'
 import { generateCertificatePNG } from '@/lib/generate-certificate'
 
@@ -32,6 +32,21 @@ export default function CertificatesPage() {
   const [filter, setFilter] = useState('todos')
   const [selected, setSelected] = useState<Cert | null>(null)
   const [downloading, setDownloading] = useState(false)
+  const [deleteConfirm, setDeleteConfirm] = useState<Cert | null>(null)
+  const [deleting, setDeleting] = useState(false)
+
+  const handleDelete = async () => {
+    if (!deleteConfirm) return
+    setDeleting(true)
+    await fetch('/api/certificates', {
+      method: 'DELETE',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id: deleteConfirm.id }),
+    })
+    setCerts(prev => prev.filter(c => c.id !== deleteConfirm.id))
+    setDeleteConfirm(null)
+    setDeleting(false)
+  }
 
   const handleDownload = async (cert: Cert) => {
     if (downloading) return
@@ -185,9 +200,14 @@ export default function CertificatesPage() {
                       </span>
                     </td>
                     <td className="px-5 py-4">
-                      <button className="text-[var(--text-faint)] hover:text-amber-400 transition-colors" onClick={e => { e.stopPropagation(); setSelected(c) }}>
-                        <Download size={15} />
-                      </button>
+                      <div className="flex items-center gap-2">
+                        <button className="text-[var(--text-faint)] hover:text-amber-400 transition-colors" onClick={e => { e.stopPropagation(); setSelected(c) }} title="Descargar">
+                          <Download size={15} />
+                        </button>
+                        <button className="text-[var(--text-faint)] hover:text-rose-400 transition-colors" onClick={e => { e.stopPropagation(); setDeleteConfirm(c) }} title="Eliminar">
+                          <Trash2 size={15} />
+                        </button>
+                      </div>
                     </td>
                   </motion.tr>
                 )
@@ -213,8 +233,13 @@ export default function CertificatesPage() {
                   </span>
                 </div>
                 <div className="flex items-center justify-between text-xs text-[var(--text-faint)]">
-                  <span className="font-mono">{c.id}</span>
-                  <span>Vence {c.expires}</span>
+                  <span className="font-mono truncate max-w-[160px]">{c.id}</span>
+                  <div className="flex items-center gap-3 flex-shrink-0">
+                    <span>Vence {c.expires}</span>
+                    <button onClick={e => { e.stopPropagation(); setDeleteConfirm(c) }} className="text-rose-400">
+                      <Trash2 size={14} />
+                    </button>
+                  </div>
                 </div>
               </div>
             )
@@ -281,6 +306,37 @@ export default function CertificatesPage() {
                   {downloading ? <><Loader2 size={14} className="animate-spin" /> Generando...</> : <><Download size={14} /> Descargar</>}
                 </button>
               </div>
+            </div>
+          </motion.div>
+        </div>
+      )}
+
+      {/* Delete confirmation modal */}
+      {deleteConfirm && (
+        <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }}
+            className="bg-[var(--bg-surface)] border border-[var(--border-strong)] rounded-2xl w-full max-w-sm p-6 text-center">
+            <div className="w-12 h-12 rounded-full flex items-center justify-center mx-auto mb-4"
+              style={{ background: 'rgba(239,68,68,0.12)', border: '1px solid rgba(239,68,68,0.25)' }}>
+              <Trash2 size={22} className="text-rose-400" />
+            </div>
+            <h3 className="font-bold text-lg mb-1" style={{ color: 'var(--text)' }}>¿Eliminar certificado?</h3>
+            <p className="text-sm mb-1" style={{ color: 'var(--text-dim)' }}>
+              <span className="font-semibold" style={{ color: 'var(--text)' }}>{deleteConfirm.name}</span>
+            </p>
+            <p className="text-xs mb-6" style={{ color: 'var(--text-faint)' }}>{deleteConfirm.course}</p>
+            <div className="flex gap-3">
+              <button onClick={() => setDeleteConfirm(null)}
+                className="flex-1 py-2.5 rounded-xl border border-[var(--border)] text-sm font-semibold transition-all"
+                style={{ color: 'var(--text-dim)' }}>
+                Cancelar
+              </button>
+              <button onClick={handleDelete} disabled={deleting}
+                className="flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl text-sm font-semibold transition-all text-white disabled:opacity-50"
+                style={{ background: '#EF4444' }}>
+                {deleting ? <Loader2 size={14} className="animate-spin" /> : <Trash2 size={14} />}
+                {deleting ? 'Eliminando...' : 'Eliminar'}
+              </button>
             </div>
           </motion.div>
         </div>
