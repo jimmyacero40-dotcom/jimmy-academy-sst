@@ -134,14 +134,9 @@ export default function UsersPage() {
         cedula: u.cedula || '',
         status: u.active ? 'activo' as UserStatus : 'inactivo' as UserStatus,
         createdAt: new Date(u.created_at).toLocaleDateString('es-CO'),
-        groups: [],
+        groups: (u.user_groups ?? []).map((ug: any) => ug.groups).filter(Boolean),
       }))
       setUsers(userList)
-      // Load groups for all users in parallel
-      const groupsResults = await Promise.all(
-        userList.map(u => fetch(`/api/users/${u.id}/groups`).then(r => r.ok ? r.json() : []).catch(() => []))
-      )
-      setUsers(userList.map((u, i) => ({ ...u, groups: groupsResults[i] ?? [] })))
     } catch {}
   }
 

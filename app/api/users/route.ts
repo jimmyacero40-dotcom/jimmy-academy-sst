@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { supabase } from '@/lib/supabase'
+import { supabaseAdmin } from '@/lib/supabase-admin'
 import { isAdminOrSuper } from '@/lib/get-company'
 import bcrypt from 'bcryptjs'
 
@@ -7,7 +8,10 @@ export async function GET() {
   const { authorized, companyId } = await isAdminOrSuper()
   if (!authorized) return NextResponse.json({ error: 'No autorizado' }, { status: 403 })
 
-  let query = supabase.from('users').select('id, email, name, cedula, role, area, active, company_id, created_at').order('created_at', { ascending: false })
+  let query = supabaseAdmin
+    .from('users')
+    .select('id, email, name, cedula, role, area, active, company_id, created_at, user_groups(groups(id, name, color))')
+    .order('created_at', { ascending: false })
   if (companyId) query = query.eq('company_id', companyId)
 
   const { data, error } = await query
