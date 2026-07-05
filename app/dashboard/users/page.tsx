@@ -122,24 +122,28 @@ export default function UsersPage() {
   const loadUsers = async () => {
     try {
       const res = await fetch('/api/users')
-      if (res.ok) {
-        const data = await res.json()
-        setUsers(data.map((u: any) => ({
-          id: u.id,
-          name: u.name,
-          email: u.email,
-          empresa: u.area || '',
-          area_id: u.area_id || '',
-          area_name: u.area || '',
-          role: u.role === 'admin' ? 'Administrador' : (u.area || 'Trabajador'),
-          cedula: u.cedula || '',
-          status: u.active ? 'activo' as UserStatus : 'inactivo' as UserStatus,
-          createdAt: new Date(u.created_at).toLocaleDateString('es-CO'),
-          groups: (u.user_groups ?? [])
-            .map((ug: any) => ug.groups)
-            .filter(Boolean),
-        })))
-      }
+      if (!res.ok) return
+      const data = await res.json()
+      // Build user list first, then load groups in parallel
+      const userList: AppUser[] = data.map((u: any) => ({
+        id: u.id,
+        name: u.name,
+        email: u.email,
+        empresa: u.area || '',
+        area_id: u.area_id || '',
+        area_name: u.area || '',
+        role: u.role === 'admin' ? 'Administrador' : (u.area || 'Trabajador'),
+        cedula: u.cedula || '',
+        status: u.active ? 'activo' as UserStatus : 'inactivo' as UserStatus,
+        createdAt: new Date(u.created_at).toLocaleDateString('es-CO'),
+        groups: [],
+      }))
+      setUsers(userList)
+      // Load groups for all users in parallel
+      const groupsResults = await Promise.all(
+        userList.map(u => fetch(`/api/users/${u.id}/groups`).then(r => r.ok ? r.json() : []).catch(() => []))
+      )
+      setUsers(userList.map((u, i) => ({ ...u, groups: groupsResults[i] ?? [] })))
     } catch {}
   }
 
@@ -309,25 +313,29 @@ export default function UsersPage() {
 
   const openInlineEdit = async (u: AppUser) => {
     setInlineEdit(u.id)
-    setInlineArea(u.area_id || '')
-    setInlineGroups([])
-    try {
-      const res = await fetch(`/api/users/${u.id}/groups`)
-      if (res.ok) { const gs = await res.json(); setInlineGroups(gs.map((g: any) => g.id)) }
-    } catch {}
+    // Match area by name since area_id may not be stored in users table
+    const matchedArea = areas.find(a => a.name === u.area_name)
+    setInlineArea(matchedArea?.id || '')
+    setInlineGroups(u.groups.map(g => g.id))
   }
 
   const saveInline = async (userId: string) => {
     setSavingInline(true)
     const selectedArea = areas.find(a => a.id === inlineArea)
-    await fetch('/api/users', {
-      method: 'PUT', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ id: userId, area: selectedArea?.name || '', area_id: inlineArea || null }),
-    })
-    await fetch(`/api/users/${userId}/groups`, {
-      method: 'PUT', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ group_ids: inlineGroups }),
-    })
+    const [userRes, groupRes] = await Promise.all([
+      fetch('/api/users', {
+        method: 'PUT', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: userId, area: selectedArea?.name || '' }),
+      }),
+      fetch(`/api/users/${userId}/groups`, {
+        method: 'PUT', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ group_ids: inlineGroups }),
+      }),
+    ])
+    if (!userRes.ok || !groupRes.ok) {
+      setSavingInline(false)
+      return
+    }
     await loadUsers()
     setInlineEdit(null)
     setSavingInline(false)
@@ -422,11 +430,11 @@ export default function UsersPage() {
             <colgroup>
               <col style={{ width: 36 }} />
               <col />
-              <col style={{ width: 110 }} />
-              <col style={{ width: '18%' }} />
-              <col style={{ width: '20%' }} />
-              <col style={{ width: 80 }} />
-              <col style={{ width: 96 }} />
+              <col style={{ width: 108 }} />
+              <col style={{ width: 120 }} />
+              <col style={{ width: 160 }} />
+              <col style={{ width: 76 }} />
+              <col style={{ width: 88 }} />
             </colgroup>
             <thead>
               <tr>
@@ -435,10 +443,10 @@ export default function UsersPage() {
                     onChange={toggleSelectAll} className="w-4 h-4 rounded accent-blue-500" />
                 </th>
                 <th>Trabajador</th>
-                <th>Cédula</th>
-                <th>Área</th>
-                <th>Grupos</th>
-                <th>Estado</th>
+                <th className="text-center">Cédula</th>
+                <th className="text-center">Área</th>
+                <th className="text-center">Grupos</th>
+                <th className="text-center">Estado</th>
                 <th></th>
               </tr>
             </thead>
@@ -470,30 +478,33 @@ export default function UsersPage() {
                     </td>
 
                     {/* Cédula */}
-                    <td><span className="font-mono text-xs">{u.cedula || '—'}</span></td>
+                    <td className="text-center">
+                      <span className="font-mono text-[11px]">{u.cedula || '—'}</span>
+                    </td>
 
                     {/* Área — dropdown en modo inline */}
-                    <td>
+                    <td className="text-center">
                       {inlineEdit === u.id ? (
                         <select value={inlineArea} onChange={e => setInlineArea(e.target.value)}
-                          className="terra-input py-1 text-xs w-full">
+                          className="terra-input py-0.5 text-[11px] w-full">
                           <option value="">Sin área</option>
                           {areas.map(a => <option key={a.id} value={a.id}>{a.name}</option>)}
                         </select>
                       ) : u.area_name ? (
-                        <span className="flex items-center gap-1.5 text-xs" style={{ color: 'var(--text-dim)' }}>
-                          <Layers size={10} style={{ color: 'var(--primary)', flexShrink: 0 }} />
+                        <span className="inline-flex items-center gap-1 text-[11px] font-medium px-2 py-0.5 rounded-full"
+                          style={{ background: 'rgba(59,130,246,0.08)', color: 'var(--primary)' }}>
+                          <Layers size={9} />
                           {u.area_name}
                         </span>
                       ) : (
-                        <span className="text-xs" style={{ color: 'var(--text-faint)' }}>—</span>
+                        <span className="text-[11px]" style={{ color: 'var(--text-faint)' }}>—</span>
                       )}
                     </td>
 
                     {/* Grupos — chips o checkboxes en modo inline */}
-                    <td>
+                    <td className="text-center">
                       {inlineEdit === u.id ? (
-                        <div className="flex flex-wrap gap-1">
+                        <div className="flex flex-wrap gap-1 justify-center">
                           {groups.map(g => {
                             const on = inlineGroups.includes(g.id)
                             return (
@@ -505,31 +516,31 @@ export default function UsersPage() {
                                   border: `1px solid ${on ? 'var(--primary-border)' : 'var(--border)'}`,
                                   color: on ? 'var(--primary)' : 'var(--text-faint)',
                                 }}>
-                                {on && '✓ '}{g.name}
+                                {on ? '✓ ' : ''}{g.name}
                               </button>
                             )
                           })}
                           {groups.length === 0 && <span className="text-[10px]" style={{ color: 'var(--text-faint)' }}>Sin grupos</span>}
                         </div>
                       ) : u.groups?.length ? (
-                        <div className="flex flex-wrap gap-1">
-                          {u.groups.slice(0, 3).map(g => (
+                        <div className="flex flex-wrap gap-1 justify-center">
+                          {u.groups.slice(0, 2).map(g => (
                             <span key={g.id} className="text-[10px] px-1.5 py-0.5 rounded-full font-semibold"
                               style={{ background: 'var(--primary-dim)', color: 'var(--primary)', border: '1px solid var(--primary-border)' }}>
                               {g.name}
                             </span>
                           ))}
-                          {u.groups.length > 3 && (
+                          {u.groups.length > 2 && (
                             <span className="text-[10px] px-1.5 py-0.5 rounded-full" style={{ background: 'var(--bg-card)', color: 'var(--text-faint)', border: '1px solid var(--border)' }}>
-                              +{u.groups.length - 3}
+                              +{u.groups.length - 2}
                             </span>
                           )}
                         </div>
-                      ) : <span className="text-xs" style={{ color: 'var(--text-faint)' }}>—</span>}
+                      ) : <span className="text-[11px]" style={{ color: 'var(--text-faint)' }}>—</span>}
                     </td>
 
                     {/* Estado */}
-                    <td>
+                    <td className="text-center">
                       <span className={u.status === 'activo' ? 'badge-green' : 'badge-red'}>
                         {u.status === 'activo' ? 'Activo' : 'Inactivo'}
                       </span>
