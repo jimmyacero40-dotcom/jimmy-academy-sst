@@ -118,7 +118,6 @@ export default function UsersPage() {
   const [inlineArea, setInlineArea] = useState('')
   const [inlineGroups, setInlineGroups] = useState<string[]>([])
   const [savingInline, setSavingInline] = useState(false)
-  const [groupDropOpen, setGroupDropOpen] = useState(false)
 
   const loadUsers = async () => {
     try {
@@ -314,7 +313,6 @@ export default function UsersPage() {
 
   const openInlineEdit = async (u: AppUser) => {
     setInlineEdit(u.id)
-    setGroupDropOpen(false)
     // Match area by name since area_id may not be stored in users table
     const matchedArea = areas.find(a => a.name === u.area_name)
     setInlineArea(matchedArea?.id || '')
@@ -340,7 +338,6 @@ export default function UsersPage() {
     }
     await loadUsers()
     setInlineEdit(null)
-    setGroupDropOpen(false)
     setSavingInline(false)
   }
 
@@ -504,47 +501,19 @@ export default function UsersPage() {
                       )}
                     </td>
 
-                    {/* Grupos — dropdown compacto en modo inline */}
+                    {/* Grupos */}
                     <td className="text-center">
                       {inlineEdit === u.id ? (
-                        <div className="relative inline-block">
-                          <button type="button"
-                            onClick={() => setGroupDropOpen(o => !o)}
-                            className="flex items-center gap-1 px-2 py-1 rounded-lg text-[11px] font-semibold transition-all"
-                            style={{
-                              background: 'var(--bg-card)',
-                              border: '1px solid var(--primary-border)',
-                              color: 'var(--primary)',
-                              minWidth: 100,
-                            }}>
-                            <Layers size={10} />
-                            {inlineGroups.length === 0 ? 'Sin grupo' : `${inlineGroups.length} grupo${inlineGroups.length > 1 ? 's' : ''}`}
-                            <ChevronDown size={10} className="ml-auto" />
-                          </button>
-                          {groupDropOpen && (
-                            <div className="absolute left-0 top-full mt-1 rounded-xl shadow-2xl z-50 py-1 min-w-[160px]"
-                              style={{ background: 'var(--bg-surface)', border: '1px solid var(--border-strong)' }}>
-                              {groups.length === 0
-                                ? <div className="px-3 py-2 text-[11px]" style={{ color: 'var(--text-faint)' }}>Sin grupos disponibles</div>
-                                : groups.map(g => {
-                                  const on = inlineGroups.includes(g.id)
-                                  return (
-                                    <button key={g.id} type="button"
-                                      onClick={() => setInlineGroups(prev => on ? prev.filter(x => x !== g.id) : [...prev, g.id])}
-                                      className="flex items-center gap-2 w-full px-3 py-2 text-[11px] font-medium transition-all text-left"
-                                      style={{ color: on ? 'var(--primary)' : 'var(--text-dim)', background: on ? 'var(--primary-dim)' : 'transparent' }}>
-                                      <div className="w-3 h-3 rounded flex items-center justify-center flex-shrink-0"
-                                        style={{ background: on ? 'var(--primary)' : 'transparent', border: `1px solid ${on ? 'var(--primary)' : 'var(--border-strong)'}` }}>
-                                        {on && <span className="text-white text-[8px] leading-none">✓</span>}
-                                      </div>
-                                      {g.name}
-                                    </button>
-                                  )
-                                })
-                              }
-                            </div>
-                          )}
-                        </div>
+                        <select
+                          multiple
+                          value={inlineGroups}
+                          onChange={e => setInlineGroups(Array.from(e.target.selectedOptions, o => o.value))}
+                          className="terra-input text-[11px] w-full"
+                          style={{ height: Math.min(groups.length, 5) * 26 + 4, padding: '2px' }}>
+                          {groups.map(g => (
+                            <option key={g.id} value={g.id}>{g.name}</option>
+                          ))}
+                        </select>
                       ) : u.groups?.length ? (
                         <div className="flex flex-wrap gap-1 justify-center">
                           {u.groups.slice(0, 2).map(g => (
@@ -579,7 +548,7 @@ export default function UsersPage() {
                             {savingInline ? <Loader2 size={10} className="animate-spin" /> : <CheckCircle size={10} />}
                             Guardar
                           </button>
-                          <button onClick={() => { setInlineEdit(null); setGroupDropOpen(false) }}
+                          <button onClick={() => setInlineEdit(null)}
                             className="w-7 h-7 rounded-lg flex items-center justify-center"
                             style={{ color: 'var(--text-faint)', border: '1px solid var(--border)' }}>
                             <X size={11} />
