@@ -185,6 +185,21 @@ body {
   background: rgba(59,130,246,0.07);
 }
 .terra-input::placeholder { color: var(--text-faint); }
+/* Dark-mode select: force OS-native dropdown to use dark colors */
+select {
+  color-scheme: dark;
+}
+select option {
+  background: #111827;
+  color: #F1F5F9;
+}
+[data-theme="light"] select {
+  color-scheme: light;
+}
+[data-theme="light"] select option {
+  background: #FFFFFF;
+  color: #0F172A;
+}
 
 .terra-tag {
   display: inline-flex;
