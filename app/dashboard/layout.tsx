@@ -10,7 +10,7 @@ import {
   ChevronLeft, ChevronRight, Search, Menu, X,
   Sun, Moon, Building2, Layers, UserCheck, Briefcase,
   CalendarDays, GraduationCap, TrendingUp, FileCheck,
-  ClipboardList, Home, History
+  ClipboardList, Home, History, Activity
 } from 'lucide-react'
 
 // ── Admin navigation (grouped) ────────────────────────────────────
@@ -24,9 +24,10 @@ const ADMIN_NAV = [
   {
     section: 'ORGANIZACIÓN',
     items: [
-      { href: '/dashboard/users',   icon: Users,            label: 'Usuarios' },
-      { href: '/dashboard/areas',   icon: Layers,           label: 'Áreas' },
-      { href: '/dashboard/groups',  icon: UserCheck,        label: 'Grupos' },
+      { href: '/dashboard/users',            icon: Users,     label: 'Usuarios' },
+      { href: '/dashboard/areas',            icon: Layers,    label: 'Áreas' },
+      { href: '/dashboard/groups',           icon: UserCheck, label: 'Grupos' },
+      { href: '/dashboard/worker-profiles',  icon: Activity,  label: 'Inf. Sociodemográfica' },
     ]
   },
   {
