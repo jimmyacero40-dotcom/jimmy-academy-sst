@@ -645,6 +645,12 @@ export default function BibliotecaPage() {
                           <Download size={13} className="text-emerald-400" />
                         </button>
 
+                        {/* Experience Designer */}
+                        <button onClick={(e) => { e.stopPropagation(); router.push(`/dashboard/trainings/${t.id}/experience`) }}
+                          className="p-1.5 rounded-lg hover:bg-violet-500/15 transition-colors" title="Diseñar experiencia">
+                          <span style={{ fontSize: 13 }}>✨</span>
+                        </button>
+
                         {/* Edit validity */}
                         <button onClick={(e) => openEditValidity(e, t)}
                           className="p-1.5 rounded-lg hover:bg-amber-500/15 transition-colors" title="Editar vigencia">
