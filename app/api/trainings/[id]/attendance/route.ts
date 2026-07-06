@@ -12,7 +12,7 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
 
   const { data: training } = await supabase
     .from('trainings')
-    .select('id, title, duration, description, created_at')
+    .select('id, title, duration, description, temario, created_at')
     .eq('id', trainingId)
     .single()
 

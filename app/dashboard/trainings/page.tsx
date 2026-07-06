@@ -9,7 +9,8 @@ import {
   BookOpen, Plus, Search, Clock, CheckCircle, AlertCircle,
   Users, Star, Play, Upload, ChevronRight, X, Award, Zap,
   FileText, Layers, Trash2, Loader2, Calendar, Save, Download,
-  ImagePlus, Copy, Archive, ArchiveRestore, Tag, Filter, RotateCcw
+  ImagePlus, Copy, Archive, ArchiveRestore, Tag, Filter, RotateCcw,
+  Pencil, RefreshCw, FileUp, AlignLeft
 } from 'lucide-react'
 
 const GRADIENTS = [
@@ -85,8 +86,9 @@ async function downloadAttendanceList(training: any) {
     cl(cX(8),y,cW(8,9),9,'DIRIGIDO A',{bg:CG,color:CW,bold:true,size:7});cl(cX(10),y,cols[10],9,'TRABAJADORES',{size:7});y+=9
     cl(cX(0),y,usable,7,'TEMARIO DEL EVENTO',{bg:CO,color:CW,bold:true,size:9});y+=7
     cl(cX(0),y,usable,6,tr.title,{bold:true,size:8,align:'left'});y+=6
-    const dl=tr.description?doc.splitTextToSize(tr.description,usable-6):[]
-    for(let i=0;i<5;i++){cl(cX(0),y,usable,6,dl[i]||'',{size:7,align:'left'});y+=6}
+    const temarioContent = tr.temario || tr.description || ''
+    const dl=temarioContent?doc.splitTextToSize(temarioContent,usable-6):[]
+    for(let i=0;i<8;i++){if(!dl[i]&&i>0&&!dl[i-1])break;cl(cX(0),y,usable,6,dl[i]||'',{size:7,align:'left'});y+=6}
     cl(cX(0),y,usable,7,'REGISTRO DE PARTICIPANTES',{bg:CO,color:CW,bold:true,size:9});y+=7
     const thH=8
     const drawTH=()=>{cl(cX(0),y,cols[0],thH,'Nº',{bg:CLO,bold:true,size:8});cl(cX(1),y,cW(1,2),thH,'CÉDULA',{bg:CLO,bold:true,size:8})
@@ -135,6 +137,149 @@ export default function BibliotecaPage() {
   const [editValidFrom, setEditValidFrom] = useState('')
   const [editValidUntil, setEditValidUntil] = useState('')
   const [savingValidity, setSavingValidity] = useState(false)
+
+  // ── Edit training full modal ──────────────────────────────────────────────
+  const [editCourse, setEditCourse] = useState<any>(null)
+  const [editForm, setEditForm] = useState({
+    title: '', category: 'Obligatorio', description: '', duration: '8h',
+    status: 'activo', temario: '', valid_from: '', valid_until: '',
+  })
+  const [editFile, setEditFile] = useState<File | null>(null)
+  const editFileRef = useRef<HTMLInputElement>(null)
+  const [savingEdit, setSavingEdit] = useState(false)
+  const [editProgress, setEditProgress] = useState('')
+  const [showPPTXSection, setShowPPTXSection] = useState(false)
+
+  const openEditCourse = (t: any) => {
+    setEditCourse(t)
+    setEditForm({
+      title: t.title || '',
+      category: t.category || 'Obligatorio',
+      description: t.description || '',
+      duration: t.duration || '8h',
+      status: t.status || 'activo',
+      temario: t.temario || '',
+      valid_from: t.valid_from || '',
+      valid_until: t.valid_until || '',
+    })
+    setEditFile(null)
+    setShowPPTXSection(false)
+    setEditProgress('')
+  }
+
+  const handleEditSave = async () => {
+    if (!editCourse || !editForm.title.trim()) return
+    setSavingEdit(true)
+    setEditProgress('Guardando información...')
+
+    try {
+      // 1. Save general info
+      const res = await fetch('/api/trainings', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          id: editCourse.id,
+          title: editForm.title.trim(),
+          category: editForm.category,
+          description: editForm.description,
+          duration: editForm.duration,
+          status: editForm.status,
+          temario: editForm.temario || null,
+          valid_from: editForm.valid_from || null,
+          valid_until: editForm.valid_until || null,
+        }),
+      })
+      if (!res.ok) {
+        const d = await res.json()
+        alert('Error al guardar: ' + (d.error || 'desconocido'))
+        setSavingEdit(false)
+        setEditProgress('')
+        return
+      }
+
+      // 2. Replace PPTX if a new file was selected
+      if (editFile && /\.(pptx|pdf)$/i.test(editFile.name)) {
+        setEditProgress('Extrayendo diapositivas...')
+        let slides: string[] = []
+        let texts: string[] = []
+
+        if (/\.pptx$/i.test(editFile.name)) {
+          try {
+            slides = await extractPPTXImages(editFile)
+            texts = await extractPPTXTexts(editFile)
+          } catch (e) { console.error('PPTX extract error', e) }
+        } else if (/\.pdf$/i.test(editFile.name)) {
+          try {
+            const { extractPDFImages } = await import('@/lib/pdf-extractor')
+            slides = await extractPDFImages(editFile)
+          } catch (e) { console.error('PDF extract error', e) }
+        }
+
+        if (slides.length > 0) {
+          setEditProgress(`Reemplazando ${slides.length} diapositivas...`)
+          // Replace slides in DB
+          const slidesPayload = slides.map((img, i) => ({
+            slide_index: i, image_data: img, slide_text: texts[i] || '',
+          }))
+          await fetch(`/api/trainings/${editCourse.id}/slides`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ slides: slidesPayload, slides_count: slides.length }),
+          })
+        }
+
+        // Upload original PPTX to storage
+        if (/\.pptx$/i.test(editFile.name)) {
+          setEditProgress('Guardando archivo original...')
+          const fd = new FormData()
+          fd.append('file', editFile)
+          await fetch(`/api/trainings/${editCourse.id}/upload-pptx`, {
+            method: 'POST',
+            body: fd,
+          })
+        }
+
+        // Update local state
+        const updatedCover = slides[0] || editCourse.cover_url
+        setTrainings(prev => prev.map(t => t.id === editCourse.id
+          ? { ...t, ...editForm, cover_url: updatedCover, slides_count: slides.length, file_name: editFile.name }
+          : t
+        ))
+      } else {
+        setTrainings(prev => prev.map(t => t.id === editCourse.id
+          ? { ...t, ...editForm }
+          : t
+        ))
+      }
+
+      setEditCourse(null)
+    } catch (e: any) {
+      alert('Error: ' + e.message)
+    } finally {
+      setSavingEdit(false)
+      setEditProgress('')
+    }
+  }
+
+  const downloadPPTX = async (e: React.MouseEvent, t: any) => {
+    e.stopPropagation()
+    if (!t.file_name) { alert('Esta capacitación no tiene un PowerPoint guardado.'); return }
+    try {
+      const res = await fetch(`/api/trainings/${t.id}/download`)
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}))
+        alert(err.error || 'No se encontró el archivo PowerPoint original. Sube o reemplaza la presentación para habilitarlo.')
+        return
+      }
+      const { url } = await res.json()
+      const a = document.createElement('a')
+      a.href = url
+      a.download = t.file_name
+      a.click()
+    } catch (e: any) {
+      alert('Error al descargar: ' + e.message)
+    }
+  }
 
   useEffect(() => {
     async function loadAndMigrate() {
@@ -645,6 +790,20 @@ export default function BibliotecaPage() {
                           <Download size={13} className="text-emerald-400" />
                         </button>
 
+                        {/* Download original PPTX */}
+                        {t.file_name && (
+                          <button onClick={(e) => downloadPPTX(e, t)}
+                            className="p-1.5 rounded-lg hover:bg-orange-500/15 transition-colors" title="Descargar PowerPoint original">
+                            <FileUp size={13} className="text-orange-400" style={{ transform: 'rotate(180deg)' }} />
+                          </button>
+                        )}
+
+                        {/* Edit training */}
+                        <button onClick={(e) => { e.stopPropagation(); openEditCourse(t) }}
+                          className="p-1.5 rounded-lg hover:bg-blue-500/15 transition-colors" title="Editar capacitación">
+                          <Pencil size={13} className="text-blue-400" />
+                        </button>
+
                         {/* Experience Designer */}
                         <button onClick={(e) => { e.stopPropagation(); router.push(`/dashboard/trainings/${t.id}/experience`) }}
                           className="p-1.5 rounded-lg hover:bg-violet-500/15 transition-colors" title="Diseñar experiencia">
@@ -812,6 +971,189 @@ export default function BibliotecaPage() {
               <button onClick={handleCreateCourse} disabled={!newCourse.name.trim() || creating}
                 className="terra-btn flex-1 py-2.5 justify-center">
                 {creating ? (uploadProgress || 'Procesando...') : 'Agregar a Biblioteca'}
+              </button>
+            </div>
+          </motion.div>
+        </div>
+      )}
+
+      {/* ─── Edit Training Full Modal ──────────────────────────────────── */}
+      {editCourse && (
+        <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-4"
+          onClick={() => !savingEdit && setEditCourse(null)}>
+          <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }}
+            className="w-full max-w-xl rounded-2xl flex flex-col max-h-[90vh]"
+            style={{ background: 'var(--bg-surface)', border: '1px solid var(--border-strong)' }}
+            onClick={e => e.stopPropagation()}>
+
+            {/* Header */}
+            <div className="flex items-center justify-between px-5 py-4 flex-shrink-0"
+              style={{ borderBottom: '1px solid var(--border)' }}>
+              <div className="flex items-center gap-2.5">
+                <div className="w-8 h-8 rounded-lg flex items-center justify-center"
+                  style={{ background: 'rgba(59,130,246,0.1)', border: '1px solid rgba(59,130,246,0.2)' }}>
+                  <Pencil size={14} className="text-blue-400" />
+                </div>
+                <div>
+                  <h2 className="font-bold text-sm" style={{ color: 'var(--text)' }}>Editar Capacitación</h2>
+                  <p className="text-[10px]" style={{ color: 'var(--text-faint)' }}>Todos los cambios se reflejan inmediatamente</p>
+                </div>
+              </div>
+              <button onClick={() => setEditCourse(null)} disabled={savingEdit} style={{ color: 'var(--text-dim)' }}>
+                <X size={18} />
+              </button>
+            </div>
+
+            {/* Body */}
+            <div className="overflow-y-auto flex-1 p-5 space-y-4">
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div className="sm:col-span-2">
+                  <label className="text-[10px] font-bold uppercase tracking-wider mb-1.5 block" style={{ color: 'var(--text-dim)' }}>
+                    Título *
+                  </label>
+                  <input value={editForm.title} onChange={e => setEditForm(f => ({ ...f, title: e.target.value }))}
+                    className="terra-input w-full" placeholder="Nombre de la capacitación" />
+                </div>
+
+                <div>
+                  <label className="text-[10px] font-bold uppercase tracking-wider mb-1.5 block" style={{ color: 'var(--text-dim)' }}>
+                    Categoría
+                  </label>
+                  <select value={editForm.category} onChange={e => setEditForm(f => ({ ...f, category: e.target.value }))}
+                    className="terra-input w-full" style={{ background: 'var(--bg-card)' }}>
+                    {CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
+                  </select>
+                </div>
+
+                <div>
+                  <label className="text-[10px] font-bold uppercase tracking-wider mb-1.5 block" style={{ color: 'var(--text-dim)' }}>
+                    Duración
+                  </label>
+                  <select value={editForm.duration} onChange={e => setEditForm(f => ({ ...f, duration: e.target.value }))}
+                    className="terra-input w-full" style={{ background: 'var(--bg-card)' }}>
+                    {['1h','2h','3h','4h','6h','8h','12h','16h','20h','24h','40h'].map(d => <option key={d} value={d}>{d}</option>)}
+                  </select>
+                </div>
+
+                <div>
+                  <label className="text-[10px] font-bold uppercase tracking-wider mb-1.5 block" style={{ color: 'var(--text-dim)' }}>
+                    Estado
+                  </label>
+                  <select value={editForm.status} onChange={e => setEditForm(f => ({ ...f, status: e.target.value }))}
+                    className="terra-input w-full" style={{ background: 'var(--bg-card)' }}>
+                    {Object.entries(statusStyles).map(([v, { label }]) => <option key={v} value={v}>{label}</option>)}
+                  </select>
+                </div>
+
+                <div>
+                  <label className="text-[10px] font-bold uppercase tracking-wider mb-1.5 block" style={{ color: 'var(--text-dim)' }}>
+                    Vigencia desde
+                  </label>
+                  <input type="date" value={editForm.valid_from} onChange={e => setEditForm(f => ({ ...f, valid_from: e.target.value }))}
+                    className="terra-input w-full" style={{ colorScheme: 'dark' }} />
+                </div>
+
+                <div>
+                  <label className="text-[10px] font-bold uppercase tracking-wider mb-1.5 block" style={{ color: 'var(--text-dim)' }}>
+                    Vigencia hasta
+                  </label>
+                  <input type="date" value={editForm.valid_until} onChange={e => setEditForm(f => ({ ...f, valid_until: e.target.value }))}
+                    className="terra-input w-full" style={{ colorScheme: 'dark' }} />
+                </div>
+
+                <div className="sm:col-span-2">
+                  <label className="text-[10px] font-bold uppercase tracking-wider mb-1.5 block" style={{ color: 'var(--text-dim)' }}>
+                    Descripción
+                  </label>
+                  <textarea value={editForm.description} onChange={e => setEditForm(f => ({ ...f, description: e.target.value }))}
+                    rows={3} className="terra-input w-full resize-none" placeholder="Descripción general del curso..." />
+                </div>
+
+                <div className="sm:col-span-2">
+                  <label className="text-[10px] font-bold uppercase tracking-wider mb-1.5 flex items-center gap-1.5" style={{ color: 'var(--text-dim)' }}>
+                    <AlignLeft size={10} style={{ color: '#f59e0b' }} />
+                    Temario <span className="text-[9px] normal-case font-normal ml-1" style={{ color: 'var(--text-faint)' }}>— aparece en la planilla de asistencia</span>
+                  </label>
+                  <textarea value={editForm.temario} onChange={e => setEditForm(f => ({ ...f, temario: e.target.value }))}
+                    rows={5} className="terra-input w-full resize-none"
+                    placeholder={'• Definición y marco normativo\n• Identificación de riesgos\n• Controles y medidas preventivas\n• Procedimientos de emergencia\n• Evaluación y compromisos'} />
+                  <p className="text-[10px] mt-1" style={{ color: 'var(--text-faint)' }}>
+                    Escribe los temas desarrollados. Este resumen quedará registrado como evidencia en la planilla de asistencia.
+                  </p>
+                </div>
+              </div>
+
+              {/* PPTX replacement section */}
+              <div className="rounded-xl overflow-hidden" style={{ border: '1px solid var(--border)' }}>
+                <button onClick={() => setShowPPTXSection(p => !p)}
+                  className="w-full flex items-center justify-between px-4 py-3 text-sm font-semibold transition-all hover:bg-white/5"
+                  style={{ color: 'var(--text-dim)' }}>
+                  <div className="flex items-center gap-2">
+                    <RefreshCw size={13} style={{ color: '#f59e0b' }} />
+                    {editCourse.slides_count > 0 ? 'Reemplazar presentación' : 'Subir presentación'}
+                    {editCourse.slides_count > 0 && (
+                      <span className="text-[10px] px-2 py-0.5 rounded"
+                        style={{ background: 'rgba(16,185,129,0.1)', color: '#6ee7b7', border: '1px solid rgba(16,185,129,0.2)' }}>
+                        {editCourse.slides_count} diapositivas actuales
+                      </span>
+                    )}
+                  </div>
+                  <ChevronRight size={14} className={`transition-transform ${showPPTXSection ? 'rotate-90' : ''}`} />
+                </button>
+
+                {showPPTXSection && (
+                  <div className="px-4 pb-4 pt-2" style={{ borderTop: '1px solid var(--border)' }}>
+                    <input ref={editFileRef} type="file" accept=".pptx,.pdf" className="hidden"
+                      onChange={e => { const f = e.target.files?.[0]; if (f) setEditFile(f); e.target.value = '' }} />
+
+                    {editFile ? (
+                      <div className="flex items-center gap-3 p-3 rounded-xl"
+                        style={{ background: 'rgba(16,185,129,0.08)', border: '1px solid rgba(16,185,129,0.2)' }}>
+                        <FileUp size={18} className="text-emerald-400 flex-shrink-0" />
+                        <div className="flex-1 min-w-0">
+                          <div className="text-xs font-semibold truncate" style={{ color: 'var(--text)' }}>{editFile.name}</div>
+                          <div className="text-[10px]" style={{ color: 'var(--text-faint)' }}>
+                            {(editFile.size / 1024 / 1024).toFixed(1)} MB · Se procesará al guardar
+                          </div>
+                        </div>
+                        <button onClick={() => setEditFile(null)} style={{ color: '#FCA5A5' }}><X size={14} /></button>
+                      </div>
+                    ) : (
+                      <button onClick={() => editFileRef.current?.click()}
+                        className="w-full py-6 rounded-xl border-2 border-dashed text-sm transition-all hover:opacity-80"
+                        style={{ borderColor: 'var(--border-strong)', color: 'var(--text-faint)' }}>
+                        <FileUp size={20} className="mx-auto mb-1.5 opacity-50" />
+                        Haz clic para seleccionar PPTX o PDF
+                      </button>
+                    )}
+
+                    {editCourse.slides_count > 0 && (
+                      <p className="text-[10px] mt-2 text-center" style={{ color: 'rgba(239,68,68,0.7)' }}>
+                        ⚠ Las {editCourse.slides_count} diapositivas actuales serán reemplazadas
+                      </p>
+                    )}
+                    {!editCourse.slides_count && (
+                      <p className="text-[10px] mt-2 text-center" style={{ color: 'var(--text-faint)' }}>
+                        El archivo PPTX también se guardará para poder descargarlo después
+                      </p>
+                    )}
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Footer */}
+            <div className="flex gap-3 px-5 py-4 flex-shrink-0" style={{ borderTop: '1px solid var(--border)' }}>
+              <button onClick={() => setEditCourse(null)} disabled={savingEdit}
+                className="terra-btn-outline flex-1 py-2.5 justify-center text-sm">
+                Cancelar
+              </button>
+              <button onClick={handleEditSave} disabled={savingEdit || !editForm.title.trim()}
+                className="terra-btn flex-1 py-2.5 justify-center text-sm disabled:opacity-40">
+                {savingEdit
+                  ? <><Loader2 size={14} className="animate-spin" /> {editProgress || 'Guardando...'}</>
+                  : <><Save size={14} /> Guardar cambios</>}
               </button>
             </div>
           </motion.div>
