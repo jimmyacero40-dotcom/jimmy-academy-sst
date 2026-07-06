@@ -100,6 +100,9 @@ export default function UsersPage() {
   const [groups, setGroups]   = useState<Group[]>([])
   const [search, setSearch]   = useState('')
   const [filter, setFilter]   = useState('todos')
+  const [filterArea, setFilterArea]   = useState('')
+  const [filterGroup, setFilterGroup] = useState('')
+  const [filterRole, setFilterRole]   = useState('')
   const [selected, setSelected] = useState<Set<string>>(new Set())
 
   const [showModal, setShowModal]     = useState(false)
@@ -149,8 +152,15 @@ export default function UsersPage() {
   const filtered = users.filter(u => {
     const q = search.toLowerCase()
     const match = u.name.toLowerCase().includes(q) || u.cedula.includes(q) || u.role.toLowerCase().includes(q) || u.empresa.toLowerCase().includes(q)
-    return match && (filter === 'todos' || u.status === filter)
+    if (!match) return false
+    if (filter !== 'todos' && u.status !== filter) return false
+    if (filterArea && u.area_id !== filterArea) return false
+    if (filterGroup && !u.groups.some(g => g.id === filterGroup)) return false
+    if (filterRole && u.role.toLowerCase() !== filterRole.toLowerCase()) return false
+    return true
   })
+
+  const uniqueRoles = [...new Set(users.map(u => u.role).filter(Boolean))]
 
   const openNew = () => { setEditUser(null); setForm(EMPTY_FORM); setFormErrors({}); setShowModal(true) }
 
@@ -362,24 +372,51 @@ export default function UsersPage() {
       )}
 
       {/* Filters */}
-      <div className="flex flex-col sm:flex-row gap-3 mb-5">
-        <div className="relative flex-1">
-          <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2" style={{ color: 'var(--text-faint)' }} />
-          <input
-            type="text" value={search} onChange={e => setSearch(e.target.value)}
-            placeholder="Buscar por nombre, cédula, cargo o área..."
-            className="terra-input pl-9 py-2 text-sm"
-          />
-          {search && <button onClick={() => setSearch('')} className="absolute right-3 top-1/2 -translate-y-1/2" style={{ color: 'var(--text-faint)' }}><X size={13} /></button>}
+      <div className="flex flex-col gap-3 mb-5">
+        <div className="flex flex-col sm:flex-row gap-3">
+          <div className="relative flex-1">
+            <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2" style={{ color: 'var(--text-faint)' }} />
+            <input
+              type="text" value={search} onChange={e => setSearch(e.target.value)}
+              placeholder="Buscar por nombre, cédula, cargo o área..."
+              className="terra-input pl-9 py-2 text-sm"
+            />
+            {search && <button onClick={() => setSearch('')} className="absolute right-3 top-1/2 -translate-y-1/2" style={{ color: 'var(--text-faint)' }}><X size={13} /></button>}
+          </div>
+          <div className="flex gap-1 p-1 rounded-xl flex-shrink-0" style={{ background: 'var(--bg-card)', border: '1px solid var(--border)' }}>
+            {['todos', 'activo', 'inactivo'].map(f => (
+              <button key={f} onClick={() => setFilter(f)}
+                className="px-3 py-1.5 rounded-lg text-xs font-semibold capitalize transition-all"
+                style={{ background: filter === f ? 'var(--primary)' : 'transparent', color: filter === f ? '#fff' : 'var(--text-dim)' }}>
+                {f}
+              </button>
+            ))}
+          </div>
         </div>
-        <div className="flex gap-1 p-1 rounded-xl flex-shrink-0" style={{ background: 'var(--bg-card)', border: '1px solid var(--border)' }}>
-          {['todos', 'activo', 'inactivo'].map(f => (
-            <button key={f} onClick={() => setFilter(f)}
-              className="px-3 py-1.5 rounded-lg text-xs font-semibold capitalize transition-all"
-              style={{ background: filter === f ? 'var(--primary)' : 'transparent', color: filter === f ? '#fff' : 'var(--text-dim)' }}>
-              {f}
+        {/* Secondary filters */}
+        <div className="flex flex-wrap gap-2">
+          <select value={filterArea} onChange={e => setFilterArea(e.target.value)}
+            className="terra-input py-1.5 text-xs pr-8 flex-shrink-0" style={{ minWidth: 140 }}>
+            <option value="">Todas las áreas</option>
+            {areas.map(a => <option key={a.id} value={a.id}>{a.name}</option>)}
+          </select>
+          <select value={filterGroup} onChange={e => setFilterGroup(e.target.value)}
+            className="terra-input py-1.5 text-xs pr-8 flex-shrink-0" style={{ minWidth: 140 }}>
+            <option value="">Todos los grupos</option>
+            {groups.map(g => <option key={g.id} value={g.id}>{g.name}</option>)}
+          </select>
+          <select value={filterRole} onChange={e => setFilterRole(e.target.value)}
+            className="terra-input py-1.5 text-xs pr-8 flex-shrink-0" style={{ minWidth: 140 }}>
+            <option value="">Todos los cargos</option>
+            {uniqueRoles.map(r => <option key={r} value={r}>{r}</option>)}
+          </select>
+          {(filterArea || filterGroup || filterRole) && (
+            <button onClick={() => { setFilterArea(''); setFilterGroup(''); setFilterRole('') }}
+              className="flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs"
+              style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', color: 'var(--text-dim)' }}>
+              <X size={11} /> Limpiar filtros
             </button>
-          ))}
+          )}
         </div>
       </div>
 
