@@ -30,6 +30,8 @@ interface Evaluation {
   min_score: number
   time_limit: number | null
   training_id: string | null
+  training_title?: string | null
+  training_category?: string | null
   created_at: string
   trainings?: { id: string; title: string; category: string } | null
 }
@@ -421,6 +423,9 @@ export default function EvaluationsPage() {
   const [modalError, setModalError] = useState<string | null>(null)
   const [needsSetup, setNeedsSetup] = useState(false)
   const [showSql, setShowSql] = useState(false)
+  const [showImportTraining, setShowImportTraining] = useState(false)
+  const [importingTraining, setImportingTraining] = useState(false)
+  const [importTrainingError, setImportTrainingError] = useState<string | null>(null)
 
   const SETUP_SQL = `-- Ejecuta esto en Supabase → SQL Editor
 CREATE TABLE IF NOT EXISTS evaluations (
@@ -650,11 +655,18 @@ CREATE TABLE IF NOT EXISTS questions (
               {evals.length} evaluación{evals.length !== 1 ? 'es' : ''} · Crea y gestiona preguntas por capacitación
             </p>
           </div>
-          <button onClick={() => { setShowModal(true); setForm(EMPTY_EVAL); setModalError(null) }}
-            className="flex items-center gap-2 px-4 py-2.5 rounded-xl font-semibold text-sm transition-all self-start sm:self-auto"
-            style={{ background: '#8B5CF6', color: '#fff' }}>
-            <Plus size={16} /> Nueva Evaluación
-          </button>
+          <div className="flex gap-2 self-start sm:self-auto">
+            <button onClick={() => { setShowImportTraining(true); setImportTrainingError(null) }}
+              className="flex items-center gap-2 px-4 py-2.5 rounded-xl font-semibold text-sm transition-all"
+              style={{ background: 'rgba(139,92,246,0.12)', color: '#A78BFA', border: '1px solid rgba(139,92,246,0.3)' }}>
+              <BookOpen size={16} /> Importar desde Biblioteca
+            </button>
+            <button onClick={() => { setShowModal(true); setForm(EMPTY_EVAL); setModalError(null) }}
+              className="flex items-center gap-2 px-4 py-2.5 rounded-xl font-semibold text-sm transition-all"
+              style={{ background: '#8B5CF6', color: '#fff' }}>
+              <Plus size={16} /> Nueva Evaluación
+            </button>
+          </div>
         </div>
       </motion.div>
 
@@ -725,10 +737,10 @@ CREATE TABLE IF NOT EXISTS questions (
                     </button>
                   </div>
 
-                  {ev.trainings && (
+                  {(ev.trainings || ev.training_title) && (
                     <div className="flex items-center gap-1 mb-2">
                       <BookOpen size={11} className="text-[var(--text-faint)]" />
-                      <span className="text-xs text-[var(--text-faint)] truncate">{ev.trainings.title}</span>
+                      <span className="text-xs text-[var(--text-faint)] truncate">{ev.trainings?.title ?? ev.training_title}</span>
                     </div>
                   )}
 
@@ -785,9 +797,9 @@ CREATE TABLE IF NOT EXISTS questions (
                   <div className="min-w-0">
                     <h2 className="text-lg font-black text-[var(--text)] mb-1">{selected.title}</h2>
                     <div className="flex flex-wrap items-center gap-3 text-xs text-[var(--text-dim)]">
-                      {selected.trainings && (
+                      {(selected.trainings || selected.training_title) && (
                         <span className="flex items-center gap-1">
-                          <BookOpen size={11} /> {selected.trainings.title}
+                          <BookOpen size={11} /> {selected.trainings?.title ?? selected.training_title}
                         </span>
                       )}
                       <span className="flex items-center gap-1">
@@ -970,7 +982,97 @@ CREATE TABLE IF NOT EXISTS questions (
         </div>
       )}
 
-      {/* Import modal */}
+      {/* Import from training modal */}
+      {showImportTraining && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }}
+            className="bg-[var(--bg-surface)] border border-[var(--border-strong)] rounded-2xl w-full max-w-lg max-h-[80vh] flex flex-col">
+            <div className="flex items-center justify-between px-6 py-4 border-b border-[var(--border)] flex-shrink-0">
+              <div className="flex items-center gap-2">
+                <BookOpen size={16} style={{ color: '#A78BFA' }} />
+                <h2 className="text-[var(--text)] font-bold">Importar desde Biblioteca</h2>
+              </div>
+              <button onClick={() => setShowImportTraining(false)} className="text-[var(--text-dim)] hover:text-[var(--text)]">
+                <X size={18} />
+              </button>
+            </div>
+            <div className="p-4 flex-shrink-0 text-xs text-[var(--text-dim)]"
+              style={{ background: 'rgba(139,92,246,0.06)', borderBottom: '1px solid var(--border)' }}>
+              Selecciona una capacitación para copiar sus preguntas como una nueva evaluación. Solo se importan capacitaciones que ya tengan preguntas guardadas.
+            </div>
+            {importTrainingError && (
+              <div className="mx-6 mt-4 flex items-start gap-2 p-3 rounded-xl text-sm flex-shrink-0"
+                style={{ background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.25)', color: '#FCA5A5' }}>
+                <AlertCircle size={14} className="flex-shrink-0 mt-0.5" />
+                <span>{importTrainingError}</span>
+              </div>
+            )}
+            <div className="overflow-y-auto flex-1 p-4 space-y-2">
+              {trainings.length === 0 ? (
+                <div className="text-center py-10 text-[var(--text-faint)] text-sm">No hay capacitaciones disponibles</div>
+              ) : (
+                trainings.map(t => (
+                  <button key={t.id}
+                    disabled={importingTraining}
+                    onClick={async () => {
+                      setImportingTraining(true)
+                      setImportTrainingError(null)
+                      try {
+                        const res = await fetch('/api/evaluations/import-from-training', {
+                          method: 'POST',
+                          headers: { 'Content-Type': 'application/json' },
+                          body: JSON.stringify({ training_id: t.id }),
+                        })
+                        const data = await res.json()
+                        if (data.id) {
+                          const newEval = {
+                            id: data.id,
+                            title: data.title,
+                            min_score: data.min_score,
+                            time_limit: data.time_limit,
+                            training_id: data.training_id,
+                            created_at: data.created_at,
+                            training_title: data.training_title,
+                            training_category: data.training_category,
+                            trainings: { id: data.training_id, title: data.training_title, category: data.training_category ?? 'SST' },
+                          } as any
+                          setEvals(prev => [newEval, ...prev])
+                          setShowImportTraining(false)
+                          selectEval(newEval)
+                        } else {
+                          setImportTrainingError(data.error ?? 'Error al importar')
+                        }
+                      } catch (e: any) {
+                        setImportTrainingError(e.message ?? 'Error de red')
+                      } finally {
+                        setImportingTraining(false)
+                      }
+                    }}
+                    className="w-full flex items-center gap-3 p-4 rounded-xl border text-left transition-all hover:border-violet-500/40 hover:bg-violet-500/5 disabled:opacity-50"
+                    style={{ background: 'var(--bg-card)', borderColor: 'var(--border)' }}
+                  >
+                    <div className="w-9 h-9 rounded-lg flex items-center justify-center flex-shrink-0"
+                      style={{ background: 'rgba(139,92,246,0.1)', border: '1px solid rgba(139,92,246,0.2)' }}>
+                      <BookOpen size={15} style={{ color: '#A78BFA' }} />
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <div className="text-sm font-semibold text-[var(--text)] truncate">{t.title}</div>
+                      <div className="text-xs text-[var(--text-faint)] mt-0.5">{t.category}</div>
+                    </div>
+                    {importingTraining ? (
+                      <RefreshCw size={14} className="animate-spin text-[var(--text-faint)] flex-shrink-0" />
+                    ) : (
+                      <ChevronRight size={14} className="text-[var(--text-faint)] flex-shrink-0" />
+                    )}
+                  </button>
+                ))
+              )}
+            </div>
+          </motion.div>
+        </div>
+      )}
+
+      {/* Import questions from file modal */}
       {showImport && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
           <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }}
