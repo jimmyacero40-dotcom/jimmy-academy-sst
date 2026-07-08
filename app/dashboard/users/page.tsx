@@ -244,6 +244,8 @@ export default function UsersPage() {
   const [search, setSearch]           = useState('')
   const [filterStatus, setFilterStatus] = useState('')
   const [filterArea, setFilterArea]   = useState('')
+  const [sortField, setSortField] = useState<'name' | 'cedula' | 'status' | 'area_name' | null>('name')
+  const [sortDir, setSortDir]     = useState<'asc' | 'desc'>('asc')
   const [filterGroup, setFilterGroup] = useState('')
   const [filterRole, setFilterRole]   = useState('')
 
@@ -296,6 +298,22 @@ export default function UsersPage() {
     if (filterGroup && !u.groups.some(g => g.id === filterGroup)) return false
     if (filterRole && u.role.toLowerCase() !== filterRole.toLowerCase()) return false
     return true
+  })
+
+  const handleSort = (field: typeof sortField) => {
+    if (sortField === field) setSortDir(d => d === 'asc' ? 'desc' : 'asc')
+    else { setSortField(field); setSortDir('asc') }
+  }
+
+  const sorted = [...filtered].sort((a, b) => {
+    if (!sortField) return 0
+    let va = '', vb = ''
+    if (sortField === 'name')      { va = a.name;      vb = b.name }
+    if (sortField === 'cedula')    { va = a.cedula;    vb = b.cedula }
+    if (sortField === 'status')    { va = a.status;    vb = b.status }
+    if (sortField === 'area_name') { va = a.area_name; vb = b.area_name }
+    const cmp = va.localeCompare(vb, 'es', { sensitivity: 'base' })
+    return sortDir === 'asc' ? cmp : -cmp
   })
 
   const uniqueRoles = [...new Set(users.map(u => u.role).filter(Boolean))]
@@ -359,7 +377,7 @@ export default function UsersPage() {
   }
 
   const toggleSelect    = (id: string) => setSelected(prev => { const n = new Set(prev); n.has(id) ? n.delete(id) : n.add(id); return n })
-  const toggleSelectAll = () => { if (selected.size === filtered.length) setSelected(new Set()); else setSelected(new Set(filtered.map(u => u.id))) }
+  const toggleSelectAll = () => { if (selected.size === sorted.length) setSelected(new Set()); else setSelected(new Set(sorted.map(u => u.id))) }
 
   const handleBulkDelete = async () => {
     if (!selected.size || !confirm(`¿Eliminar ${selected.size} usuario(s) permanentemente?`)) return
@@ -412,10 +430,26 @@ export default function UsersPage() {
     </th>
   )
 
-  const ColLabel = ({ children }: { children: React.ReactNode }) => (
-    <span className="text-[10px] font-semibold uppercase tracking-widest block" style={{ color: 'var(--text-faint)' }}>
-      {children}
-    </span>
+  const SortIcon = ({ field }: { field: typeof sortField }) => {
+    const active = sortField === field
+    return (
+      <span className="inline-flex flex-col ml-1 leading-none" style={{ verticalAlign: 'middle' }}>
+        <span style={{ opacity: active && sortDir === 'asc' ? 1 : 0.25, fontSize: 8, lineHeight: '9px', color: active ? 'var(--primary)' : 'var(--text-faint)' }}>▲</span>
+        <span style={{ opacity: active && sortDir === 'desc' ? 1 : 0.25, fontSize: 8, lineHeight: '9px', color: active ? 'var(--primary)' : 'var(--text-faint)' }}>▼</span>
+      </span>
+    )
+  }
+
+  const ColLabel = ({ children, field }: { children: React.ReactNode; field?: typeof sortField }) => (
+    field
+      ? <button onClick={() => handleSort(field)}
+          className="flex items-center gap-0.5 text-[10px] font-semibold uppercase tracking-widest transition-colors hover:opacity-80"
+          style={{ color: sortField === field ? 'var(--primary)' : 'var(--text-faint)' }}>
+          {children}<SortIcon field={field} />
+        </button>
+      : <span className="text-[10px] font-semibold uppercase tracking-widest block" style={{ color: 'var(--text-faint)' }}>
+          {children}
+        </span>
   )
 
   // ── Render ────────────────────────────────────────────────────────────────
@@ -451,7 +485,7 @@ export default function UsersPage() {
 
         <div className="flex items-center gap-2">
           {hasFilters && (
-            <button onClick={() => { setSearch(''); setFilterStatus(''); setFilterArea(''); setFilterGroup(''); setFilterRole('') }}
+            <button onClick={() => { setSearch(''); setFilterStatus(''); setFilterArea(''); setFilterGroup(''); setFilterRole(''); setSortField('name'); setSortDir('asc') }}
               className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs transition-all"
               style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', color: 'var(--text-dim)' }}>
               <X size={11} /> Limpiar filtros
@@ -532,26 +566,26 @@ export default function UsersPage() {
                   {/* Checkbox */}
                   <th className="px-4 py-3 text-left align-middle" style={{ borderBottom: '1px solid var(--border)' }}>
                     <input type="checkbox"
-                      checked={selected.size === filtered.length && filtered.length > 0}
+                      checked={selected.size === sorted.length && sorted.length > 0}
                       onChange={toggleSelectAll}
                       className="w-4 h-4 rounded accent-blue-500" />
                   </th>
 
                   {/* Trabajador + search */}
                   <TH>
-                    <ColLabel>Trabajador</ColLabel>
+                    <ColLabel field="name">Trabajador</ColLabel>
                     <FilterInput value={search} onChange={setSearch} placeholder="Buscar..." />
                   </TH>
 
                   {/* Cédula */}
                   <TH>
-                    <ColLabel>Cédula</ColLabel>
-                    <div className="mt-1.5 h-6" /> {/* spacing placeholder to align rows */}
+                    <ColLabel field="cedula">Cédula</ColLabel>
+                    <div className="mt-1.5 h-6" />
                   </TH>
 
                   {/* Área */}
                   <TH>
-                    <ColLabel>Área</ColLabel>
+                    <ColLabel field="area_name">Área</ColLabel>
                     <FilterSelect
                       value={filterArea} onChange={setFilterArea}
                       placeholder="Todas"
@@ -571,7 +605,7 @@ export default function UsersPage() {
 
                   {/* Estado */}
                   <TH>
-                    <ColLabel>Estado</ColLabel>
+                    <ColLabel field="status">Estado</ColLabel>
                     <FilterSelect
                       value={filterStatus} onChange={setFilterStatus}
                       placeholder="Todos"
@@ -589,7 +623,7 @@ export default function UsersPage() {
               {/* ── Rows ─────────────────────────────────────────────── */}
               <tbody>
                 <AnimatePresence>
-                  {filtered.map((u, i) => (
+                  {sorted.map((u, i) => (
                     <motion.tr key={u.id}
                       initial={{ opacity: 0 }} animate={{ opacity: 1 }}
                       exit={{ opacity: 0 }} transition={{ delay: Math.min(i * 0.012, 0.2) }}
@@ -715,7 +749,7 @@ export default function UsersPage() {
               </tbody>
             </table>
 
-            {filtered.length === 0 && users.length > 0 && (
+            {sorted.length === 0 && users.length > 0 && (
               <div className="py-16 text-center">
                 <Search size={24} className="mx-auto mb-3 opacity-20" style={{ color: 'var(--text-faint)' }} />
                 <p className="text-sm font-medium mb-1" style={{ color: 'var(--text-dim)' }}>Sin resultados</p>
@@ -724,13 +758,13 @@ export default function UsersPage() {
             )}
 
             {/* Footer with count */}
-            {filtered.length > 0 && (
+            {sorted.length > 0 && (
               <div className="px-4 py-3 flex items-center justify-between"
                 style={{ borderTop: '1px solid var(--border)' }}>
                 <span className="text-xs" style={{ color: 'var(--text-faint)' }}>
-                  {filtered.length === users.length
+                  {sorted.length === users.length
                     ? `${users.length} trabajadores`
-                    : `${filtered.length} de ${users.length} trabajadores`}
+                    : `${sorted.length} de ${users.length} trabajadores`}
                 </span>
                 {selected.size > 0 && (
                   <span className="text-xs font-medium" style={{ color: 'var(--primary)' }}>
@@ -752,7 +786,7 @@ export default function UsersPage() {
               {search && <button onClick={() => setSearch('')} className="absolute right-3 top-1/2 -translate-y-1/2" style={{ color: 'var(--text-faint)' }}><X size={13} /></button>}
             </div>
             <AnimatePresence>
-              {filtered.map(u => (
+              {sorted.map(u => (
                 <motion.div key={u.id} initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
                   className="terra-card p-4">
                   <div className="flex items-start justify-between gap-3">

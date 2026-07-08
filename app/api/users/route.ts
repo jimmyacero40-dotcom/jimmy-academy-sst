@@ -10,7 +10,7 @@ export async function GET() {
 
   let query = supabaseAdmin
     .from('users')
-    .select('id, email, name, cedula, role, area, active, company_id, created_at')
+    .select('id, email, name, cedula, role, area, area_id, active, company_id, created_at')
     .order('created_at', { ascending: false })
   if (companyId) query = query.eq('company_id', companyId)
 
@@ -76,7 +76,7 @@ export async function POST(req: NextRequest) {
       active: true,
       company_id: companyId,
     })
-    .select('id, email, name, cedula, role, area, active, company_id, created_at')
+    .select('id, email, name, cedula, role, area, area_id, active, company_id, created_at')
     .single()
 
   if (error) {
@@ -104,7 +104,7 @@ export async function PUT(req: NextRequest) {
   let query = supabase.from('users').update(updates).eq('id', id)
   if (companyId) query = query.eq('company_id', companyId)
 
-  const { data, error } = await query.select('id, email, name, cedula, role, area, active, company_id, created_at').single()
+  const { data, error } = await query.select('id, email, name, cedula, role, area, area_id, active, company_id, created_at').single()
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
   return NextResponse.json(data)
 }
