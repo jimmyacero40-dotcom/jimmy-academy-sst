@@ -5,11 +5,10 @@ import { useRouter } from 'next/navigation'
 import { motion, AnimatePresence } from 'framer-motion'
 import * as XLSX from 'xlsx'
 import {
-  Users, Search, MoreVertical, CheckCircle, Clock,
+  Users, Search, MoreVertical, CheckCircle,
   Building2, X, Edit2, Trash2, Download, ChevronDown,
   UserPlus, FileSpreadsheet, AlertCircle, Loader2,
-  Layers, UserCheck, Tag, ChevronRight, Plus, BookOpen,
-  Filter, Eye
+  Layers, UserCheck, Tag, Eye, BookOpen
 } from 'lucide-react'
 
 type UserStatus = 'activo' | 'inactivo'
@@ -94,73 +93,138 @@ function downloadTemplate() {
   XLSX.writeFile(wb2, 'plantilla_trabajadores.xlsx')
 }
 
-// Groups cell: max 2 visible chips + overflow badge
-function GroupsCell({ u, groups, cellSaving, groupAdd, setGroupAdd, autoSaveGroups }: {
+// ── Compact filter input ─────────────────────────────────────────────────────
+function FilterInput({ value, onChange, placeholder }: {
+  value: string; onChange: (v: string) => void; placeholder: string
+}) {
+  return (
+    <div className="relative mt-1.5">
+      <Search size={11} className="absolute left-2 top-1/2 -translate-y-1/2 pointer-events-none" style={{ color: 'var(--text-faint)' }} />
+      <input
+        type="text" value={value} onChange={e => onChange(e.target.value)}
+        placeholder={placeholder}
+        className="w-full pl-6 pr-2 py-1 text-[11px] rounded-md outline-none transition-colors"
+        style={{
+          background: 'var(--bg-card)',
+          border: '1px solid var(--border)',
+          color: 'var(--text)',
+          colorScheme: 'dark',
+        }}
+        onFocus={e => e.currentTarget.style.borderColor = 'var(--primary-border)'}
+        onBlur={e => e.currentTarget.style.borderColor = 'var(--border)'}
+      />
+      {value && (
+        <button onClick={() => onChange('')} className="absolute right-1.5 top-1/2 -translate-y-1/2" style={{ color: 'var(--text-faint)' }}>
+          <X size={10} />
+        </button>
+      )}
+    </div>
+  )
+}
+
+// ── Compact filter select ────────────────────────────────────────────────────
+function FilterSelect({ value, onChange, options, placeholder }: {
+  value: string; onChange: (v: string) => void
+  options: { value: string; label: string }[]; placeholder: string
+}) {
+  return (
+    <div className="relative mt-1.5">
+      <select
+        value={value} onChange={e => onChange(e.target.value)}
+        className="w-full pl-2 pr-6 py-1 text-[11px] rounded-md outline-none transition-colors appearance-none cursor-pointer"
+        style={{
+          background: value ? 'rgba(59,130,246,0.08)' : 'var(--bg-card)',
+          border: `1px solid ${value ? 'rgba(59,130,246,0.3)' : 'var(--border)'}`,
+          color: value ? 'var(--primary)' : 'var(--text-faint)',
+          colorScheme: 'dark',
+        }}>
+        <option value="">{placeholder}</option>
+        {options.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
+      </select>
+      <ChevronDown size={10} className="absolute right-1.5 top-1/2 -translate-y-1/2 pointer-events-none"
+        style={{ color: value ? 'var(--primary)' : 'var(--text-faint)' }} />
+    </div>
+  )
+}
+
+// ── Groups cell with popover ─────────────────────────────────────────────────
+function GroupsCell({ u, groups, cellSaving, groupPopover, setGroupPopover, autoSaveGroups }: {
   u: AppUser
   groups: Group[]
   cellSaving: string | null
-  groupAdd: string | null
-  setGroupAdd: (id: string | null) => void
+  groupPopover: string | null
+  setGroupPopover: (id: string | null) => void
   autoSaveGroups: (userId: string, groupIds: string[]) => void
 }) {
-  const MAX = 2
-  const visible = u.groups.slice(0, MAX)
-  const hidden = u.groups.slice(MAX)
   const available = groups.filter(g => !u.groups.find(ug => ug.id === g.id))
+  const MAX_VISIBLE = 2
+  const visible = u.groups.slice(0, MAX_VISIBLE)
+  const overflow = u.groups.slice(MAX_VISIBLE)
 
   return (
     <div className="flex flex-wrap gap-1 items-center">
       {visible.map(g => (
         <span key={g.id}
-          className="inline-flex items-center gap-1 text-[10px] px-2 py-0.5 rounded-full font-semibold whitespace-nowrap"
-          style={{ background: 'var(--primary-dim)', color: 'var(--primary)', border: '1px solid var(--primary-border)' }}>
+          className="inline-flex items-center gap-0.5 text-[10px] px-2 py-0.5 rounded-full font-medium whitespace-nowrap"
+          style={{ background: 'rgba(59,130,246,0.1)', color: '#93C5FD', border: '1px solid rgba(59,130,246,0.2)' }}>
           {g.name}
           <button
-            onClick={() => autoSaveGroups(u.id, u.groups.filter(x => x.id !== g.id).map(x => x.id))}
+            onMouseDown={e => { e.preventDefault(); autoSaveGroups(u.id, u.groups.filter(x => x.id !== g.id).map(x => x.id)) }}
             disabled={cellSaving === u.id}
-            className="leading-none opacity-50 hover:opacity-100 ml-0.5 transition-opacity">×</button>
+            className="ml-0.5 opacity-40 hover:opacity-90 transition-opacity leading-none">×</button>
         </span>
       ))}
 
-      {hidden.length > 0 && (
-        <span
-          title={hidden.map(g => g.name).join(', ')}
-          className="inline-flex items-center text-[10px] px-2 py-0.5 rounded-full font-bold cursor-help"
-          style={{ background: 'rgba(148,163,184,0.12)', color: 'var(--text-dim)', border: '1px solid var(--border)' }}>
-          +{hidden.length}
+      {overflow.length > 0 && (
+        <span title={overflow.map(g => g.name).join(', ')}
+          className="inline-flex items-center text-[10px] px-1.5 py-0.5 rounded-full font-semibold cursor-help"
+          style={{ background: 'var(--bg-card)', color: 'var(--text-faint)', border: '1px solid var(--border)' }}>
+          +{overflow.length}
         </span>
       )}
 
+      {/* Add group button + popover */}
       {available.length > 0 && (
         <div className="relative">
-          {groupAdd === u.id ? (
-            <select autoFocus
-              onChange={e => {
-                if (!e.target.value) { setGroupAdd(null); return }
-                autoSaveGroups(u.id, [...u.groups.map(g => g.id), e.target.value])
-                setGroupAdd(null)
-              }}
-              onBlur={() => setGroupAdd(null)}
-              className="text-[11px] rounded-lg px-1.5 py-0.5 absolute left-0 top-0 z-30 min-w-[160px]"
-              style={{ background: 'var(--bg-surface)', border: '1px solid var(--primary-border)', color: 'var(--text)', colorScheme: 'dark' }}
-              defaultValue="">
-              <option value="">Agregar grupo...</option>
-              {available.map(g => <option key={g.id} value={g.id}>{g.name}</option>)}
-            </select>
-          ) : (
-            <button
-              onClick={() => setGroupAdd(u.id)}
-              disabled={cellSaving === u.id}
-              title="Agregar grupo"
-              className="w-5 h-5 rounded-full text-[11px] font-bold leading-none flex items-center justify-center transition-all hover:scale-110"
-              style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', color: 'var(--text-faint)' }}>
-              +
-            </button>
+          <button
+            onMouseDown={e => { e.preventDefault(); setGroupPopover(groupPopover === u.id ? null : u.id) }}
+            disabled={cellSaving === u.id}
+            title="Agregar grupo"
+            className="w-5 h-5 rounded-full text-[11px] font-bold leading-none flex items-center justify-center transition-all hover:scale-110"
+            style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', color: 'var(--text-faint)' }}>
+            +
+          </button>
+
+          {groupPopover === u.id && (
+            <div className="absolute left-0 top-6 z-50 rounded-xl shadow-2xl overflow-hidden"
+              style={{ background: 'var(--bg-surface)', border: '1px solid var(--border-strong)', minWidth: 200 }}>
+              <div className="px-3 py-2 text-[10px] font-semibold uppercase tracking-wider"
+                style={{ color: 'var(--text-faint)', borderBottom: '1px solid var(--border)' }}>
+                Agregar al grupo
+              </div>
+              <div className="py-1 max-h-48 overflow-y-auto">
+                {available.map(g => (
+                  <button key={g.id}
+                    onMouseDown={e => {
+                      e.preventDefault()
+                      autoSaveGroups(u.id, [...u.groups.map(x => x.id), g.id])
+                      setGroupPopover(null)
+                    }}
+                    className="flex items-center gap-2.5 w-full px-3 py-2 text-xs text-left transition-colors"
+                    style={{ color: 'var(--text)' }}
+                    onMouseEnter={e => e.currentTarget.style.background = 'var(--bg-card)'}
+                    onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
+                    <span className="w-1.5 h-1.5 rounded-full flex-shrink-0" style={{ background: 'var(--primary)' }} />
+                    {g.name}
+                  </button>
+                ))}
+              </div>
+            </div>
           )}
         </div>
       )}
 
-      {u.groups.length === 0 && groupAdd !== u.id && (
+      {u.groups.length === 0 && groupPopover !== u.id && (
         <span className="text-[11px]" style={{ color: 'var(--text-faint)' }}>—</span>
       )}
       {cellSaving === u.id && <Loader2 size={10} className="animate-spin" style={{ color: 'var(--primary)' }} />}
@@ -168,50 +232,51 @@ function GroupsCell({ u, groups, cellSaving, groupAdd, setGroupAdd, autoSaveGrou
   )
 }
 
+// ── Main component ───────────────────────────────────────────────────────────
 export default function UsersPage() {
   const router = useRouter()
-  const [users, setUsers]     = useState<AppUser[]>([])
-  const [areas, setAreas]     = useState<Area[]>([])
-  const [groups, setGroups]   = useState<Group[]>([])
-  const [search, setSearch]   = useState('')
-  const [filter, setFilter]   = useState('todos')
+  const [users, setUsers]   = useState<AppUser[]>([])
+  const [areas, setAreas]   = useState<Area[]>([])
+  const [groups, setGroups] = useState<Group[]>([])
+
+  // Filters
+  const [search, setSearch]           = useState('')
+  const [filterStatus, setFilterStatus] = useState('')
   const [filterArea, setFilterArea]   = useState('')
   const [filterGroup, setFilterGroup] = useState('')
   const [filterRole, setFilterRole]   = useState('')
+
   const [selected, setSelected] = useState<Set<string>>(new Set())
 
-  const [showModal, setShowModal]     = useState(false)
-  const [editUser, setEditUser]       = useState<AppUser | null>(null)
-  const [form, setForm]               = useState(EMPTY_FORM)
-  const [formErrors, setFormErrors]   = useState<Record<string, string>>({})
+  // Modals & UI state
+  const [showModal, setShowModal]         = useState(false)
+  const [editUser, setEditUser]           = useState<AppUser | null>(null)
+  const [form, setForm]                   = useState(EMPTY_FORM)
+  const [formErrors, setFormErrors]       = useState<Record<string, string>>({})
   const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null)
-  const [menuOpen, setMenuOpen]       = useState<string | null>(null)
-  const [excelError, setExcelError]   = useState('')
-  const [saving, setSaving]           = useState(false)
+  const [excelError, setExcelError]       = useState('')
+  const [saving, setSaving]               = useState(false)
   const [loadingGroups, setLoadingGroups] = useState(false)
   const fileRef = useRef<HTMLInputElement>(null)
-  const [cellSaving, setCellSaving] = useState<string | null>(null)
-  const [groupAdd, setGroupAdd] = useState<string | null>(null)
 
+  const [cellSaving, setCellSaving] = useState<string | null>(null)
+  const [groupPopover, setGroupPopover] = useState<string | null>(null)
+
+  // ── Data loading ─────────────────────────────────────────────────────────
   const loadUsers = async () => {
     try {
       const res = await fetch('/api/users')
       if (!res.ok) return
       const data = await res.json()
-      const userList: AppUser[] = data.map((u: any) => ({
-        id: u.id,
-        name: u.name,
-        email: u.email,
-        empresa: u.area || '',
-        area_id: u.area_id || '',
-        area_name: u.area || '',
+      setUsers(data.map((u: any) => ({
+        id: u.id, name: u.name, email: u.email,
+        empresa: u.area || '', area_id: u.area_id || '', area_name: u.area || '',
         role: u.role === 'admin' ? 'Administrador' : (u.area || 'Trabajador'),
         cedula: u.cedula || '',
         status: u.active ? 'activo' as UserStatus : 'inactivo' as UserStatus,
         createdAt: new Date(u.created_at).toLocaleDateString('es-CO'),
         groups: (u.user_groups ?? []).map((ug: any) => ug.groups).filter(Boolean),
-      }))
-      setUsers(userList)
+      })))
     } catch {}
   }
 
@@ -223,9 +288,8 @@ export default function UsersPage() {
 
   const filtered = users.filter(u => {
     const q = search.toLowerCase()
-    const match = u.name.toLowerCase().includes(q) || u.cedula.includes(q) || u.role.toLowerCase().includes(q) || u.empresa.toLowerCase().includes(q)
-    if (!match) return false
-    if (filter !== 'todos' && u.status !== filter) return false
+    if (q && !u.name.toLowerCase().includes(q) && !u.cedula.includes(q) && !u.role.toLowerCase().includes(q) && !u.empresa.toLowerCase().includes(q)) return false
+    if (filterStatus && u.status !== filterStatus) return false
     if (filterArea && u.area_id !== filterArea) return false
     if (filterGroup && !u.groups.some(g => g.id === filterGroup)) return false
     if (filterRole && u.role.toLowerCase() !== filterRole.toLowerCase()) return false
@@ -233,25 +297,21 @@ export default function UsersPage() {
   })
 
   const uniqueRoles = [...new Set(users.map(u => u.role).filter(Boolean))]
-  const activeCount = users.filter(u => u.status === 'activo').length
+  const activeCount   = users.filter(u => u.status === 'activo').length
   const inactiveCount = users.filter(u => u.status === 'inactivo').length
-  const hasSecondaryFilters = !!(filterArea || filterGroup || filterRole)
+  const hasFilters    = !!(search || filterStatus || filterArea || filterGroup || filterRole)
 
+  // ── CRUD ─────────────────────────────────────────────────────────────────
   const openNew = () => { setEditUser(null); setForm(EMPTY_FORM); setFormErrors({}); setShowModal(true) }
 
   const openEdit = async (u: AppUser) => {
     setEditUser(u)
     setForm({ name: u.name, email: u.email || '', password: '', empresa: u.empresa, area_id: u.area_id || '', role: u.role, cedula: u.cedula, status: u.status, emailManual: true, selectedGroups: [] })
-    setFormErrors({})
-    setShowModal(true)
-    setMenuOpen(null)
+    setFormErrors({}); setShowModal(true)
     setLoadingGroups(true)
     try {
       const res = await fetch(`/api/users/${u.id}/groups`)
-      if (res.ok) {
-        const gList = await res.json()
-        setForm(f => ({ ...f, selectedGroups: gList.map((g: any) => g.id) }))
-      }
+      if (res.ok) { const gList = await res.json(); setForm(f => ({ ...f, selectedGroups: gList.map((g: any) => g.id) })) }
     } catch {}
     setLoadingGroups(false)
   }
@@ -270,9 +330,7 @@ export default function UsersPage() {
     if (Object.keys(errs).length) { setFormErrors(errs); return }
     setSaving(true)
     try {
-      const selectedArea = areas.find(a => a.id === form.area_id)
-      const areaText = selectedArea?.name || form.empresa
-
+      const areaText = areas.find(a => a.id === form.area_id)?.name || form.empresa
       if (editUser) {
         const body: any = { id: editUser.id, name: form.name, email: form.email, cedula: form.cedula, area: areaText, active: form.status === 'activo' }
         if (form.password.trim()) body.password = form.password
@@ -287,8 +345,7 @@ export default function UsersPage() {
           await fetch(`/api/users/${created.id}/groups`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ group_ids: form.selectedGroups }) })
         }
       }
-      await loadUsers()
-      setShowModal(false)
+      await loadUsers(); setShowModal(false)
     } catch { setFormErrors({ name: 'Error de conexión' }) }
     setSaving(false)
   }
@@ -296,79 +353,74 @@ export default function UsersPage() {
   const handleDelete = async (id: string) => {
     await fetch('/api/users', { method: 'DELETE', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id }) })
     await loadUsers()
-    setDeleteConfirm(null); setMenuOpen(null); setSelected(prev => { const n = new Set(prev); n.delete(id); return n })
+    setDeleteConfirm(null); setSelected(prev => { const n = new Set(prev); n.delete(id); return n })
   }
 
   const toggleSelect    = (id: string) => setSelected(prev => { const n = new Set(prev); n.has(id) ? n.delete(id) : n.add(id); return n })
-  const toggleSelectAll = () => {
-    if (selected.size === filtered.length) setSelected(new Set())
-    else setSelected(new Set(filtered.map(u => u.id)))
-  }
+  const toggleSelectAll = () => { if (selected.size === filtered.length) setSelected(new Set()); else setSelected(new Set(filtered.map(u => u.id))) }
 
   const handleBulkDelete = async () => {
-    if (!selected.size) return
-    if (!confirm(`¿Eliminar ${selected.size} usuario(s) permanentemente?`)) return
-    for (const id of selected) {
-      await fetch('/api/users', { method: 'DELETE', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id }) })
-    }
-    await loadUsers()
-    setSelected(new Set())
+    if (!selected.size || !confirm(`¿Eliminar ${selected.size} usuario(s) permanentemente?`)) return
+    for (const id of selected) await fetch('/api/users', { method: 'DELETE', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id }) })
+    await loadUsers(); setSelected(new Set())
   }
 
   const toggleStatus = async (id: string) => {
-    const u = users.find(u => u.id === id)
-    if (!u) return
+    const u = users.find(u => u.id === id); if (!u) return
     await fetch('/api/users', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id, active: u.status !== 'activo' }) })
-    setMenuOpen(null)
     await loadUsers()
   }
 
   const handleExcel = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0]
-    if (!file) return
+    const file = e.target.files?.[0]; if (!file) return
     setExcelError('')
     try {
-      const buf = await file.arrayBuffer()
-      const rows = parseExcel(buf)
+      const rows = parseExcel(await file.arrayBuffer())
       if (!rows.length) { setExcelError('No se encontraron trabajadores en el archivo'); return }
       let created = 0
       for (const row of rows) {
         if (!row.name || !row.cedula) continue
-        const email = generateEmail(row.name)
-        const res = await fetch('/api/users', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: row.name, email, password: row.cedula, cedula: row.cedula, role: 'worker', area: row.empresa }) })
+        const res = await fetch('/api/users', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: row.name, email: generateEmail(row.name), password: row.cedula, cedula: row.cedula, role: 'worker', area: row.empresa }) })
         if (res.ok) created++
       }
-      await loadUsers()
-      alert(`${created} trabajador(es) importados correctamente`)
+      await loadUsers(); alert(`${created} trabajador(es) importados correctamente`)
     } catch { setExcelError('Error al leer el archivo Excel') }
     if (fileRef.current) fileRef.current.value = ''
   }
 
-  const toggleGroup = (gid: string) => {
-    setForm(f => ({
-      ...f,
-      selectedGroups: f.selectedGroups.includes(gid) ? f.selectedGroups.filter(x => x !== gid) : [...f.selectedGroups, gid],
-    }))
-  }
+  const toggleGroup = (gid: string) => setForm(f => ({ ...f, selectedGroups: f.selectedGroups.includes(gid) ? f.selectedGroups.filter(x => x !== gid) : [...f.selectedGroups, gid] }))
 
   const autoSaveArea = async (userId: string, areaName: string) => {
     setCellSaving(userId)
     await fetch('/api/users', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: userId, area: areaName }) })
-    await loadUsers()
-    setCellSaving(null)
+    await loadUsers(); setCellSaving(null)
   }
 
   const autoSaveGroups = async (userId: string, groupIds: string[]) => {
     setCellSaving(userId)
     await fetch(`/api/users/${userId}/groups`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ group_ids: groupIds }) })
-    await loadUsers()
-    setCellSaving(null)
+    await loadUsers(); setCellSaving(null)
   }
 
+  // ── TH helper ────────────────────────────────────────────────────────────
+  const TH = ({ children, className = '' }: { children: React.ReactNode; className?: string }) => (
+    <th className={`px-4 py-0 text-left align-top ${className}`}
+      style={{ borderBottom: '1px solid var(--border)' }}>
+      <div className="py-3">{children}</div>
+    </th>
+  )
+
+  const ColLabel = ({ children }: { children: React.ReactNode }) => (
+    <span className="text-[10px] font-semibold uppercase tracking-widest block" style={{ color: 'var(--text-faint)' }}>
+      {children}
+    </span>
+  )
+
+  // ── Render ────────────────────────────────────────────────────────────────
   return (
     <div className="p-6 max-w-7xl mx-auto">
 
-      {/* ── Header ─────────────────────────────────────────────────── */}
+      {/* Header */}
       <div className="flex items-center justify-between mb-6">
         <div className="flex items-center gap-3">
           <div className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0"
@@ -396,6 +448,13 @@ export default function UsersPage() {
         </div>
 
         <div className="flex items-center gap-2">
+          {hasFilters && (
+            <button onClick={() => { setSearch(''); setFilterStatus(''); setFilterArea(''); setFilterGroup(''); setFilterRole('') }}
+              className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs transition-all"
+              style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', color: 'var(--text-dim)' }}>
+              <X size={11} /> Limpiar filtros
+            </button>
+          )}
           <button onClick={downloadTemplate} className="terra-btn-outline" style={{ padding: '8px 14px', fontSize: 12 }}>
             <Download size={13} /> Plantilla
           </button>
@@ -417,100 +476,15 @@ export default function UsersPage() {
         </div>
       )}
 
-      {/* ── Search + Status filter row ──────────────────────────────── */}
-      <div className="flex flex-col sm:flex-row gap-2 mb-3">
-        <div className="relative flex-1">
-          <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2" style={{ color: 'var(--text-faint)' }} />
-          <input
-            type="text" value={search} onChange={e => setSearch(e.target.value)}
-            placeholder="Buscar por nombre, cédula, cargo o área..."
-            className="terra-input pl-9 py-2 text-sm"
-          />
-          {search && <button onClick={() => setSearch('')} className="absolute right-3 top-1/2 -translate-y-1/2" style={{ color: 'var(--text-faint)' }}><X size={13} /></button>}
-        </div>
-        <div className="flex gap-1 p-1 rounded-xl flex-shrink-0" style={{ background: 'var(--bg-card)', border: '1px solid var(--border)' }}>
-          {(['todos', 'activo', 'inactivo'] as const).map(f => (
-            <button key={f} onClick={() => setFilter(f)}
-              className="px-3 py-1.5 rounded-lg text-xs font-semibold capitalize transition-all"
-              style={{ background: filter === f ? 'var(--primary)' : 'transparent', color: filter === f ? '#fff' : 'var(--text-dim)' }}>
-              {f}
-            </button>
-          ))}
-        </div>
-      </div>
-
-      {/* ── Compact secondary filters ────────────────────────────────── */}
-      <div className="flex flex-wrap items-center gap-2 mb-5">
-        {/* Area filter pill */}
-        <label className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs cursor-pointer transition-all"
-          style={{
-            background: filterArea ? 'var(--primary-dim)' : 'var(--bg-card)',
-            border: `1px solid ${filterArea ? 'var(--primary-border)' : 'var(--border)'}`,
-          }}>
-          <Building2 size={11} style={{ color: filterArea ? 'var(--primary)' : 'var(--text-faint)' }} />
-          <select value={filterArea} onChange={e => setFilterArea(e.target.value)}
-            className="bg-transparent outline-none text-xs cursor-pointer"
-            style={{ color: filterArea ? 'var(--primary)' : 'var(--text-dim)', colorScheme: 'dark', appearance: 'none' }}>
-            <option value="">Área</option>
-            {areas.map(a => <option key={a.id} value={a.id}>{a.name}</option>)}
-          </select>
-          <ChevronDown size={10} style={{ color: filterArea ? 'var(--primary)' : 'var(--text-faint)' }} />
-        </label>
-
-        {/* Group filter pill */}
-        <label className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs cursor-pointer transition-all"
-          style={{
-            background: filterGroup ? 'var(--primary-dim)' : 'var(--bg-card)',
-            border: `1px solid ${filterGroup ? 'var(--primary-border)' : 'var(--border)'}`,
-          }}>
-          <Users size={11} style={{ color: filterGroup ? 'var(--primary)' : 'var(--text-faint)' }} />
-          <select value={filterGroup} onChange={e => setFilterGroup(e.target.value)}
-            className="bg-transparent outline-none text-xs cursor-pointer"
-            style={{ color: filterGroup ? 'var(--primary)' : 'var(--text-dim)', colorScheme: 'dark', appearance: 'none' }}>
-            <option value="">Grupo</option>
-            {groups.map(g => <option key={g.id} value={g.id}>{g.name}</option>)}
-          </select>
-          <ChevronDown size={10} style={{ color: filterGroup ? 'var(--primary)' : 'var(--text-faint)' }} />
-        </label>
-
-        {/* Role/Cargo filter pill */}
-        <label className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs cursor-pointer transition-all"
-          style={{
-            background: filterRole ? 'var(--primary-dim)' : 'var(--bg-card)',
-            border: `1px solid ${filterRole ? 'var(--primary-border)' : 'var(--border)'}`,
-          }}>
-          <Tag size={11} style={{ color: filterRole ? 'var(--primary)' : 'var(--text-faint)' }} />
-          <select value={filterRole} onChange={e => setFilterRole(e.target.value)}
-            className="bg-transparent outline-none text-xs cursor-pointer"
-            style={{ color: filterRole ? 'var(--primary)' : 'var(--text-dim)', colorScheme: 'dark', appearance: 'none' }}>
-            <option value="">Cargo</option>
-            {uniqueRoles.map(r => <option key={r} value={r}>{r}</option>)}
-          </select>
-          <ChevronDown size={10} style={{ color: filterRole ? 'var(--primary)' : 'var(--text-faint)' }} />
-        </label>
-
-        {hasSecondaryFilters && (
-          <button onClick={() => { setFilterArea(''); setFilterGroup(''); setFilterRole('') }}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs transition-all"
-            style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', color: 'var(--text-dim)' }}>
-            <X size={11} /> Limpiar
-          </button>
-        )}
-
-        {filtered.length !== users.length && (
-          <span className="ml-auto text-xs" style={{ color: 'var(--text-faint)' }}>
-            {filtered.length} de {users.length}
-          </span>
-        )}
-      </div>
-
-      {/* ── Bulk actions banner ──────────────────────────────────────── */}
+      {/* Bulk actions */}
       <AnimatePresence>
         {selected.size > 0 && (
           <motion.div initial={{ opacity: 0, y: -8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -8 }}
             className="flex items-center gap-3 mb-4 px-4 py-2.5 rounded-xl"
             style={{ background: 'var(--primary-dim)', border: '1px solid var(--primary-border)' }}>
-            <span className="text-sm font-semibold" style={{ color: 'var(--primary)' }}>{selected.size} seleccionado{selected.size !== 1 ? 's' : ''}</span>
+            <span className="text-sm font-semibold" style={{ color: 'var(--primary)' }}>
+              {selected.size} seleccionado{selected.size !== 1 ? 's' : ''}
+            </span>
             <button onClick={handleBulkDelete}
               className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold ml-auto"
               style={{ background: 'var(--red-dim)', color: '#FCA5A5', border: '1px solid rgba(239,68,68,0.2)' }}>
@@ -521,7 +495,7 @@ export default function UsersPage() {
         )}
       </AnimatePresence>
 
-      {/* ── Empty state ──────────────────────────────────────────────── */}
+      {/* Empty state */}
       {users.length === 0 ? (
         <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }}
           className="flex flex-col items-center justify-center py-24 text-center terra-card">
@@ -535,113 +509,157 @@ export default function UsersPage() {
         </motion.div>
       ) : (
         <>
-          {/* ── Desktop table ───────────────────────────────────────── */}
+          {/* ── Desktop table ─────────────────────────────────────────── */}
           <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }}
-            className="terra-card overflow-hidden hidden md:block">
+            className="terra-card hidden md:block"
+            style={{ borderRadius: 16, overflow: 'visible' }}>
             <table className="w-full" style={{ borderCollapse: 'collapse' }}>
               <colgroup>
                 <col style={{ width: 40 }} />
-                <col />
-                <col style={{ width: 130 }} />
-                <col style={{ width: 220 }} />
-                <col style={{ width: 82 }} />
-                <col style={{ width: 44 }} />
+                <col />                        {/* Trabajador — flexible */}
+                <col style={{ width: 115 }} /> {/* Cédula */}
+                <col style={{ width: 145 }} /> {/* Área */}
+                <col style={{ width: 210 }} /> {/* Grupos */}
+                <col style={{ width: 110 }} /> {/* Estado */}
+                <col style={{ width: 100 }} /> {/* Acciones */}
               </colgroup>
+
+              {/* ── Table header with embedded filters ───────────────── */}
               <thead>
-                <tr style={{ borderBottom: '1px solid var(--border)' }}>
-                  <th className="px-4 py-3 text-left">
+                <tr>
+                  {/* Checkbox */}
+                  <th className="px-4 py-3 text-left align-middle" style={{ borderBottom: '1px solid var(--border)' }}>
                     <input type="checkbox"
                       checked={selected.size === filtered.length && filtered.length > 0}
                       onChange={toggleSelectAll}
                       className="w-4 h-4 rounded accent-blue-500" />
                   </th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider" style={{ color: 'var(--text-faint)' }}>Trabajador</th>
-                  <th className="px-3 py-3 text-left text-xs font-semibold uppercase tracking-wider" style={{ color: 'var(--text-faint)' }}>Área</th>
-                  <th className="px-3 py-3 text-left text-xs font-semibold uppercase tracking-wider" style={{ color: 'var(--text-faint)' }}>Grupos</th>
-                  <th className="px-3 py-3 text-center text-xs font-semibold uppercase tracking-wider" style={{ color: 'var(--text-faint)' }}>Estado</th>
-                  <th></th>
+
+                  {/* Trabajador + search */}
+                  <TH>
+                    <ColLabel>Trabajador</ColLabel>
+                    <FilterInput value={search} onChange={setSearch} placeholder="Buscar..." />
+                  </TH>
+
+                  {/* Cédula */}
+                  <TH>
+                    <ColLabel>Cédula</ColLabel>
+                    <div className="mt-1.5 h-6" /> {/* spacing placeholder to align rows */}
+                  </TH>
+
+                  {/* Área */}
+                  <TH>
+                    <ColLabel>Área</ColLabel>
+                    <FilterSelect
+                      value={filterArea} onChange={setFilterArea}
+                      placeholder="Todas"
+                      options={areas.map(a => ({ value: a.id, label: a.name }))}
+                    />
+                  </TH>
+
+                  {/* Grupos */}
+                  <TH>
+                    <ColLabel>Grupos</ColLabel>
+                    <FilterSelect
+                      value={filterGroup} onChange={setFilterGroup}
+                      placeholder="Todos"
+                      options={groups.map(g => ({ value: g.id, label: g.name }))}
+                    />
+                  </TH>
+
+                  {/* Estado */}
+                  <TH>
+                    <ColLabel>Estado</ColLabel>
+                    <FilterSelect
+                      value={filterStatus} onChange={setFilterStatus}
+                      placeholder="Todos"
+                      options={[{ value: 'activo', label: 'Activo' }, { value: 'inactivo', label: 'Inactivo' }]}
+                    />
+                  </TH>
+
+                  {/* Acciones */}
+                  <th className="px-4 py-3 text-right align-middle" style={{ borderBottom: '1px solid var(--border)' }}>
+                    <span className="text-[10px] font-semibold uppercase tracking-widest" style={{ color: 'var(--text-faint)' }}>Acciones</span>
+                  </th>
                 </tr>
               </thead>
+
+              {/* ── Rows ─────────────────────────────────────────────── */}
               <tbody>
                 <AnimatePresence>
                   {filtered.map((u, i) => (
                     <motion.tr key={u.id}
                       initial={{ opacity: 0 }} animate={{ opacity: 1 }}
-                      exit={{ opacity: 0 }} transition={{ delay: Math.min(i * 0.015, 0.25) }}
+                      exit={{ opacity: 0 }} transition={{ delay: Math.min(i * 0.012, 0.2) }}
                       className="group transition-colors"
                       style={{ borderBottom: '1px solid var(--border)' }}
-                      onMouseEnter={e => (e.currentTarget.style.background = 'var(--bg-card)')}
+                      onMouseEnter={e => (e.currentTarget.style.background = 'rgba(255,255,255,0.02)')}
                       onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}>
 
                       {/* Checkbox */}
-                      <td className="px-4 py-3.5">
+                      <td className="px-4 py-3">
                         <input type="checkbox" checked={selected.has(u.id)} onChange={() => toggleSelect(u.id)}
                           className="w-4 h-4 rounded accent-blue-500" />
                       </td>
 
-                      {/* Trabajador: avatar + nombre + email + cédula + cargo */}
-                      <td className="px-4 py-3.5">
+                      {/* Trabajador: avatar + nombre + email */}
+                      <td className="px-4 py-3">
                         <div className="flex items-center gap-3">
-                          <div className={`w-9 h-9 rounded-full bg-gradient-to-br ${colorForUser(u.id)} flex items-center justify-center text-white text-[11px] font-bold flex-shrink-0 shadow-sm`}>
+                          <div className={`w-8 h-8 rounded-full bg-gradient-to-br ${colorForUser(u.id)} flex items-center justify-center text-white text-[11px] font-bold flex-shrink-0`}>
                             {getInitials(u.name)}
                           </div>
                           <div className="min-w-0">
-                            <div className="text-sm font-semibold leading-tight truncate" style={{ color: 'var(--text)' }}>
+                            <div className="text-sm font-semibold leading-snug truncate" style={{ color: 'var(--text)' }}>
                               {u.name}
                             </div>
-                            <div className="flex items-center gap-2 mt-0.5 flex-wrap">
-                              <span className="text-[11px] truncate" style={{ color: 'var(--text-faint)' }}>{u.email || '—'}</span>
-                              {u.cedula && (
-                                <span className="font-mono text-[10px] px-1.5 py-0.5 rounded"
-                                  style={{ background: 'var(--bg-card)', color: 'var(--text-faint)', border: '1px solid var(--border)' }}>
-                                  {u.cedula}
-                                </span>
-                              )}
+                            <div className="text-[11px] truncate mt-0.5" style={{ color: 'var(--text-faint)' }}>
+                              {u.email || '—'}
                             </div>
                           </div>
                         </div>
                       </td>
 
-                      {/* Área — compact pill select */}
-                      <td className="px-3 py-3.5">
-                        <div className="relative inline-flex items-center">
+                      {/* Cédula */}
+                      <td className="px-4 py-3">
+                        <span className="font-mono text-[12px]" style={{ color: 'var(--text-dim)' }}>
+                          {u.cedula || '—'}
+                        </span>
+                      </td>
+
+                      {/* Área — compact inline select */}
+                      <td className="px-4 py-3">
+                        <div className="relative inline-flex items-center w-full">
                           <select
                             value={areas.find(a => a.name === u.area_name)?.id || ''}
-                            onChange={e => {
-                              const a = areas.find(x => x.id === e.target.value)
-                              autoSaveArea(u.id, a?.name || '')
-                            }}
+                            onChange={e => { const a = areas.find(x => x.id === e.target.value); autoSaveArea(u.id, a?.name || '') }}
                             disabled={cellSaving === u.id}
-                            className="text-[11px] font-medium rounded-lg pl-2 pr-6 py-1 transition-all"
+                            className="w-full text-[11px] font-medium rounded-lg pl-2.5 pr-6 py-1.5 transition-all appearance-none cursor-pointer"
                             style={{
                               background: u.area_name ? 'rgba(59,130,246,0.08)' : 'var(--bg-card)',
                               border: `1px solid ${u.area_name ? 'rgba(59,130,246,0.2)' : 'var(--border)'}`,
-                              color: u.area_name ? 'var(--primary)' : 'var(--text-faint)',
-                              cursor: 'pointer',
-                              appearance: 'none',
+                              color: u.area_name ? '#93C5FD' : 'var(--text-faint)',
                               colorScheme: 'dark',
-                              maxWidth: 110,
                             }}>
                             <option value="">Sin área</option>
                             {areas.map(a => <option key={a.id} value={a.id}>{a.name}</option>)}
                           </select>
-                          <ChevronDown size={10} className="absolute right-1.5 pointer-events-none"
-                            style={{ color: u.area_name ? 'var(--primary)' : 'var(--text-faint)' }} />
+                          <ChevronDown size={10} className="absolute right-2 pointer-events-none"
+                            style={{ color: u.area_name ? '#93C5FD' : 'var(--text-faint)' }} />
                         </div>
                       </td>
 
-                      {/* Grupos — chips with overflow */}
-                      <td className="px-3 py-3.5">
+                      {/* Grupos */}
+                      <td className="px-4 py-3" style={{ overflow: 'visible', position: 'relative' }}>
                         <GroupsCell
                           u={u} groups={groups}
-                          cellSaving={cellSaving} groupAdd={groupAdd}
-                          setGroupAdd={setGroupAdd} autoSaveGroups={autoSaveGroups}
+                          cellSaving={cellSaving} groupPopover={groupPopover}
+                          setGroupPopover={setGroupPopover} autoSaveGroups={autoSaveGroups}
                         />
                       </td>
 
                       {/* Estado */}
-                      <td className="px-3 py-3.5 text-center">
-                        <span className="inline-flex items-center gap-1.5 text-[11px] font-semibold px-2.5 py-1 rounded-full"
+                      <td className="px-4 py-3">
+                        <span className="inline-flex items-center gap-1.5 text-[11px] font-semibold px-2.5 py-1 rounded-full whitespace-nowrap"
                           style={u.status === 'activo'
                             ? { background: 'rgba(16,185,129,0.1)', color: '#6EE7B7', border: '1px solid rgba(16,185,129,0.2)' }
                             : { background: 'rgba(239,68,68,0.08)', color: '#FCA5A5', border: '1px solid rgba(239,68,68,0.2)' }}>
@@ -651,41 +669,41 @@ export default function UsersPage() {
                         </span>
                       </td>
 
-                      {/* Acciones */}
-                      <td className="px-2 py-3.5">
-                        <div className="relative flex justify-center">
-                          <button onClick={() => setMenuOpen(menuOpen === u.id ? null : u.id)}
-                            className="w-7 h-7 rounded-lg flex items-center justify-center transition-colors opacity-0 group-hover:opacity-100"
+                      {/* Acciones inline */}
+                      <td className="px-4 py-3">
+                        <div className="flex items-center justify-end gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
+                          <button onClick={() => router.push(`/dashboard/users/${u.id}`)}
+                            title="Ver hoja de vida"
+                            className="w-7 h-7 rounded-lg flex items-center justify-center transition-colors"
                             style={{ color: 'var(--text-faint)' }}
-                            onMouseEnter={e => e.currentTarget.classList.add('opacity-100')}>
-                            <MoreVertical size={15} />
+                            onMouseEnter={e => { e.currentTarget.style.background = 'var(--bg-card)'; e.currentTarget.style.color = 'var(--primary)' }}
+                            onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = 'var(--text-faint)' }}>
+                            <Eye size={14} />
                           </button>
-                          {menuOpen === u.id && (
-                            <div className="absolute right-0 top-8 rounded-xl shadow-xl z-20 w-44 py-1 overflow-hidden"
-                              style={{ background: 'var(--bg-surface)', border: '1px solid var(--border-strong)' }}>
-                              <button onClick={() => { setMenuOpen(null); router.push(`/dashboard/users/${u.id}`) }}
-                                className="flex items-center gap-2.5 w-full px-4 py-2.5 text-sm transition-all hover:opacity-80"
-                                style={{ color: 'var(--text-dim)' }}>
-                                <BookOpen size={13} /> Ver hoja de vida
-                              </button>
-                              <button onClick={() => openEdit(u)}
-                                className="flex items-center gap-2.5 w-full px-4 py-2.5 text-sm transition-all hover:opacity-80"
-                                style={{ color: 'var(--text-dim)' }}>
-                                <Edit2 size={13} /> Editar datos
-                              </button>
-                              <button onClick={() => toggleStatus(u.id)}
-                                className="flex items-center gap-2.5 w-full px-4 py-2.5 text-sm transition-all hover:opacity-80"
-                                style={{ color: 'var(--text-dim)' }}>
-                                <CheckCircle size={13} /> {u.status === 'activo' ? 'Desactivar' : 'Activar'}
-                              </button>
-                              <div style={{ borderTop: '1px solid var(--border)', margin: '4px 0' }} />
-                              <button onClick={() => { setDeleteConfirm(u.id); setMenuOpen(null) }}
-                                className="flex items-center gap-2.5 w-full px-4 py-2.5 text-sm transition-all hover:opacity-80"
-                                style={{ color: '#FCA5A5' }}>
-                                <Trash2 size={13} /> Eliminar
-                              </button>
-                            </div>
-                          )}
+                          <button onClick={() => openEdit(u)}
+                            title="Editar datos"
+                            className="w-7 h-7 rounded-lg flex items-center justify-center transition-colors"
+                            style={{ color: 'var(--text-faint)' }}
+                            onMouseEnter={e => { e.currentTarget.style.background = 'var(--bg-card)'; e.currentTarget.style.color = 'var(--primary)' }}
+                            onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = 'var(--text-faint)' }}>
+                            <Edit2 size={14} />
+                          </button>
+                          <button onClick={() => toggleStatus(u.id)}
+                            title={u.status === 'activo' ? 'Desactivar' : 'Activar'}
+                            className="w-7 h-7 rounded-lg flex items-center justify-center transition-colors"
+                            style={{ color: 'var(--text-faint)' }}
+                            onMouseEnter={e => { e.currentTarget.style.background = 'var(--bg-card)'; e.currentTarget.style.color = u.status === 'activo' ? '#FCA5A5' : '#6EE7B7' }}
+                            onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = 'var(--text-faint)' }}>
+                            <CheckCircle size={14} />
+                          </button>
+                          <button onClick={() => setDeleteConfirm(u.id)}
+                            title="Eliminar"
+                            className="w-7 h-7 rounded-lg flex items-center justify-center transition-colors"
+                            style={{ color: 'var(--text-faint)' }}
+                            onMouseEnter={e => { e.currentTarget.style.background = 'rgba(239,68,68,0.1)'; e.currentTarget.style.color = '#FCA5A5' }}
+                            onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = 'var(--text-faint)' }}>
+                            <Trash2 size={14} />
+                          </button>
                         </div>
                       </td>
                     </motion.tr>
@@ -695,16 +713,41 @@ export default function UsersPage() {
             </table>
 
             {filtered.length === 0 && users.length > 0 && (
-              <div className="py-14 text-center">
-                <Search size={24} className="mx-auto mb-2 opacity-20" style={{ color: 'var(--text-faint)' }} />
+              <div className="py-16 text-center">
+                <Search size={24} className="mx-auto mb-3 opacity-20" style={{ color: 'var(--text-faint)' }} />
                 <p className="text-sm font-medium mb-1" style={{ color: 'var(--text-dim)' }}>Sin resultados</p>
                 <p className="text-xs" style={{ color: 'var(--text-faint)' }}>Ajusta los filtros o el término de búsqueda</p>
+              </div>
+            )}
+
+            {/* Footer with count */}
+            {filtered.length > 0 && (
+              <div className="px-4 py-3 flex items-center justify-between"
+                style={{ borderTop: '1px solid var(--border)' }}>
+                <span className="text-xs" style={{ color: 'var(--text-faint)' }}>
+                  {filtered.length === users.length
+                    ? `${users.length} trabajadores`
+                    : `${filtered.length} de ${users.length} trabajadores`}
+                </span>
+                {selected.size > 0 && (
+                  <span className="text-xs font-medium" style={{ color: 'var(--primary)' }}>
+                    {selected.size} seleccionado{selected.size !== 1 ? 's' : ''}
+                  </span>
+                )}
               </div>
             )}
           </motion.div>
 
           {/* ── Mobile cards ─────────────────────────────────────────── */}
           <div className="md:hidden space-y-2">
+            {/* Mobile search */}
+            <div className="relative mb-3">
+              <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2" style={{ color: 'var(--text-faint)' }} />
+              <input type="text" value={search} onChange={e => setSearch(e.target.value)}
+                placeholder="Buscar trabajador..."
+                className="terra-input pl-9 py-2 text-sm" />
+              {search && <button onClick={() => setSearch('')} className="absolute right-3 top-1/2 -translate-y-1/2" style={{ color: 'var(--text-faint)' }}><X size={13} /></button>}
+            </div>
             <AnimatePresence>
               {filtered.map(u => (
                 <motion.div key={u.id} initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
@@ -716,7 +759,7 @@ export default function UsersPage() {
                       </div>
                       <div className="min-w-0">
                         <div className="font-semibold text-sm truncate" style={{ color: 'var(--text)' }}>{u.name}</div>
-                        <div className="text-[11px] font-mono mt-0.5" style={{ color: 'var(--text-faint)' }}>CC: {u.cedula || '—'}</div>
+                        <div className="text-[11px] mt-0.5 font-mono" style={{ color: 'var(--text-faint)' }}>CC: {u.cedula || '—'}</div>
                         {u.area_name && (
                           <div className="text-[11px] flex items-center gap-1 mt-0.5" style={{ color: 'var(--text-dim)' }}>
                             <Layers size={10} style={{ color: 'var(--primary)' }} />{u.area_name}
@@ -724,30 +767,23 @@ export default function UsersPage() {
                         )}
                       </div>
                     </div>
-                    <div className="flex items-center gap-2 flex-shrink-0">
-                      <span className="inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-full"
-                        style={u.status === 'activo'
-                          ? { background: 'rgba(16,185,129,0.1)', color: '#6EE7B7', border: '1px solid rgba(16,185,129,0.2)' }
-                          : { background: 'rgba(239,68,68,0.08)', color: '#FCA5A5', border: '1px solid rgba(239,68,68,0.2)' }}>
-                        <span className="w-1.5 h-1.5 rounded-full" style={{ background: u.status === 'activo' ? '#10B981' : '#EF4444' }} />
-                        {u.status === 'activo' ? 'Activo' : 'Inactivo'}
-                      </span>
-                      <button onClick={() => setMenuOpen(menuOpen === u.id ? null : u.id)} style={{ color: 'var(--text-faint)' }}>
-                        <MoreVertical size={15} />
-                      </button>
-                    </div>
+                    <span className="inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-full flex-shrink-0"
+                      style={u.status === 'activo'
+                        ? { background: 'rgba(16,185,129,0.1)', color: '#6EE7B7', border: '1px solid rgba(16,185,129,0.2)' }
+                        : { background: 'rgba(239,68,68,0.08)', color: '#FCA5A5', border: '1px solid rgba(239,68,68,0.2)' }}>
+                      <span className="w-1.5 h-1.5 rounded-full" style={{ background: u.status === 'activo' ? '#10B981' : '#EF4444' }} />
+                      {u.status === 'activo' ? 'Activo' : 'Inactivo'}
+                    </span>
                   </div>
-                  {menuOpen === u.id && (
-                    <div className="flex gap-2 mt-3 flex-wrap">
-                      <button onClick={() => { setMenuOpen(null); router.push(`/dashboard/users/${u.id}`) }}
-                        className="terra-btn flex-1 text-xs py-2 justify-center"><BookOpen size={12} /> Hoja de vida</button>
-                      <button onClick={() => openEdit(u)} className="terra-btn-outline flex-1 text-xs py-2 justify-center"><Edit2 size={12} /> Editar</button>
-                      <button onClick={() => toggleStatus(u.id)} className="terra-btn-outline flex-1 text-xs py-2 justify-center"><CheckCircle size={12} /> {u.status === 'activo' ? 'Desactivar' : 'Activar'}</button>
-                      <button onClick={() => setDeleteConfirm(u.id)} className="px-3 py-2 rounded-lg text-xs font-semibold" style={{ background: 'var(--red-dim)', color: '#FCA5A5' }}>
-                        <Trash2 size={12} />
-                      </button>
-                    </div>
-                  )}
+                  <div className="flex gap-2 mt-3 flex-wrap">
+                    <button onClick={() => router.push(`/dashboard/users/${u.id}`)}
+                      className="terra-btn flex-1 text-xs py-2 justify-center"><BookOpen size={12} /> Hoja de vida</button>
+                    <button onClick={() => openEdit(u)} className="terra-btn-outline flex-1 text-xs py-2 justify-center"><Edit2 size={12} /> Editar</button>
+                    <button onClick={() => toggleStatus(u.id)} className="terra-btn-outline flex-1 text-xs py-2 justify-center"><CheckCircle size={12} /> {u.status === 'activo' ? 'Desactivar' : 'Activar'}</button>
+                    <button onClick={() => setDeleteConfirm(u.id)} className="px-3 py-2 rounded-lg text-xs" style={{ background: 'var(--red-dim)', color: '#FCA5A5' }}>
+                      <Trash2 size={12} />
+                    </button>
+                  </div>
                 </motion.div>
               ))}
             </AnimatePresence>
@@ -755,9 +791,10 @@ export default function UsersPage() {
         </>
       )}
 
-      {menuOpen && <div className="fixed inset-0 z-10" onClick={() => setMenuOpen(null)} />}
+      {/* Close popovers on outside click */}
+      {groupPopover && <div className="fixed inset-0 z-40" onClick={() => setGroupPopover(null)} />}
 
-      {/* ── Add/Edit Modal ───────────────────────────────────────────── */}
+      {/* ── Add/Edit Modal ──────────────────────────────────────────── */}
       <AnimatePresence>
         {showModal && (
           <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-4">
@@ -778,33 +815,23 @@ export default function UsersPage() {
 
               <div className="p-6 space-y-4 overflow-y-auto" style={{ maxHeight: 'calc(90vh - 140px)' }}>
                 {([
-                  { key: 'name',   label: 'Nombre completo *',                       placeholder: 'JUAN CARLOS PEREZ GOMEZ',   mono: false, type: 'text'  },
-                  { key: 'cedula', label: 'Cédula * (será la contraseña inicial)',   placeholder: '1052392965',                 mono: true,  type: 'text'  },
-                  { key: 'email',  label: 'Correo electrónico *',                    placeholder: 'juan.perez@jimmyacademy.com', mono: false, type: 'email' },
-                  { key: 'role',   label: 'Cargo',                                   placeholder: 'SUPERVISOR DE MONTAJE',      mono: false, type: 'text'  },
+                  { key: 'name',   label: 'Nombre completo *',                      placeholder: 'JUAN CARLOS PEREZ GOMEZ',   mono: false, type: 'text'  },
+                  { key: 'cedula', label: 'Cédula * (será la contraseña inicial)',  placeholder: '1052392965',                 mono: true,  type: 'text'  },
+                  { key: 'email',  label: 'Correo electrónico *',                   placeholder: 'juan.perez@jimmyacademy.com', mono: false, type: 'email' },
+                  { key: 'role',   label: 'Cargo',                                  placeholder: 'SUPERVISOR DE MONTAJE',      mono: false, type: 'text'  },
                 ] as const).map(({ key, label, placeholder, mono, type }) => (
                   <div key={key}>
                     <label className="text-xs font-semibold mb-1.5 block" style={{ color: 'var(--text-dim)' }}>{label}</label>
-                    <input
-                      type={type}
-                      value={(form as any)[key]}
+                    <input type={type} value={(form as any)[key]}
                       onChange={e => {
                         const val = key === 'cedula' ? e.target.value.replace(/\D/g, '') : e.target.value
-                        if (key === 'name') {
-                          const upper = val.toUpperCase()
-                          setForm(f => ({ ...f, name: upper, ...(!f.emailManual ? { email: generateEmail(upper) } : {}) }))
-                        } else if (key === 'cedula') {
-                          setForm(f => ({ ...f, cedula: val, password: val }))
-                        } else if (key === 'role') {
-                          setForm(f => ({ ...f, role: val.toUpperCase() }))
-                        } else if (key === 'email') {
-                          setForm(f => ({ ...f, email: e.target.value, emailManual: true }))
-                        } else {
-                          setForm(f => ({ ...f, [key]: val }))
-                        }
+                        if (key === 'name') { const upper = val.toUpperCase(); setForm(f => ({ ...f, name: upper, ...(!f.emailManual ? { email: generateEmail(upper) } : {}) })) }
+                        else if (key === 'cedula') { setForm(f => ({ ...f, cedula: val, password: val })) }
+                        else if (key === 'role') { setForm(f => ({ ...f, role: val.toUpperCase() })) }
+                        else if (key === 'email') { setForm(f => ({ ...f, email: e.target.value, emailManual: true })) }
+                        else { setForm(f => ({ ...f, [key]: val })) }
                       }}
-                      placeholder={placeholder}
-                      inputMode={key === 'cedula' ? 'numeric' : undefined}
+                      placeholder={placeholder} inputMode={key === 'cedula' ? 'numeric' : undefined}
                       className={`terra-input ${mono ? 'font-mono' : ''}`}
                       style={(formErrors as any)[key] ? { borderColor: 'rgba(239,68,68,0.5)' } : {}}
                     />
@@ -880,7 +907,7 @@ export default function UsersPage() {
         )}
       </AnimatePresence>
 
-      {/* ── Delete confirm ───────────────────────────────────────────── */}
+      {/* ── Delete confirm ──────────────────────────────────────────── */}
       <AnimatePresence>
         {deleteConfirm && (
           <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-4">
@@ -898,10 +925,8 @@ export default function UsersPage() {
               <div className="flex gap-3">
                 <button onClick={() => setDeleteConfirm(null)} className="terra-btn-outline flex-1 py-2.5 justify-center">Cancelar</button>
                 <button onClick={() => handleDelete(deleteConfirm!)}
-                  className="flex-1 py-2.5 rounded-xl font-bold text-sm text-white transition-all"
-                  style={{ background: 'var(--red)' }}>
-                  Eliminar
-                </button>
+                  className="flex-1 py-2.5 rounded-xl font-bold text-sm text-white"
+                  style={{ background: 'var(--red)' }}>Eliminar</button>
               </div>
             </motion.div>
           </div>
