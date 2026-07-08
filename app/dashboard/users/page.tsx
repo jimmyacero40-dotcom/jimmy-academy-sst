@@ -24,6 +24,7 @@ interface AppUser {
   cedula: string
   status: UserStatus
   createdAt: string
+  photo_url?: string | null
   groups: { id: string; name: string; color?: string }[]
 }
 
@@ -275,6 +276,7 @@ export default function UsersPage() {
         cedula: u.cedula || '',
         status: u.active ? 'activo' as UserStatus : 'inactivo' as UserStatus,
         createdAt: new Date(u.created_at).toLocaleDateString('es-CO'),
+        photo_url: u.photo_url || null,
         groups: (u.user_groups ?? []).map((ug: any) => ug.groups).filter(Boolean),
       })))
     } catch {}
@@ -605,9 +607,10 @@ export default function UsersPage() {
                       {/* Trabajador: avatar + nombre + email */}
                       <td className="px-4 py-3">
                         <div className="flex items-center gap-3">
-                          <div className={`w-8 h-8 rounded-full bg-gradient-to-br ${colorForUser(u.id)} flex items-center justify-center text-white text-[11px] font-bold flex-shrink-0`}>
-                            {getInitials(u.name)}
-                          </div>
+                          {u.photo_url
+                            ? <img src={u.photo_url} alt={u.name} className="w-8 h-8 rounded-full object-cover flex-shrink-0" />
+                            : <div className={`w-8 h-8 rounded-full bg-gradient-to-br ${colorForUser(u.id)} flex items-center justify-center text-white text-[11px] font-bold flex-shrink-0`}>{getInitials(u.name)}</div>
+                          }
                           <div className="min-w-0">
                             <div className="text-sm font-semibold leading-snug truncate" style={{ color: 'var(--text)' }}>
                               {u.name}
@@ -754,9 +757,10 @@ export default function UsersPage() {
                   className="terra-card p-4">
                   <div className="flex items-start justify-between gap-3">
                     <div className="flex items-center gap-3 min-w-0">
-                      <div className={`w-10 h-10 rounded-full bg-gradient-to-br ${colorForUser(u.id)} flex items-center justify-center text-white text-sm font-bold flex-shrink-0`}>
-                        {getInitials(u.name)}
-                      </div>
+                      {u.photo_url
+                        ? <img src={u.photo_url} alt={u.name} className="w-10 h-10 rounded-full object-cover flex-shrink-0" />
+                        : <div className={`w-10 h-10 rounded-full bg-gradient-to-br ${colorForUser(u.id)} flex items-center justify-center text-white text-sm font-bold flex-shrink-0`}>{getInitials(u.name)}</div>
+                      }
                       <div className="min-w-0">
                         <div className="font-semibold text-sm truncate" style={{ color: 'var(--text)' }}>{u.name}</div>
                         <div className="text-[11px] mt-0.5 font-mono" style={{ color: 'var(--text-faint)' }}>CC: {u.cedula || '—'}</div>

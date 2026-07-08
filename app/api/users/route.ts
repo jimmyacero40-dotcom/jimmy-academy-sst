@@ -31,8 +31,20 @@ export async function GET() {
     if (row.groups) groupsByUser[row.user_id].push(row.groups)
   }
 
+  // Fetch photo_url from user_profiles
+  const { data: profilesData } = await supabaseAdmin
+    .from('user_profiles')
+    .select('user_id, photo_url')
+    .in('user_id', userIds.length ? userIds : ['_'])
+
+  const photoByUser: Record<string, string> = {}
+  for (const p of profilesData ?? []) {
+    if (p.photo_url) photoByUser[p.user_id] = p.photo_url
+  }
+
   const result = (data ?? []).map((u: any) => ({
     ...u,
+    photo_url: photoByUser[u.id] || null,
     user_groups: (groupsByUser[u.id] ?? []).map(g => ({ groups: g })),
   }))
 
