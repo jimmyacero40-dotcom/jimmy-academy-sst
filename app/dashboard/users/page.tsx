@@ -8,7 +8,8 @@ import {
   Users, Search, MoreVertical, CheckCircle, Clock,
   Building2, X, Edit2, Trash2, Download, ChevronDown,
   UserPlus, FileSpreadsheet, AlertCircle, Loader2,
-  Layers, UserCheck, Tag, ChevronRight, Plus, BookOpen
+  Layers, UserCheck, Tag, ChevronRight, Plus, BookOpen,
+  Filter, Eye
 } from 'lucide-react'
 
 type UserStatus = 'activo' | 'inactivo'
@@ -17,9 +18,9 @@ interface AppUser {
   id: string
   name: string
   email: string
-  empresa: string   // area text (legacy)
-  area_id: string   // area UUID
-  area_name: string // resolved area name
+  empresa: string
+  area_id: string
+  area_name: string
   role: string
   cedula: string
   status: UserStatus
@@ -93,6 +94,80 @@ function downloadTemplate() {
   XLSX.writeFile(wb2, 'plantilla_trabajadores.xlsx')
 }
 
+// Groups cell: max 2 visible chips + overflow badge
+function GroupsCell({ u, groups, cellSaving, groupAdd, setGroupAdd, autoSaveGroups }: {
+  u: AppUser
+  groups: Group[]
+  cellSaving: string | null
+  groupAdd: string | null
+  setGroupAdd: (id: string | null) => void
+  autoSaveGroups: (userId: string, groupIds: string[]) => void
+}) {
+  const MAX = 2
+  const visible = u.groups.slice(0, MAX)
+  const hidden = u.groups.slice(MAX)
+  const available = groups.filter(g => !u.groups.find(ug => ug.id === g.id))
+
+  return (
+    <div className="flex flex-wrap gap-1 items-center">
+      {visible.map(g => (
+        <span key={g.id}
+          className="inline-flex items-center gap-1 text-[10px] px-2 py-0.5 rounded-full font-semibold whitespace-nowrap"
+          style={{ background: 'var(--primary-dim)', color: 'var(--primary)', border: '1px solid var(--primary-border)' }}>
+          {g.name}
+          <button
+            onClick={() => autoSaveGroups(u.id, u.groups.filter(x => x.id !== g.id).map(x => x.id))}
+            disabled={cellSaving === u.id}
+            className="leading-none opacity-50 hover:opacity-100 ml-0.5 transition-opacity">×</button>
+        </span>
+      ))}
+
+      {hidden.length > 0 && (
+        <span
+          title={hidden.map(g => g.name).join(', ')}
+          className="inline-flex items-center text-[10px] px-2 py-0.5 rounded-full font-bold cursor-help"
+          style={{ background: 'rgba(148,163,184,0.12)', color: 'var(--text-dim)', border: '1px solid var(--border)' }}>
+          +{hidden.length}
+        </span>
+      )}
+
+      {available.length > 0 && (
+        <div className="relative">
+          {groupAdd === u.id ? (
+            <select autoFocus
+              onChange={e => {
+                if (!e.target.value) { setGroupAdd(null); return }
+                autoSaveGroups(u.id, [...u.groups.map(g => g.id), e.target.value])
+                setGroupAdd(null)
+              }}
+              onBlur={() => setGroupAdd(null)}
+              className="text-[11px] rounded-lg px-1.5 py-0.5 absolute left-0 top-0 z-30 min-w-[160px]"
+              style={{ background: 'var(--bg-surface)', border: '1px solid var(--primary-border)', color: 'var(--text)', colorScheme: 'dark' }}
+              defaultValue="">
+              <option value="">Agregar grupo...</option>
+              {available.map(g => <option key={g.id} value={g.id}>{g.name}</option>)}
+            </select>
+          ) : (
+            <button
+              onClick={() => setGroupAdd(u.id)}
+              disabled={cellSaving === u.id}
+              title="Agregar grupo"
+              className="w-5 h-5 rounded-full text-[11px] font-bold leading-none flex items-center justify-center transition-all hover:scale-110"
+              style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', color: 'var(--text-faint)' }}>
+              +
+            </button>
+          )}
+        </div>
+      )}
+
+      {u.groups.length === 0 && groupAdd !== u.id && (
+        <span className="text-[11px]" style={{ color: 'var(--text-faint)' }}>—</span>
+      )}
+      {cellSaving === u.id && <Loader2 size={10} className="animate-spin" style={{ color: 'var(--primary)' }} />}
+    </div>
+  )
+}
+
 export default function UsersPage() {
   const router = useRouter()
   const [users, setUsers]     = useState<AppUser[]>([])
@@ -115,9 +190,7 @@ export default function UsersPage() {
   const [saving, setSaving]           = useState(false)
   const [loadingGroups, setLoadingGroups] = useState(false)
   const fileRef = useRef<HTMLInputElement>(null)
-  // Per-user saving indicator for auto-save cells
   const [cellSaving, setCellSaving] = useState<string | null>(null)
-  // Group add dropdown open per user
   const [groupAdd, setGroupAdd] = useState<string | null>(null)
 
   const loadUsers = async () => {
@@ -125,7 +198,6 @@ export default function UsersPage() {
       const res = await fetch('/api/users')
       if (!res.ok) return
       const data = await res.json()
-      // Build user list first, then load groups in parallel
       const userList: AppUser[] = data.map((u: any) => ({
         id: u.id,
         name: u.name,
@@ -161,20 +233,18 @@ export default function UsersPage() {
   })
 
   const uniqueRoles = [...new Set(users.map(u => u.role).filter(Boolean))]
+  const activeCount = users.filter(u => u.status === 'activo').length
+  const inactiveCount = users.filter(u => u.status === 'inactivo').length
+  const hasSecondaryFilters = !!(filterArea || filterGroup || filterRole)
 
   const openNew = () => { setEditUser(null); setForm(EMPTY_FORM); setFormErrors({}); setShowModal(true) }
 
   const openEdit = async (u: AppUser) => {
     setEditUser(u)
-    setForm({
-      name: u.name, email: u.email || '', password: '', empresa: u.empresa,
-      area_id: u.area_id || '', role: u.role, cedula: u.cedula, status: u.status,
-      emailManual: true, selectedGroups: [],
-    })
+    setForm({ name: u.name, email: u.email || '', password: '', empresa: u.empresa, area_id: u.area_id || '', role: u.role, cedula: u.cedula, status: u.status, emailManual: true, selectedGroups: [] })
     setFormErrors({})
     setShowModal(true)
     setMenuOpen(null)
-    // Load user's groups
     setLoadingGroups(true)
     try {
       const res = await fetch(`/api/users/${u.id}/groups`)
@@ -200,46 +270,21 @@ export default function UsersPage() {
     if (Object.keys(errs).length) { setFormErrors(errs); return }
     setSaving(true)
     try {
-      // Resolve area name from selected area_id
       const selectedArea = areas.find(a => a.id === form.area_id)
       const areaText = selectedArea?.name || form.empresa
 
       if (editUser) {
-        const body: any = {
-          id: editUser.id,
-          name: form.name,
-          email: form.email,
-          cedula: form.cedula,
-          area: areaText,
-          active: form.status === 'activo',
-        }
+        const body: any = { id: editUser.id, name: form.name, email: form.email, cedula: form.cedula, area: areaText, active: form.status === 'activo' }
         if (form.password.trim()) body.password = form.password
         const res = await fetch('/api/users', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
         if (!res.ok) { const d = await res.json(); setFormErrors({ name: d.error || 'Error al guardar' }); setSaving(false); return }
-        // Update groups
-        await fetch(`/api/users/${editUser.id}/groups`, {
-          method: 'PUT',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ group_ids: form.selectedGroups }),
-        })
+        await fetch(`/api/users/${editUser.id}/groups`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ group_ids: form.selectedGroups }) })
       } else {
-        const res = await fetch('/api/users', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            name: form.name, email: form.email, password: form.cedula,
-            cedula: form.cedula, role: 'worker', area: areaText,
-          })
-        })
+        const res = await fetch('/api/users', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: form.name, email: form.email, password: form.cedula, cedula: form.cedula, role: 'worker', area: areaText }) })
         if (!res.ok) { const d = await res.json(); setFormErrors({ email: d.error || 'Error al crear' }); setSaving(false); return }
         const created = await res.json()
-        // Assign groups for new user
         if (form.selectedGroups.length && created.id) {
-          await fetch(`/api/users/${created.id}/groups`, {
-            method: 'PUT',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ group_ids: form.selectedGroups }),
-          })
+          await fetch(`/api/users/${created.id}/groups`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ group_ids: form.selectedGroups }) })
         }
       }
       await loadUsers()
@@ -273,10 +318,7 @@ export default function UsersPage() {
   const toggleStatus = async (id: string) => {
     const u = users.find(u => u.id === id)
     if (!u) return
-    await fetch('/api/users', {
-      method: 'PUT', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ id, active: u.status !== 'activo' }),
-    })
+    await fetch('/api/users', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id, active: u.status !== 'activo' }) })
     setMenuOpen(null)
     await loadUsers()
   }
@@ -293,10 +335,7 @@ export default function UsersPage() {
       for (const row of rows) {
         if (!row.name || !row.cedula) continue
         const email = generateEmail(row.name)
-        const res = await fetch('/api/users', {
-          method: 'POST', headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ name: row.name, email, password: row.cedula, cedula: row.cedula, role: 'worker', area: row.empresa }),
-        })
+        const res = await fetch('/api/users', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: row.name, email, password: row.cedula, cedula: row.cedula, role: 'worker', area: row.empresa }) })
         if (res.ok) created++
       }
       await loadUsers()
@@ -308,44 +347,51 @@ export default function UsersPage() {
   const toggleGroup = (gid: string) => {
     setForm(f => ({
       ...f,
-      selectedGroups: f.selectedGroups.includes(gid)
-        ? f.selectedGroups.filter(x => x !== gid)
-        : [...f.selectedGroups, gid],
+      selectedGroups: f.selectedGroups.includes(gid) ? f.selectedGroups.filter(x => x !== gid) : [...f.selectedGroups, gid],
     }))
   }
 
   const autoSaveArea = async (userId: string, areaName: string) => {
     setCellSaving(userId)
-    await fetch('/api/users', {
-      method: 'PUT', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ id: userId, area: areaName }),
-    })
+    await fetch('/api/users', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: userId, area: areaName }) })
     await loadUsers()
     setCellSaving(null)
   }
 
   const autoSaveGroups = async (userId: string, groupIds: string[]) => {
     setCellSaving(userId)
-    await fetch(`/api/users/${userId}/groups`, {
-      method: 'PUT', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ group_ids: groupIds }),
-    })
+    await fetch(`/api/users/${userId}/groups`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ group_ids: groupIds }) })
     await loadUsers()
     setCellSaving(null)
   }
 
   return (
-    <div className="p-6 max-w-6xl mx-auto">
+    <div className="p-6 max-w-7xl mx-auto">
 
-      {/* Header */}
-      <div className="flex items-center justify-between mb-8">
+      {/* ── Header ─────────────────────────────────────────────────── */}
+      <div className="flex items-center justify-between mb-6">
         <div className="flex items-center gap-3">
-          <div className="w-9 h-9 rounded-xl flex items-center justify-center" style={{ background: 'var(--primary-dim)' }}>
-            <Users size={18} style={{ color: 'var(--primary)' }} />
+          <div className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0"
+            style={{ background: 'var(--primary-dim)', border: '1px solid var(--primary-border)' }}>
+            <Users size={20} style={{ color: 'var(--primary)' }} />
           </div>
           <div>
             <h1 className="text-xl font-bold" style={{ color: 'var(--text)' }}>Trabajadores</h1>
-            <p className="text-xs" style={{ color: 'var(--text-dim)' }}>{users.length} registrados</p>
+            <div className="flex items-center gap-2 mt-0.5">
+              <span className="text-xs" style={{ color: 'var(--text-faint)' }}>{users.length} registrados</span>
+              {activeCount > 0 && (
+                <span className="text-[11px] px-2 py-0.5 rounded-full font-semibold"
+                  style={{ background: 'rgba(16,185,129,0.1)', color: '#6EE7B7', border: '1px solid rgba(16,185,129,0.2)' }}>
+                  {activeCount} activos
+                </span>
+              )}
+              {inactiveCount > 0 && (
+                <span className="text-[11px] px-2 py-0.5 rounded-full font-semibold"
+                  style={{ background: 'rgba(239,68,68,0.08)', color: '#FCA5A5', border: '1px solid rgba(239,68,68,0.2)' }}>
+                  {inactiveCount} inactivos
+                </span>
+              )}
+            </div>
           </div>
         </div>
 
@@ -371,321 +417,353 @@ export default function UsersPage() {
         </div>
       )}
 
-      {/* Filters */}
-      <div className="flex flex-col gap-3 mb-5">
-        <div className="flex flex-col sm:flex-row gap-3">
-          <div className="relative flex-1">
-            <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2" style={{ color: 'var(--text-faint)' }} />
-            <input
-              type="text" value={search} onChange={e => setSearch(e.target.value)}
-              placeholder="Buscar por nombre, cédula, cargo o área..."
-              className="terra-input pl-9 py-2 text-sm"
-            />
-            {search && <button onClick={() => setSearch('')} className="absolute right-3 top-1/2 -translate-y-1/2" style={{ color: 'var(--text-faint)' }}><X size={13} /></button>}
-          </div>
-          <div className="flex gap-1 p-1 rounded-xl flex-shrink-0" style={{ background: 'var(--bg-card)', border: '1px solid var(--border)' }}>
-            {['todos', 'activo', 'inactivo'].map(f => (
-              <button key={f} onClick={() => setFilter(f)}
-                className="px-3 py-1.5 rounded-lg text-xs font-semibold capitalize transition-all"
-                style={{ background: filter === f ? 'var(--primary)' : 'transparent', color: filter === f ? '#fff' : 'var(--text-dim)' }}>
-                {f}
-              </button>
-            ))}
-          </div>
+      {/* ── Search + Status filter row ──────────────────────────────── */}
+      <div className="flex flex-col sm:flex-row gap-2 mb-3">
+        <div className="relative flex-1">
+          <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2" style={{ color: 'var(--text-faint)' }} />
+          <input
+            type="text" value={search} onChange={e => setSearch(e.target.value)}
+            placeholder="Buscar por nombre, cédula, cargo o área..."
+            className="terra-input pl-9 py-2 text-sm"
+          />
+          {search && <button onClick={() => setSearch('')} className="absolute right-3 top-1/2 -translate-y-1/2" style={{ color: 'var(--text-faint)' }}><X size={13} /></button>}
         </div>
-        {/* Secondary filters */}
-        <div className="flex flex-wrap gap-2">
-          <select value={filterArea} onChange={e => setFilterArea(e.target.value)}
-            className="terra-input py-1.5 text-xs pr-8 flex-shrink-0" style={{ minWidth: 140 }}>
-            <option value="">Todas las áreas</option>
-            {areas.map(a => <option key={a.id} value={a.id}>{a.name}</option>)}
-          </select>
-          <select value={filterGroup} onChange={e => setFilterGroup(e.target.value)}
-            className="terra-input py-1.5 text-xs pr-8 flex-shrink-0" style={{ minWidth: 140 }}>
-            <option value="">Todos los grupos</option>
-            {groups.map(g => <option key={g.id} value={g.id}>{g.name}</option>)}
-          </select>
-          <select value={filterRole} onChange={e => setFilterRole(e.target.value)}
-            className="terra-input py-1.5 text-xs pr-8 flex-shrink-0" style={{ minWidth: 140 }}>
-            <option value="">Todos los cargos</option>
-            {uniqueRoles.map(r => <option key={r} value={r}>{r}</option>)}
-          </select>
-          {(filterArea || filterGroup || filterRole) && (
-            <button onClick={() => { setFilterArea(''); setFilterGroup(''); setFilterRole('') }}
-              className="flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs"
-              style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', color: 'var(--text-dim)' }}>
-              <X size={11} /> Limpiar filtros
+        <div className="flex gap-1 p-1 rounded-xl flex-shrink-0" style={{ background: 'var(--bg-card)', border: '1px solid var(--border)' }}>
+          {(['todos', 'activo', 'inactivo'] as const).map(f => (
+            <button key={f} onClick={() => setFilter(f)}
+              className="px-3 py-1.5 rounded-lg text-xs font-semibold capitalize transition-all"
+              style={{ background: filter === f ? 'var(--primary)' : 'transparent', color: filter === f ? '#fff' : 'var(--text-dim)' }}>
+              {f}
             </button>
-          )}
+          ))}
         </div>
       </div>
 
-      {/* Bulk actions */}
-      {selected.size > 0 && (
-        <motion.div initial={{ opacity: 0, y: -8 }} animate={{ opacity: 1, y: 0 }}
-          className="flex items-center gap-3 mb-4 px-4 py-2.5 rounded-xl"
-          style={{ background: 'var(--primary-dim)', border: '1px solid var(--primary-border)' }}>
-          <span className="text-sm font-semibold" style={{ color: 'var(--primary)' }}>{selected.size} seleccionado{selected.size !== 1 ? 's' : ''}</span>
-          <button onClick={handleBulkDelete}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold ml-auto"
-            style={{ background: 'var(--red-dim)', color: '#FCA5A5', border: '1px solid rgba(239,68,68,0.2)' }}>
-            <Trash2 size={12} /> Eliminar
-          </button>
-          <button onClick={() => setSelected(new Set())} style={{ color: 'var(--text-dim)' }}><X size={15} /></button>
-        </motion.div>
-      )}
+      {/* ── Compact secondary filters ────────────────────────────────── */}
+      <div className="flex flex-wrap items-center gap-2 mb-5">
+        {/* Area filter pill */}
+        <label className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs cursor-pointer transition-all"
+          style={{
+            background: filterArea ? 'var(--primary-dim)' : 'var(--bg-card)',
+            border: `1px solid ${filterArea ? 'var(--primary-border)' : 'var(--border)'}`,
+          }}>
+          <Building2 size={11} style={{ color: filterArea ? 'var(--primary)' : 'var(--text-faint)' }} />
+          <select value={filterArea} onChange={e => setFilterArea(e.target.value)}
+            className="bg-transparent outline-none text-xs cursor-pointer"
+            style={{ color: filterArea ? 'var(--primary)' : 'var(--text-dim)', colorScheme: 'dark', appearance: 'none' }}>
+            <option value="">Área</option>
+            {areas.map(a => <option key={a.id} value={a.id}>{a.name}</option>)}
+          </select>
+          <ChevronDown size={10} style={{ color: filterArea ? 'var(--primary)' : 'var(--text-faint)' }} />
+        </label>
 
-      {/* Desktop table */}
+        {/* Group filter pill */}
+        <label className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs cursor-pointer transition-all"
+          style={{
+            background: filterGroup ? 'var(--primary-dim)' : 'var(--bg-card)',
+            border: `1px solid ${filterGroup ? 'var(--primary-border)' : 'var(--border)'}`,
+          }}>
+          <Users size={11} style={{ color: filterGroup ? 'var(--primary)' : 'var(--text-faint)' }} />
+          <select value={filterGroup} onChange={e => setFilterGroup(e.target.value)}
+            className="bg-transparent outline-none text-xs cursor-pointer"
+            style={{ color: filterGroup ? 'var(--primary)' : 'var(--text-dim)', colorScheme: 'dark', appearance: 'none' }}>
+            <option value="">Grupo</option>
+            {groups.map(g => <option key={g.id} value={g.id}>{g.name}</option>)}
+          </select>
+          <ChevronDown size={10} style={{ color: filterGroup ? 'var(--primary)' : 'var(--text-faint)' }} />
+        </label>
+
+        {/* Role/Cargo filter pill */}
+        <label className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs cursor-pointer transition-all"
+          style={{
+            background: filterRole ? 'var(--primary-dim)' : 'var(--bg-card)',
+            border: `1px solid ${filterRole ? 'var(--primary-border)' : 'var(--border)'}`,
+          }}>
+          <Tag size={11} style={{ color: filterRole ? 'var(--primary)' : 'var(--text-faint)' }} />
+          <select value={filterRole} onChange={e => setFilterRole(e.target.value)}
+            className="bg-transparent outline-none text-xs cursor-pointer"
+            style={{ color: filterRole ? 'var(--primary)' : 'var(--text-dim)', colorScheme: 'dark', appearance: 'none' }}>
+            <option value="">Cargo</option>
+            {uniqueRoles.map(r => <option key={r} value={r}>{r}</option>)}
+          </select>
+          <ChevronDown size={10} style={{ color: filterRole ? 'var(--primary)' : 'var(--text-faint)' }} />
+        </label>
+
+        {hasSecondaryFilters && (
+          <button onClick={() => { setFilterArea(''); setFilterGroup(''); setFilterRole('') }}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs transition-all"
+            style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', color: 'var(--text-dim)' }}>
+            <X size={11} /> Limpiar
+          </button>
+        )}
+
+        {filtered.length !== users.length && (
+          <span className="ml-auto text-xs" style={{ color: 'var(--text-faint)' }}>
+            {filtered.length} de {users.length}
+          </span>
+        )}
+      </div>
+
+      {/* ── Bulk actions banner ──────────────────────────────────────── */}
+      <AnimatePresence>
+        {selected.size > 0 && (
+          <motion.div initial={{ opacity: 0, y: -8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -8 }}
+            className="flex items-center gap-3 mb-4 px-4 py-2.5 rounded-xl"
+            style={{ background: 'var(--primary-dim)', border: '1px solid var(--primary-border)' }}>
+            <span className="text-sm font-semibold" style={{ color: 'var(--primary)' }}>{selected.size} seleccionado{selected.size !== 1 ? 's' : ''}</span>
+            <button onClick={handleBulkDelete}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold ml-auto"
+              style={{ background: 'var(--red-dim)', color: '#FCA5A5', border: '1px solid rgba(239,68,68,0.2)' }}>
+              <Trash2 size={12} /> Eliminar seleccionados
+            </button>
+            <button onClick={() => setSelected(new Set())} style={{ color: 'var(--text-dim)' }}><X size={15} /></button>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* ── Empty state ──────────────────────────────────────────────── */}
       {users.length === 0 ? (
         <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }}
           className="flex flex-col items-center justify-center py-24 text-center terra-card">
-          <Users size={32} className="mb-3 opacity-30" style={{ color: 'var(--text-faint)' }} />
+          <div className="w-16 h-16 rounded-2xl flex items-center justify-center mb-4"
+            style={{ background: 'var(--bg-card)', border: '1px solid var(--border)' }}>
+            <Users size={28} style={{ color: 'var(--text-faint)' }} />
+          </div>
           <p className="font-semibold mb-1" style={{ color: 'var(--text)' }}>Sin trabajadores registrados</p>
           <p className="text-sm mb-5" style={{ color: 'var(--text-dim)' }}>Agrega el primero manualmente o importa desde Excel</p>
           <button onClick={openNew} className="terra-btn"><UserPlus size={14} /> Agregar trabajador</button>
         </motion.div>
       ) : (
-        <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} className="terra-card overflow-hidden hidden md:block">
-          <table className="terra-table w-full">
-            <colgroup>
-              <col style={{ width: 36 }} />
-              <col />
-              <col style={{ width: 100 }} />
-              <col style={{ width: 140 }} />
-              <col style={{ width: 200 }} />
-              <col style={{ width: 76 }} />
-              <col style={{ width: 44 }} />
-            </colgroup>
-            <thead>
-              <tr>
-                <th>
-                  <input type="checkbox" checked={selected.size === filtered.length && filtered.length > 0}
-                    onChange={toggleSelectAll} className="w-4 h-4 rounded accent-blue-500" />
-                </th>
-                <th>Trabajador</th>
-                <th className="text-center">Cédula</th>
-                <th className="text-center">Área</th>
-                <th className="text-center">Grupos</th>
-                <th className="text-center">Estado</th>
-                <th></th>
-              </tr>
-            </thead>
-            <tbody>
-              <AnimatePresence>
-                {filtered.map((u, i) => (
-                  <motion.tr key={u.id}
-                    initial={{ opacity: 0 }} animate={{ opacity: 1 }}
-                    exit={{ opacity: 0 }} transition={{ delay: Math.min(i * 0.015, 0.25) }}
-                    className="group">
+        <>
+          {/* ── Desktop table ───────────────────────────────────────── */}
+          <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }}
+            className="terra-card overflow-hidden hidden md:block">
+            <table className="w-full" style={{ borderCollapse: 'collapse' }}>
+              <colgroup>
+                <col style={{ width: 40 }} />
+                <col />
+                <col style={{ width: 130 }} />
+                <col style={{ width: 220 }} />
+                <col style={{ width: 82 }} />
+                <col style={{ width: 44 }} />
+              </colgroup>
+              <thead>
+                <tr style={{ borderBottom: '1px solid var(--border)' }}>
+                  <th className="px-4 py-3 text-left">
+                    <input type="checkbox"
+                      checked={selected.size === filtered.length && filtered.length > 0}
+                      onChange={toggleSelectAll}
+                      className="w-4 h-4 rounded accent-blue-500" />
+                  </th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider" style={{ color: 'var(--text-faint)' }}>Trabajador</th>
+                  <th className="px-3 py-3 text-left text-xs font-semibold uppercase tracking-wider" style={{ color: 'var(--text-faint)' }}>Área</th>
+                  <th className="px-3 py-3 text-left text-xs font-semibold uppercase tracking-wider" style={{ color: 'var(--text-faint)' }}>Grupos</th>
+                  <th className="px-3 py-3 text-center text-xs font-semibold uppercase tracking-wider" style={{ color: 'var(--text-faint)' }}>Estado</th>
+                  <th></th>
+                </tr>
+              </thead>
+              <tbody>
+                <AnimatePresence>
+                  {filtered.map((u, i) => (
+                    <motion.tr key={u.id}
+                      initial={{ opacity: 0 }} animate={{ opacity: 1 }}
+                      exit={{ opacity: 0 }} transition={{ delay: Math.min(i * 0.015, 0.25) }}
+                      className="group transition-colors"
+                      style={{ borderBottom: '1px solid var(--border)' }}
+                      onMouseEnter={e => (e.currentTarget.style.background = 'var(--bg-card)')}
+                      onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}>
 
-                    {/* Checkbox */}
-                    <td>
-                      <input type="checkbox" checked={selected.has(u.id)} onChange={() => toggleSelect(u.id)}
-                        className="w-4 h-4 rounded accent-blue-500" />
-                    </td>
+                      {/* Checkbox */}
+                      <td className="px-4 py-3.5">
+                        <input type="checkbox" checked={selected.has(u.id)} onChange={() => toggleSelect(u.id)}
+                          className="w-4 h-4 rounded accent-blue-500" />
+                      </td>
 
-                    {/* Nombre — avatar + nombre completo siempre visible */}
-                    <td>
-                      <div className="flex items-center gap-3">
-                        <div className={`w-8 h-8 rounded-full bg-gradient-to-br ${colorForUser(u.id)} flex items-center justify-center text-white text-[11px] font-bold flex-shrink-0`}>
-                          {getInitials(u.name)}
+                      {/* Trabajador: avatar + nombre + email + cédula + cargo */}
+                      <td className="px-4 py-3.5">
+                        <div className="flex items-center gap-3">
+                          <div className={`w-9 h-9 rounded-full bg-gradient-to-br ${colorForUser(u.id)} flex items-center justify-center text-white text-[11px] font-bold flex-shrink-0 shadow-sm`}>
+                            {getInitials(u.name)}
+                          </div>
+                          <div className="min-w-0">
+                            <div className="text-sm font-semibold leading-tight truncate" style={{ color: 'var(--text)' }}>
+                              {u.name}
+                            </div>
+                            <div className="flex items-center gap-2 mt-0.5 flex-wrap">
+                              <span className="text-[11px] truncate" style={{ color: 'var(--text-faint)' }}>{u.email || '—'}</span>
+                              {u.cedula && (
+                                <span className="font-mono text-[10px] px-1.5 py-0.5 rounded"
+                                  style={{ background: 'var(--bg-card)', color: 'var(--text-faint)', border: '1px solid var(--border)' }}>
+                                  {u.cedula}
+                                </span>
+                              )}
+                            </div>
+                          </div>
                         </div>
-                        <div>
-                          <div className="text-sm font-semibold leading-snug" style={{ color: 'var(--text)' }}>{u.name}</div>
-                          <div className="text-[11px] mt-0.5 truncate max-w-[260px]" style={{ color: 'var(--text-faint)' }}>{u.email || '—'}</div>
+                      </td>
+
+                      {/* Área — compact pill select */}
+                      <td className="px-3 py-3.5">
+                        <div className="relative inline-flex items-center">
+                          <select
+                            value={areas.find(a => a.name === u.area_name)?.id || ''}
+                            onChange={e => {
+                              const a = areas.find(x => x.id === e.target.value)
+                              autoSaveArea(u.id, a?.name || '')
+                            }}
+                            disabled={cellSaving === u.id}
+                            className="text-[11px] font-medium rounded-lg pl-2 pr-6 py-1 transition-all"
+                            style={{
+                              background: u.area_name ? 'rgba(59,130,246,0.08)' : 'var(--bg-card)',
+                              border: `1px solid ${u.area_name ? 'rgba(59,130,246,0.2)' : 'var(--border)'}`,
+                              color: u.area_name ? 'var(--primary)' : 'var(--text-faint)',
+                              cursor: 'pointer',
+                              appearance: 'none',
+                              colorScheme: 'dark',
+                              maxWidth: 110,
+                            }}>
+                            <option value="">Sin área</option>
+                            {areas.map(a => <option key={a.id} value={a.id}>{a.name}</option>)}
+                          </select>
+                          <ChevronDown size={10} className="absolute right-1.5 pointer-events-none"
+                            style={{ color: u.area_name ? 'var(--primary)' : 'var(--text-faint)' }} />
                         </div>
-                      </div>
-                    </td>
+                      </td>
 
-                    {/* Cédula */}
-                    <td className="text-center">
-                      <span className="font-mono text-[11px]">{u.cedula || '—'}</span>
-                    </td>
+                      {/* Grupos — chips with overflow */}
+                      <td className="px-3 py-3.5">
+                        <GroupsCell
+                          u={u} groups={groups}
+                          cellSaving={cellSaving} groupAdd={groupAdd}
+                          setGroupAdd={setGroupAdd} autoSaveGroups={autoSaveGroups}
+                        />
+                      </td>
 
-                    {/* Área — auto-save al cambiar */}
-                    <td className="text-center" style={{ padding: '6px 8px' }}>
-                      <select
-                        value={areas.find(a => a.name === u.area_name)?.id || ''}
-                        onChange={e => {
-                          const a = areas.find(x => x.id === e.target.value)
-                          autoSaveArea(u.id, a?.name || '')
-                        }}
-                        disabled={cellSaving === u.id}
-                        className="text-[11px] font-medium rounded-lg px-2 py-1 w-full text-center"
-                        style={{
-                          background: u.area_name ? 'rgba(59,130,246,0.08)' : 'var(--bg-card)',
-                          border: '1px solid var(--border)',
-                          color: u.area_name ? 'var(--primary)' : 'var(--text-faint)',
-                          cursor: 'pointer',
-                          appearance: 'auto',
-                          colorScheme: 'dark',
-                        }}>
-                        <option value="">Sin área</option>
-                        {areas.map(a => <option key={a.id} value={a.id}>{a.name}</option>)}
-                      </select>
-                    </td>
+                      {/* Estado */}
+                      <td className="px-3 py-3.5 text-center">
+                        <span className="inline-flex items-center gap-1.5 text-[11px] font-semibold px-2.5 py-1 rounded-full"
+                          style={u.status === 'activo'
+                            ? { background: 'rgba(16,185,129,0.1)', color: '#6EE7B7', border: '1px solid rgba(16,185,129,0.2)' }
+                            : { background: 'rgba(239,68,68,0.08)', color: '#FCA5A5', border: '1px solid rgba(239,68,68,0.2)' }}>
+                          <span className="w-1.5 h-1.5 rounded-full flex-shrink-0"
+                            style={{ background: u.status === 'activo' ? '#10B981' : '#EF4444' }} />
+                          {u.status === 'activo' ? 'Activo' : 'Inactivo'}
+                        </span>
+                      </td>
 
-                    {/* Grupos — chips + dropdown para añadir, auto-save */}
-                    <td className="text-center" style={{ padding: '6px 8px' }}>
-                      <div className="flex flex-wrap gap-1 items-center justify-center">
-                        {u.groups.map(g => (
-                          <span key={g.id}
-                            className="inline-flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded-full font-semibold"
-                            style={{ background: 'var(--primary-dim)', color: 'var(--primary)', border: '1px solid var(--primary-border)' }}>
-                            {g.name}
-                            <button
-                              onClick={() => autoSaveGroups(u.id, u.groups.filter(x => x.id !== g.id).map(x => x.id))}
-                              disabled={cellSaving === u.id}
-                              className="leading-none opacity-60 hover:opacity-100 ml-0.5">×</button>
-                          </span>
-                        ))}
-                        {/* Dropdown para añadir grupo */}
-                        {groups.filter(g => !u.groups.find(ug => ug.id === g.id)).length > 0 && (
-                          <div className="relative">
-                            {groupAdd === u.id ? (
-                              <select autoFocus
-                                onChange={e => {
-                                  if (!e.target.value) { setGroupAdd(null); return }
-                                  autoSaveGroups(u.id, [...u.groups.map(g => g.id), e.target.value])
-                                  setGroupAdd(null)
-                                }}
-                                onBlur={() => setGroupAdd(null)}
-                                className="text-[11px] rounded-lg px-1.5 py-0.5 absolute right-0 top-0 z-30 min-w-[140px]"
-                                style={{ background: 'var(--bg-surface)', border: '1px solid var(--primary-border)', color: 'var(--text)', colorScheme: 'dark' }}
-                                defaultValue="">
-                                <option value="">Agregar grupo...</option>
-                                {groups.filter(g => !u.groups.find(ug => ug.id === g.id)).map(g => (
-                                  <option key={g.id} value={g.id}>{g.name}</option>
-                                ))}
-                              </select>
-                            ) : (
-                              <button
-                                onClick={() => setGroupAdd(u.id)}
-                                disabled={cellSaving === u.id}
-                                title="Agregar grupo"
-                                className="w-5 h-5 rounded-full text-[11px] font-bold leading-none flex items-center justify-center transition-all"
-                                style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', color: 'var(--text-faint)' }}>
-                                +
+                      {/* Acciones */}
+                      <td className="px-2 py-3.5">
+                        <div className="relative flex justify-center">
+                          <button onClick={() => setMenuOpen(menuOpen === u.id ? null : u.id)}
+                            className="w-7 h-7 rounded-lg flex items-center justify-center transition-colors opacity-0 group-hover:opacity-100"
+                            style={{ color: 'var(--text-faint)' }}
+                            onMouseEnter={e => e.currentTarget.classList.add('opacity-100')}>
+                            <MoreVertical size={15} />
+                          </button>
+                          {menuOpen === u.id && (
+                            <div className="absolute right-0 top-8 rounded-xl shadow-xl z-20 w-44 py-1 overflow-hidden"
+                              style={{ background: 'var(--bg-surface)', border: '1px solid var(--border-strong)' }}>
+                              <button onClick={() => { setMenuOpen(null); router.push(`/dashboard/users/${u.id}`) }}
+                                className="flex items-center gap-2.5 w-full px-4 py-2.5 text-sm transition-all hover:opacity-80"
+                                style={{ color: 'var(--text-dim)' }}>
+                                <BookOpen size={13} /> Ver hoja de vida
                               </button>
-                            )}
+                              <button onClick={() => openEdit(u)}
+                                className="flex items-center gap-2.5 w-full px-4 py-2.5 text-sm transition-all hover:opacity-80"
+                                style={{ color: 'var(--text-dim)' }}>
+                                <Edit2 size={13} /> Editar datos
+                              </button>
+                              <button onClick={() => toggleStatus(u.id)}
+                                className="flex items-center gap-2.5 w-full px-4 py-2.5 text-sm transition-all hover:opacity-80"
+                                style={{ color: 'var(--text-dim)' }}>
+                                <CheckCircle size={13} /> {u.status === 'activo' ? 'Desactivar' : 'Activar'}
+                              </button>
+                              <div style={{ borderTop: '1px solid var(--border)', margin: '4px 0' }} />
+                              <button onClick={() => { setDeleteConfirm(u.id); setMenuOpen(null) }}
+                                className="flex items-center gap-2.5 w-full px-4 py-2.5 text-sm transition-all hover:opacity-80"
+                                style={{ color: '#FCA5A5' }}>
+                                <Trash2 size={13} /> Eliminar
+                              </button>
+                            </div>
+                          )}
+                        </div>
+                      </td>
+                    </motion.tr>
+                  ))}
+                </AnimatePresence>
+              </tbody>
+            </table>
+
+            {filtered.length === 0 && users.length > 0 && (
+              <div className="py-14 text-center">
+                <Search size={24} className="mx-auto mb-2 opacity-20" style={{ color: 'var(--text-faint)' }} />
+                <p className="text-sm font-medium mb-1" style={{ color: 'var(--text-dim)' }}>Sin resultados</p>
+                <p className="text-xs" style={{ color: 'var(--text-faint)' }}>Ajusta los filtros o el término de búsqueda</p>
+              </div>
+            )}
+          </motion.div>
+
+          {/* ── Mobile cards ─────────────────────────────────────────── */}
+          <div className="md:hidden space-y-2">
+            <AnimatePresence>
+              {filtered.map(u => (
+                <motion.div key={u.id} initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+                  className="terra-card p-4">
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="flex items-center gap-3 min-w-0">
+                      <div className={`w-10 h-10 rounded-full bg-gradient-to-br ${colorForUser(u.id)} flex items-center justify-center text-white text-sm font-bold flex-shrink-0`}>
+                        {getInitials(u.name)}
+                      </div>
+                      <div className="min-w-0">
+                        <div className="font-semibold text-sm truncate" style={{ color: 'var(--text)' }}>{u.name}</div>
+                        <div className="text-[11px] font-mono mt-0.5" style={{ color: 'var(--text-faint)' }}>CC: {u.cedula || '—'}</div>
+                        {u.area_name && (
+                          <div className="text-[11px] flex items-center gap-1 mt-0.5" style={{ color: 'var(--text-dim)' }}>
+                            <Layers size={10} style={{ color: 'var(--primary)' }} />{u.area_name}
                           </div>
                         )}
-                        {u.groups.length === 0 && groupAdd !== u.id && (
-                          <span className="text-[11px]" style={{ color: 'var(--text-faint)' }}>—</span>
-                        )}
-                        {cellSaving === u.id && <Loader2 size={10} className="animate-spin" style={{ color: 'var(--primary)' }} />}
                       </div>
-                    </td>
-
-                    {/* Estado */}
-                    <td className="text-center">
-                      <span className={u.status === 'activo' ? 'badge-green' : 'badge-red'}>
+                    </div>
+                    <div className="flex items-center gap-2 flex-shrink-0">
+                      <span className="inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-full"
+                        style={u.status === 'activo'
+                          ? { background: 'rgba(16,185,129,0.1)', color: '#6EE7B7', border: '1px solid rgba(16,185,129,0.2)' }
+                          : { background: 'rgba(239,68,68,0.08)', color: '#FCA5A5', border: '1px solid rgba(239,68,68,0.2)' }}>
+                        <span className="w-1.5 h-1.5 rounded-full" style={{ background: u.status === 'activo' ? '#10B981' : '#EF4444' }} />
                         {u.status === 'activo' ? 'Activo' : 'Inactivo'}
                       </span>
-                    </td>
-
-                    {/* Acciones */}
-                    <td>
-                      <div className="relative flex justify-center">
-                        <button onClick={() => setMenuOpen(menuOpen === u.id ? null : u.id)}
-                          className="w-7 h-7 rounded-lg flex items-center justify-center transition-colors"
-                          style={{ color: 'var(--text-faint)' }}>
-                          <MoreVertical size={15} />
-                        </button>
-                        {menuOpen === u.id && (
-                          <div className="absolute right-0 top-8 rounded-xl shadow-xl z-20 w-44 py-1"
-                            style={{ background: 'var(--bg-surface)', border: '1px solid var(--border-strong)' }}>
-                            <button onClick={() => { setMenuOpen(null); router.push(`/dashboard/users/${u.id}`) }}
-                              className="flex items-center gap-2.5 w-full px-4 py-2.5 text-sm transition-all hover:opacity-80"
-                              style={{ color: 'var(--text-dim)' }}>
-                              <BookOpen size={13} /> Ver hoja de vida
-                            </button>
-                            <button onClick={() => openEdit(u)}
-                              className="flex items-center gap-2.5 w-full px-4 py-2.5 text-sm transition-all hover:opacity-80"
-                              style={{ color: 'var(--text-dim)' }}>
-                              <Edit2 size={13} /> Editar datos
-                            </button>
-                            <button onClick={() => toggleStatus(u.id)}
-                              className="flex items-center gap-2.5 w-full px-4 py-2.5 text-sm transition-all hover:opacity-80"
-                              style={{ color: 'var(--text-dim)' }}>
-                              <CheckCircle size={13} /> {u.status === 'activo' ? 'Desactivar' : 'Activar'}
-                            </button>
-                            <div style={{ borderTop: '1px solid var(--border)', margin: '4px 0' }} />
-                            <button onClick={() => { setDeleteConfirm(u.id); setMenuOpen(null) }}
-                              className="flex items-center gap-2.5 w-full px-4 py-2.5 text-sm transition-all hover:opacity-80" style={{ color: '#FCA5A5' }}>
-                              <Trash2 size={13} /> Eliminar
-                            </button>
-                          </div>
-                        )}
-                      </div>
-                    </td>
-                  </motion.tr>
-                ))}
-              </AnimatePresence>
-            </tbody>
-          </table>
-
-          {filtered.length === 0 && users.length > 0 && (
-            <div className="py-12 text-center">
-              <Users size={28} className="mx-auto mb-2 opacity-30" style={{ color: 'var(--text-faint)' }} />
-              <p className="text-sm" style={{ color: 'var(--text-faint)' }}>No se encontraron trabajadores</p>
-            </div>
-          )}
-        </motion.div>
+                      <button onClick={() => setMenuOpen(menuOpen === u.id ? null : u.id)} style={{ color: 'var(--text-faint)' }}>
+                        <MoreVertical size={15} />
+                      </button>
+                    </div>
+                  </div>
+                  {menuOpen === u.id && (
+                    <div className="flex gap-2 mt-3 flex-wrap">
+                      <button onClick={() => { setMenuOpen(null); router.push(`/dashboard/users/${u.id}`) }}
+                        className="terra-btn flex-1 text-xs py-2 justify-center"><BookOpen size={12} /> Hoja de vida</button>
+                      <button onClick={() => openEdit(u)} className="terra-btn-outline flex-1 text-xs py-2 justify-center"><Edit2 size={12} /> Editar</button>
+                      <button onClick={() => toggleStatus(u.id)} className="terra-btn-outline flex-1 text-xs py-2 justify-center"><CheckCircle size={12} /> {u.status === 'activo' ? 'Desactivar' : 'Activar'}</button>
+                      <button onClick={() => setDeleteConfirm(u.id)} className="px-3 py-2 rounded-lg text-xs font-semibold" style={{ background: 'var(--red-dim)', color: '#FCA5A5' }}>
+                        <Trash2 size={12} />
+                      </button>
+                    </div>
+                  )}
+                </motion.div>
+              ))}
+            </AnimatePresence>
+          </div>
+        </>
       )}
-
-      {/* Mobile cards */}
-      <div className="md:hidden space-y-3">
-        <AnimatePresence>
-          {filtered.map(u => (
-            <motion.div key={u.id} initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-              className="terra-card p-4">
-              <div className="flex items-start justify-between">
-                <div className="flex items-center gap-3">
-                  <div className={`w-10 h-10 rounded-full bg-gradient-to-br ${colorForUser(u.id)} flex items-center justify-center text-white text-sm font-bold flex-shrink-0`}>
-                    {getInitials(u.name)}
-                  </div>
-                  <div>
-                    <div className="font-semibold text-sm" style={{ color: 'var(--text)' }}>{u.name}</div>
-                    <div className="text-xs font-mono mt-0.5" style={{ color: 'var(--text-faint)' }}>CC: {u.cedula || '—'}</div>
-                    {u.area_name && (
-                      <div className="text-xs flex items-center gap-1 mt-0.5" style={{ color: 'var(--text-dim)' }}>
-                        <Layers size={10} style={{ color: 'var(--primary)' }} />{u.area_name}
-                      </div>
-                    )}
-                  </div>
-                </div>
-                <div className="flex items-center gap-2">
-                  <span className={u.status === 'activo' ? 'badge-green' : 'badge-red'}>{u.status === 'activo' ? 'Activo' : 'Inactivo'}</span>
-                  <button onClick={() => setMenuOpen(menuOpen === u.id ? null : u.id)} style={{ color: 'var(--text-faint)' }}>
-                    <MoreVertical size={15} />
-                  </button>
-                </div>
-              </div>
-              {menuOpen === u.id && (
-                <div className="flex gap-2 mt-3 flex-wrap">
-                  <button onClick={() => { setMenuOpen(null); router.push(`/dashboard/users/${u.id}`) }}
-                    className="terra-btn flex-1 text-xs py-2 justify-center"><BookOpen size={12} /> Hoja de vida</button>
-                  <button onClick={() => openEdit(u)} className="terra-btn-outline flex-1 text-xs py-2 justify-center"><Edit2 size={12} /> Editar</button>
-                  <button onClick={() => toggleStatus(u.id)} className="terra-btn-outline flex-1 text-xs py-2 justify-center"><CheckCircle size={12} /> {u.status === 'activo' ? 'Desactivar' : 'Activar'}</button>
-                  <button onClick={() => setDeleteConfirm(u.id)} className="px-3 py-2 rounded-lg text-xs font-semibold" style={{ background: 'var(--red-dim)', color: '#FCA5A5' }}>
-                    <Trash2 size={12} />
-                  </button>
-                </div>
-              )}
-            </motion.div>
-          ))}
-        </AnimatePresence>
-      </div>
 
       {menuOpen && <div className="fixed inset-0 z-10" onClick={() => setMenuOpen(null)} />}
 
-      {/* ── Add/Edit Modal ── */}
+      {/* ── Add/Edit Modal ───────────────────────────────────────────── */}
       <AnimatePresence>
         {showModal && (
           <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-4">
             <motion.div initial={{ opacity: 0, scale: 0.95, y: 16 }} animate={{ opacity: 1, scale: 1, y: 0 }} exit={{ opacity: 0, scale: 0.95 }}
-              className="w-full max-w-lg rounded-2xl overflow-hidden" style={{ background: 'var(--bg-surface)', border: '1px solid var(--border-strong)' }}>
+              className="w-full max-w-lg rounded-2xl overflow-hidden"
+              style={{ background: 'var(--bg-surface)', border: '1px solid var(--border-strong)' }}>
 
               <div className="flex items-center justify-between px-6 py-4" style={{ borderBottom: '1px solid var(--border)' }}>
                 <div className="flex items-center gap-2.5">
@@ -699,13 +777,11 @@ export default function UsersPage() {
               </div>
 
               <div className="p-6 space-y-4 overflow-y-auto" style={{ maxHeight: 'calc(90vh - 140px)' }}>
-
-                {/* Basic fields */}
                 {([
-                  { key: 'name',    label: 'Nombre completo *',                        placeholder: 'JUAN CARLOS PEREZ GOMEZ',   mono: false, type: 'text'  },
-                  { key: 'cedula',  label: 'Cédula * (será la contraseña inicial)',    placeholder: '1052392965',                 mono: true,  type: 'text'  },
-                  { key: 'email',   label: 'Correo electrónico *',                     placeholder: 'juan.perez@jimmyacademy.com', mono: false, type: 'email' },
-                  { key: 'role',    label: 'Cargo',                                    placeholder: 'SUPERVISOR DE MONTAJE',      mono: false, type: 'text'  },
+                  { key: 'name',   label: 'Nombre completo *',                       placeholder: 'JUAN CARLOS PEREZ GOMEZ',   mono: false, type: 'text'  },
+                  { key: 'cedula', label: 'Cédula * (será la contraseña inicial)',   placeholder: '1052392965',                 mono: true,  type: 'text'  },
+                  { key: 'email',  label: 'Correo electrónico *',                    placeholder: 'juan.perez@jimmyacademy.com', mono: false, type: 'email' },
+                  { key: 'role',   label: 'Cargo',                                   placeholder: 'SUPERVISOR DE MONTAJE',      mono: false, type: 'text'  },
                 ] as const).map(({ key, label, placeholder, mono, type }) => (
                   <div key={key}>
                     <label className="text-xs font-semibold mb-1.5 block" style={{ color: 'var(--text-dim)' }}>{label}</label>
@@ -716,8 +792,7 @@ export default function UsersPage() {
                         const val = key === 'cedula' ? e.target.value.replace(/\D/g, '') : e.target.value
                         if (key === 'name') {
                           const upper = val.toUpperCase()
-                          const suggested = generateEmail(upper)
-                          setForm(f => ({ ...f, name: upper, ...(!f.emailManual ? { email: suggested } : {}) }))
+                          setForm(f => ({ ...f, name: upper, ...(!f.emailManual ? { email: generateEmail(upper) } : {}) }))
                         } else if (key === 'cedula') {
                           setForm(f => ({ ...f, cedula: val, password: val }))
                         } else if (key === 'role') {
@@ -737,21 +812,16 @@ export default function UsersPage() {
                   </div>
                 ))}
 
-                {/* Area dropdown */}
                 <div>
                   <label className="text-xs font-semibold mb-1.5 flex items-center gap-1.5" style={{ color: 'var(--text-dim)' }}>
                     <Layers size={12} style={{ color: 'var(--primary)' }} /> Área
                   </label>
-                  <select
-                    value={form.area_id}
-                    onChange={e => setForm(f => ({ ...f, area_id: e.target.value }))}
-                    className="terra-input">
+                  <select value={form.area_id} onChange={e => setForm(f => ({ ...f, area_id: e.target.value }))} className="terra-input">
                     <option value="">Sin área asignada</option>
                     {areas.map(a => <option key={a.id} value={a.id}>{a.name}</option>)}
                   </select>
                 </div>
 
-                {/* Groups checkboxes */}
                 {groups.length > 0 && (
                   <div>
                     <label className="text-xs font-semibold mb-2 flex items-center gap-1.5" style={{ color: 'var(--text-dim)' }}>
@@ -770,7 +840,7 @@ export default function UsersPage() {
                               color: checked ? 'var(--primary)' : 'var(--text-dim)',
                             }}>
                             <div className="w-3 h-3 rounded flex items-center justify-center flex-shrink-0"
-                              style={{ background: checked ? 'var(--primary)' : 'var(--border)', border: checked ? 'none' : '1px solid var(--border-strong)' }}>
+                              style={{ background: checked ? 'var(--primary)' : 'var(--border)' }}>
                               {checked && <span className="text-white text-[8px]">✓</span>}
                             </div>
                             <span className="truncate">{g.name}</span>
@@ -781,7 +851,6 @@ export default function UsersPage() {
                   </div>
                 )}
 
-                {/* Status (edit only) */}
                 {editUser && (
                   <div>
                     <label className="text-xs font-semibold mb-1.5 block" style={{ color: 'var(--text-dim)' }}>Estado</label>
@@ -800,10 +869,10 @@ export default function UsersPage() {
                 )}
               </div>
 
-              <div className="px-6 pb-6 flex gap-3 pt-2" style={{ borderTop: '1px solid var(--border)' }}>
+              <div className="px-6 pb-6 flex gap-3 pt-4" style={{ borderTop: '1px solid var(--border)' }}>
                 <button onClick={() => setShowModal(false)} className="terra-btn-outline flex-1 py-2.5 justify-center">Cancelar</button>
                 <button onClick={handleSubmit} disabled={saving} className="terra-btn flex-1 py-2.5 justify-center">
-                  <UserPlus size={15} /> {saving ? 'Guardando...' : editUser ? 'Guardar cambios' : 'Agregar'}
+                  {saving ? <><Loader2 size={14} className="animate-spin" /> Guardando...</> : <><UserPlus size={14} /> {editUser ? 'Guardar cambios' : 'Agregar'}</>}
                 </button>
               </div>
             </motion.div>
@@ -811,12 +880,13 @@ export default function UsersPage() {
         )}
       </AnimatePresence>
 
-      {/* Delete confirm */}
+      {/* ── Delete confirm ───────────────────────────────────────────── */}
       <AnimatePresence>
         {deleteConfirm && (
           <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-4">
             <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.95 }}
-              className="p-6 w-full max-w-sm text-center rounded-2xl" style={{ background: 'var(--bg-surface)', border: '1px solid var(--border-strong)' }}>
+              className="p-6 w-full max-w-sm text-center rounded-2xl"
+              style={{ background: 'var(--bg-surface)', border: '1px solid var(--border-strong)' }}>
               <div className="w-12 h-12 rounded-full flex items-center justify-center mx-auto mb-4"
                 style={{ background: 'var(--red-dim)', border: '1px solid rgba(239,68,68,0.25)' }}>
                 <Trash2 size={22} style={{ color: '#FCA5A5' }} />
