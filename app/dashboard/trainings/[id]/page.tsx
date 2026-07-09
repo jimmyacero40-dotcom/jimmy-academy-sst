@@ -272,6 +272,11 @@ export default function TrainingDetailPage() {
   const router = useRouter()
   const courseId = parseInt(params.id as string)
 
+  const userRole = (session?.user as any)?.role
+  const isWorker = userRole === 'worker'
+  // Workers always go back to Mi Formación; admins to the library
+  const backPath = isWorker ? '/dashboard/my-plan' : '/dashboard/trainings'
+
   const [slides, setSlides] = useState<string[]>([])
   const [loading, setLoading] = useState(true)
   const [currentSlide, setCurrentSlide] = useState(0)
@@ -389,6 +394,17 @@ export default function TrainingDetailPage() {
   useEffect(() => {
     loadTraining()
   }, [courseId])
+
+  // Workers: validate this training is in their assigned enrollments
+  useEffect(() => {
+    if (!isWorker || !courseId) return
+    fetch('/api/enrollments')
+      .then(r => r.ok ? r.json() : [])
+      .then((enrs: any[]) => {
+        const assigned = enrs.some((e: any) => e.trainings?.id === courseId)
+        if (!assigned) router.replace('/dashboard/my-plan')
+      })
+  }, [isWorker, courseId])
 
   useEffect(() => {
     if (phase === 'slides' && slideCount > 0 && !slideCacheRef.current[currentSlide]) {
@@ -534,9 +550,9 @@ export default function TrainingDetailPage() {
               Período de vigencia: {training.valid_from} → {training.valid_until}
             </p>
           )}
-          <button onClick={() => router.push('/dashboard/trainings')}
+          <button onClick={() => router.push(backPath)}
             className="terra-btn-primary px-6 py-2.5">
-            ← Volver a capacitaciones
+            ← {isWorker ? 'Volver a Mi Formación' : 'Volver a capacitaciones'}
           </button>
         </div>
       </div>
@@ -549,15 +565,15 @@ export default function TrainingDetailPage() {
         <div className="text-center max-w-md">
           <BookOpen size={48} className="mx-auto mb-4 opacity-30" style={{ color: 'var(--text-faint)' }} />
           <h2 className="text-lg font-bold mb-2" style={{ color: 'var(--text)' }}>
-            {training?.slides_count > 0 ? 'Cargando diapositivas...' : 'Sin diapositivas'}
+            {training?.slides_count > 0 ? 'Cargando contenido...' : 'Contenido no disponible'}
           </h2>
           <p className="text-sm mb-6" style={{ color: 'var(--text-dim)' }}>
             {training?.slides_count > 0
-              ? 'Las diapositivas pueden tardar unos segundos en estar disponibles. Intenta recargar.'
-              : 'Este curso no tiene un archivo PPTX con diapositivas. Sube un archivo PowerPoint al crear el curso.'}
+              ? 'El contenido puede tardar unos segundos en estar disponible. Intenta recargar.'
+              : 'Esta capacitación aún no tiene contenido disponible.'}
           </p>
           <div className="flex gap-3 justify-center">
-            <button onClick={() => router.push('/dashboard/trainings')}
+            <button onClick={() => router.push(backPath)}
               className="terra-btn-outline px-5 py-2.5">
               <ChevronLeft size={16} /> Volver
             </button>
@@ -578,7 +594,7 @@ export default function TrainingDetailPage() {
       {/* Header */}
       <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} className="mb-5">
         <div className="flex items-center gap-3 mb-3">
-          <button onClick={() => router.push('/dashboard/trainings')}
+          <button onClick={() => router.push(backPath)}
             className="p-2 rounded-xl border transition-all hover:bg-white/5"
             style={{ borderColor: 'var(--border)', color: 'var(--text-dim)' }}>
             <ChevronLeft size={18} />
@@ -920,7 +936,7 @@ export default function TrainingDetailPage() {
               </button>
             ) : (
               <div className="flex gap-3">
-                <button onClick={() => router.push('/dashboard/trainings')}
+                <button onClick={() => router.push(backPath)}
                   className="flex-1 py-3 rounded-xl border text-sm font-semibold transition-all"
                   style={{ borderColor: 'var(--border)', color: 'var(--text-dim)' }}>Volver</button>
                 <button onClick={retryQuiz} className="terra-btn flex-1 py-3 justify-center">
@@ -1006,7 +1022,7 @@ export default function TrainingDetailPage() {
               <img src={certImage} alt="Certificado" className="w-full rounded-lg" />
             </div>
             <div className="flex gap-3 mt-4 max-w-md mx-auto">
-              <button onClick={() => router.push('/dashboard/trainings')}
+              <button onClick={() => router.push(backPath)}
                 className="flex-1 py-3 rounded-xl border text-sm font-semibold transition-all"
                 style={{ borderColor: 'var(--border)', color: 'var(--text-dim)' }}>
                 Volver a Cursos

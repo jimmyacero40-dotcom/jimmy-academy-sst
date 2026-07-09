@@ -12,7 +12,7 @@ export async function GET() {
       .from('enrollments')
       .select(`
         id, status, due_date, started_at, completed_at, score, created_at,
-        trainings(id, title, description, duration)
+        trainings(id, title, description, duration, cover_url, category)
       `)
       .eq('user_id', user.id)
       .order('due_date', { ascending: true, nullsFirst: false })

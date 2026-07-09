@@ -4,9 +4,9 @@ import { useState, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useRouter } from 'next/navigation'
 import {
-  BookOpen, Clock, CheckCircle, AlertTriangle,
-  ChevronRight, Loader2, Award, CalendarDays,
-  History, GraduationCap, Lock, Play
+  Clock, CheckCircle, AlertTriangle, Loader2, Award,
+  CalendarDays, History, GraduationCap, Lock, Play,
+  BookOpen, ChevronRight, Star
 } from 'lucide-react'
 
 interface Enrollment {
@@ -22,6 +22,8 @@ interface Enrollment {
     title: string
     description: string | null
     duration: number | null
+    cover_url: string | null
+    category: string | null
   }
 }
 
@@ -31,6 +33,15 @@ interface Certificate {
 }
 
 const MONTHS_ES = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre']
+
+const GRADIENTS = [
+  'from-blue-600 to-indigo-800',
+  'from-emerald-600 to-teal-800',
+  'from-violet-600 to-purple-800',
+  'from-amber-500 to-orange-700',
+  'from-rose-600 to-pink-800',
+  'from-cyan-600 to-sky-800',
+]
 
 function daysUntil(dateStr: string | null): number | null {
   if (!dateStr) return null
@@ -43,21 +54,10 @@ function fmtDate(d: string | null) {
   return new Date(d).toLocaleDateString('es-CO', { day: 'numeric', month: 'short', year: 'numeric' })
 }
 
-// Pill badge for course status
-function StatusBadge({ status }: { status: string }) {
-  const cfg: Record<string, { label: string; color: string; bg: string }> = {
-    pending:     { label: 'Pendiente',  color: '#F59E0B', bg: 'rgba(245,158,11,0.12)'  },
-    in_progress: { label: 'En curso',   color: '#60A5FA', bg: 'rgba(96,165,250,0.12)'  },
-    completed:   { label: 'Completado', color: '#34D399', bg: 'rgba(16,185,129,0.12)'  },
-    expired:     { label: 'Vencido',    color: '#FCA5A5', bg: 'rgba(239,68,68,0.12)'   },
-  }
-  const c = cfg[status] ?? cfg.pending
-  return (
-    <span className="text-[10px] font-bold px-2 py-0.5 rounded-full whitespace-nowrap"
-      style={{ background: c.bg, color: c.color }}>
-      {c.label}
-    </span>
-  )
+function fmtMonth(d: string) {
+  // Show start of month from due_date string without UTC conversion issues
+  const [y, m] = d.slice(0, 7).split('-').map(Number)
+  return new Date(y, m - 1, 1).toLocaleDateString('es-CO', { month: 'long' })
 }
 
 export default function MyPlanPage() {
@@ -81,10 +81,9 @@ export default function MyPlanPage() {
   // ── Date helpers ──────────────────────────────────────────────────────────
   const now       = new Date()
   const year      = now.getFullYear()
-  const monthIdx  = now.getMonth()           // 0-based
+  const monthIdx  = now.getMonth()
   const monthName = MONTHS_ES[monthIdx]
   const currentYM = `${year}-${String(monthIdx + 1).padStart(2, '0')}`
-  // due_date siempre es el último día del mes (ej: "2026-07-31") → slice(0,7) = "2026-07"
   const dueYM = (d: string) => d.slice(0, 7)
 
   // ── Filter logic ──────────────────────────────────────────────────────────
@@ -100,7 +99,6 @@ export default function MyPlanPage() {
       (e.status === 'pending' || e.status === 'in_progress')
   })
 
-  // History: completed + past expired
   const history = enrollments.filter(e =>
     e.status === 'completed' ||
     (e.status === 'expired' && e.due_date && dueYM(e.due_date) < currentYM)
@@ -127,51 +125,43 @@ export default function MyPlanPage() {
     router.push(`/dashboard/trainings/${enrollment.trainings.id}`)
   }
 
-  // ── Tab definitions ───────────────────────────────────────────────────────
   const tabs = [
-    { key: 'month',   label: `${monthName}`,       icon: CalendarDays,  count: thisMonth.length   },
-    { key: 'history', label: 'Historial',           icon: History,       count: history.length     },
-    { key: 'certs',   label: 'Certificados',        icon: Award,         count: certs.length       },
+    { key: 'month',   label: monthName,      icon: GraduationCap, count: thisMonth.length  },
+    { key: 'history', label: 'Historial',    icon: History,       count: history.length    },
+    { key: 'certs',   label: 'Certificados', icon: Award,         count: certs.length      },
   ] as const
 
   return (
-    <div className="p-6 max-w-3xl mx-auto">
+    <div className="p-6 max-w-6xl mx-auto">
 
       {/* ── Header ──────────────────────────────────────────────────────── */}
-      <div className="flex items-start justify-between mb-6">
+      <div className="flex items-start justify-between mb-7">
         <div>
-          <div className="flex items-center gap-3 mb-1">
-            <div className="w-10 h-10 rounded-xl flex items-center justify-center"
-              style={{ background: 'rgba(139,92,246,0.12)', border: '1px solid rgba(139,92,246,0.2)' }}>
-              <GraduationCap size={20} style={{ color: '#A78BFA' }} />
-            </div>
-            <div>
-              <h1 className="text-xl font-bold" style={{ color: 'var(--text)' }}>Mi Formación</h1>
-              <p className="text-xs" style={{ color: 'var(--text-dim)' }}>
-                {monthName} {year} · Plan de capacitación
-              </p>
-            </div>
-          </div>
+          <h1 className="text-2xl font-black mb-0.5" style={{ color: 'var(--text)' }}>
+            Mi Formación
+          </h1>
+          <p className="text-sm" style={{ color: 'var(--text-dim)' }}>
+            {monthName} {year} · Plan de capacitación personal
+          </p>
         </div>
 
-        {/* Quick stats */}
         {!loading && enrollments.length > 0 && (
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-4">
             <div className="text-center">
-              <div className="text-lg font-bold" style={{ color: '#34D399' }}>{completedCount}</div>
-              <div className="text-[10px]" style={{ color: 'var(--text-faint)' }}>completados</div>
+              <div className="text-2xl font-black" style={{ color: '#34D399' }}>{completedCount}</div>
+              <div className="text-[10px] uppercase tracking-wider" style={{ color: 'var(--text-faint)' }}>completados</div>
             </div>
-            <div className="w-px h-8" style={{ background: 'var(--border)' }} />
+            <div className="w-px h-10" style={{ background: 'var(--border)' }} />
             <div className="text-center">
-              <div className="text-lg font-bold" style={{ color: '#60A5FA' }}>{pendingCount}</div>
-              <div className="text-[10px]" style={{ color: 'var(--text-faint)' }}>este mes</div>
+              <div className="text-2xl font-black" style={{ color: '#60A5FA' }}>{pendingCount}</div>
+              <div className="text-[10px] uppercase tracking-wider" style={{ color: 'var(--text-faint)' }}>este mes</div>
             </div>
             {certs.length > 0 && (
               <>
-                <div className="w-px h-8" style={{ background: 'var(--border)' }} />
+                <div className="w-px h-10" style={{ background: 'var(--border)' }} />
                 <div className="text-center">
-                  <div className="text-lg font-bold" style={{ color: '#FBBF24' }}>{certs.length}</div>
-                  <div className="text-[10px]" style={{ color: 'var(--text-faint)' }}>certificados</div>
+                  <div className="text-2xl font-black" style={{ color: '#FBBF24' }}>{certs.length}</div>
+                  <div className="text-[10px] uppercase tracking-wider" style={{ color: 'var(--text-faint)' }}>certificados</div>
                 </div>
               </>
             )}
@@ -180,18 +170,18 @@ export default function MyPlanPage() {
       </div>
 
       {loading ? (
-        <div className="flex items-center justify-center py-32">
-          <Loader2 size={24} className="animate-spin" style={{ color: 'var(--primary)' }} />
+        <div className="flex items-center justify-center py-40">
+          <Loader2 size={28} className="animate-spin" style={{ color: 'var(--primary)' }} />
         </div>
       ) : (
         <>
-          {/* ── Alert: urgent courses ──────────────────────────────────── */}
+          {/* ── Alert: urgent ──────────────────────────────────────────── */}
           <AnimatePresence>
             {urgentCount > 0 && (
               <motion.div initial={{ opacity: 0, y: -6 }} animate={{ opacity: 1, y: 0 }}
-                className="flex items-center gap-3 p-3.5 rounded-xl mb-5"
+                className="flex items-center gap-3 p-4 rounded-xl mb-5"
                 style={{ background: 'rgba(239,68,68,0.07)', border: '1px solid rgba(239,68,68,0.2)' }}>
-                <AlertTriangle size={15} className="flex-shrink-0" style={{ color: '#FCA5A5' }} />
+                <AlertTriangle size={16} className="flex-shrink-0" style={{ color: '#FCA5A5' }} />
                 <span className="text-sm font-medium" style={{ color: '#FCA5A5' }}>
                   Tienes {urgentCount} capacitación{urgentCount > 1 ? 'es' : ''} que vence{urgentCount > 1 ? 'n' : ''} pronto este mes
                 </span>
@@ -200,11 +190,11 @@ export default function MyPlanPage() {
           </AnimatePresence>
 
           {/* ── Tabs ────────────────────────────────────────────────────── */}
-          <div className="flex gap-1 p-1 rounded-xl mb-6"
+          <div className="flex gap-1 p-1 rounded-xl mb-7"
             style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', display: 'inline-flex' }}>
             {tabs.map(t => (
               <button key={t.key} onClick={() => setTab(t.key)}
-                className="flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-semibold transition-all"
+                className="flex items-center gap-2 px-5 py-2 rounded-lg text-sm font-semibold transition-all"
                 style={{
                   background: tab === t.key ? 'var(--primary)' : 'transparent',
                   color: tab === t.key ? '#fff' : 'var(--text-dim)',
@@ -214,7 +204,7 @@ export default function MyPlanPage() {
                 {t.count > 0 && (
                   <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full"
                     style={{
-                      background: tab === t.key ? 'rgba(255,255,255,0.2)' : 'var(--bg-surface)',
+                      background: tab === t.key ? 'rgba(255,255,255,0.25)' : 'var(--bg-surface)',
                       color: tab === t.key ? '#fff' : 'var(--text-faint)',
                     }}>
                     {t.count}
@@ -226,79 +216,75 @@ export default function MyPlanPage() {
 
           {/* ── TAB: Este mes ─────────────────────────────────────────── */}
           {tab === 'month' && (
-            <div className="space-y-3">
+            <>
               {thisMonth.length === 0 ? (
                 <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }}
-                  className="flex flex-col items-center py-20 text-center">
-                  <div className="w-14 h-14 rounded-2xl flex items-center justify-center mb-4"
+                  className="flex flex-col items-center py-24 text-center">
+                  <div className="w-16 h-16 rounded-2xl flex items-center justify-center mb-5"
                     style={{ background: 'var(--bg-card)', border: '1px solid var(--border)' }}>
-                    <CheckCircle size={24} style={{ color: '#34D399' }} />
+                    <CheckCircle size={28} style={{ color: '#34D399' }} />
                   </div>
-                  <p className="font-semibold text-base mb-1" style={{ color: 'var(--text)' }}>
-                    {enrollments.length === 0
-                      ? 'Sin cursos asignados'
-                      : `Sin capacitaciones para ${monthName}`}
+                  <p className="font-bold text-lg mb-2" style={{ color: 'var(--text)' }}>
+                    {enrollments.length === 0 ? 'Sin cursos asignados' : `Al día en ${monthName}`}
                   </p>
                   <p className="text-sm max-w-xs" style={{ color: 'var(--text-dim)' }}>
                     {enrollments.length === 0
                       ? 'Tu administrador publicará tu plan de capacitación aquí.'
-                      : `Tus capacitaciones de ${monthName} ya están completadas o no hay cursos programados para este mes.`}
+                      : `Tus capacitaciones de ${monthName} están completadas.`}
                   </p>
                 </motion.div>
               ) : (
-                thisMonth.map((e, i) => <CourseCard key={e.id} enrollment={e} index={i} onStart={startCourse} onCert={() => setTab('certs')} />)
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5 mb-8">
+                  {thisMonth.map((e, i) => (
+                    <CourseCard key={e.id} enrollment={e} index={i} gradIndex={i}
+                      onStart={startCourse} onCert={() => setTab('certs')} />
+                  ))}
+                </div>
               )}
 
-              {/* Next month preview */}
+              {/* ── Próximamente ──────────────────────────────────────── */}
               {future.length > 0 && (
-                <div className="mt-6 pt-5" style={{ borderTop: '1px solid var(--border)' }}>
-                  <p className="text-xs font-semibold uppercase tracking-wider mb-3"
-                    style={{ color: 'var(--text-faint)' }}>Próximamente</p>
-                  <div className="space-y-2">
-                    {future.slice(0, 3).map(e => (
-                      <div key={e.id} className="flex items-center gap-3 px-4 py-3 rounded-xl"
-                        style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', opacity: 0.6 }}>
-                        <Lock size={14} style={{ color: 'var(--text-faint)' }} />
-                        <div className="flex-1 min-w-0">
-                          <div className="text-sm font-medium truncate" style={{ color: 'var(--text-dim)' }}>
-                            {e.trainings.title}
-                          </div>
-                        </div>
-                        {e.due_date && (
-                          <span className="text-[10px]" style={{ color: 'var(--text-faint)' }}>
-                            Disponible {new Date(new Date(e.due_date).getFullYear(), new Date(e.due_date).getMonth(), 1).toLocaleDateString('es-CO', { day: 'numeric', month: 'short' })}
-                          </span>
-                        )}
-                      </div>
+                <div className="mt-2">
+                  <div className="flex items-center gap-3 mb-4">
+                    <div className="h-px flex-1" style={{ background: 'var(--border)' }} />
+                    <span className="text-xs font-bold uppercase tracking-widest px-2"
+                      style={{ color: 'var(--text-faint)' }}>Próximamente</span>
+                    <div className="h-px flex-1" style={{ background: 'var(--border)' }} />
+                  </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                    {future.map((e, i) => (
+                      <LockedCard key={e.id} enrollment={e} index={i} gradIndex={thisMonth.length + i} />
                     ))}
-                    {future.length > 3 && (
-                      <p className="text-xs text-center" style={{ color: 'var(--text-faint)' }}>
-                        +{future.length - 3} capacitaciones más programadas
-                      </p>
-                    )}
                   </div>
                 </div>
               )}
-            </div>
+            </>
           )}
 
           {/* ── TAB: Historial ────────────────────────────────────────── */}
           {tab === 'history' && (
-            <div className="space-y-3">
+            <>
               {history.length === 0 ? (
                 <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }}
-                  className="flex flex-col items-center py-20 text-center">
-                  <div className="w-14 h-14 rounded-2xl flex items-center justify-center mb-4"
+                  className="flex flex-col items-center py-24 text-center">
+                  <div className="w-16 h-16 rounded-2xl flex items-center justify-center mb-5"
                     style={{ background: 'var(--bg-card)', border: '1px solid var(--border)' }}>
-                    <History size={24} style={{ color: 'var(--text-faint)' }} />
+                    <History size={28} style={{ color: 'var(--text-faint)' }} />
                   </div>
-                  <p className="font-semibold mb-1" style={{ color: 'var(--text)' }}>Sin historial</p>
-                  <p className="text-sm" style={{ color: 'var(--text-dim)' }}>Tus capacitaciones completadas aparecerán aquí.</p>
+                  <p className="font-bold text-lg mb-2" style={{ color: 'var(--text)' }}>Sin historial</p>
+                  <p className="text-sm" style={{ color: 'var(--text-dim)' }}>
+                    Tus capacitaciones completadas aparecerán aquí.
+                  </p>
                 </motion.div>
               ) : (
-                history.map((e, i) => <CourseCard key={e.id} enrollment={e} index={i} onStart={startCourse} onCert={() => setTab('certs')} />)
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
+                  {history.map((e, i) => (
+                    <CourseCard key={e.id} enrollment={e} index={i} gradIndex={i}
+                      onStart={startCourse} onCert={() => setTab('certs')} />
+                  ))}
+                </div>
               )}
-            </div>
+            </>
           )}
 
           {/* ── TAB: Certificados ─────────────────────────────────────── */}
@@ -306,12 +292,12 @@ export default function MyPlanPage() {
             <div className="space-y-3">
               {certs.length === 0 ? (
                 <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }}
-                  className="flex flex-col items-center py-20 text-center">
-                  <div className="w-14 h-14 rounded-2xl flex items-center justify-center mb-4"
+                  className="flex flex-col items-center py-24 text-center">
+                  <div className="w-16 h-16 rounded-2xl flex items-center justify-center mb-5"
                     style={{ background: 'rgba(251,191,36,0.08)', border: '1px solid rgba(251,191,36,0.2)' }}>
-                    <Award size={24} style={{ color: '#FBBF24' }} />
+                    <Award size={28} style={{ color: '#FBBF24' }} />
                   </div>
-                  <p className="font-semibold mb-1" style={{ color: 'var(--text)' }}>Sin certificados aún</p>
+                  <p className="font-bold text-lg mb-2" style={{ color: 'var(--text)' }}>Sin certificados aún</p>
                   <p className="text-sm" style={{ color: 'var(--text-dim)' }}>
                     Al completar una capacitación recibirás tu certificado aquí.
                   </p>
@@ -327,10 +313,11 @@ export default function MyPlanPage() {
   )
 }
 
-// ── Course card ───────────────────────────────────────────────────────────────
-function CourseCard({ enrollment: e, index, onStart, onCert }: {
+// ── Course card (Netflix/Coursera style) ──────────────────────────────────────
+function CourseCard({ enrollment: e, index, gradIndex, onStart, onCert }: {
   enrollment: Enrollment
   index: number
+  gradIndex: number
   onStart: (e: Enrollment) => void
   onCert: () => void
 }) {
@@ -338,86 +325,193 @@ function CourseCard({ enrollment: e, index, onStart, onCert }: {
   const isUrgent  = days !== null && days <= 5 && days >= 0
   const isDone    = e.status === 'completed'
   const isExpired = e.status === 'expired'
+  const isActive  = e.status === 'in_progress'
+  const grad      = GRADIENTS[gradIndex % GRADIENTS.length]
+  const hasCover  = e.trainings.cover_url && e.trainings.cover_url.startsWith('http')
+
+  const statusColor = isDone ? '#34D399' : isExpired ? '#FCA5A5' : isUrgent ? '#F97316' : isActive ? '#60A5FA' : '#A78BFA'
+  const statusLabel = isDone ? 'Completado' : isExpired ? 'Vencido' : isActive ? 'En curso' : 'Pendiente'
+  const statusBg    = isDone ? 'rgba(16,185,129,0.15)' : isExpired ? 'rgba(239,68,68,0.15)' : isActive ? 'rgba(96,165,250,0.15)' : 'rgba(167,139,250,0.15)'
 
   return (
     <motion.div
-      initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}
-      transition={{ delay: index * 0.04 }}
-      className="terra-card p-4 group"
-      style={{ cursor: isDone ? 'default' : 'pointer' }}
-      onClick={() => !isDone && onStart(e)}>
+      initial={{ opacity: 0, y: 16 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ delay: index * 0.06 }}
+      className="rounded-2xl overflow-hidden flex flex-col group cursor-pointer"
+      style={{
+        background: 'var(--bg-card)',
+        border: '1px solid var(--border)',
+        boxShadow: '0 2px 12px rgba(0,0,0,0.12)',
+        transition: 'transform 0.2s, box-shadow 0.2s',
+      }}
+      whileHover={{ y: -4, boxShadow: '0 8px 30px rgba(0,0,0,0.2)' }}
+      onClick={() => !isDone && !isExpired && onStart(e)}>
 
-      <div className="flex items-start gap-4">
-        {/* Status icon */}
-        <div className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 mt-0.5"
-          style={{
-            background: isDone ? 'rgba(16,185,129,0.1)' : isExpired ? 'rgba(239,68,68,0.1)' : isUrgent ? 'rgba(239,68,68,0.08)' : 'rgba(96,165,250,0.1)',
-          }}>
-          {isDone    ? <CheckCircle size={18} style={{ color: '#34D399' }} />
-          : isExpired ? <AlertTriangle size={18} style={{ color: '#FCA5A5' }} />
-          : e.status === 'in_progress' ? <Play size={18} style={{ color: '#60A5FA' }} />
-          : <BookOpen size={18} style={{ color: '#60A5FA' }} />}
+      {/* ── Cover image ─────────────────────────────────────────────── */}
+      <div className="relative h-44 overflow-hidden flex-shrink-0">
+        {hasCover ? (
+          <img
+            src={e.trainings.cover_url!}
+            alt={e.trainings.title}
+            className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
+          />
+        ) : (
+          <div className={`w-full h-full bg-gradient-to-br ${grad} flex items-center justify-center`}>
+            <BookOpen size={40} className="opacity-30 text-white" />
+          </div>
+        )}
+
+        {/* Gradient overlay */}
+        <div className="absolute inset-0"
+          style={{ background: 'linear-gradient(to top, rgba(0,0,0,0.7) 0%, transparent 60%)' }} />
+
+        {/* Status badge top-right */}
+        <div className="absolute top-3 right-3">
+          <span className="text-[10px] font-bold px-2.5 py-1 rounded-full backdrop-blur-sm"
+            style={{ background: statusBg, color: statusColor, border: `1px solid ${statusColor}30` }}>
+            {statusLabel}
+          </span>
         </div>
 
-        {/* Content */}
-        <div className="flex-1 min-w-0">
-          <div className="flex items-start justify-between gap-2 mb-0.5">
-            <div className="font-semibold text-sm leading-snug" style={{ color: 'var(--text)' }}>
-              {e.trainings.title}
+        {/* Category top-left */}
+        {e.trainings.category && (
+          <div className="absolute top-3 left-3">
+            <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full backdrop-blur-sm"
+              style={{ background: 'rgba(0,0,0,0.45)', color: 'rgba(255,255,255,0.85)' }}>
+              {e.trainings.category}
+            </span>
+          </div>
+        )}
+
+        {/* Score badge for completed */}
+        {isDone && e.score !== null && (
+          <div className="absolute bottom-3 right-3 flex items-center gap-1 px-2 py-0.5 rounded-full backdrop-blur-sm"
+            style={{ background: 'rgba(16,185,129,0.8)', color: '#fff' }}>
+            <Star size={10} fill="currentColor" />
+            <span className="text-[10px] font-bold">{e.score}%</span>
+          </div>
+        )}
+      </div>
+
+      {/* ── Card body ───────────────────────────────────────────────── */}
+      <div className="p-4 flex flex-col flex-1">
+        {/* Title */}
+        <h3 className="font-bold text-sm leading-snug mb-2 line-clamp-2"
+          style={{ color: 'var(--text)' }}>
+          {e.trainings.title}
+        </h3>
+
+        {/* Progress bar (in_progress) */}
+        {isActive && (
+          <div className="mb-3">
+            <div className="h-1.5 rounded-full overflow-hidden"
+              style={{ background: 'var(--border)' }}>
+              <div className="h-full rounded-full"
+                style={{ width: '35%', background: 'linear-gradient(90deg, #3B82F6, #60A5FA)' }} />
             </div>
-            <StatusBadge status={e.status} />
+            <p className="text-[10px] mt-1" style={{ color: 'var(--text-faint)' }}>En progreso</p>
           </div>
+        )}
 
-          {e.trainings.description && (
-            <p className="text-xs line-clamp-1 mb-2" style={{ color: 'var(--text-dim)' }}>
-              {e.trainings.description}
-            </p>
+        {/* Meta info */}
+        <div className="flex items-center gap-3 mt-auto flex-wrap">
+          {e.trainings.duration && (
+            <span className="text-[11px] flex items-center gap-1" style={{ color: 'var(--text-faint)' }}>
+              <Clock size={10} /> {e.trainings.duration}
+            </span>
           )}
-
-          <div className="flex items-center gap-3 flex-wrap">
-            {e.trainings.duration && (
-              <span className="text-[11px] flex items-center gap-1" style={{ color: 'var(--text-faint)' }}>
-                <Clock size={10} /> {e.trainings.duration} min
-              </span>
-            )}
-
-            {/* Date info */}
-            {!isDone && e.due_date && (
-              <span className="text-[11px] flex items-center gap-1 font-medium"
-                style={{ color: isUrgent || isExpired ? '#FCA5A5' : 'var(--text-faint)' }}>
-                <CalendarDays size={10} />
-                {isExpired
-                  ? `Venció el ${fmtDate(e.due_date)}`
-                  : days === 0 ? 'Vence hoy'
-                  : `Vence ${fmtDate(e.due_date)}`}
-              </span>
-            )}
-
-            {isDone && e.completed_at && (
-              <span className="text-[11px] flex items-center gap-1" style={{ color: 'var(--text-faint)' }}>
-                <CheckCircle size={10} /> Completado {fmtDate(e.completed_at)}
-              </span>
-            )}
-
-            {isDone && e.score !== null && (
-              <span className="text-[11px] flex items-center gap-1 font-semibold" style={{ color: '#34D399' }}>
-                <Award size={10} /> {e.score}%
-              </span>
-            )}
-          </div>
+          {!isDone && e.due_date && (
+            <span className="text-[11px] flex items-center gap-1 font-medium"
+              style={{ color: isUrgent || isExpired ? '#FCA5A5' : 'var(--text-faint)' }}>
+              <CalendarDays size={10} />
+              {isExpired ? `Venció ${fmtDate(e.due_date)}`
+                : days === 0 ? 'Vence hoy'
+                : days !== null && days <= 5 ? `${days}d restantes`
+                : `Hasta ${fmtDate(e.due_date)}`}
+            </span>
+          )}
+          {isDone && e.completed_at && (
+            <span className="text-[11px] flex items-center gap-1" style={{ color: 'var(--text-faint)' }}>
+              <CheckCircle size={10} /> {fmtDate(e.completed_at)}
+            </span>
+          )}
         </div>
 
-        {/* Action button */}
-        {isDone ? (
-          <button
-            onClick={ev => { ev.stopPropagation(); onCert() }}
-            className="flex items-center gap-1.5 text-[11px] font-semibold px-3 py-1.5 rounded-lg flex-shrink-0 transition-all"
-            style={{ background: 'rgba(251,191,36,0.1)', color: '#FBBF24', border: '1px solid rgba(251,191,36,0.2)' }}>
-            <Award size={12} /> Ver certificado
-          </button>
-        ) : !isExpired && (
-          <ChevronRight size={16} className="flex-shrink-0 mt-1 transition-transform group-hover:translate-x-1"
-            style={{ color: 'var(--text-faint)' }} />
+        {/* CTA button */}
+        <div className="mt-3">
+          {isDone ? (
+            <button
+              onClick={ev => { ev.stopPropagation(); onCert() }}
+              className="w-full py-2 rounded-xl text-xs font-bold flex items-center justify-center gap-2 transition-all"
+              style={{ background: 'rgba(251,191,36,0.1)', color: '#FBBF24', border: '1px solid rgba(251,191,36,0.25)' }}>
+              <Award size={13} /> Ver certificado
+            </button>
+          ) : isExpired ? (
+            <div className="w-full py-2 rounded-xl text-xs font-semibold flex items-center justify-center gap-2"
+              style={{ background: 'rgba(239,68,68,0.07)', color: '#FCA5A5', border: '1px solid rgba(239,68,68,0.2)' }}>
+              <AlertTriangle size={13} /> Período vencido
+            </div>
+          ) : (
+            <button
+              onClick={ev => { ev.stopPropagation(); onStart(e) }}
+              className="w-full py-2 rounded-xl text-xs font-bold flex items-center justify-center gap-2 transition-all hover:opacity-90"
+              style={{ background: isActive ? 'linear-gradient(135deg,#3B82F6,#60A5FA)' : 'linear-gradient(135deg,#7C3AED,#A78BFA)', color: '#fff' }}>
+              <Play size={12} fill="currentColor" />
+              {isActive ? 'Continuar' : 'Iniciar'}
+            </button>
+          )}
+        </div>
+      </div>
+    </motion.div>
+  )
+}
+
+// ── Locked card (future courses) ─────────────────────────────────────────────
+function LockedCard({ enrollment: e, index, gradIndex }: {
+  enrollment: Enrollment
+  index: number
+  gradIndex: number
+}) {
+  const grad    = GRADIENTS[gradIndex % GRADIENTS.length]
+  const hasCover = e.trainings.cover_url && e.trainings.cover_url.startsWith('http')
+  const availMonth = e.due_date ? fmtMonth(e.due_date) : null
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 12 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ delay: index * 0.05 }}
+      className="rounded-2xl overflow-hidden flex items-center gap-3 p-3"
+      style={{
+        background: 'var(--bg-card)',
+        border: '1px solid var(--border)',
+        opacity: 0.55,
+      }}>
+
+      {/* Mini cover */}
+      <div className="w-12 h-12 rounded-xl overflow-hidden flex-shrink-0 relative">
+        {hasCover ? (
+          <img src={e.trainings.cover_url!} alt="" className="w-full h-full object-cover" />
+        ) : (
+          <div className={`w-full h-full bg-gradient-to-br ${grad} flex items-center justify-center`}>
+            <BookOpen size={16} className="text-white opacity-50" />
+          </div>
+        )}
+        <div className="absolute inset-0 flex items-center justify-center"
+          style={{ background: 'rgba(0,0,0,0.4)' }}>
+          <Lock size={14} className="text-white" />
+        </div>
+      </div>
+
+      <div className="flex-1 min-w-0">
+        <p className="text-sm font-semibold truncate" style={{ color: 'var(--text-dim)' }}>
+          {e.trainings.title}
+        </p>
+        {availMonth && (
+          <p className="text-[11px] mt-0.5" style={{ color: 'var(--text-faint)' }}>
+            Disponible en {availMonth}
+          </p>
         )}
       </div>
     </motion.div>
@@ -427,7 +521,7 @@ function CourseCard({ enrollment: e, index, onStart, onCert }: {
 // ── Certificate card ──────────────────────────────────────────────────────────
 function CertCard({ cert, index }: { cert: Certificate; index: number }) {
   const router = useRouter()
-  const isValid = new Date(cert.expires).getTime() > Date.now()
+  const isValid   = new Date(cert.expires).getTime() > Date.now()
   const expiresIn = Math.ceil((new Date(cert.expires).getTime() - Date.now()) / 86400000)
 
   return (
@@ -435,14 +529,10 @@ function CertCard({ cert, index }: { cert: Certificate; index: number }) {
       initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}
       transition={{ delay: index * 0.04 }}
       className="terra-card p-4 flex items-center gap-4">
-
-      {/* Icon */}
-      <div className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0"
+      <div className="w-11 h-11 rounded-xl flex items-center justify-center flex-shrink-0"
         style={{ background: isValid ? 'rgba(251,191,36,0.1)' : 'rgba(239,68,68,0.08)' }}>
-        <Award size={18} style={{ color: isValid ? '#FBBF24' : '#FCA5A5' }} />
+        <Award size={20} style={{ color: isValid ? '#FBBF24' : '#FCA5A5' }} />
       </div>
-
-      {/* Info */}
       <div className="flex-1 min-w-0">
         <div className="font-semibold text-sm truncate mb-0.5" style={{ color: 'var(--text)' }}>
           {cert.course}
@@ -456,20 +546,13 @@ function CertCard({ cert, index }: { cert: Certificate; index: number }) {
               ? expiresIn <= 30 ? `Vence en ${expiresIn} días` : `Vigente hasta ${fmtDate(cert.expires)}`
               : `Venció ${fmtDate(cert.expires)}`}
           </span>
-          {cert.score && (
-            <span className="text-[11px] font-semibold" style={{ color: '#34D399' }}>
-              {cert.score}%
-            </span>
-          )}
         </div>
       </div>
-
-      {/* View button */}
       <button
-        onClick={() => router.push('/dashboard/certificates')}
-        className="flex items-center gap-1.5 text-[11px] font-semibold px-3 py-1.5 rounded-lg flex-shrink-0 transition-all"
-        style={{ background: 'rgba(59,130,246,0.1)', color: '#60A5FA', border: '1px solid rgba(59,130,246,0.2)' }}>
-        <Award size={12} /> Ver
+        onClick={() => router.push(`/dashboard/certificates/${cert.id}`)}
+        className="text-[11px] font-semibold px-3 py-1.5 rounded-lg flex-shrink-0 transition-all"
+        style={{ background: 'rgba(251,191,36,0.08)', color: '#FBBF24', border: '1px solid rgba(251,191,36,0.2)' }}>
+        Ver
       </button>
     </motion.div>
   )
