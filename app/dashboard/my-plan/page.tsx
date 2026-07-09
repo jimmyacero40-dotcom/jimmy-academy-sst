@@ -79,33 +79,31 @@ export default function MyPlanPage() {
   }, [])
 
   // ── Date helpers ──────────────────────────────────────────────────────────
-  const now          = new Date()
-  const year         = now.getFullYear()
-  const monthIdx     = now.getMonth()           // 0-based
-  const monthName    = MONTHS_ES[monthIdx]
-  const startOfMonth = new Date(year, monthIdx, 1)
-  const endOfMonth   = new Date(year, monthIdx + 1, 0, 23, 59, 59)
+  const now       = new Date()
+  const year      = now.getFullYear()
+  const monthIdx  = now.getMonth()           // 0-based
+  const monthName = MONTHS_ES[monthIdx]
+  // Compare as "YYYY-MM" strings to avoid UTC vs local timezone issues
+  const currentYM = `${year}-${String(monthIdx + 1).padStart(2, '0')}`
+  const dueYM = (d: string) => d.slice(0, 7)   // "2026-07-01" → "2026-07"
 
   // ── Filter logic ──────────────────────────────────────────────────────────
-  // This month: due_date falls within the current month
   const thisMonth = enrollments.filter(e => {
     if (!e.due_date) return false
-    const due = new Date(e.due_date)
-    return due >= startOfMonth && due <= endOfMonth &&
+    return dueYM(e.due_date) === currentYM &&
       (e.status === 'pending' || e.status === 'in_progress' || e.status === 'expired')
   })
 
-  // Future: scheduled for upcoming months — not shown yet
   const future = enrollments.filter(e => {
     if (!e.due_date) return false
-    return new Date(e.due_date) > endOfMonth &&
+    return dueYM(e.due_date) > currentYM &&
       (e.status === 'pending' || e.status === 'in_progress')
   })
 
   // History: completed + past expired
   const history = enrollments.filter(e =>
     e.status === 'completed' ||
-    (e.status === 'expired' && e.due_date && new Date(e.due_date) < startOfMonth)
+    (e.status === 'expired' && e.due_date && dueYM(e.due_date) < currentYM)
   ).sort((a, b) => {
     const da = a.completed_at || a.due_date || a.created_at
     const db = b.completed_at || b.due_date || b.created_at
