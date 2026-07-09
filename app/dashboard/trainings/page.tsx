@@ -149,16 +149,15 @@ async function downloadAttendanceList(training: any) {
       y+=thH
     }
     drawTH()
-    const rowH=14, totalR=Math.max(participants.length,22)
+    const rowH=14, totalR=Math.max(participants.length,20)
     for(let r=0;r<totalR;r++){
       if(y+rowH>215.9-M){doc.addPage();y=M;drawTH()}
-      const p=participants[r], bg=r%2===1?CLG:CW
-      cl(cX(0),y,cols[0],rowH,String(r+1),{bg,bold:true,size:8})
-      cl(cX(1),y,cW(1,2),rowH,p?.cedula||'',{bg,size:8})
-      cl(cX(3),y,cW(3,6),rowH,p?.name||'',{bg,size:8,align:'left'})
-      cl(cX(7),y,cW(7,9),rowH,p?.cargo||'',{bg,size:7,align:'left'})
-      // Firma: fondo blanco (sin color de fila) para que el alpha del PNG sea limpio
-      fl(cX(10),y,cols[10],rowH,[255,255,255]); bd(cX(10),y,cols[10],rowH)
+      const p=participants[r]
+      cl(cX(0),y,cols[0],rowH,String(r+1),{bg:CW,bold:true,size:8})
+      cl(cX(1),y,cW(1,2),rowH,p?.cedula||'',{bg:CW,size:8})
+      cl(cX(3),y,cW(3,6),rowH,p?.name||'',{bg:CW,size:8,align:'left'})
+      cl(cX(7),y,cW(7,9),rowH,p?.cargo||'',{bg:CW,size:7,align:'left'})
+      fl(cX(10),y,cols[10],rowH,CW); bd(cX(10),y,cols[10],rowH)
       if(p?.signature && sigDims[r]) {
         try {
           const { w: iw, h: ih } = sigDims[r]
