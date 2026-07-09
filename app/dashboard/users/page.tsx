@@ -260,6 +260,8 @@ export default function UsersPage() {
   const [excelError, setExcelError]       = useState('')
   const [saving, setSaving]               = useState(false)
   const [loadingGroups, setLoadingGroups] = useState(false)
+  const [isDirty, setIsDirty]             = useState(false)
+  const [confirmClose, setConfirmClose]   = useState(false)
   const fileRef = useRef<HTMLInputElement>(null)
 
   const [cellSaving, setCellSaving] = useState<string | null>(null)
@@ -322,12 +324,15 @@ export default function UsersPage() {
   const hasFilters    = !!(search || filterStatus || filterArea || filterGroup || filterRole)
 
   // ── CRUD ─────────────────────────────────────────────────────────────────
-  const openNew = () => { setEditUser(null); setForm(EMPTY_FORM); setFormErrors({}); setShowModal(true) }
+  const closeModal = () => { setShowModal(false); setIsDirty(false); setConfirmClose(false) }
+  const tryClose   = () => { if (isDirty) { setConfirmClose(true) } else { closeModal() } }
+
+  const openNew = () => { setEditUser(null); setForm(EMPTY_FORM); setFormErrors({}); setIsDirty(false); setConfirmClose(false); setShowModal(true) }
 
   const openEdit = async (u: AppUser) => {
     setEditUser(u)
     setForm({ name: u.name, email: u.email || '', password: '', empresa: u.empresa, area_id: u.area_id || '', role: u.role, cedula: u.cedula, status: u.status, emailManual: true, selectedGroups: [] })
-    setFormErrors({}); setShowModal(true)
+    setFormErrors({}); setIsDirty(false); setConfirmClose(false); setShowModal(true)
     setLoadingGroups(true)
     try {
       const res = await fetch(`/api/users/${u.id}/groups`)
@@ -365,7 +370,7 @@ export default function UsersPage() {
           await fetch(`/api/users/${created.id}/groups`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ group_ids: form.selectedGroups }) })
         }
       }
-      await loadUsers(); setShowModal(false)
+      await loadUsers(); closeModal()
     } catch { setFormErrors({ name: 'Error de conexión' }) }
     setSaving(false)
   }
@@ -837,8 +842,23 @@ export default function UsersPage() {
         {showModal && (
           <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-4">
             <motion.div initial={{ opacity: 0, scale: 0.95, y: 16 }} animate={{ opacity: 1, scale: 1, y: 0 }} exit={{ opacity: 0, scale: 0.95 }}
-              className="w-full max-w-lg rounded-2xl overflow-hidden"
+              className="relative w-full max-w-lg rounded-2xl overflow-hidden"
               style={{ background: 'var(--bg-surface)', border: '1px solid var(--border-strong)' }}>
+
+              {confirmClose && (
+                <div className="absolute inset-0 flex items-center justify-center z-10 rounded-2xl"
+                  style={{ background: 'rgba(0,0,0,0.75)' }}>
+                  <div className="mx-6 p-5 rounded-xl text-center"
+                    style={{ background: 'var(--bg-surface)', border: '1px solid var(--border-strong)' }}>
+                    <p className="font-bold mb-1" style={{ color: 'var(--text)' }}>Tienes cambios sin guardar</p>
+                    <p className="text-sm mb-4" style={{ color: 'var(--text-dim)' }}>¿Deseas salir sin guardar?</p>
+                    <div className="flex gap-2">
+                      <button onClick={() => setConfirmClose(false)} className="terra-btn-outline flex-1 py-2 text-sm">Continuar editando</button>
+                      <button onClick={closeModal} className="flex-1 py-2 text-sm font-semibold rounded-lg" style={{ background: '#EF4444', color: '#fff' }}>Salir sin guardar</button>
+                    </div>
+                  </div>
+                </div>
+              )}
 
               <div className="flex items-center justify-between px-6 py-4" style={{ borderBottom: '1px solid var(--border)' }}>
                 <div className="flex items-center gap-2.5">
@@ -848,10 +868,10 @@ export default function UsersPage() {
                   </div>
                   <h2 className="font-bold" style={{ color: 'var(--text)' }}>{editUser ? 'Editar Trabajador' : 'Nuevo Trabajador'}</h2>
                 </div>
-                <button onClick={() => setShowModal(false)} style={{ color: 'var(--text-dim)' }}><X size={18} /></button>
+                <button onClick={tryClose} style={{ color: 'var(--text-dim)' }}><X size={18} /></button>
               </div>
 
-              <div className="p-6 space-y-4 overflow-y-auto" style={{ maxHeight: 'calc(90vh - 140px)' }}>
+              <div className="p-6 space-y-4 overflow-y-auto" style={{ maxHeight: 'calc(90vh - 140px)' }} onChange={() => setIsDirty(true)}>
                 {([
                   { key: 'name',   label: 'Nombre completo *',                      placeholder: 'JUAN CARLOS PEREZ GOMEZ',   mono: false, type: 'text'  },
                   { key: 'cedula', label: 'Cédula * (será la contraseña inicial)',  placeholder: '1052392965',                 mono: true,  type: 'text'  },
@@ -935,7 +955,7 @@ export default function UsersPage() {
               </div>
 
               <div className="px-6 pb-6 flex gap-3 pt-4" style={{ borderTop: '1px solid var(--border)' }}>
-                <button onClick={() => setShowModal(false)} className="terra-btn-outline flex-1 py-2.5 justify-center">Cancelar</button>
+                <button onClick={tryClose} className="terra-btn-outline flex-1 py-2.5 justify-center">Cancelar</button>
                 <button onClick={handleSubmit} disabled={saving} className="terra-btn flex-1 py-2.5 justify-center">
                   {saving ? <><Loader2 size={14} className="animate-spin" /> Guardando...</> : <><UserPlus size={14} /> {editUser ? 'Guardar cambios' : 'Agregar'}</>}
                 </button>

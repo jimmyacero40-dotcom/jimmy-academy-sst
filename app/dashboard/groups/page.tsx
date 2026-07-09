@@ -60,6 +60,8 @@ export default function GroupsPage() {
   const [form, setForm] = useState(EMPTY_FORM)
   const [saving, setSaving] = useState(false)
   const [deleting, setDeleting] = useState<string | null>(null)
+  const [isDirty, setIsDirty] = useState(false)
+  const [confirmClose, setConfirmClose] = useState(false)
   const [search, setSearch] = useState('')
 
   // Members panel
@@ -95,15 +97,18 @@ export default function GroupsPage() {
     if (activeGroup) loadMembers(activeGroup.id)
   }, [activeGroup, loadMembers])
 
+  const closeModal = () => { setShowModal(false); setIsDirty(false); setConfirmClose(false) }
+  const tryClose   = () => { if (isDirty) { setConfirmClose(true) } else { closeModal() } }
+
   const openCreate = (prefill?: Partial<typeof EMPTY_FORM>) => {
     setEditItem(null)
     setForm({ ...EMPTY_FORM, ...prefill })
-    setShowModal(true)
+    setIsDirty(false); setConfirmClose(false); setShowModal(true)
   }
   const openEdit = (g: Group) => {
     setEditItem(g)
     setForm({ name: g.name, description: g.description || '', color: g.color || '#3B82F6' })
-    setShowModal(true)
+    setIsDirty(false); setConfirmClose(false); setShowModal(true)
   }
 
   const handleSave = async (e: React.FormEvent) => {
@@ -113,7 +118,7 @@ export default function GroupsPage() {
     const method = editItem ? 'PUT' : 'POST'
     const body = editItem ? { id: editItem.id, ...form } : { ...form }
     const res = await fetch('/api/groups', { method, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
-    if (res.ok) { await loadGroups(); setShowModal(false) }
+    if (res.ok) { await loadGroups(); closeModal() }
     else { const err = await res.json(); setError(err.error || 'Error al guardar') }
     setSaving(false)
   }
@@ -397,23 +402,38 @@ export default function GroupsPage() {
         {showModal && (
           <>
             <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-              className="fixed inset-0 z-40 bg-black/60 backdrop-blur-sm"
-              onClick={() => setShowModal(false)} />
+              className="fixed inset-0 z-40 bg-black/60 backdrop-blur-sm" />
             <motion.div initial={{ opacity: 0, scale: 0.96, y: 16 }} animate={{ opacity: 1, scale: 1, y: 0 }} exit={{ opacity: 0, scale: 0.96, y: 16 }}
               className="fixed z-50 inset-0 flex items-center justify-center p-4 pointer-events-none">
-              <div className="w-full max-w-md pointer-events-auto rounded-2xl p-6"
+              <div className="relative w-full max-w-md pointer-events-auto rounded-2xl p-6"
                 style={{ background: 'var(--bg-surface)', border: '1px solid var(--border)' }}>
+
+                {confirmClose && (
+                  <div className="absolute inset-0 flex items-center justify-center z-10 rounded-2xl"
+                    style={{ background: 'rgba(0,0,0,0.75)' }}>
+                    <div className="mx-6 p-5 rounded-xl text-center"
+                      style={{ background: 'var(--bg-surface)', border: '1px solid var(--border-strong)' }}>
+                      <p className="font-bold mb-1" style={{ color: 'var(--text)' }}>Tienes cambios sin guardar</p>
+                      <p className="text-sm mb-4" style={{ color: 'var(--text-dim)' }}>¿Deseas salir sin guardar?</p>
+                      <div className="flex gap-2">
+                        <button onClick={() => setConfirmClose(false)} className="terra-btn-outline flex-1 py-2 text-sm">Continuar editando</button>
+                        <button onClick={closeModal} className="flex-1 py-2 text-sm font-semibold rounded-lg" style={{ background: '#EF4444', color: '#fff' }}>Salir sin guardar</button>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
                 <div className="flex items-center justify-between mb-6">
                   <h2 className="font-bold text-base" style={{ color: 'var(--text)' }}>
                     {editItem ? 'Editar grupo' : 'Nuevo grupo'}
                   </h2>
-                  <button onClick={() => setShowModal(false)}
+                  <button onClick={tryClose}
                     className="w-8 h-8 rounded-lg flex items-center justify-center"
                     style={{ color: 'var(--text-dim)', background: 'var(--bg-card)' }}>
                     <X size={15} />
                   </button>
                 </div>
-                <form onSubmit={handleSave} className="space-y-4">
+                <form onSubmit={handleSave} className="space-y-4" onChange={() => setIsDirty(true)}>
                   <div>
                     <label className="block text-xs font-semibold mb-1.5" style={{ color: 'var(--text-dim)' }}>
                       Nombre del grupo *
@@ -443,14 +463,14 @@ export default function GroupsPage() {
                     <label className="block text-xs font-semibold mb-2" style={{ color: 'var(--text-dim)' }}>Color</label>
                     <div className="flex gap-2 flex-wrap">
                       {GROUP_COLORS.map(c => (
-                        <button key={c} type="button" onClick={() => setForm({ ...form, color: c })}
+                        <button key={c} type="button" onClick={() => { setForm({ ...form, color: c }); setIsDirty(true) }}
                           className="w-7 h-7 rounded-lg transition-all"
                           style={{ background: c, outline: form.color === c ? `2px solid ${c}` : 'none', outlineOffset: 2, transform: form.color === c ? 'scale(1.15)' : 'scale(1)' }} />
                       ))}
                     </div>
                   </div>
                   <div className="flex gap-3 pt-2">
-                    <button type="button" onClick={() => setShowModal(false)} className="terra-btn-outline flex-1">Cancelar</button>
+                    <button type="button" onClick={tryClose} className="terra-btn-outline flex-1">Cancelar</button>
                     <button type="submit" disabled={saving || !form.name.trim()} className="terra-btn flex-1">
                       {saving ? <Loader2 size={14} className="animate-spin" /> : editItem ? 'Guardar cambios' : 'Crear grupo'}
                     </button>

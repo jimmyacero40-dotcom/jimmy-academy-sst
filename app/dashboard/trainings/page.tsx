@@ -234,6 +234,14 @@ export default function BibliotecaPage() {
   const [editProgress, setEditProgress] = useState('')
   const [showPPTXSection, setShowPPTXSection] = useState(false)
 
+  // ── Dirty-check state for each modal ─────────────────────────────────────
+  const [isDirtyCreate, setIsDirtyCreate] = useState(false)
+  const [confirmCreate, setConfirmCreate] = useState(false)
+  const [isDirtyEdit, setIsDirtyEdit] = useState(false)
+  const [confirmEdit, setConfirmEdit] = useState(false)
+  const [isDirtyValidity, setIsDirtyValidity] = useState(false)
+  const [confirmValidity, setConfirmValidity] = useState(false)
+
   const openEditCourse = (t: any) => {
     setEditCourse(t)
     setEditForm({
@@ -249,6 +257,7 @@ export default function BibliotecaPage() {
     setEditFile(null)
     setShowPPTXSection(false)
     setEditProgress('')
+    setIsDirtyEdit(false); setConfirmEdit(false)
   }
 
   const handleEditSave = async () => {
@@ -336,7 +345,7 @@ export default function BibliotecaPage() {
         ))
       }
 
-      setEditCourse(null)
+      setIsDirtyEdit(false); setEditCourse(null)
     } catch (e: any) {
       alert('Error: ' + e.message)
     } finally {
@@ -563,6 +572,7 @@ export default function BibliotecaPage() {
     setEditingTraining(t)
     setEditValidFrom(t.valid_from || '')
     setEditValidUntil(t.valid_until || '')
+    setIsDirtyValidity(false); setConfirmValidity(false)
   }
 
   const saveValidity = async () => {
@@ -582,7 +592,7 @@ export default function BibliotecaPage() {
         setTrainings(prev => prev.map(t =>
           t.id === editingTraining.id ? { ...t, valid_from: editValidFrom || null, valid_until: editValidUntil || null } : t
         ))
-        setEditingTraining(null)
+        setIsDirtyValidity(false); setEditingTraining(null)
       }
     } catch (_) {}
     setSavingValidity(false)
@@ -634,7 +644,7 @@ export default function BibliotecaPage() {
               <button onClick={() => router.push('/dashboard/trainings/create')} className="terra-btn text-sm py-2.5 px-4">
                 <Zap size={15} /> Generar con IA
               </button>
-              <button onClick={() => setShowModal(true)} className="terra-btn-outline text-sm py-2.5 px-4">
+              <button onClick={() => { setIsDirtyCreate(false); setConfirmCreate(false); setShowModal(true) }} className="terra-btn-outline text-sm py-2.5 px-4">
                 <Plus size={16} /> Agregar Curso
               </button>
             </div>
@@ -946,8 +956,23 @@ export default function BibliotecaPage() {
       {showModal && (
         <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-4">
           <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }}
-            className="w-full max-w-lg max-h-[90vh] overflow-y-auto rounded-2xl"
+            className="relative w-full max-w-lg max-h-[90vh] overflow-y-auto rounded-2xl"
             style={{ background: 'var(--bg-surface)', border: '1px solid var(--border-strong)' }}>
+            {confirmCreate && (
+              <div className="absolute inset-0 flex items-center justify-center z-10 rounded-2xl"
+                style={{ background: 'rgba(0,0,0,0.75)' }}>
+                <div className="mx-6 p-5 rounded-xl text-center"
+                  style={{ background: 'var(--bg-surface)', border: '1px solid var(--border-strong)' }}>
+                  <p className="font-bold mb-1" style={{ color: 'var(--text)' }}>Tienes cambios sin guardar</p>
+                  <p className="text-sm mb-4" style={{ color: 'var(--text-dim)' }}>¿Deseas salir sin guardar?</p>
+                  <div className="flex gap-2">
+                    <button onClick={() => setConfirmCreate(false)} className="terra-btn-outline flex-1 py-2 text-sm">Continuar editando</button>
+                    <button onClick={() => { setConfirmCreate(false); setIsDirtyCreate(false); setShowModal(false); setUploadedFile(null); setNewCourse({ name: '', duration: '', description: '', category: 'Obligatorio', risk_type: '', valid_from: '', valid_until: '' }) }}
+                      className="flex-1 py-2 text-sm font-semibold rounded-lg" style={{ background: '#EF4444', color: '#fff' }}>Salir sin guardar</button>
+                  </div>
+                </div>
+              </div>
+            )}
             <div className="flex items-center justify-between px-6 py-4" style={{ borderBottom: '1px solid var(--border)' }}>
               <div className="flex items-center gap-2.5">
                 <div className="w-8 h-8 rounded-lg flex items-center justify-center"
@@ -956,10 +981,10 @@ export default function BibliotecaPage() {
                 </div>
                 <h2 className="font-bold" style={{ color: 'var(--text)' }}>Agregar Curso a la Biblioteca</h2>
               </div>
-              <button onClick={() => { setShowModal(false); setUploadedFile(null); setNewCourse({ name: '', duration: '', description: '', category: 'Obligatorio', risk_type: '', valid_from: '', valid_until: '' }) }}
+              <button onClick={() => { if (isDirtyCreate) { setConfirmCreate(true) } else { setShowModal(false); setUploadedFile(null); setNewCourse({ name: '', duration: '', description: '', category: 'Obligatorio', risk_type: '', valid_from: '', valid_until: '' }) } }}
                 style={{ color: 'var(--text-dim)' }}><X size={18} /></button>
             </div>
-            <div className="p-6 space-y-4">
+            <div className="p-6 space-y-4" onChange={() => setIsDirtyCreate(true)}>
               <div>
                 <label className="text-xs font-semibold mb-1.5 block" style={{ color: 'var(--text-dim)' }}>Nombre del curso *</label>
                 <input placeholder="Ej: Trabajo en Alturas, Uso de EPP..."
@@ -1050,7 +1075,7 @@ export default function BibliotecaPage() {
               </div>
             </div>
             <div className="px-6 pb-6 flex gap-3">
-              <button onClick={() => { setShowModal(false); setUploadedFile(null); setNewCourse({ name: '', duration: '', description: '', category: 'Obligatorio', risk_type: '', valid_from: '', valid_until: '' }) }}
+              <button onClick={() => { if (isDirtyCreate) { setConfirmCreate(true) } else { setShowModal(false); setUploadedFile(null); setNewCourse({ name: '', duration: '', description: '', category: 'Obligatorio', risk_type: '', valid_from: '', valid_until: '' }) } }}
                 className="terra-btn-outline flex-1 py-2.5 justify-center">Cancelar</button>
               <button onClick={handleCreateCourse} disabled={!newCourse.name.trim() || creating}
                 className="terra-btn flex-1 py-2.5 justify-center">
@@ -1063,12 +1088,26 @@ export default function BibliotecaPage() {
 
       {/* ─── Edit Training Full Modal ──────────────────────────────────── */}
       {editCourse && (
-        <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-4"
-          onClick={() => !savingEdit && setEditCourse(null)}>
+        <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-4">
           <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }}
-            className="w-full max-w-xl rounded-2xl flex flex-col max-h-[90vh]"
-            style={{ background: 'var(--bg-surface)', border: '1px solid var(--border-strong)' }}
-            onClick={e => e.stopPropagation()}>
+            className="relative w-full max-w-xl rounded-2xl flex flex-col max-h-[90vh]"
+            style={{ background: 'var(--bg-surface)', border: '1px solid var(--border-strong)' }}>
+
+            {confirmEdit && (
+              <div className="absolute inset-0 flex items-center justify-center z-10 rounded-2xl"
+                style={{ background: 'rgba(0,0,0,0.75)' }}>
+                <div className="mx-6 p-5 rounded-xl text-center"
+                  style={{ background: 'var(--bg-surface)', border: '1px solid var(--border-strong)' }}>
+                  <p className="font-bold mb-1" style={{ color: 'var(--text)' }}>Tienes cambios sin guardar</p>
+                  <p className="text-sm mb-4" style={{ color: 'var(--text-dim)' }}>¿Deseas salir sin guardar?</p>
+                  <div className="flex gap-2">
+                    <button onClick={() => setConfirmEdit(false)} className="terra-btn-outline flex-1 py-2 text-sm">Continuar editando</button>
+                    <button onClick={() => { setConfirmEdit(false); setIsDirtyEdit(false); setEditCourse(null) }}
+                      className="flex-1 py-2 text-sm font-semibold rounded-lg" style={{ background: '#EF4444', color: '#fff' }}>Salir sin guardar</button>
+                  </div>
+                </div>
+              </div>
+            )}
 
             {/* Header */}
             <div className="flex items-center justify-between px-5 py-4 flex-shrink-0"
@@ -1083,13 +1122,13 @@ export default function BibliotecaPage() {
                   <p className="text-[10px]" style={{ color: 'var(--text-faint)' }}>Todos los cambios se reflejan inmediatamente</p>
                 </div>
               </div>
-              <button onClick={() => setEditCourse(null)} disabled={savingEdit} style={{ color: 'var(--text-dim)' }}>
+              <button onClick={() => { if (isDirtyEdit) { setConfirmEdit(true) } else { setEditCourse(null) } }} disabled={savingEdit} style={{ color: 'var(--text-dim)' }}>
                 <X size={18} />
               </button>
             </div>
 
             {/* Body */}
-            <div className="overflow-y-auto flex-1 p-5 space-y-4">
+            <div className="overflow-y-auto flex-1 p-5 space-y-4" onChange={() => setIsDirtyEdit(true)}>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div className="sm:col-span-2">
@@ -1229,7 +1268,7 @@ export default function BibliotecaPage() {
 
             {/* Footer */}
             <div className="flex gap-3 px-5 py-4 flex-shrink-0" style={{ borderTop: '1px solid var(--border)' }}>
-              <button onClick={() => setEditCourse(null)} disabled={savingEdit}
+              <button onClick={() => { if (isDirtyEdit) { setConfirmEdit(true) } else { setEditCourse(null) } }} disabled={savingEdit}
                 className="terra-btn-outline flex-1 py-2.5 justify-center text-sm">
                 Cancelar
               </button>
@@ -1246,12 +1285,27 @@ export default function BibliotecaPage() {
 
       {/* Edit validity modal */}
       {editingTraining && (
-        <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-4"
-          onClick={() => setEditingTraining(null)}>
+        <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-4">
           <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }}
-            className="w-full max-w-sm rounded-2xl"
-            style={{ background: 'var(--bg-surface)', border: '1px solid var(--border-strong)' }}
-            onClick={e => e.stopPropagation()}>
+            className="relative w-full max-w-sm rounded-2xl"
+            style={{ background: 'var(--bg-surface)', border: '1px solid var(--border-strong)' }}>
+
+            {confirmValidity && (
+              <div className="absolute inset-0 flex items-center justify-center z-10 rounded-2xl"
+                style={{ background: 'rgba(0,0,0,0.75)' }}>
+                <div className="mx-6 p-5 rounded-xl text-center"
+                  style={{ background: 'var(--bg-surface)', border: '1px solid var(--border-strong)' }}>
+                  <p className="font-bold mb-1" style={{ color: 'var(--text)' }}>Tienes cambios sin guardar</p>
+                  <p className="text-sm mb-4" style={{ color: 'var(--text-dim)' }}>¿Deseas salir sin guardar?</p>
+                  <div className="flex gap-2">
+                    <button onClick={() => setConfirmValidity(false)} className="terra-btn-outline flex-1 py-2 text-sm">Continuar editando</button>
+                    <button onClick={() => { setConfirmValidity(false); setIsDirtyValidity(false); setEditingTraining(null) }}
+                      className="flex-1 py-2 text-sm font-semibold rounded-lg" style={{ background: '#EF4444', color: '#fff' }}>Salir sin guardar</button>
+                  </div>
+                </div>
+              </div>
+            )}
+
             <div className="flex items-center justify-between px-5 py-4" style={{ borderBottom: '1px solid var(--border)' }}>
               <div className="flex items-center gap-2.5">
                 <div className="w-8 h-8 rounded-lg flex items-center justify-center"
@@ -1260,9 +1314,9 @@ export default function BibliotecaPage() {
                 </div>
                 <h2 className="font-bold text-sm" style={{ color: 'var(--text)' }}>Editar Vigencia</h2>
               </div>
-              <button onClick={() => setEditingTraining(null)} style={{ color: 'var(--text-dim)' }}><X size={18} /></button>
+              <button onClick={() => { if (isDirtyValidity) { setConfirmValidity(true) } else { setEditingTraining(null) } }} style={{ color: 'var(--text-dim)' }}><X size={18} /></button>
             </div>
-            <div className="p-5 space-y-4">
+            <div className="p-5 space-y-4" onChange={() => setIsDirtyValidity(true)}>
               <div className="text-sm font-semibold" style={{ color: 'var(--text)' }}>{editingTraining.title}</div>
               <div>
                 <label className="text-xs font-semibold mb-1.5 block" style={{ color: 'var(--text-dim)' }}>Vigencia desde</label>
@@ -1275,7 +1329,7 @@ export default function BibliotecaPage() {
                   className="terra-input w-full" style={{ colorScheme: 'dark' }} />
               </div>
               <div className="flex gap-3">
-                <button onClick={() => setEditingTraining(null)} className="terra-btn-outline flex-1 py-2.5 justify-center">Cancelar</button>
+                <button onClick={() => { if (isDirtyValidity) { setConfirmValidity(true) } else { setEditingTraining(null) } }} className="terra-btn-outline flex-1 py-2.5 justify-center">Cancelar</button>
                 <button onClick={saveValidity} disabled={savingValidity}
                   className="terra-btn flex-1 py-2.5 justify-center flex items-center gap-2">
                   {savingValidity ? <Loader2 size={14} className="animate-spin" /> : <><Save size={14} /> Guardar</>}
