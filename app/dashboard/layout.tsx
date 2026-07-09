@@ -42,7 +42,6 @@ const ADMIN_NAV = [
   {
     section: 'GESTIÓN',
     items: [
-      { href: '/dashboard/evaluations',    icon: FileCheck,     label: 'Evaluaciones' },
       { href: '/dashboard/certificates',   icon: Award,         label: 'Certificados' },
       { href: '/dashboard/reports',        icon: BarChart2,     label: 'Reportes' },
     ]

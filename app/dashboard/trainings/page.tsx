@@ -5,12 +5,13 @@ import { motion } from 'framer-motion'
 import { useRouter } from 'next/navigation'
 import { useSession } from 'next-auth/react'
 import { extractPPTXSlides, getCourseData, getCustomQuestions } from '@/lib/pptx-extractor'
+import { QuestionBuilder } from './QuestionBuilder'
 import {
   BookOpen, Plus, Search, Clock, CheckCircle, AlertCircle,
   Users, Star, Play, Upload, ChevronRight, X, Award, Zap,
   FileText, Layers, Trash2, Loader2, Calendar, Save, Download,
   ImagePlus, Copy, Archive, ArchiveRestore, Tag, Filter, RotateCcw,
-  Pencil, RefreshCw, FileUp, AlignLeft
+  Pencil, RefreshCw, FileUp, AlignLeft, HelpCircle
 } from 'lucide-react'
 
 const GRADIENTS = [
@@ -234,6 +235,8 @@ export default function BibliotecaPage() {
   const [editProgress, setEditProgress] = useState('')
   const [showPPTXSection, setShowPPTXSection] = useState(false)
 
+  const [editTab, setEditTab] = useState<'info' | 'questions'>('info')
+
   // ── Dirty-check state for each modal ─────────────────────────────────────
   const [isDirtyCreate, setIsDirtyCreate] = useState(false)
   const [confirmCreate, setConfirmCreate] = useState(false)
@@ -257,6 +260,7 @@ export default function BibliotecaPage() {
     setEditFile(null)
     setShowPPTXSection(false)
     setEditProgress('')
+    setEditTab('info')
     setIsDirtyEdit(false); setConfirmEdit(false)
   }
 
@@ -1162,7 +1166,7 @@ export default function BibliotecaPage() {
       {editCourse && (
         <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-4">
           <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }}
-            className="relative w-full max-w-xl rounded-2xl flex flex-col max-h-[90vh]"
+            className="relative w-full max-w-2xl rounded-2xl flex flex-col max-h-[92vh]"
             style={{ background: 'var(--bg-surface)', border: '1px solid var(--border-strong)' }}>
 
             {confirmEdit && (
@@ -1199,9 +1203,40 @@ export default function BibliotecaPage() {
               </button>
             </div>
 
-            {/* Body */}
-            <div className="overflow-y-auto flex-1 p-5 space-y-4" onChange={() => setIsDirtyEdit(true)}>
+            {/* Tab bar */}
+            <div className="flex flex-shrink-0 px-5" style={{ borderBottom: '1px solid var(--border)' }}>
+              {[
+                { key: 'info', label: 'Información', icon: <AlignLeft size={13} /> },
+                { key: 'questions', label: 'Preguntas', icon: <HelpCircle size={13} /> },
+              ].map(tab => (
+                <button key={tab.key} onClick={() => setEditTab(tab.key as 'info' | 'questions')}
+                  className="flex items-center gap-1.5 px-4 py-3 text-xs font-semibold border-b-2 transition-all -mb-px"
+                  style={{
+                    borderColor: editTab === tab.key ? 'var(--primary)' : 'transparent',
+                    color: editTab === tab.key ? 'var(--primary)' : 'var(--text-dim)',
+                  }}>
+                  {tab.icon} {tab.label}
+                  {tab.key === 'questions' && editCourse?.questions_count > 0 && (
+                    <span className="ml-1 px-1.5 py-0.5 rounded-full text-[9px] font-bold"
+                      style={{ background: 'rgba(59,130,246,0.15)', color: 'var(--primary)' }}>
+                      {editCourse.questions_count}
+                    </span>
+                  )}
+                </button>
+              ))}
+            </div>
 
+            {/* Body */}
+            <div className="overflow-y-auto flex-1 p-5 space-y-4" onChange={() => editTab === 'info' && setIsDirtyEdit(true)}>
+
+            {editTab === 'questions' && editCourse && (
+              <QuestionBuilder
+                trainingId={editCourse.id}
+                trainingTitle={editCourse.title}
+              />
+            )}
+
+            {editTab === 'info' && <div className="space-y-4">
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div className="sm:col-span-2">
                   <label className="text-[10px] font-bold uppercase tracking-wider mb-1.5 block" style={{ color: 'var(--text-dim)' }}>
@@ -1336,10 +1371,19 @@ export default function BibliotecaPage() {
                   </div>
                 )}
               </div>
+            </div>}
+
             </div>
 
-            {/* Footer */}
-            {savingEdit && editProgress && (
+            {/* Footer — only show save button when on info tab */}
+            {editTab === 'questions' && (
+              <div className="px-5 py-3 flex-shrink-0" style={{ borderTop: '1px solid var(--border)' }}>
+                <p className="text-xs text-center" style={{ color: 'var(--text-faint)' }}>
+                  Las preguntas se guardan automáticamente al agregarlas o editarlas.
+                </p>
+              </div>
+            )}
+            {editTab === 'info' && savingEdit && editProgress && (
               <div className="px-5 pb-3">
                 <div className="rounded-xl px-4 py-3" style={{ background: 'rgba(59,130,246,0.08)', border: '1px solid rgba(59,130,246,0.2)' }}>
                   <div className="flex items-center gap-2.5">
@@ -1359,18 +1403,20 @@ export default function BibliotecaPage() {
                 </div>
               </div>
             )}
-            <div className="flex gap-3 px-5 py-4 flex-shrink-0" style={{ borderTop: '1px solid var(--border)' }}>
-              <button onClick={() => { if (isDirtyEdit) { setConfirmEdit(true) } else { setEditCourse(null) } }} disabled={savingEdit}
-                className="terra-btn-outline flex-1 py-2.5 justify-center text-sm">
-                Cancelar
-              </button>
-              <button onClick={handleEditSave} disabled={savingEdit || !editForm.title.trim()}
-                className="terra-btn flex-1 py-2.5 justify-center text-sm disabled:opacity-40">
-                {savingEdit
-                  ? <><Loader2 size={14} className="animate-spin" /> Guardando...</>
-                  : <><Save size={14} /> Guardar cambios</>}
-              </button>
-            </div>
+            {editTab === 'info' && (
+              <div className="flex gap-3 px-5 py-4 flex-shrink-0" style={{ borderTop: '1px solid var(--border)' }}>
+                <button onClick={() => { if (isDirtyEdit) { setConfirmEdit(true) } else { setEditCourse(null) } }} disabled={savingEdit}
+                  className="terra-btn-outline flex-1 py-2.5 justify-center text-sm">
+                  Cancelar
+                </button>
+                <button onClick={handleEditSave} disabled={savingEdit || !editForm.title.trim()}
+                  className="terra-btn flex-1 py-2.5 justify-center text-sm disabled:opacity-40">
+                  {savingEdit
+                    ? <><Loader2 size={14} className="animate-spin" /> Guardando...</>
+                    : <><Save size={14} /> Guardar cambios</>}
+                </button>
+              </div>
+            )}
           </motion.div>
         </div>
       )}
