@@ -149,7 +149,7 @@ async function downloadAttendanceList(training: any) {
       y+=thH
     }
     drawTH()
-    const rowH=14, totalR=Math.max(participants.length,20)
+    const rowH=45, totalR=Math.max(participants.length,20)
     for(let r=0;r<totalR;r++){
       if(y+rowH>215.9-M){doc.addPage();y=M;drawTH()}
       const p=participants[r]
