@@ -83,9 +83,12 @@ export default function MyPlanPage() {
   const year      = now.getFullYear()
   const monthIdx  = now.getMonth()           // 0-based
   const monthName = MONTHS_ES[monthIdx]
-  // Compare as "YYYY-MM" strings to avoid UTC vs local timezone issues
   const currentYM = `${year}-${String(monthIdx + 1).padStart(2, '0')}`
-  const dueYM = (d: string) => d.slice(0, 7)   // "2026-07-01" → "2026-07"
+  // Usa fecha LOCAL (no UTC) para evitar desfase de timezone Colombia UTC-5
+  const dueYM = (d: string) => {
+    const dt = new Date(d)
+    return `${dt.getFullYear()}-${String(dt.getMonth() + 1).padStart(2, '0')}`
+  }
 
   // ── Filter logic ──────────────────────────────────────────────────────────
   const thisMonth = enrollments.filter(e => {
