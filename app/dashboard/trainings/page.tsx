@@ -39,23 +39,28 @@ function getImgDims(src: string): Promise<{w: number; h: number}> {
   })
 }
 
-// Convierte duration (string como "8h", "30 min", "1.5h" o número en minutos) a texto legible
-function formatDuration(raw: string | number | null | undefined): string {
-  if (!raw) return ''
-  if (typeof raw === 'number') {
-    if (raw < 60) return `${raw} min`
-    const h = raw / 60
-    return Number.isInteger(h) ? `${h} hora${h !== 1 ? 's' : ''}` : `${h.toFixed(1)} horas`
+// Calcula la intensidad a partir del horario ingresado ("8:00 AM - 12:00 PM", "01:00 pm a 02:00 pm")
+function calcIntensidad(horario: string): string {
+  if (!horario) return ''
+  const norm = horario.replace(/\s+a\s+/i, ' - ')
+  const parts = norm.split(/\s*[-–]\s*/)
+  if (parts.length < 2) return ''
+  const parseT = (t: string) => {
+    const m = t.trim().match(/(\d+):(\d+)\s*(am|pm)?/i)
+    if (!m) return null
+    let h = parseInt(m[1]), min = parseInt(m[2])
+    const mer = (m[3] || '').toLowerCase()
+    if (mer === 'pm' && h !== 12) h += 12
+    if (mer === 'am' && h === 12) h = 0
+    return h * 60 + min
   }
-  const s = String(raw).trim()
-  // "Xh" → "X hora(s)"
-  const mH = s.match(/^(\d+(?:\.\d+)?)\s*h$/i)
-  if (mH) {
-    const n = parseFloat(mH[1])
-    return Number.isInteger(n) ? `${n} hora${n !== 1 ? 's' : ''}` : `${n} horas`
-  }
-  // "X min" → devuelve tal cual
-  return s
+  const t1 = parseT(parts[0]), t2 = parseT(parts[1])
+  if (t1 === null || t2 === null || t2 <= t1) return ''
+  const diff = t2 - t1
+  if (diff < 60) return `${diff} min`
+  const hrs = Math.floor(diff / 60), mins = diff % 60
+  if (mins === 0) return `${hrs} hora${hrs !== 1 ? 's' : ''}`
+  return `${hrs}h ${mins}min`
 }
 
 async function downloadAttendanceList(training: any) {
@@ -73,8 +78,8 @@ async function downloadAttendanceList(training: any) {
     const doc = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'letter' })
     const { training: tr, participants, companyName, companyLogo } = data
 
-    // Intensidad calculada automáticamente desde la capacitación
-    const intensidad = formatDuration(tr.duration)
+    // Intensidad calculada desde el horario ingresado
+    const intensidad = calcIntensidad(horario || '')
 
     const W = 279.4, M = 8, usable = W - 2 * M
     const today = new Date().toLocaleDateString('es-CO')
@@ -152,18 +157,18 @@ async function downloadAttendanceList(training: any) {
       cl(cX(1),y,cW(1,2),rowH,p?.cedula||'',{bg,size:8})
       cl(cX(3),y,cW(3,6),rowH,p?.name||'',{bg,size:8,align:'left'})
       cl(cX(7),y,cW(7,9),rowH,p?.cargo||'',{bg,size:7,align:'left'})
-      fl(cX(10),y,cols[10],rowH,bg); bd(cX(10),y,cols[10],rowH)
+      // Firma: fondo blanco (sin color de fila) para que el alpha del PNG sea limpio
+      fl(cX(10),y,cols[10],rowH,[255,255,255]); bd(cX(10),y,cols[10],rowH)
       if(p?.signature && sigDims[r]) {
         try {
-          // Escalar respetando aspect ratio y centrar dentro de la celda
           const { w: iw, h: ih } = sigDims[r]
-          const aspect  = iw / (ih || 1)
-          const maxH    = rowH - 4         // 2mm margen arriba y abajo
-          const maxW    = cols[10] - 6     // 3mm margen izquierda y derecha
-          const drawH   = Math.min(maxH, maxW / aspect)
-          const drawW   = drawH * aspect
-          const sx      = cX(10) + (cols[10] - drawW) / 2
-          const sy      = y + (rowH - drawH) / 2
+          const aspect = iw / (ih || 1)
+          const maxH   = rowH - 2
+          const maxW   = cols[10] - 4
+          const drawH  = Math.min(maxH, maxW / aspect)
+          const drawW  = drawH * aspect
+          const sx     = cX(10) + (cols[10] - drawW) / 2
+          const sy     = y + (rowH - drawH) / 2
           doc.addImage(p.signature, 'PNG', sx, sy, drawW, drawH)
         } catch {}
       }
