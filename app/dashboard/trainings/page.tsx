@@ -2,7 +2,7 @@
 
 import { useState, useRef, useEffect } from 'react'
 import { motion } from 'framer-motion'
-import { useRouter, useSearchParams } from 'next/navigation'
+import { useRouter } from 'next/navigation'
 import { useSession } from 'next-auth/react'
 import { extractPPTXSlides, getCourseData, getCustomQuestions } from '@/lib/pptx-extractor'
 import { QuestionBuilder } from './QuestionBuilder'
@@ -201,7 +201,6 @@ async function downloadAttendanceList(training: any) {
 
 export default function BibliotecaPage() {
   const router = useRouter()
-  const searchParams = useSearchParams()
   const { data: session } = useSession()
   const userRole = (session?.user as any)?.role || 'worker'
   const isAdmin = userRole === 'superadmin' || userRole === 'admin'
@@ -446,7 +445,9 @@ export default function BibliotecaPage() {
       setLoading(false)
 
       // Scroll to highlighted course from command palette
-      const hid = searchParams?.get('highlight')
+      const hid = typeof window !== 'undefined'
+        ? new URLSearchParams(window.location.search).get('highlight')
+        : null
       if (hid) {
         setHighlightId(parseInt(hid))
         setTimeout(() => {
