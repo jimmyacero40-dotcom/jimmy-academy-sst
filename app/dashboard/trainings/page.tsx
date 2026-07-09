@@ -2,7 +2,7 @@
 
 import { useState, useRef, useEffect } from 'react'
 import { motion } from 'framer-motion'
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { useSession } from 'next-auth/react'
 import { extractPPTXSlides, getCourseData, getCustomQuestions } from '@/lib/pptx-extractor'
 import { QuestionBuilder } from './QuestionBuilder'
@@ -201,12 +201,14 @@ async function downloadAttendanceList(training: any) {
 
 export default function BibliotecaPage() {
   const router = useRouter()
+  const searchParams = useSearchParams()
   const { data: session } = useSession()
   const userRole = (session?.user as any)?.role || 'worker'
   const isAdmin = userRole === 'superadmin' || userRole === 'admin'
   const [trainings, setTrainings] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
+  const [highlightId, setHighlightId] = useState<number | null>(null)
   const [statusFilter, setStatusFilter] = useState('activos')
   const [categoryFilter, setCategoryFilter] = useState('todos')
   const [showModal, setShowModal] = useState(false)
@@ -442,6 +444,18 @@ export default function BibliotecaPage() {
 
       setTrainings(apiTrainings)
       setLoading(false)
+
+      // Scroll to highlighted course from command palette
+      const hid = searchParams?.get('highlight')
+      if (hid) {
+        setHighlightId(parseInt(hid))
+        setTimeout(() => {
+          const el = document.getElementById(`course-${hid}`)
+          el?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+          // Clear highlight after animation
+          setTimeout(() => setHighlightId(null), 3000)
+        }, 400)
+      }
     }
     loadAndMigrate()
   }, [])
@@ -819,8 +833,9 @@ export default function BibliotecaPage() {
             const gradColor = t.color || GRADIENTS[t.id % GRADIENTS.length]
             const isArchived = t.status === 'archivado'
             return (
-              <motion.div key={t.id} initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.06 }}
+              <motion.div key={t.id} id={`course-${t.id}`} initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.06 }}
                 className={`terra-card terra-card-lift overflow-hidden cursor-pointer group ${isArchived ? 'opacity-60' : ''}`}
+                style={highlightId === t.id ? { outline: '2px solid rgba(245,158,11,0.8)', outlineOffset: 2 } : {}}
                 onClick={() => !isArchived && router.push(`/dashboard/trainings/${t.id}`)}>
 
                 <div className="relative h-44 overflow-hidden">

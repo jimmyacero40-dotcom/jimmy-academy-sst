@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { usePathname, useRouter } from 'next/navigation'
 import { useSession, signOut } from 'next-auth/react'
 import Link from 'next/link'
@@ -12,6 +12,7 @@ import {
   CalendarDays, GraduationCap, TrendingUp, FileCheck,
   ClipboardList, Home, History, Activity
 } from 'lucide-react'
+import { CommandPalette } from '@/components/CommandPalette'
 
 // ── Admin navigation (grouped) ────────────────────────────────────
 const ADMIN_NAV = [
@@ -77,6 +78,19 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   const [collapsed, setCollapsed] = useState(false)
   const [mobileOpen, setMobileOpen] = useState(false)
   const [theme, setTheme] = useState<'dark' | 'light'>('dark')
+  const [searchOpen, setSearchOpen] = useState(false)
+
+  // Ctrl+K / Cmd+K global shortcut
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
+        e.preventDefault()
+        setSearchOpen(true)
+      }
+    }
+    window.addEventListener('keydown', handler)
+    return () => window.removeEventListener('keydown', handler)
+  }, [])
 
   useEffect(() => {
     const match = document.cookie.match(/x-active-company=([^;]+)/)
@@ -118,6 +132,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
   return (
     <div className="flex h-screen overflow-hidden" style={{ background: 'var(--bg)' }}>
+      <CommandPalette open={searchOpen} onClose={() => setSearchOpen(false)} />
 
       {/* Mobile overlay */}
       {mobileOpen && (
@@ -273,11 +288,19 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
             </button>
 
             {isAdmin ? (
-              <div className="relative hidden sm:block">
-                <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2" style={{ color: 'var(--text-faint)' }} />
-                <input type="text" placeholder="Buscar empleados, cursos..."
-                  className="terra-input pl-8 py-2 w-64" />
-              </div>
+              <button
+                onClick={() => setSearchOpen(true)}
+                className="relative hidden sm:flex items-center gap-2 px-3 py-2 rounded-xl transition-all w-64"
+                style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', color: 'var(--text-faint)' }}
+                onMouseEnter={e => { (e.currentTarget as HTMLElement).style.borderColor = 'rgba(245,158,11,0.4)' }}
+                onMouseLeave={e => { (e.currentTarget as HTMLElement).style.borderColor = 'var(--border)' }}>
+                <Search size={14} />
+                <span className="text-sm flex-1 text-left">Buscar cursos...</span>
+                <kbd className="text-[10px] px-1.5 py-0.5 rounded font-mono"
+                  style={{ background: 'var(--bg-surface)', border: '1px solid var(--border)' }}>
+                  ⌘K
+                </kbd>
+              </button>
             ) : (
               <div className="flex items-center gap-2">
                 <div className="text-sm font-semibold" style={{ color: 'var(--text)' }}>
