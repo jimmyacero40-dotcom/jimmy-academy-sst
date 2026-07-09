@@ -84,11 +84,8 @@ export default function MyPlanPage() {
   const monthIdx  = now.getMonth()           // 0-based
   const monthName = MONTHS_ES[monthIdx]
   const currentYM = `${year}-${String(monthIdx + 1).padStart(2, '0')}`
-  // Usa fecha LOCAL (no UTC) para evitar desfase de timezone Colombia UTC-5
-  const dueYM = (d: string) => {
-    const dt = new Date(d)
-    return `${dt.getFullYear()}-${String(dt.getMonth() + 1).padStart(2, '0')}`
-  }
+  // due_date siempre es el último día del mes (ej: "2026-07-31") → slice(0,7) = "2026-07"
+  const dueYM = (d: string) => d.slice(0, 7)
 
   // ── Filter logic ──────────────────────────────────────────────────────────
   const thisMonth = enrollments.filter(e => {

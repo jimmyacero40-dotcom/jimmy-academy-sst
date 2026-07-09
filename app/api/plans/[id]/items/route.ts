@@ -36,7 +36,7 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
       scheduled_date: scheduled_date || null,
       periodicity: periodicity || 'once',
       required: required !== false,
-      valid_days: valid_days || 365,
+      valid_days: valid_days || null,
     })
     .select('id')
     .single()

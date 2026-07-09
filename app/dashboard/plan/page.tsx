@@ -580,10 +580,24 @@ export default function PlanPage() {
                       </>
                     )}
                     {activePlan.status === 'active' && (
-                      <span className="flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-full"
-                        style={{ background: 'rgba(16,185,129,0.1)', color: '#34D399' }}>
-                        <CheckCircle size={12} /> Plan activo
-                      </span>
+                      <div className="flex items-center gap-2">
+                        <span className="flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-full"
+                          style={{ background: 'rgba(16,185,129,0.1)', color: '#34D399' }}>
+                          <CheckCircle size={12} /> Plan activo
+                        </span>
+                        <button
+                          onClick={async () => {
+                            if (!confirm('¿Recalcular las fechas límite de todos los cursos de este plan?\nEsto corrige matrículas con fechas incorrectas.')) return
+                            const res = await fetch(`/api/plans/${activePlan.id}/fix-dates`, { method: 'POST' })
+                            const data = await res.json()
+                            if (res.ok) alert(`Fechas corregidas: ${data.fixed} matrículas actualizadas.`)
+                            else alert('Error: ' + (data.error || 'desconocido'))
+                          }}
+                          className="text-xs px-3 py-1.5 rounded-full font-semibold"
+                          style={{ background: 'rgba(245,158,11,0.1)', color: '#F59E0B', border: '1px solid rgba(245,158,11,0.3)' }}>
+                          Corregir fechas
+                        </button>
+                      </div>
                     )}
                   </div>
                 </div>

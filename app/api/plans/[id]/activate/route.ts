@@ -64,11 +64,12 @@ export async function POST(_req: NextRequest, { params }: { params: { id: string
     // Deduplicate
     const uniqueUsers = [...new Set(targetUsers)]
 
-    // Calculate due date from month + year
-    const dueDate = new Date(plan.year, (item as any).month - 1 + 1, 0) // last day of that month
-    if ((item as any).valid_days) {
-      dueDate.setDate(dueDate.getDate() + (item as any).valid_days)
-    }
+    // due_date = último día del mes del plan (sin sumar valid_days, que es para validez de certificado)
+    // Se construye como string directamente para evitar conversión UTC/local
+    const lastDay = new Date(plan.year, (item as any).month, 0) // día 0 del mes siguiente = último del mes actual
+    const mm = String(lastDay.getMonth() + 1).padStart(2, '0')
+    const dd = String(lastDay.getDate()).padStart(2, '0')
+    const dueDateStr = `${plan.year}-${mm}-${dd}`
 
     for (const userId of uniqueUsers) {
       enrollments.push({
@@ -77,19 +78,22 @@ export async function POST(_req: NextRequest, { params }: { params: { id: string
         plan_item_id: item.id,
         company_id: companyId,
         status: 'pending',
-        due_date: dueDate.toISOString().split('T')[0],
+        due_date: dueDateStr,
       })
     }
   }
 
-  // 5. Insert enrollments (ignore duplicates via UNIQUE constraint)
+  // 5. Upsert enrollments — actualiza due_date si ya existe (corrige datos previos incorrectos)
   let created = 0
   if (enrollments.length > 0) {
     const BATCH = 100
     for (let i = 0; i < enrollments.length; i += BATCH) {
       const { data: inserted } = await supabase
         .from('enrollments')
-        .upsert(enrollments.slice(i, i + BATCH), { onConflict: 'user_id,training_id,plan_item_id', ignoreDuplicates: true })
+        .upsert(enrollments.slice(i, i + BATCH), {
+          onConflict: 'user_id,training_id,plan_item_id',
+          ignoreDuplicates: false,   // actualiza due_date si el registro ya existe
+        })
         .select('id')
       created += inserted?.length ?? 0
     }
