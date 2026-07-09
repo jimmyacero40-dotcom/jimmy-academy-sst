@@ -29,26 +29,60 @@ const statusStyles: Record<string, { label: string; color: string; bg: string; b
   archivado:  { label: 'Archivado',   color: '#94A3B8', bg: 'rgba(148,163,184,0.1)', border: 'rgba(148,163,184,0.25)' },
 }
 
+// Pre-carga dimensiones de una imagen (data URL) para escalar correctamente
+function getImgDims(src: string): Promise<{w: number; h: number}> {
+  return new Promise(resolve => {
+    const img = new window.Image()
+    img.onload  = () => resolve({ w: img.naturalWidth,  h: img.naturalHeight })
+    img.onerror = () => resolve({ w: 4, h: 1 })
+    img.src = src
+  })
+}
+
+// Convierte duration (string como "8h", "30 min", "1.5h" o número en minutos) a texto legible
+function formatDuration(raw: string | number | null | undefined): string {
+  if (!raw) return ''
+  if (typeof raw === 'number') {
+    if (raw < 60) return `${raw} min`
+    const h = raw / 60
+    return Number.isInteger(h) ? `${h} hora${h !== 1 ? 's' : ''}` : `${h.toFixed(1)} horas`
+  }
+  const s = String(raw).trim()
+  // "Xh" → "X hora(s)"
+  const mH = s.match(/^(\d+(?:\.\d+)?)\s*h$/i)
+  if (mH) {
+    const n = parseFloat(mH[1])
+    return Number.isInteger(n) ? `${n} hora${n !== 1 ? 's' : ''}` : `${n} horas`
+  }
+  // "X min" → devuelve tal cual
+  return s
+}
+
 async function downloadAttendanceList(training: any) {
-  const horario = prompt('Ingrese el HORARIO (ej: 8:00 AM - 12:00 PM):')
+  const horario = prompt('Ingrese el HORARIO (ej: 8:00 AM - 4:30 PM):')
   if (horario === null) return
-  const intensidad = prompt('Ingrese la INTENSIDAD (ej: 4 horas):')
-  if (intensidad === null) return
+  const dirigidoA = prompt('DIRIGIDO A (ej: TRABAJADORES, ÁREA OPERATIVA, COPASST):') ?? 'TRABAJADORES'
+
   try {
     const res = await fetch(`/api/trainings/${training.id}/attendance`)
     if (!res.ok) { alert('Error API: ' + res.status); return }
     const data = await res.json()
     if (!data?.training) { alert('Sin datos'); return }
+
     const jsPDF = (await import('jspdf')).default
     const doc = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'letter' })
     const { training: tr, participants, companyName, companyLogo } = data
+
+    // Intensidad calculada automáticamente desde la capacitación
+    const intensidad = formatDuration(tr.duration)
+
     const W = 279.4, M = 8, usable = W - 2 * M
     const today = new Date().toLocaleDateString('es-CO')
     const CG: [number,number,number] = [56,118,29], CO: [number,number,number] = [230,145,56]
     const CLO: [number,number,number] = [248,216,176], CLG: [number,number,number] = [198,224,180]
     const CW: [number,number,number] = [255,255,255], CB: [number,number,number] = [0,0,0]
     const rawW = [16,18,18,20,20,20,20,30,30,30,41]
-    const tot = rawW.reduce((a,b)=>a+b,0)
+    const tot  = rawW.reduce((a,b)=>a+b,0)
     const cols = rawW.map(w=>(w/tot)*usable)
     const colX = cols.reduce((a: number[],w,i)=>{a.push(i===0?M:a[i-1]+cols[i-1]);return a},[] as number[])
     const cX = (c:number)=>colX[c]
@@ -63,8 +97,17 @@ async function downloadAttendanceList(training: any) {
       let ft=txt;const mw=w-4;while(doc.getTextWidth(ft)>mw&&ft.length>1)ft=ft.slice(0,-1);if(ft!==txt&&ft.length>0)ft+='..'
       doc.text(ft,tx,ty,{align:al==='center'?'center':'left'})
     }
+
+    // Pre-cargar dimensiones de firmas para escalar sin distorsión
+    const sigDims: Record<number, {w: number; h: number}> = {}
+    for (let r = 0; r < participants.length; r++) {
+      if (participants[r]?.signature) {
+        sigDims[r] = await getImgDims(participants[r].signature)
+      }
+    }
+
     let y = M
-    const r0H=14,logoW=cW(0,1)
+    const r0H=14, logoW=cW(0,1)
     if(companyLogo){bd(cX(0),y,logoW,r0H);try{doc.addImage(companyLogo,'PNG',cX(0)+2,y+1,logoW-4,r0H-2)}catch{}}
     else cl(cX(0),y,logoW,r0H,companyName||'',{bold:true,size:8})
     cl(cX(2),y,cW(2,10),r0H,'REGISTRO DE ASISTENCIA A CAPACITACIÓN Y/O EVENTOS',{bold:true,size:12});y+=r0H
@@ -74,7 +117,7 @@ async function downloadAttendanceList(training: any) {
     cl(cX(0),y,logoW,6,'');cl(cX(2),y,cols[2],6,'1',{size:7});cl(cX(3),y,cW(3,4),6,'AVC-FR05',{size:7})
     cl(cX(5),y,cols[5],6,'CEO',{size:7});cl(cX(6),y,cW(6,8),6,'14/10/2025',{size:7});cl(cX(9),y,cW(9,10),6,'22/01/2026',{size:7});y+=6
     cl(cX(0),y,cW(0,1),9,'FECHA',{bg:CG,color:CW,bold:true,size:8});cl(cX(2),y,cW(2,3),9,today,{size:8})
-    cl(cX(4),y,cW(4,5),9,'HORARIO',{bg:CG,color:CW,bold:true,size:8});cl(cX(6),y,cW(6,7),9,horario,{size:7})
+    cl(cX(4),y,cW(4,5),9,'HORARIO',{bg:CG,color:CW,bold:true,size:8});cl(cX(6),y,cW(6,7),9,horario||'',{size:7})
     cl(cX(8),y,cW(8,9),9,'INTENSIDAD',{bg:CG,color:CW,bold:true,size:8});cl(cX(10),y,cols[10],9,intensidad,{size:7});y+=9
     cl(cX(0),y,cW(0,1),9,'ORGANIZADO POR',{bg:CG,color:CW,bold:true,size:7});cl(cX(2),y,cW(2,3),9,'SST-AGROVENTURE CAPITAL',{size:6})
     cl(cX(4),y,cW(4,5),9,'REALIZADO POR',{bg:CG,color:CW,bold:true,size:7})
@@ -83,7 +126,8 @@ async function downloadAttendanceList(training: any) {
     doc.text('Jimmy J. Acero. C.',rpX+rpW/2,y+3.5,{align:'center'})
     doc.setFontSize(5.5);doc.setFont('helvetica','normal')
     doc.text('Profesional SST',rpX+rpW/2,y+7,{align:'center'})
-    cl(cX(8),y,cW(8,9),9,'DIRIGIDO A',{bg:CG,color:CW,bold:true,size:7});cl(cX(10),y,cols[10],9,'TRABAJADORES',{size:7});y+=9
+    cl(cX(8),y,cW(8,9),9,'DIRIGIDO A',{bg:CG,color:CW,bold:true,size:7})
+    cl(cX(10),y,cols[10],9,dirigidoA.toUpperCase(),{size:7});y+=9
     cl(cX(0),y,usable,7,'TEMARIO DEL EVENTO',{bg:CO,color:CW,bold:true,size:9});y+=7
     cl(cX(0),y,usable,6,tr.title,{bold:true,size:8,align:'left'});y+=6
     const temarioContent = tr.temario || tr.description || ''
@@ -91,23 +135,42 @@ async function downloadAttendanceList(training: any) {
     for(let i=0;i<8;i++){if(!dl[i]&&i>0&&!dl[i-1])break;cl(cX(0),y,usable,6,dl[i]||'',{size:7,align:'left'});y+=6}
     cl(cX(0),y,usable,7,'REGISTRO DE PARTICIPANTES',{bg:CO,color:CW,bold:true,size:9});y+=7
     const thH=8
-    const drawTH=()=>{cl(cX(0),y,cols[0],thH,'Nº',{bg:CLO,bold:true,size:8});cl(cX(1),y,cW(1,2),thH,'CÉDULA',{bg:CLO,bold:true,size:8})
-      cl(cX(3),y,cW(3,6),thH,'NOMBRES Y APELLIDOS',{bg:CLO,bold:true,size:8});cl(cX(7),y,cW(7,9),thH,'CARGO',{bg:CLO,bold:true,size:8})
-      cl(cX(10),y,cols[10],thH,'FIRMA',{bg:CLO,bold:true,size:8});y+=thH}
+    const drawTH=()=>{
+      cl(cX(0),y,cols[0],thH,'Nº',{bg:CLO,bold:true,size:8})
+      cl(cX(1),y,cW(1,2),thH,'CÉDULA',{bg:CLO,bold:true,size:8})
+      cl(cX(3),y,cW(3,6),thH,'NOMBRES Y APELLIDOS',{bg:CLO,bold:true,size:8})
+      cl(cX(7),y,cW(7,9),thH,'CARGO',{bg:CLO,bold:true,size:8})
+      cl(cX(10),y,cols[10],thH,'FIRMA',{bg:CLO,bold:true,size:8})
+      y+=thH
+    }
     drawTH()
-    const rowH=10,totalR=Math.max(participants.length,25)
+    const rowH=14, totalR=Math.max(participants.length,22)
     for(let r=0;r<totalR;r++){
       if(y+rowH>215.9-M){doc.addPage();y=M;drawTH()}
-      const p=participants[r],bg=r%2===1?CLG:CW
-      cl(cX(0),y,cols[0],rowH,String(r+1),{bg,bold:true,size:8});cl(cX(1),y,cW(1,2),rowH,p?.cedula||'',{bg,size:8})
-      cl(cX(3),y,cW(3,6),rowH,p?.name||'',{bg,size:8,align:'left'});cl(cX(7),y,cW(7,9),rowH,p?.cargo||'',{bg,size:7,align:'left'})
-      fl(cX(10),y,cols[10],rowH,bg);bd(cX(10),y,cols[10],rowH)
-      if(p?.signature){try{doc.addImage(p.signature,'PNG',cX(10)+2,y+1,cols[10]-4,rowH-2)}catch{}}
+      const p=participants[r], bg=r%2===1?CLG:CW
+      cl(cX(0),y,cols[0],rowH,String(r+1),{bg,bold:true,size:8})
+      cl(cX(1),y,cW(1,2),rowH,p?.cedula||'',{bg,size:8})
+      cl(cX(3),y,cW(3,6),rowH,p?.name||'',{bg,size:8,align:'left'})
+      cl(cX(7),y,cW(7,9),rowH,p?.cargo||'',{bg,size:7,align:'left'})
+      fl(cX(10),y,cols[10],rowH,bg); bd(cX(10),y,cols[10],rowH)
+      if(p?.signature && sigDims[r]) {
+        try {
+          // Escalar respetando aspect ratio y centrar dentro de la celda
+          const { w: iw, h: ih } = sigDims[r]
+          const aspect  = iw / (ih || 1)
+          const maxH    = rowH - 4         // 2mm margen arriba y abajo
+          const maxW    = cols[10] - 6     // 3mm margen izquierda y derecha
+          const drawH   = Math.min(maxH, maxW / aspect)
+          const drawW   = drawH * aspect
+          const sx      = cX(10) + (cols[10] - drawW) / 2
+          const sy      = y + (rowH - drawH) / 2
+          doc.addImage(p.signature, 'PNG', sx, sy, drawW, drawH)
+        } catch {}
+      }
       y+=rowH
     }
     const fname = 'Asistencia_'+tr.title.replace(/[^a-zA-Z0-9]/g,'_').slice(0,30)+'.pdf'
     doc.save(fname)
-    alert('PDF descargado: ' + fname)
   } catch (err: any) {
     console.error('Error PDF:', err)
     alert('Error: ' + (err?.message || err))
