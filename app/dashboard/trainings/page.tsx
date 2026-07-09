@@ -134,15 +134,27 @@ async function downloadAttendanceList(training: any) {
     cl(cX(8),y,cW(8,9),9,'DIRIGIDO A',{bg:CG,color:CW,bold:true,size:7})
     cl(cX(10),y,cols[10],9,dirigidoA.toUpperCase(),{size:7});y+=9
     cl(cX(0),y,usable,7,'TEMARIO DEL EVENTO',{bg:CO,color:CW,bold:true,size:9});y+=7
-    cl(cX(0),y,usable,7,tr.title,{bold:true,size:8,align:'left'});y+=7
+    cl(cX(0),y,usable,6,tr.title,{bold:true,size:8,align:'left'});y+=6
     const temarioContent = tr.temario || tr.description || ''
     const dl: string[] = temarioContent ? doc.splitTextToSize(temarioContent, usable-4) : []
-    const lineH = 5, pad = 3
-    const boxH = Math.max(dl.length * lineH + pad * 2, 14)
-    fl(cX(0),y,usable,boxH,CW); bd(cX(0),y,usable,boxH)
-    doc.setFontSize(7); doc.setFont('helvetica','normal'); doc.setTextColor(0,0,0)
-    dl.forEach((line: string, i: number) => { doc.text(line, cX(0)+2, y+pad+4+i*lineH) })
-    y+=boxH
+    // Texto justificado: distribuye espacio entre palabras excepto en la última línea
+    const justifyLine = (line: string, x: number, yy: number, maxW: number, isLast: boolean) => {
+      const words = line.trim().split(' ')
+      if (isLast || words.length <= 1) { doc.text(line, x+2, yy); return }
+      const totalW = words.reduce((s,w)=>s+doc.getTextWidth(w),0)
+      const gap = (maxW-4-totalW)/(words.length-1)
+      let cx = x+2
+      words.forEach(w=>{ doc.text(w,cx,yy); cx+=doc.getTextWidth(w)+gap })
+    }
+    for(let i=0;i<8;i++){
+      if(!dl[i]&&i>0&&!dl[i-1])break
+      fl(cX(0),y,usable,6,CW);bd(cX(0),y,usable,6)
+      if(dl[i]){
+        doc.setFontSize(7);doc.setFont('helvetica','normal');doc.setTextColor(0,0,0)
+        justifyLine(dl[i],cX(0),y+4.5,usable,i===dl.length-1)
+      }
+      y+=6
+    }
     cl(cX(0),y,usable,7,'REGISTRO DE PARTICIPANTES',{bg:CO,color:CW,bold:true,size:9});y+=7
     const thH=8
     const drawTH=()=>{
