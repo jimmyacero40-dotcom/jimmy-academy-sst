@@ -134,10 +134,15 @@ async function downloadAttendanceList(training: any) {
     cl(cX(8),y,cW(8,9),9,'DIRIGIDO A',{bg:CG,color:CW,bold:true,size:7})
     cl(cX(10),y,cols[10],9,dirigidoA.toUpperCase(),{size:7});y+=9
     cl(cX(0),y,usable,7,'TEMARIO DEL EVENTO',{bg:CO,color:CW,bold:true,size:9});y+=7
-    cl(cX(0),y,usable,6,tr.title,{bold:true,size:8,align:'left'});y+=6
+    cl(cX(0),y,usable,7,tr.title,{bold:true,size:8,align:'left'});y+=7
     const temarioContent = tr.temario || tr.description || ''
-    const dl=temarioContent?doc.splitTextToSize(temarioContent,usable-6):[]
-    for(let i=0;i<8;i++){if(!dl[i]&&i>0&&!dl[i-1])break;cl(cX(0),y,usable,6,dl[i]||'',{size:7,align:'left'});y+=6}
+    const dl: string[] = temarioContent ? doc.splitTextToSize(temarioContent, usable-4) : []
+    const lineH = 5, pad = 3
+    const boxH = Math.max(dl.length * lineH + pad * 2, 14)
+    fl(cX(0),y,usable,boxH,CW); bd(cX(0),y,usable,boxH)
+    doc.setFontSize(7); doc.setFont('helvetica','normal'); doc.setTextColor(0,0,0)
+    dl.forEach((line: string, i: number) => { doc.text(line, cX(0)+2, y+pad+4+i*lineH) })
+    y+=boxH
     cl(cX(0),y,usable,7,'REGISTRO DE PARTICIPANTES',{bg:CO,color:CW,bold:true,size:9});y+=7
     const thH=8
     const drawTH=()=>{
