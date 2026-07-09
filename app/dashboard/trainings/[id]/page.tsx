@@ -560,16 +560,17 @@ export default function TrainingDetailPage() {
   }
 
   if (slideCount === 0) {
+    const isProcessing = (training?.slides_count ?? 0) > 0
     return (
       <div className="flex items-center justify-center h-full min-h-[60vh]">
         <div className="text-center max-w-md">
           <BookOpen size={48} className="mx-auto mb-4 opacity-30" style={{ color: 'var(--text-faint)' }} />
           <h2 className="text-lg font-bold mb-2" style={{ color: 'var(--text)' }}>
-            {training?.slides_count > 0 ? 'Cargando contenido...' : 'Contenido no disponible'}
+            {isProcessing ? 'Presentación en preparación' : 'Contenido no disponible'}
           </h2>
           <p className="text-sm mb-6" style={{ color: 'var(--text-dim)' }}>
-            {training?.slides_count > 0
-              ? 'El contenido puede tardar unos segundos en estar disponible. Intenta recargar.'
+            {isProcessing
+              ? 'La presentación aún está siendo procesada. Por favor regresa en unos minutos.'
               : 'Esta capacitación aún no tiene contenido disponible.'}
           </p>
           <div className="flex gap-3 justify-center">
@@ -577,12 +578,10 @@ export default function TrainingDetailPage() {
               className="terra-btn-outline px-5 py-2.5">
               <ChevronLeft size={16} /> Volver
             </button>
-            {training?.slides_count > 0 && (
-              <button onClick={() => { setLoading(true); loadTraining() }}
-                className="terra-btn px-5 py-2.5">
-                <RotateCcw size={16} /> Recargar
-              </button>
-            )}
+            <button onClick={() => { setLoading(true); loadTraining() }}
+              className="terra-btn px-5 py-2.5">
+              <RotateCcw size={16} /> Reintentar
+            </button>
           </div>
         </div>
       </div>

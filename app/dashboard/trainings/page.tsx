@@ -4,7 +4,7 @@ import { useState, useRef, useEffect } from 'react'
 import { motion } from 'framer-motion'
 import { useRouter } from 'next/navigation'
 import { useSession } from 'next-auth/react'
-import { extractPPTXImages, extractPPTXTexts, getCourseData, getCustomQuestions } from '@/lib/pptx-extractor'
+import { extractPPTXSlides, getCourseData, getCustomQuestions } from '@/lib/pptx-extractor'
 import {
   BookOpen, Plus, Search, Clock, CheckCircle, AlertCircle,
   Users, Star, Play, Upload, ChevronRight, X, Award, Zap,
@@ -292,33 +292,49 @@ export default function BibliotecaPage() {
 
       // 2. Replace PPTX if a new file was selected
       if (editFile && /\.(pptx|pdf)$/i.test(editFile.name)) {
-        setEditProgress('Extrayendo diapositivas...')
         let slides: string[] = []
         let texts: string[] = []
+        let expectedCount = 0
 
         if (/\.pptx$/i.test(editFile.name)) {
           try {
-            slides = await extractPPTXImages(editFile)
-            texts = await extractPPTXTexts(editFile)
+            const result = await extractPPTXSlides(editFile, setEditProgress)
+            slides = result.images
+            texts = result.texts
+            expectedCount = slides.length
           } catch (e) { console.error('PPTX extract error', e) }
         } else if (/\.pdf$/i.test(editFile.name)) {
           try {
+            setEditProgress('Extrayendo páginas del PDF...')
             const { extractPDFImages } = await import('@/lib/pdf-extractor')
             slides = await extractPDFImages(editFile)
+            expectedCount = slides.length
           } catch (e) { console.error('PDF extract error', e) }
         }
 
         if (slides.length > 0) {
-          setEditProgress(`Reemplazando ${slides.length} diapositivas...`)
-          // Replace slides in DB
+          setEditProgress(`Subiendo ${slides.length} diapositivas...`)
           const slidesPayload = slides.map((img, i) => ({
             slide_index: i, image_data: img, slide_text: texts[i] || '',
           }))
-          await fetch(`/api/trainings/${editCourse.id}/slides`, {
+          const sRes = await fetch(`/api/trainings/${editCourse.id}/slides`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ slides: slidesPayload, slides_count: slides.length }),
           })
+
+          // Verify stored count
+          if (sRes.ok && expectedCount > 0) {
+            const verifyRes = await fetch(`/api/trainings/${editCourse.id}`)
+            const verifyData = await verifyRes.json()
+            const storedCount = verifyData.slideCount || 0
+            if (storedCount === expectedCount) {
+              setEditProgress(`✓ ${storedCount} diapositivas actualizadas`)
+            } else {
+              setEditProgress(`⚠ Se guardaron ${storedCount} de ${expectedCount} diapositivas`)
+            }
+            await new Promise(r => setTimeout(r, 1200))
+          }
         }
 
         // Upload original PPTX to storage
@@ -326,14 +342,10 @@ export default function BibliotecaPage() {
           setEditProgress('Guardando archivo original...')
           const fd = new FormData()
           fd.append('file', editFile)
-          await fetch(`/api/trainings/${editCourse.id}/upload-pptx`, {
-            method: 'POST',
-            body: fd,
-          })
+          await fetch(`/api/trainings/${editCourse.id}/upload-pptx`, { method: 'POST', body: fd })
         }
 
-        // Update local state
-        const updatedCover = slides[0] || editCourse.cover_url
+        const updatedCover = slides.find(s => s) || editCourse.cover_url
         setTrainings(prev => prev.map(t => t.id === editCourse.id
           ? { ...t, ...editForm, cover_url: updatedCover, slides_count: slides.length, file_name: editFile.name }
           : t
@@ -439,25 +451,29 @@ export default function BibliotecaPage() {
   const handleCreateCourse = async () => {
     if (!newCourse.name.trim()) return
     setCreating(true)
-    setUploadProgress('Extrayendo diapositivas...')
 
     let slides: string[] = []
     let texts: string[] = []
+    let expectedCount = 0
 
     if (uploadedFile && /\.pptx$/i.test(uploadedFile.name)) {
       try {
-        slides = await extractPPTXImages(uploadedFile)
-        texts = await extractPPTXTexts(uploadedFile)
+        const result = await extractPPTXSlides(uploadedFile, setUploadProgress)
+        slides = result.images
+        texts = result.texts
+        expectedCount = slides.length
       } catch (e) { console.error('Error extracting PPTX:', e) }
     } else if (uploadedFile && /\.pdf$/i.test(uploadedFile.name)) {
       try {
         setUploadProgress('Extrayendo páginas del PDF...')
         const { extractPDFImages } = await import('@/lib/pdf-extractor')
         slides = await extractPDFImages(uploadedFile)
+        expectedCount = slides.length
       } catch (e) { console.error('Error extracting PDF:', e) }
     }
 
     try {
+      // Create training with slides_count=0 — never shows as ready until slides are uploaded
       setUploadProgress('Creando curso...')
       const res = await fetch('/api/trainings', {
         method: 'POST',
@@ -467,8 +483,8 @@ export default function BibliotecaPage() {
           category: newCourse.category,
           duration: newCourse.duration || '8h',
           description: newCourse.description,
-          slides_count: slides.length,
-          cover_url: slides[0] || null,
+          slides_count: 0,
+          cover_url: null,
           color: GRADIENTS[trainings.length % GRADIENTS.length],
           file_name: uploadedFile?.name,
           valid_from: newCourse.valid_from || null,
@@ -478,31 +494,62 @@ export default function BibliotecaPage() {
       const training = await res.json()
       if (!res.ok) {
         alert(`Error al crear curso: ${training.error || 'Error desconocido'}`)
-        setCreating(false)
-        setUploadProgress('')
-        return
+        setCreating(false); setUploadProgress(''); return
       }
 
+      let finalCount = 0
+
       if (slides.length > 0) {
-        for (let i = 0; i < slides.length; i++) {
-          setUploadProgress(`Subiendo diapositiva ${i + 1} de ${slides.length}...`)
-          try {
-            await fetch('/api/trainings/slides', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({
-                training_id: training.id, slide_index: i,
-                image_data: slides[i], slide_text: texts[i] || '',
-              }),
-            })
-          } catch (e) { console.error(`Error uploading slide ${i}:`, e) }
+        // Single bulk request — much faster than N individual requests
+        setUploadProgress(`Subiendo ${slides.length} diapositivas...`)
+        const slidesPayload = slides.map((img, i) => ({
+          slide_index: i, image_data: img, slide_text: texts[i] || '',
+        }))
+        const sRes = await fetch(`/api/trainings/${training.id}/slides`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ slides: slidesPayload, slides_count: slides.length }),
+        })
+        if (sRes.ok) {
+          const sData = await sRes.json()
+          finalCount = sData.count || slides.length
+        } else {
+          const sErr = await sRes.json().catch(() => ({}))
+          alert(`Error al subir las diapositivas: ${sErr.error || 'desconocido'}`)
+          // Training was created with slides_count=0; notify admin and bail
+          setCreating(false); setUploadProgress(''); return
         }
       }
 
-      if (slides[0]) training.cover_url = slides[0]
+      // Upload the original PPTX for admin download
+      if (uploadedFile && /\.pptx$/i.test(uploadedFile.name)) {
+        setUploadProgress('Guardando archivo original...')
+        const fd = new FormData()
+        fd.append('file', uploadedFile)
+        await fetch(`/api/trainings/${training.id}/upload-pptx`, { method: 'POST', body: fd })
+      }
 
-      setTrainings(prev => [training, ...prev])
-      setShowModal(false)
+      // Verify stored count matches what we uploaded
+      if (expectedCount > 0) {
+        const verifyRes = await fetch(`/api/trainings/${training.id}`)
+        const verifyData = await verifyRes.json()
+        const storedCount = verifyData.slideCount || 0
+        if (storedCount === expectedCount) {
+          setUploadProgress(`✓ ${storedCount} diapositivas cargadas correctamente`)
+        } else {
+          setUploadProgress(`⚠ Se guardaron ${storedCount} de ${expectedCount} diapositivas`)
+        }
+        finalCount = storedCount
+        await new Promise(r => setTimeout(r, 1800))
+      }
+
+      const finalTraining = {
+        ...training,
+        slides_count: finalCount,
+        cover_url: slides.find(s => s) || null,
+      }
+      setTrainings(prev => [finalTraining, ...prev])
+      setShowModal(false); setIsDirtyCreate(false)
       setNewCourse({ name: '', duration: '', description: '', category: 'Obligatorio', risk_type: '', valid_from: '', valid_until: '' })
       setUploadedFile(null)
     } catch (e) {
@@ -1074,12 +1121,37 @@ export default function BibliotecaPage() {
                 )}
               </div>
             </div>
+            {creating && uploadProgress && (
+              <div className="px-6 pb-4">
+                <div className="rounded-xl px-4 py-3" style={{ background: 'rgba(59,130,246,0.08)', border: '1px solid rgba(59,130,246,0.2)' }}>
+                  <div className="flex items-center gap-2.5">
+                    {uploadProgress.startsWith('✓') ? (
+                      <div className="w-5 h-5 rounded-full flex items-center justify-center flex-shrink-0" style={{ background: '#10B981' }}>
+                        <span className="text-white text-xs">✓</span>
+                      </div>
+                    ) : uploadProgress.startsWith('⚠') ? (
+                      <div className="w-5 h-5 rounded-full flex items-center justify-center flex-shrink-0" style={{ background: '#F59E0B' }}>
+                        <span className="text-white text-xs">!</span>
+                      </div>
+                    ) : (
+                      <Loader2 size={16} className="animate-spin flex-shrink-0" style={{ color: 'var(--primary)' }} />
+                    )}
+                    <span className="text-sm font-medium" style={{ color: 'var(--text)' }}>{uploadProgress}</span>
+                  </div>
+                  {!uploadProgress.startsWith('✓') && !uploadProgress.startsWith('⚠') && (
+                    <p className="text-xs mt-1.5 ml-7" style={{ color: 'var(--text-faint)' }}>
+                      No cierres esta ventana mientras se procesa el archivo.
+                    </p>
+                  )}
+                </div>
+              </div>
+            )}
             <div className="px-6 pb-6 flex gap-3">
               <button onClick={() => { if (isDirtyCreate) { setConfirmCreate(true) } else { setShowModal(false); setUploadedFile(null); setNewCourse({ name: '', duration: '', description: '', category: 'Obligatorio', risk_type: '', valid_from: '', valid_until: '' }) } }}
-                className="terra-btn-outline flex-1 py-2.5 justify-center">Cancelar</button>
+                className="terra-btn-outline flex-1 py-2.5 justify-center" disabled={creating}>Cancelar</button>
               <button onClick={handleCreateCourse} disabled={!newCourse.name.trim() || creating}
                 className="terra-btn flex-1 py-2.5 justify-center">
-                {creating ? (uploadProgress || 'Procesando...') : 'Agregar a Biblioteca'}
+                {creating ? 'Procesando...' : 'Agregar a Biblioteca'}
               </button>
             </div>
           </motion.div>
@@ -1267,6 +1339,26 @@ export default function BibliotecaPage() {
             </div>
 
             {/* Footer */}
+            {savingEdit && editProgress && (
+              <div className="px-5 pb-3">
+                <div className="rounded-xl px-4 py-3" style={{ background: 'rgba(59,130,246,0.08)', border: '1px solid rgba(59,130,246,0.2)' }}>
+                  <div className="flex items-center gap-2.5">
+                    {editProgress.startsWith('✓') ? (
+                      <div className="w-5 h-5 rounded-full flex items-center justify-center flex-shrink-0" style={{ background: '#10B981' }}>
+                        <span className="text-white text-xs">✓</span>
+                      </div>
+                    ) : editProgress.startsWith('⚠') ? (
+                      <div className="w-5 h-5 rounded-full flex items-center justify-center flex-shrink-0" style={{ background: '#F59E0B' }}>
+                        <span className="text-white text-xs">!</span>
+                      </div>
+                    ) : (
+                      <Loader2 size={14} className="animate-spin flex-shrink-0" style={{ color: 'var(--primary)' }} />
+                    )}
+                    <span className="text-xs font-medium" style={{ color: 'var(--text)' }}>{editProgress}</span>
+                  </div>
+                </div>
+              </div>
+            )}
             <div className="flex gap-3 px-5 py-4 flex-shrink-0" style={{ borderTop: '1px solid var(--border)' }}>
               <button onClick={() => { if (isDirtyEdit) { setConfirmEdit(true) } else { setEditCourse(null) } }} disabled={savingEdit}
                 className="terra-btn-outline flex-1 py-2.5 justify-center text-sm">
@@ -1275,7 +1367,7 @@ export default function BibliotecaPage() {
               <button onClick={handleEditSave} disabled={savingEdit || !editForm.title.trim()}
                 className="terra-btn flex-1 py-2.5 justify-center text-sm disabled:opacity-40">
                 {savingEdit
-                  ? <><Loader2 size={14} className="animate-spin" /> {editProgress || 'Guardando...'}</>
+                  ? <><Loader2 size={14} className="animate-spin" /> Guardando...</>
                   : <><Save size={14} /> Guardar cambios</>}
               </button>
             </div>

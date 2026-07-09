@@ -95,6 +95,109 @@ export async function deleteSlides(courseId: number): Promise<void> {
   })
 }
 
+// Compress a data-URL image to JPEG at reduced resolution to cut upload size
+async function compressImage(dataUrl: string, maxWidth = 1280, quality = 0.82): Promise<string> {
+  if (!dataUrl || typeof document === 'undefined') return dataUrl
+  return new Promise((resolve) => {
+    const img = new Image()
+    img.onload = () => {
+      const scale = img.width > maxWidth ? maxWidth / img.width : 1
+      const canvas = document.createElement('canvas')
+      canvas.width = Math.round(img.width * scale)
+      canvas.height = Math.round(img.height * scale)
+      const ctx = canvas.getContext('2d')
+      if (!ctx) { resolve(dataUrl); return }
+      ctx.drawImage(img, 0, 0, canvas.width, canvas.height)
+      resolve(canvas.toDataURL('image/jpeg', quality))
+    }
+    img.onerror = () => resolve(dataUrl)
+    img.src = dataUrl
+  })
+}
+
+// Single-pass extraction: images + texts from one ZIP parse, with compression
+export async function extractPPTXSlides(
+  file: File,
+  onProgress?: (msg: string) => void
+): Promise<{ images: string[]; texts: string[] }> {
+  onProgress?.('Abriendo archivo...')
+  const zip = await JSZip.loadAsync(file)
+
+  const slideFiles: string[] = []
+  zip.forEach((path) => {
+    if (/^ppt\/slides\/slide\d+\.xml$/.test(path)) slideFiles.push(path)
+  })
+  slideFiles.sort((a, b) => {
+    const na = parseInt(a.match(/slide(\d+)/)?.[1] || '0')
+    const nb = parseInt(b.match(/slide(\d+)/)?.[1] || '0')
+    return na - nb
+  })
+
+  const images: string[] = []
+  const texts: string[] = []
+  let anyImage = false
+
+  for (let i = 0; i < slideFiles.length; i++) {
+    onProgress?.(`Extrayendo diapositiva ${i + 1} de ${slideFiles.length}...`)
+    const slideFile = zip.file(slideFiles[i])
+    let slideText = ''
+    let slideImage = ''
+
+    if (slideFile) {
+      const xml = await slideFile.async('text')
+      const textMatches = [...xml.matchAll(/<a:t>([^<]*)<\/a:t>/g)]
+      slideText = textMatches.map(m => m[1].trim()).filter(t => t.length > 0).join(' ')
+
+      const slideNum = slideFiles[i].match(/slide(\d+)/)?.[1]
+      const relsFile = zip.file(`ppt/slides/_rels/slide${slideNum}.xml.rels`)
+      if (relsFile) {
+        const relsXml = await relsFile.async('text')
+        const imgMatches = [...relsXml.matchAll(/Target="\.\.\/media\/(image[^"]+)"/g)]
+        let bestSize = 0
+        for (const match of imgMatches) {
+          const imgFile = zip.file(`ppt/media/${match[1]}`)
+          if (imgFile) {
+            const blob = await imgFile.async('blob')
+            const ext = match[1].split('.').pop()?.toLowerCase() || 'png'
+            const mime = ext === 'jpg' || ext === 'jpeg' ? 'image/jpeg'
+                       : ext === 'png' ? 'image/png'
+                       : ext === 'gif' ? 'image/gif'
+                       : (ext === 'emf' || ext === 'wmf') ? '' : `image/${ext}`
+            if (mime && blob.size > bestSize) {
+              bestSize = blob.size
+              const raw = await blobToDataURL(blob, mime)
+              slideImage = await compressImage(raw)
+            }
+          }
+        }
+        if (slideImage) anyImage = true
+      }
+    }
+    images.push(slideImage)
+    texts.push(slideText)
+  }
+
+  // Fallback: no relationship-based images found → extract all ppt/media/ files in order
+  if (!anyImage) {
+    onProgress?.('Extrayendo imágenes del archivo...')
+    const mediaFiles: { name: string; file: JSZip.JSZipObject }[] = []
+    zip.forEach((path, f) => {
+      if (path.startsWith('ppt/media/') && /\.(png|jpg|jpeg|gif|bmp)$/i.test(path))
+        mediaFiles.push({ name: path, file: f })
+    })
+    mediaFiles.sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true }))
+    for (let i = 0; i < Math.min(mediaFiles.length, slideFiles.length); i++) {
+      const blob = await mediaFiles[i].file.async('blob')
+      const ext = mediaFiles[i].name.split('.').pop()?.toLowerCase() || 'png'
+      const mime = ext === 'jpg' || ext === 'jpeg' ? 'image/jpeg' : `image/${ext}`
+      const raw = await blobToDataURL(blob, mime)
+      images[i] = await compressImage(raw)
+    }
+  }
+
+  return { images, texts }
+}
+
 export async function extractPPTXImages(file: File): Promise<string[]> {
   const zip = await JSZip.loadAsync(file)
   const images: { index: number; data: string }[] = []
