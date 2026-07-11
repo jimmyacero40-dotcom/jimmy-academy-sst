@@ -52,6 +52,18 @@ export default function CertificatesPage() {
     if (downloading) return
     setDownloading(true)
     try {
+      // Always fetch the latest worker signature fresh — never use cached data
+      let employeeSignature: string | undefined
+      try {
+        const sigRes = await fetch('/api/signatures')
+        if (sigRes.ok) {
+          const sigData = await sigRes.json()
+          if (sigData.signature?.signature_data) {
+            employeeSignature = sigData.signature.signature_data
+          }
+        }
+      } catch (_) {}
+
       const img = await generateCertificatePNG({
         employeeName: cert.name,
         employeeCedula: cert.cedula || '',
@@ -60,6 +72,7 @@ export default function CertificatesPage() {
         duration: cert.duration || '8 horas',
         score: cert.score || '100%',
         code: cert.code,
+        employeeSignature,
         logoUrl: '/images/LOGO.png',
         instructorSignatureUrl: '/images/FIRMA FIRMA.png',
       })

@@ -413,7 +413,18 @@ export async function generateCertificatePNG(data: {
       const sig = await loadImage(data.employeeSignature)
       const sw = sigImgH * (sig.width / sig.height)
       ctx.drawImage(sig, empX - sw / 2, sigImgTop, sw, sigImgH)
-    } catch (_) {}
+    } catch (_) {
+      // signature image failed to load — draw placeholder
+      ctx.fillStyle = C.textLight
+      ctx.font = `italic 34px ${elegantFont}`
+      ctx.textAlign = 'center'
+      ctx.fillText('Firma no registrada', empX, sigImgTop + sigImgH / 2)
+    }
+  } else {
+    ctx.fillStyle = C.textLight
+    ctx.font = `italic 34px ${elegantFont}`
+    ctx.textAlign = 'center'
+    ctx.fillText('Firma no registrada', empX, sigImgTop + sigImgH / 2)
   }
   if (data.instructorSignatureUrl) {
     try {
@@ -455,15 +466,6 @@ export async function generateCertificatePNG(data: {
 
   // ── SEAL centered ──
   drawPremiumSeal(ctx, CX, sigLineY - 10, dataFont)
-
-  // ── QR ──
-  const qrSize = 260
-  const qrY = sigLineY + 180
-  drawQR(ctx, CX - qrSize / 2, qrY, qrSize, data.code)
-  ctx.fillStyle = C.textLight
-  ctx.font = `400 34px ${dataFont}`
-  ctx.textAlign = 'center'
-  ctx.fillText('Escanee para verificar autenticidad', CX, qrY + qrSize + 45)
 
   return canvas.toDataURL('image/png', 1.0)
 }
@@ -602,24 +604,6 @@ function drawLine(ctx: CanvasRenderingContext2D, x1: number, x2: number, y: numb
   ctx.stroke()
 }
 
-function drawQR(ctx: CanvasRenderingContext2D, x: number, y: number, size: number, code: string) {
-  const mods = 25, cell = size / mods
-  let seed = 0
-  for (let i = 0; i < code.length; i++) seed = ((seed << 5) - seed + code.charCodeAt(i)) | 0
-  seed = Math.abs(seed)
-  for (let r = 0; r < mods; r++) {
-    for (let c = 0; c < mods; c++) {
-      const isEdge = (r < 7 && c < 7 && (r === 0 || r === 6 || c === 0 || c === 6)) || (r < 7 && c >= mods - 7 && (r === 0 || r === 6 || c === mods - 7 || c === mods - 1)) || (r >= mods - 7 && c < 7 && (r === mods - 7 || r === mods - 1 || c === 0 || c === 6))
-      const isInner = (r >= 2 && r <= 4 && c >= 2 && c <= 4) || (r >= 2 && r <= 4 && c >= mods - 5 && c <= mods - 3) || (r >= mods - 5 && r <= mods - 3 && c >= 2 && c <= 4)
-      const isCorner = (r < 7 && c < 7) || (r < 7 && c >= mods - 7) || (r >= mods - 7 && c < 7)
-      let fill = false
-      if (isEdge || isInner) fill = true
-      else if (isCorner) fill = false
-      else { seed = (seed * 1103515245 + 12345) & 0x7fffffff; fill = seed % 3 !== 0 }
-      if (fill) { ctx.fillStyle = C.greenDark; ctx.fillRect(x + c * cell, y + r * cell, cell - 0.5, cell - 0.5) }
-    }
-  }
-}
 
 function drawFallbackLogo(ctx: CanvasRenderingContext2D, x: number, y: number, sans: string) {
   ctx.textAlign = 'center'
