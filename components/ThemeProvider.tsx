@@ -67,9 +67,25 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
   }, [])
 
   const setTheme = useCallback((id: ThemeId, persist = true) => {
+    const html = document.documentElement
+
+    // 1. Suppress ALL CSS transitions so the switch is truly instant.
+    //    The universal * transition in globals.css makes color changes animate
+    //    over 200ms — dramatic theme changes (dark→verde) look "slow".
+    //    We freeze transitions for exactly one frame, then restore them.
+    html.classList.add('theme-switching')
+
+    // 2. Apply the new theme immediately — CSS variables update synchronously.
+    html.setAttribute('data-theme', id)
     setThemeState(id)
-    document.documentElement.setAttribute('data-theme', id)
     if (persist) localStorage.setItem('sst-theme', id)
+
+    // 3. Restore transitions on the next painted frame.
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        html.classList.remove('theme-switching')
+      })
+    })
   }, [])
 
   return <Ctx.Provider value={{ theme, setTheme }}>{children}</Ctx.Provider>

@@ -429,11 +429,13 @@ select option { background: var(--bg-surface); color: var(--text); }
 .animate-marquee  { animation: marquee 24s linear infinite; }
 .animate-pulse-dot{ animation: pulse-dot 2s infinite; }
 
-/* smooth color transitions when switching themes */
-*,*::before,*::after {
-  transition-property: background-color, border-color, color, box-shadow;
-  transition-duration: 200ms;
-  transition-timing-function: ease;
+/* Freeze all transitions for the single frame of a theme switch.
+   ThemeProvider adds .theme-switching to <html>, then removes it on the
+   next painted frame — so the CSS variable update lands with zero animation. */
+.theme-switching *,
+.theme-switching *::before,
+.theme-switching *::after {
+  transition: none !important;
 }
 /* but don't slow down layout transitions */
 .terra-card, .terra-btn, .terra-btn-outline, .terra-input, .nav-item {

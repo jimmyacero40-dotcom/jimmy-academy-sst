@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect, useCallback, useRef } from 'react'
+import { createPortal } from 'react-dom'
 import { usePathname, useRouter } from 'next/navigation'
 import { useSession, signOut } from 'next-auth/react'
 import Link from 'next/link'
@@ -81,6 +82,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   const [searchOpen, setSearchOpen] = useState(false)
   const [themePickerOpen, setThemePickerOpen] = useState(false)
   const [pickerPos, setPickerPos] = useState({ top: 0, right: 0 })
+  const [mounted, setMounted] = useState(false)
   const themeButtonRef = useRef<HTMLButtonElement>(null)
   const { theme, setTheme } = useTheme()
 
@@ -126,6 +128,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     }
   }, [])
 
+  useEffect(() => { setMounted(true) }, [])
   useEffect(() => { setMobileOpen(false) }, [pathname])
 
   const isActive = (href: string) => {
@@ -136,6 +139,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   const userInitials = session?.user?.name?.split(' ').map(w => w[0]).join('').slice(0, 2) ?? 'JA'
 
   return (
+    <>
     <div className="flex h-screen overflow-hidden" style={{ background: 'var(--bg)' }}>
       <CommandPalette open={searchOpen} onClose={() => setSearchOpen(false)} />
 
@@ -332,87 +336,6 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
               </button>
             </div>
 
-            {themePickerOpen && (
-              <>
-                {/* Full-screen backdrop */}
-                <div
-                  className="fixed inset-0"
-                  style={{ zIndex: 9998 }}
-                  onClick={() => setThemePickerOpen(false)}
-                />
-                {/* Picker panel — fixed so it's never clipped */}
-                <div
-                  className="fixed"
-                  style={{
-                    top: pickerPos.top,
-                    right: pickerPos.right,
-                    zIndex: 9999,
-                    width: 232,
-                    background: 'var(--bg-surface)',
-                    border: '1px solid var(--border)',
-                    borderRadius: 16,
-                    boxShadow: '0 24px 64px rgba(0,0,0,0.5)',
-                    padding: 10,
-                  }}>
-
-                  <p className="text-[10px] font-bold uppercase tracking-widest px-2 py-1.5"
-                    style={{ color: 'var(--text-faint)' }}>
-                    Tema visual
-                  </p>
-
-                  {THEMES.map(t => {
-                    const isActive = theme === t.id
-                    return (
-                      <button
-                        key={t.id}
-                        onClick={() => { setTheme(t.id); setThemePickerOpen(false) }}
-                        className="w-full flex items-center gap-3 px-2.5 py-2.5 rounded-xl text-left"
-                        style={{
-                          background: isActive ? 'var(--primary-dim)' : 'transparent',
-                          border: `1px solid ${isActive ? 'var(--primary-border)' : 'transparent'}`,
-                          transition: 'background 0.15s, border-color 0.15s',
-                        }}
-                        onMouseEnter={e => {
-                          if (!isActive) (e.currentTarget as HTMLElement).style.background = 'var(--bg-card-hover)'
-                        }}
-                        onMouseLeave={e => {
-                          if (!isActive) (e.currentTarget as HTMLElement).style.background = 'transparent'
-                        }}>
-
-                        {/* Swatch: sidebar strip + 2 color dots */}
-                        <div className="flex-shrink-0 flex items-center gap-1">
-                          <div className="w-2 h-8 rounded" style={{ background: t.preview.sidebar }} />
-                          <div className="flex flex-col gap-1">
-                            <div className="w-3.5 h-3.5 rounded-sm" style={{ background: t.preview.primary }} />
-                            <div className="w-3.5 h-3.5 rounded-sm" style={{ background: t.preview.accent }} />
-                          </div>
-                        </div>
-
-                        {/* Label */}
-                        <div className="flex-1 min-w-0">
-                          <div className="text-xs font-semibold" style={{ color: isActive ? 'var(--primary)' : 'var(--text)' }}>
-                            {t.name}
-                          </div>
-                          <div className="text-[9px] leading-tight mt-0.5 opacity-60" style={{ color: 'var(--text)' }}>
-                            {t.description}
-                          </div>
-                        </div>
-
-                        {/* Active indicator */}
-                        {isActive && (
-                          <div className="flex-shrink-0 w-4 h-4 rounded-full flex items-center justify-center"
-                            style={{ background: 'var(--primary)' }}>
-                            <svg width="8" height="8" viewBox="0 0 8 8" fill="none">
-                              <path d="M1.5 4L3.5 6L6.5 2" stroke="white" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-                            </svg>
-                          </div>
-                        )}
-                      </button>
-                    )
-                  })}
-                </div>
-              </>
-            )}
 
             {isAdmin && (
               <Link href="/dashboard/notifications"
@@ -439,5 +362,86 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         </main>
       </div>
     </div>
+
+    {/* Theme picker — rendered into document.body via Portal so it escapes the
+        header's backdrop-filter stacking context (which otherwise hijacks
+        position:fixed children and positions them relative to the header). */}
+    {mounted && themePickerOpen && createPortal(
+      <>
+        <div
+          className="fixed inset-0"
+          style={{ zIndex: 9998 }}
+          onClick={() => setThemePickerOpen(false)}
+        />
+        <div
+          className="fixed"
+          style={{
+            top: pickerPos.top,
+            right: pickerPos.right,
+            zIndex: 9999,
+            width: 232,
+            background: 'var(--bg-surface)',
+            border: '1px solid var(--border)',
+            borderRadius: 16,
+            boxShadow: '0 24px 64px rgba(0,0,0,0.5)',
+            padding: 10,
+          }}>
+
+          <p className="text-[10px] font-bold uppercase tracking-widest px-2 py-1.5"
+            style={{ color: 'var(--text-faint)' }}>
+            Tema visual
+          </p>
+
+          {THEMES.map(t => {
+            const active = theme === t.id
+            return (
+              <button
+                key={t.id}
+                onClick={() => { setTheme(t.id); setThemePickerOpen(false) }}
+                className="w-full flex items-center gap-3 px-2.5 py-2.5 rounded-xl text-left"
+                style={{
+                  background: active ? 'var(--primary-dim)' : 'transparent',
+                  border: `1px solid ${active ? 'var(--primary-border)' : 'transparent'}`,
+                }}
+                onMouseEnter={e => {
+                  if (!active) (e.currentTarget as HTMLElement).style.background = 'var(--bg-card-hover)'
+                }}
+                onMouseLeave={e => {
+                  if (!active) (e.currentTarget as HTMLElement).style.background = active ? 'var(--primary-dim)' : 'transparent'
+                }}>
+
+                <div className="flex-shrink-0 flex items-center gap-1">
+                  <div className="w-2 h-8 rounded" style={{ background: t.preview.sidebar }} />
+                  <div className="flex flex-col gap-1">
+                    <div className="w-3.5 h-3.5 rounded-sm" style={{ background: t.preview.primary }} />
+                    <div className="w-3.5 h-3.5 rounded-sm" style={{ background: t.preview.accent }} />
+                  </div>
+                </div>
+
+                <div className="flex-1 min-w-0">
+                  <div className="text-xs font-semibold" style={{ color: active ? 'var(--primary)' : 'var(--text)' }}>
+                    {t.name}
+                  </div>
+                  <div className="text-[9px] leading-tight mt-0.5 opacity-60" style={{ color: 'var(--text)' }}>
+                    {t.description}
+                  </div>
+                </div>
+
+                {active && (
+                  <div className="flex-shrink-0 w-4 h-4 rounded-full flex items-center justify-center"
+                    style={{ background: 'var(--primary)' }}>
+                    <svg width="8" height="8" viewBox="0 0 8 8" fill="none">
+                      <path d="M1.5 4L3.5 6L6.5 2" stroke="white" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                    </svg>
+                  </div>
+                )}
+              </button>
+            )
+          })}
+        </div>
+      </>,
+      document.body
+    )}
+    </>
   )
 }
