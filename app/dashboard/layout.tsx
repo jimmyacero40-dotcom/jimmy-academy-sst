@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { usePathname, useRouter } from 'next/navigation'
 import { useSession, signOut } from 'next-auth/react'
 import Link from 'next/link'
@@ -80,7 +80,17 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   const [mobileOpen, setMobileOpen] = useState(false)
   const [searchOpen, setSearchOpen] = useState(false)
   const [themePickerOpen, setThemePickerOpen] = useState(false)
+  const [pickerPos, setPickerPos] = useState({ top: 0, right: 0 })
+  const themeButtonRef = useRef<HTMLButtonElement>(null)
   const { theme, setTheme } = useTheme()
+
+  const openThemePicker = () => {
+    if (themeButtonRef.current) {
+      const r = themeButtonRef.current.getBoundingClientRect()
+      setPickerPos({ top: r.bottom + 8, right: window.innerWidth - r.right })
+    }
+    setThemePickerOpen(o => !o)
+  }
 
   // Ctrl+K / Cmd+K global shortcut
   useEffect(() => {
@@ -308,51 +318,101 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           <div className="flex items-center gap-2">
             {/* Theme picker */}
             <div className="relative">
-              <button onClick={() => setThemePickerOpen(o => !o)}
+              <button
+                ref={themeButtonRef}
+                onClick={openThemePicker}
                 className="w-9 h-9 rounded-lg flex items-center justify-center transition-all"
-                style={{ background: 'var(--bg-card)', border: `1px solid ${themePickerOpen ? 'var(--primary)' : 'var(--border)'}`, color: 'var(--text-dim)' }}
+                style={{
+                  background: themePickerOpen ? 'var(--primary-dim)' : 'var(--bg-card)',
+                  border: `1px solid ${themePickerOpen ? 'var(--primary-border)' : 'var(--border)'}`,
+                  color: themePickerOpen ? 'var(--primary)' : 'var(--text-dim)',
+                }}
                 title="Cambiar tema">
                 <Palette size={17} strokeWidth={2} />
               </button>
-
-              {themePickerOpen && (
-                <>
-                  {/* backdrop */}
-                  <div className="fixed inset-0 z-40" onClick={() => setThemePickerOpen(false)} />
-                  <div className="absolute right-0 top-11 z-50 p-3 rounded-2xl shadow-2xl w-56"
-                    style={{ background: 'var(--bg-surface)', border: '1px solid var(--border)' }}>
-                    <p className="text-[10px] font-bold uppercase tracking-widest mb-2.5 px-1" style={{ color: 'var(--text-faint)' }}>
-                      Tema visual
-                    </p>
-                    <div className="space-y-1">
-                      {THEMES.map(t => (
-                        <button key={t.id} onClick={() => { setTheme(t.id); setThemePickerOpen(false) }}
-                          className="w-full flex items-center gap-2.5 px-2.5 py-2 rounded-xl text-left transition-all"
-                          style={{
-                            background: theme === t.id ? 'var(--primary-dim)' : 'transparent',
-                            border: `1px solid ${theme === t.id ? 'var(--primary-border)' : 'transparent'}`,
-                          }}>
-                          {/* Color swatch */}
-                          <div className="flex gap-0.5 flex-shrink-0">
-                            <div className="w-3.5 h-6 rounded-l-md" style={{ background: t.preview.sidebar }} />
-                            <div className="w-3 h-3 rounded-sm mt-0.5" style={{ background: t.preview.primary }} />
-                          </div>
-                          <div className="min-w-0">
-                            <div className="text-xs font-semibold" style={{ color: theme === t.id ? 'var(--primary)' : 'var(--text)' }}>
-                              {t.name}
-                            </div>
-                            <div className="text-[9px] truncate" style={{ color: 'var(--text-faint)' }}>{t.description}</div>
-                          </div>
-                          {theme === t.id && (
-                            <div className="ml-auto w-1.5 h-1.5 rounded-full flex-shrink-0" style={{ background: 'var(--primary)' }} />
-                          )}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                </>
-              )}
             </div>
+
+            {themePickerOpen && (
+              <>
+                {/* Full-screen backdrop */}
+                <div
+                  className="fixed inset-0"
+                  style={{ zIndex: 9998 }}
+                  onClick={() => setThemePickerOpen(false)}
+                />
+                {/* Picker panel — fixed so it's never clipped */}
+                <div
+                  className="fixed"
+                  style={{
+                    top: pickerPos.top,
+                    right: pickerPos.right,
+                    zIndex: 9999,
+                    width: 232,
+                    background: 'var(--bg-surface)',
+                    border: '1px solid var(--border)',
+                    borderRadius: 16,
+                    boxShadow: '0 24px 64px rgba(0,0,0,0.5)',
+                    padding: 10,
+                  }}>
+
+                  <p className="text-[10px] font-bold uppercase tracking-widest px-2 py-1.5"
+                    style={{ color: 'var(--text-faint)' }}>
+                    Tema visual
+                  </p>
+
+                  {THEMES.map(t => {
+                    const isActive = theme === t.id
+                    return (
+                      <button
+                        key={t.id}
+                        onClick={() => { setTheme(t.id); setThemePickerOpen(false) }}
+                        className="w-full flex items-center gap-3 px-2.5 py-2.5 rounded-xl text-left"
+                        style={{
+                          background: isActive ? 'var(--primary-dim)' : 'transparent',
+                          border: `1px solid ${isActive ? 'var(--primary-border)' : 'transparent'}`,
+                          transition: 'background 0.15s, border-color 0.15s',
+                        }}
+                        onMouseEnter={e => {
+                          if (!isActive) (e.currentTarget as HTMLElement).style.background = 'var(--bg-card-hover)'
+                        }}
+                        onMouseLeave={e => {
+                          if (!isActive) (e.currentTarget as HTMLElement).style.background = 'transparent'
+                        }}>
+
+                        {/* Swatch: sidebar strip + 2 color dots */}
+                        <div className="flex-shrink-0 flex items-center gap-1">
+                          <div className="w-2 h-8 rounded" style={{ background: t.preview.sidebar }} />
+                          <div className="flex flex-col gap-1">
+                            <div className="w-3.5 h-3.5 rounded-sm" style={{ background: t.preview.primary }} />
+                            <div className="w-3.5 h-3.5 rounded-sm" style={{ background: t.preview.accent }} />
+                          </div>
+                        </div>
+
+                        {/* Label */}
+                        <div className="flex-1 min-w-0">
+                          <div className="text-xs font-semibold" style={{ color: isActive ? 'var(--primary)' : 'var(--text)' }}>
+                            {t.name}
+                          </div>
+                          <div className="text-[9px] leading-tight mt-0.5 opacity-60" style={{ color: 'var(--text)' }}>
+                            {t.description}
+                          </div>
+                        </div>
+
+                        {/* Active indicator */}
+                        {isActive && (
+                          <div className="flex-shrink-0 w-4 h-4 rounded-full flex items-center justify-center"
+                            style={{ background: 'var(--primary)' }}>
+                            <svg width="8" height="8" viewBox="0 0 8 8" fill="none">
+                              <path d="M1.5 4L3.5 6L6.5 2" stroke="white" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                            </svg>
+                          </div>
+                        )}
+                      </button>
+                    )
+                  })}
+                </div>
+              </>
+            )}
 
             {isAdmin && (
               <Link href="/dashboard/notifications"
