@@ -71,8 +71,21 @@ export default function MyPlanPage() {
     Promise.all([
       fetch('/api/enrollments').then(r => r.ok ? r.json() : []),
       fetch('/api/certificates').then(r => r.ok ? r.json() : []),
-    ]).then(([enr, c]) => {
-      setEnrollments(enr)
+    ]).then(([enr, c]: [Enrollment[], Certificate[]]) => {
+      // If a certificate exists for a training title, mark that enrollment as
+      // completed regardless of what the DB status says. This corrects enrollments
+      // that stayed in_progress because training_id was missing from the cert POST.
+      const certTitles = new Set<string>(c.map(cert => cert.course.trim().toLowerCase()))
+      const corrected = enr.map(e => {
+        if (
+          (e.status === 'in_progress' || e.status === 'pending') &&
+          certTitles.has(e.trainings.title.trim().toLowerCase())
+        ) {
+          return { ...e, status: 'completed' as const }
+        }
+        return e
+      })
+      setEnrollments(corrected)
       setCerts(c)
       setLoading(false)
     })
@@ -549,7 +562,7 @@ function CertCard({ cert, index }: { cert: Certificate; index: number }) {
         </div>
       </div>
       <button
-        onClick={() => router.push(`/dashboard/certificates/${cert.id}`)}
+        onClick={() => router.push('/dashboard/certificates')}
         className="text-[11px] font-semibold px-3 py-1.5 rounded-lg flex-shrink-0 transition-all"
         style={{ background: 'rgba(251,191,36,0.08)', color: '#FBBF24', border: '1px solid rgba(251,191,36,0.2)' }}>
         Ver

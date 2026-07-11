@@ -491,6 +491,7 @@ export default function TrainingDetailPage() {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
+            training_id: courseId,
             code: certCode,
             name: employeeName.trim(),
             cedula: employeeCedula.trim(),

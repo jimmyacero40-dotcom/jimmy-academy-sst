@@ -77,6 +77,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   const isSuperAdmin = userRole === 'superadmin'
 
   const [activeCompany, setActiveCompany] = useState<{ name: string; logo_url?: string; color?: string } | null>(null)
+  const [workerDisplayName, setWorkerDisplayName] = useState<string | null>(null)
   const [collapsed, setCollapsed] = useState(false)
   const [mobileOpen, setMobileOpen] = useState(false)
   const [searchOpen, setSearchOpen] = useState(false)
@@ -127,6 +128,19 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         })
     }
   }, [])
+
+  // Load worker's first name from their profile so the greeting shows the real name,
+  // not whatever was stored in the users.name column at registration.
+  useEffect(() => {
+    if (isAdmin) return
+    fetch('/api/profile')
+      .then(r => r.ok ? r.json() : {})
+      .then((d: any) => {
+        const first = d?.nombres?.trim()
+        if (first) setWorkerDisplayName(first)
+      })
+      .catch(() => {})
+  }, [isAdmin])
 
   useEffect(() => { setMounted(true) }, [])
   useEffect(() => { setMobileOpen(false) }, [pathname])
@@ -313,7 +327,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
             ) : (
               <div className="flex items-center gap-2">
                 <div className="text-sm font-semibold" style={{ color: 'var(--text)' }}>
-                  Bienvenido, {session?.user?.name?.split(' ')[0] ?? 'trabajador'}
+                  Bienvenido, {workerDisplayName ?? session?.user?.name ?? session?.user?.email?.split('@')[0] ?? 'trabajador'}
                 </div>
               </div>
             )}
