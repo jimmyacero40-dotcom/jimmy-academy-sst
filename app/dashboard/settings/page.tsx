@@ -6,11 +6,13 @@ import { motion } from 'framer-motion'
 import {
   Settings, Building2, Bell, Shield, Globe, Palette,
   Save, ChevronRight, Moon, Mail, Phone, MapPin,
-  FileText, Lock, Users, Database, CheckCircle, User
+  FileText, Lock, Users, Database, CheckCircle, User, Check
 } from 'lucide-react'
+import { useTheme, THEMES, type ThemeId } from '@/components/ThemeProvider'
 
 const ADMIN_SECTIONS = [
   { id: 'empresa', label: 'Empresa', icon: Building2 },
+  { id: 'tema', label: 'Tema Visual', icon: Palette },
   { id: 'notificaciones', label: 'Notificaciones', icon: Bell },
   { id: 'seguridad', label: 'Seguridad', icon: Shield },
   { id: 'sistema', label: 'Sistema', icon: Settings },
@@ -43,8 +45,26 @@ export default function SettingsPage() {
 
   const [active, setActive] = useState('')
   const [saved, setSaved] = useState(false)
+  const [themeSaving, setThemeSaving] = useState(false)
+  const [themeSaved, setThemeSaved] = useState(false)
+  const { theme, setTheme } = useTheme()
 
   const effectiveActive = active || (isWorker ? 'perfil' : 'empresa')
+
+  const handleThemeChange = async (id: ThemeId) => {
+    setTheme(id)
+    setThemeSaving(true)
+    try {
+      await fetch('/api/companies/theme', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ theme: id }),
+      })
+      setThemeSaved(true)
+      setTimeout(() => setThemeSaved(false), 2000)
+    } catch (_) {}
+    setThemeSaving(false)
+  }
 
   const save = () => {
     setSaved(true)
@@ -202,6 +222,117 @@ export default function SettingsPage() {
                     </div>
                     <Toggle defaultOn={false} />
                   </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {effectiveActive === 'tema' && (
+            <div className="space-y-5">
+              {/* Header */}
+              <div className="rounded-2xl p-5" style={{ background: 'var(--bg-surface)', border: '1px solid var(--border)' }}>
+                <div className="flex items-center justify-between mb-1">
+                  <h2 className="font-bold flex items-center gap-2" style={{ color: 'var(--text)' }}>
+                    <Palette size={16} style={{ color: 'var(--primary)' }} /> Identidad Visual
+                  </h2>
+                  {themeSaved && (
+                    <span className="flex items-center gap-1 text-xs font-semibold" style={{ color: 'var(--accent)' }}>
+                      <Check size={12} /> Guardado
+                    </span>
+                  )}
+                  {themeSaving && (
+                    <span className="text-xs" style={{ color: 'var(--text-faint)' }}>Guardando...</span>
+                  )}
+                </div>
+                <p className="text-sm mb-5" style={{ color: 'var(--text-dim)' }}>
+                  El tema seleccionado aplica a toda la plataforma y se guarda por empresa.
+                </p>
+
+                <div className="grid sm:grid-cols-2 gap-3">
+                  {THEMES.map(t => {
+                    const isActive = theme === t.id
+                    return (
+                      <button key={t.id} onClick={() => handleThemeChange(t.id)}
+                        className="relative text-left rounded-2xl p-4 transition-all overflow-hidden"
+                        style={{
+                          background: t.preview.bg,
+                          border: `2px solid ${isActive ? t.preview.primary : 'rgba(255,255,255,0.06)'}`,
+                          boxShadow: isActive ? `0 0 0 4px ${t.preview.primary}22` : 'none',
+                        }}>
+
+                        {/* Active check */}
+                        {isActive && (
+                          <div className="absolute top-3 right-3 w-5 h-5 rounded-full flex items-center justify-center"
+                            style={{ background: t.preview.primary }}>
+                            <Check size={11} color="white" strokeWidth={3} />
+                          </div>
+                        )}
+
+                        {/* Mini UI preview */}
+                        <div className="flex gap-2 mb-3">
+                          {/* Sidebar */}
+                          <div className="w-6 rounded-md flex flex-col gap-1 p-1" style={{ background: t.preview.sidebar }}>
+                            <div className="w-full h-1 rounded-sm" style={{ background: t.preview.primary, opacity: 0.9 }} />
+                            <div className="w-full h-1 rounded-sm" style={{ background: 'rgba(255,255,255,0.12)' }} />
+                            <div className="w-full h-1 rounded-sm" style={{ background: 'rgba(255,255,255,0.12)' }} />
+                            <div className="w-full h-1 rounded-sm" style={{ background: 'rgba(255,255,255,0.12)' }} />
+                          </div>
+                          {/* Content */}
+                          <div className="flex-1 flex flex-col gap-1.5">
+                            <div className="h-2 rounded" style={{ background: 'rgba(255,255,255,0.1)', width: '70%' }} />
+                            <div className="flex gap-1">
+                              <div className="h-5 flex-1 rounded" style={{ background: t.preview.primary, opacity: 0.8 }} />
+                              <div className="h-5 flex-1 rounded" style={{ background: t.preview.accent, opacity: 0.6 }} />
+                            </div>
+                            <div className="flex gap-1">
+                              <div className="h-4 w-1/3 rounded-sm" style={{ background: 'rgba(255,255,255,0.08)' }} />
+                              <div className="h-4 flex-1 rounded-sm" style={{ background: 'rgba(255,255,255,0.05)' }} />
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Theme name + description */}
+                        <div className="font-bold text-sm" style={{ color: t.preview.primary }}>
+                          {t.name}
+                        </div>
+                        <div className="text-[10px] mt-0.5" style={{ color: 'rgba(255,255,255,0.45)' }}>
+                          {t.description}
+                        </div>
+
+                        {/* Color dots */}
+                        <div className="flex gap-1.5 mt-2.5">
+                          {[t.preview.primary, t.preview.accent, t.preview.sidebar, t.preview.bg].map((c, i) => (
+                            <div key={i} className="w-3 h-3 rounded-full border border-white/10"
+                              style={{ background: c }} />
+                          ))}
+                        </div>
+                      </button>
+                    )
+                  })}
+                </div>
+              </div>
+
+              {/* Token preview */}
+              <div className="rounded-2xl p-5" style={{ background: 'var(--bg-surface)', border: '1px solid var(--border)' }}>
+                <h3 className="font-semibold text-sm mb-3" style={{ color: 'var(--text)' }}>Vista previa — tema actual</h3>
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                  {[
+                    { label: 'Primary', bg: 'var(--primary)', text: '#fff' },
+                    { label: 'Accent', bg: 'var(--accent)', text: '#fff' },
+                    { label: 'Surface', bg: 'var(--bg-surface)', text: 'var(--text)', border: true },
+                    { label: 'Card', bg: 'var(--bg-card)', text: 'var(--text)', border: true },
+                  ].map(({ label, bg, text, border }) => (
+                    <div key={label} className="rounded-xl p-3 flex flex-col gap-1"
+                      style={{ background: bg, border: border ? '1px solid var(--border)' : 'none' }}>
+                      <div className="w-full h-1 rounded-full" style={{ background: text, opacity: 0.3 }} />
+                      <div className="text-[10px] font-semibold mt-1" style={{ color: text, opacity: 0.7 }}>{label}</div>
+                    </div>
+                  ))}
+                </div>
+                <div className="mt-3 flex flex-wrap gap-2">
+                  <button className="terra-btn text-xs py-2 px-4">Botón primario</button>
+                  <button className="terra-btn-outline text-xs py-2 px-4">Botón outline</button>
+                  <input className="terra-input text-xs py-2" style={{ width: 160 }} placeholder="Input de texto..." readOnly />
                 </div>
               </div>
             </div>

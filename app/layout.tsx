@@ -1,6 +1,7 @@
 import type { Metadata } from 'next'
 import './globals.css'
 import SessionProviderWrapper from '@/components/SessionProviderWrapper'
+import { ThemeProvider } from '@/components/ThemeProvider'
 
 export const metadata: Metadata = {
   title: 'Jimmy Academy SST — Plataforma #1 en Colombia para SG-SST',
@@ -28,13 +29,16 @@ export default function RootLayout({
           (function(){
             try {
               var t = localStorage.getItem('sst-theme');
-              if (t === 'light' || t === 'dark') document.documentElement.setAttribute('data-theme', t);
+              var valid = ['dark','light','navy','verde','academy'];
+              if (t && valid.indexOf(t) !== -1) document.documentElement.setAttribute('data-theme', t);
             } catch(e) {}
           })();
         `}} />
       </head>
       <body className="antialiased">
-        <SessionProviderWrapper>{children}</SessionProviderWrapper>
+        <SessionProviderWrapper>
+          <ThemeProvider>{children}</ThemeProvider>
+        </SessionProviderWrapper>
       </body>
     </html>
   )

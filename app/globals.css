@@ -4,22 +4,41 @@
 @tailwind components;
 @tailwind utilities;
 
-/* ═══════════════════════════════════════════
-   CAMPUS SST — DESIGN SYSTEM (BLUE)
-   ═══════════════════════════════════════════ */
+/* ═══════════════════════════════════════════════════════════════════
+   JIMMY ACADEMY — DESIGN SYSTEM
+   Full theme system via [data-theme] CSS variables.
+   Components NEVER hardcode colors — always use variables.
+   ═══════════════════════════════════════════════════════════════════ */
 
+/* ── Shared structural tokens (never change across themes) ────────── */
 :root {
+  --font-display: 'Fraunces', Georgia, serif;
+  --font-body:    'Plus Jakarta Sans', system-ui, sans-serif;
+  --radius:       14px;
+  --radius-sm:    8px;
+  --radius-lg:    20px;
+  --radius-xl:    28px;
+  --red:          #EF4444;
+  --red-dim:      rgba(239,68,68,0.12);
+  --glow-red:     0 0 40px rgba(239,68,68,0.15);
+  /* success / warning shared semantics */
+  --success:      #10B981;
+  --warning:      #F59E0B;
+  --danger:       #EF4444;
+  --info:         #60A5FA;
+}
+
+/* ── TEMA 1: Dark (default — azul profundo) ───────────────────────── */
+:root,
+[data-theme="dark"] {
   --primary:        #3B82F6;
   --primary-light:  #93C5FD;
-  --primary-dim:    rgba(59,130,246,0.15);
-  --primary-border: rgba(59,130,246,0.18);
+  --primary-dim:    rgba(59,130,246,0.12);
+  --primary-border: rgba(59,130,246,0.22);
 
   --accent:         #10B981;
   --accent-dim:     rgba(16,185,129,0.12);
   --accent-border:  rgba(16,185,129,0.22);
-
-  --red:            #EF4444;
-  --red-dim:        rgba(239,68,68,0.12);
 
   --bg:             #060E1E;
   --bg-surface:     #0A1628;
@@ -33,36 +52,37 @@
   --text-dim:       rgba(238,242,255,0.55);
   --text-faint:     rgba(238,242,255,0.28);
 
-  --font-display:   'Fraunces', Georgia, serif;
-  --font-body:      'Plus Jakarta Sans', system-ui, sans-serif;
-
   --grad-main:      linear-gradient(135deg, #3B82F6, #10B981);
   --grad-subtle:    linear-gradient(135deg, rgba(59,130,246,0.15), rgba(16,185,129,0.08));
 
   --glow-primary:   0 0 40px rgba(59,130,246,0.2);
   --glow-accent:    0 0 40px rgba(16,185,129,0.15);
 
-  /* legacy aliases so old references don't break */
+  --header-bg:      rgba(6,14,30,0.88);
+
+  /* legacy aliases */
   --amber:          #3B82F6;
   --amber-light:    #93C5FD;
-  --amber-dim:      rgba(59,130,246,0.15);
-  --amber-border:   rgba(59,130,246,0.18);
+  --amber-dim:      rgba(59,130,246,0.12);
+  --amber-border:   rgba(59,130,246,0.22);
   --glow-amber:     0 0 40px rgba(59,130,246,0.2);
-  --glow-red:       0 0 40px rgba(239,68,68,0.15);
-
-  --header-bg:      rgba(6,14,30,0.85);
-
-  --radius:         14px;
-  --radius-sm:      8px;
-  --radius-lg:      20px;
-  --radius-xl:      28px;
 }
 
+/* ── TEMA 2: Light (claro — azul limpio) ─────────────────────────── */
 [data-theme="light"] {
+  --primary:        #2563EB;
+  --primary-light:  #93C5FD;
+  --primary-dim:    rgba(37,99,235,0.08);
+  --primary-border: rgba(37,99,235,0.22);
+
+  --accent:         #059669;
+  --accent-dim:     rgba(5,150,105,0.1);
+  --accent-border:  rgba(5,150,105,0.22);
+
   --bg:             #F0F4FF;
   --bg-surface:     #FFFFFF;
-  --bg-card:        rgba(59,130,246,0.04);
-  --bg-card-hover:  rgba(59,130,246,0.09);
+  --bg-card:        rgba(37,99,235,0.04);
+  --bg-card-hover:  rgba(37,99,235,0.09);
 
   --border:         rgba(0,0,0,0.08);
   --border-strong:  rgba(0,0,0,0.16);
@@ -71,18 +91,140 @@
   --text-dim:       rgba(15,23,42,0.6);
   --text-faint:     rgba(15,23,42,0.35);
 
-  --header-bg:      rgba(255,255,255,0.88);
+  --grad-main:      linear-gradient(135deg, #2563EB, #059669);
+  --grad-subtle:    linear-gradient(135deg, rgba(37,99,235,0.1), rgba(5,150,105,0.05));
 
-  --grad-subtle:    linear-gradient(135deg, rgba(59,130,246,0.10), rgba(16,185,129,0.05));
-  --glow-primary:   0 0 40px rgba(59,130,246,0.12);
-  --glow-accent:    0 0 40px rgba(16,185,129,0.08);
+  --glow-primary:   0 0 40px rgba(37,99,235,0.12);
+  --glow-accent:    0 0 40px rgba(5,150,105,0.08);
+
+  --header-bg:      rgba(255,255,255,0.92);
 
   --amber:          #2563EB;
-  --amber-dim:      rgba(37,99,235,0.1);
-  --amber-border:   rgba(37,99,235,0.18);
+  --amber-light:    #93C5FD;
+  --amber-dim:      rgba(37,99,235,0.08);
+  --amber-border:   rgba(37,99,235,0.22);
   --glow-amber:     0 0 40px rgba(37,99,235,0.12);
   --glow-red:       0 0 40px rgba(239,68,68,0.08);
+  --red-dim:        rgba(239,68,68,0.08);
 }
+
+/* ── TEMA 3: Navy (SaaS Premium — índigo/cian) ───────────────────── */
+[data-theme="navy"] {
+  --primary:        #818CF8;
+  --primary-light:  #C7D2FE;
+  --primary-dim:    rgba(129,140,248,0.12);
+  --primary-border: rgba(129,140,248,0.22);
+
+  --accent:         #22D3EE;
+  --accent-dim:     rgba(34,211,238,0.1);
+  --accent-border:  rgba(34,211,238,0.22);
+
+  --bg:             #07090F;
+  --bg-surface:     #0D1117;
+  --bg-card:        rgba(129,140,248,0.04);
+  --bg-card-hover:  rgba(129,140,248,0.09);
+
+  --border:         rgba(129,140,248,0.1);
+  --border-strong:  rgba(129,140,248,0.25);
+
+  --text:           #E8EAFF;
+  --text-dim:       rgba(232,234,255,0.55);
+  --text-faint:     rgba(232,234,255,0.28);
+
+  --grad-main:      linear-gradient(135deg, #818CF8, #22D3EE);
+  --grad-subtle:    linear-gradient(135deg, rgba(129,140,248,0.14), rgba(34,211,238,0.06));
+
+  --glow-primary:   0 0 40px rgba(129,140,248,0.22);
+  --glow-accent:    0 0 40px rgba(34,211,238,0.15);
+
+  --header-bg:      rgba(7,9,15,0.90);
+
+  --amber:          #818CF8;
+  --amber-light:    #C7D2FE;
+  --amber-dim:      rgba(129,140,248,0.12);
+  --amber-border:   rgba(129,140,248,0.22);
+  --glow-amber:     0 0 40px rgba(129,140,248,0.2);
+}
+
+/* ── TEMA 4: Verde Agro (bosque oscuro — esmeralda/ámbar) ─────────── */
+[data-theme="verde"] {
+  --primary:        #10B981;
+  --primary-light:  #6EE7B7;
+  --primary-dim:    rgba(16,185,129,0.12);
+  --primary-border: rgba(16,185,129,0.22);
+
+  --accent:         #F59E0B;
+  --accent-dim:     rgba(245,158,11,0.1);
+  --accent-border:  rgba(245,158,11,0.22);
+
+  --bg:             #051208;
+  --bg-surface:     #0A1C0F;
+  --bg-card:        rgba(16,185,129,0.04);
+  --bg-card-hover:  rgba(16,185,129,0.09);
+
+  --border:         rgba(16,185,129,0.1);
+  --border-strong:  rgba(16,185,129,0.25);
+
+  --text:           #ECFDF5;
+  --text-dim:       rgba(236,253,245,0.55);
+  --text-faint:     rgba(236,253,245,0.28);
+
+  --grad-main:      linear-gradient(135deg, #10B981, #F59E0B);
+  --grad-subtle:    linear-gradient(135deg, rgba(16,185,129,0.14), rgba(245,158,11,0.06));
+
+  --glow-primary:   0 0 40px rgba(16,185,129,0.22);
+  --glow-accent:    0 0 40px rgba(245,158,11,0.15);
+
+  --header-bg:      rgba(5,18,8,0.90);
+
+  --amber:          #10B981;
+  --amber-light:    #6EE7B7;
+  --amber-dim:      rgba(16,185,129,0.12);
+  --amber-border:   rgba(16,185,129,0.22);
+  --glow-amber:     0 0 40px rgba(16,185,129,0.2);
+}
+
+/* ── TEMA 5: Academy (educativo — violeta/rosa) ──────────────────── */
+[data-theme="academy"] {
+  --primary:        #A78BFA;
+  --primary-light:  #DDD6FE;
+  --primary-dim:    rgba(167,139,250,0.12);
+  --primary-border: rgba(167,139,250,0.22);
+
+  --accent:         #F472B6;
+  --accent-dim:     rgba(244,114,182,0.1);
+  --accent-border:  rgba(244,114,182,0.22);
+
+  --bg:             #0C0814;
+  --bg-surface:     #130D20;
+  --bg-card:        rgba(167,139,250,0.04);
+  --bg-card-hover:  rgba(167,139,250,0.09);
+
+  --border:         rgba(167,139,250,0.1);
+  --border-strong:  rgba(167,139,250,0.25);
+
+  --text:           #F5F0FF;
+  --text-dim:       rgba(245,240,255,0.55);
+  --text-faint:     rgba(245,240,255,0.28);
+
+  --grad-main:      linear-gradient(135deg, #A78BFA, #F472B6);
+  --grad-subtle:    linear-gradient(135deg, rgba(167,139,250,0.14), rgba(244,114,182,0.06));
+
+  --glow-primary:   0 0 40px rgba(167,139,250,0.22);
+  --glow-accent:    0 0 40px rgba(244,114,182,0.15);
+
+  --header-bg:      rgba(12,8,20,0.90);
+
+  --amber:          #A78BFA;
+  --amber-light:    #DDD6FE;
+  --amber-dim:      rgba(167,139,250,0.12);
+  --amber-border:   rgba(167,139,250,0.22);
+  --glow-amber:     0 0 40px rgba(167,139,250,0.2);
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   BASE STYLES
+   ═══════════════════════════════════════════════════════════════════ */
 
 * { box-sizing: border-box; margin: 0; padding: 0; }
 
@@ -97,14 +239,18 @@ body {
 /* ── SCROLLBAR ── */
 ::-webkit-scrollbar { width: 4px; height: 4px; }
 ::-webkit-scrollbar-track { background: transparent; }
-::-webkit-scrollbar-thumb { background: rgba(59,130,246,0.25); border-radius: 4px; }
-::-webkit-scrollbar-thumb:hover { background: rgba(59,130,246,0.45); }
+::-webkit-scrollbar-thumb { background: var(--primary-dim); border-radius: 4px; }
+::-webkit-scrollbar-thumb:hover { background: var(--primary-border); }
 
-/* ── TYPOGRAPHY HELPERS ── */
-.display { font-family: var(--font-display); font-weight: 900; }
+/* ── TYPOGRAPHY ── */
+.display        { font-family: var(--font-display); font-weight: 900; }
 .display-italic { font-family: var(--font-display); font-style: italic; font-weight: 700; }
 
-/* ── TERRA COMPONENTS ── */
+/* ═══════════════════════════════════════════════════════════════════
+   COMPONENT LIBRARY — all colors via variables
+   ═══════════════════════════════════════════════════════════════════ */
+
+/* ── CARD ── */
 .terra-card {
   background: var(--bg-card);
   border: 1px solid var(--border);
@@ -115,12 +261,12 @@ body {
   background: var(--bg-card-hover);
   border-color: var(--border-strong);
 }
-
 .terra-card-lift:hover {
   transform: translateY(-4px);
-  box-shadow: 0 16px 48px rgba(59,130,246,0.12);
+  box-shadow: 0 16px 48px var(--primary-dim);
 }
 
+/* ── BUTTONS ── */
 .terra-btn {
   background: var(--grad-main);
   color: white;
@@ -138,19 +284,21 @@ body {
 }
 .terra-btn:hover {
   transform: translateY(-2px);
-  box-shadow: 0 12px 32px rgba(59,130,246,0.3);
+  box-shadow: 0 12px 32px var(--primary-dim);
+  filter: brightness(1.1);
 }
 .terra-btn:disabled {
   opacity: 0.4;
   cursor: not-allowed;
   transform: none;
   box-shadow: none;
+  filter: none;
 }
 
 .terra-btn-outline {
   background: transparent;
-  color: rgba(59,130,246,0.85);
-  border: 1px solid rgba(59,130,246,0.28);
+  color: var(--primary);
+  border: 1px solid var(--primary-border);
   border-radius: var(--radius);
   padding: 12px 28px;
   font-family: var(--font-body);
@@ -168,8 +316,9 @@ body {
   background: var(--primary-dim);
 }
 
+/* ── INPUT ── */
 .terra-input {
-  background: rgba(59,130,246,0.04);
+  background: var(--primary-dim);
   border: 1px solid var(--border);
   border-radius: var(--radius-sm);
   padding: 10px 16px;
@@ -181,26 +330,18 @@ body {
   width: 100%;
 }
 .terra-input:focus {
-  border-color: rgba(59,130,246,0.5);
-  background: rgba(59,130,246,0.07);
+  border-color: var(--primary-border);
+  background: var(--bg-card-hover);
 }
 .terra-input::placeholder { color: var(--text-faint); }
-/* Dark-mode select: force OS-native dropdown to use dark colors */
-select {
-  color-scheme: dark;
-}
-select option {
-  background: #111827;
-  color: #F1F5F9;
-}
-[data-theme="light"] select {
-  color-scheme: light;
-}
-[data-theme="light"] select option {
-  background: #FFFFFF;
-  color: #0F172A;
-}
 
+/* ── SELECT color-scheme ── */
+select { color-scheme: dark; }
+select option { background: var(--bg-surface); color: var(--text); }
+[data-theme="light"] select  { color-scheme: light; }
+[data-theme="light"] select option { background: #FFFFFF; color: #0F172A; }
+
+/* ── TAG ── */
 .terra-tag {
   display: inline-flex;
   align-items: center;
@@ -220,19 +361,19 @@ select option {
   flex-shrink: 0;
 }
 
-/* ── BADGE ── */
-.badge-amber { background: rgba(59,130,246,0.12); border: 1px solid rgba(59,130,246,0.25); color: #93C5FD; font-size: 11px; font-weight: 600; padding: 3px 10px; border-radius: 100px; }
-.badge-green  { background: rgba(16,185,129,0.12); border: 1px solid rgba(16,185,129,0.25); color: #6EE7B7; font-size: 11px; font-weight: 600; padding: 3px 10px; border-radius: 100px; }
-.badge-red    { background: rgba(239,68,68,0.12);  border: 1px solid rgba(239,68,68,0.25);  color: #FCA5A5; font-size: 11px; font-weight: 600; padding: 3px 10px; border-radius: 100px; }
-.badge-blue   { background: rgba(59,130,246,0.12); border: 1px solid rgba(59,130,246,0.25); color: #93C5FD; font-size: 11px; font-weight: 600; padding: 3px 10px; border-radius: 100px; }
+/* ── BADGES ── */
+.badge-amber { background: var(--primary-dim);  border: 1px solid var(--primary-border); color: var(--primary-light); font-size: 11px; font-weight: 600; padding: 3px 10px; border-radius: 100px; }
+.badge-green  { background: var(--accent-dim);   border: 1px solid var(--accent-border);  color: var(--accent);       font-size: 11px; font-weight: 600; padding: 3px 10px; border-radius: 100px; }
+.badge-red    { background: var(--red-dim,rgba(239,68,68,0.12)); border: 1px solid rgba(239,68,68,0.25); color: #FCA5A5; font-size: 11px; font-weight: 600; padding: 3px 10px; border-radius: 100px; }
+.badge-blue   { background: var(--primary-dim);  border: 1px solid var(--primary-border); color: var(--primary-light); font-size: 11px; font-weight: 600; padding: 3px 10px; border-radius: 100px; }
 
 /* ── PROGRESS BAR ── */
 .terra-progress-track { height: 6px; background: var(--border); border-radius: 100px; overflow: hidden; }
-.terra-progress-fill  { height: 100%; border-radius: 100px; transition: width 1s ease; }
+.terra-progress-fill  { height: 100%; border-radius: 100px; background: var(--grad-main); transition: width 1s ease; }
 
 /* ── GLOW EFFECTS ── */
 .glow-amber   { box-shadow: var(--glow-primary); }
-.glow-red     { box-shadow: var(--glow-accent); }
+.glow-red     { box-shadow: var(--glow-red,0 0 40px rgba(239,68,68,0.15)); }
 .glow-primary { box-shadow: var(--glow-primary); }
 
 /* ── NAV LINK ── */
@@ -250,8 +391,8 @@ select option {
   text-decoration: none;
   border: 1px solid transparent;
 }
-.nav-item:hover  { background: rgba(59,130,246,0.07); color: var(--text); }
-.nav-item.active { background: rgba(59,130,246,0.12); color: var(--primary); border-color: rgba(59,130,246,0.22); font-weight: 600; }
+.nav-item:hover  { background: var(--bg-card-hover); color: var(--text); }
+.nav-item.active { background: var(--primary-dim); color: var(--primary); border-color: var(--primary-border); font-weight: 600; }
 
 /* ── STAT CARD ── */
 .stat-card {
@@ -264,45 +405,63 @@ select option {
 .stat-card:hover { background: var(--bg-card-hover); border-color: var(--border-strong); }
 
 /* ── TABLE ── */
-.terra-table th { font-size: 10px; font-weight: 700; letter-spacing: 1.5px; text-transform: uppercase; color: var(--text-faint); padding: 12px 20px; text-align: left; border-bottom: 1px solid var(--border); }
-.terra-table th.text-center { text-align: center; }
-.terra-table td { padding: 14px 20px; border-bottom: 1px solid rgba(59,130,246,0.05); font-size: 13px; }
-.terra-table tr:hover td { background: rgba(59,130,246,0.02); }
-
-/* ── ANIMATIONS ── */
-@keyframes fadeUp   { from { opacity:0; transform:translateY(20px); } to { opacity:1; transform:translateY(0); } }
-@keyframes fadeIn   { from { opacity:0; } to { opacity:1; } }
-@keyframes shimmer  { 0%{background-position:200% center} 100%{background-position:-200% center} }
-@keyframes pulse-dot{ 0%,100%{opacity:1} 50%{opacity:.3} }
-@keyframes marquee  { from{transform:translateX(0)} to{transform:translateX(-50%)} }
-
-.fade-up   { animation: fadeUp .6s ease both; }
-.fade-in   { animation: fadeIn .5s ease both; }
-.animate-marquee { animation: marquee 24s linear infinite; }
-.animate-pulse-dot { animation: pulse-dot 2s infinite; }
-
-[data-theme="light"] .divide-white\/5 > :not([hidden]) ~ :not([hidden]) {
-  border-color: rgba(0,0,0,0.06);
+.terra-table th {
+  font-size: 10px; font-weight: 700; letter-spacing: 1.5px; text-transform: uppercase;
+  color: var(--text-faint); padding: 12px 20px; text-align: left;
+  border-bottom: 1px solid var(--border);
 }
+.terra-table th.text-center { text-align: center; }
+.terra-table td { padding: 14px 20px; border-bottom: 1px solid var(--border); font-size: 13px; }
+.terra-table tr:hover td { background: var(--bg-card-hover); }
+
+/* ═══════════════════════════════════════════════════════════════════
+   ANIMATIONS
+   ═══════════════════════════════════════════════════════════════════ */
+@keyframes fadeUp    { from { opacity:0; transform:translateY(20px); } to { opacity:1; transform:translateY(0); } }
+@keyframes fadeIn    { from { opacity:0; } to { opacity:1; } }
+@keyframes shimmer   { 0%{background-position:200% center} 100%{background-position:-200% center} }
+@keyframes pulse-dot { 0%,100%{opacity:1} 50%{opacity:.3} }
+@keyframes marquee   { from{transform:translateX(0)} to{transform:translateX(-50%)} }
+@keyframes theme-in  { from{opacity:0;transform:scale(0.98)} to{opacity:1;transform:scale(1)} }
+
+.fade-up          { animation: fadeUp .6s ease both; }
+.fade-in          { animation: fadeIn .5s ease both; }
+.animate-marquee  { animation: marquee 24s linear infinite; }
+.animate-pulse-dot{ animation: pulse-dot 2s infinite; }
+
+/* smooth color transitions when switching themes */
+*,*::before,*::after {
+  transition-property: background-color, border-color, color, box-shadow;
+  transition-duration: 200ms;
+  transition-timing-function: ease;
+}
+/* but don't slow down layout transitions */
+.terra-card, .terra-btn, .terra-btn-outline, .terra-input, .nav-item {
+  transition: background .25s, border-color .25s, color .2s, transform .25s, box-shadow .25s, filter .2s;
+}
+
+/* ── Light-mode Tailwind overrides ── */
+[data-theme="light"] .divide-white\/5 > :not([hidden]) ~ :not([hidden]) { border-color: rgba(0,0,0,0.06); }
 [data-theme="light"] .bg-white\/5  { background: rgba(0,0,0,0.04) !important; }
 [data-theme="light"] .bg-white\/8  { background: rgba(0,0,0,0.06) !important; }
 [data-theme="light"] .bg-white\/10 { background: rgba(0,0,0,0.06) !important; }
 [data-theme="light"] .bg-black\/60 { background: rgba(0,0,0,0.4) !important; }
-[data-theme="light"] .terra-card { color: #0F172A; }
-[data-theme="light"] .terra-card .text-white { color: #0F172A !important; }
+[data-theme="light"] .terra-card   { color: #0F172A; }
+[data-theme="light"] .terra-card .text-white              { color: #0F172A !important; }
 [data-theme="light"] .terra-card .text-white\/60,
 [data-theme="light"] .terra-card .text-white\/70,
 [data-theme="light"] .terra-card .text-white\/80,
-[data-theme="light"] .terra-card .text-white\/90 { color: rgba(15,23,42,0.7) !important; }
+[data-theme="light"] .terra-card .text-white\/90          { color: rgba(15,23,42,0.7) !important; }
 [data-theme="light"] .terra-card .text-white\/30,
 [data-theme="light"] .terra-card .text-white\/40,
-[data-theme="light"] .terra-card .text-white\/50 { color: rgba(15,23,42,0.5) !important; }
+[data-theme="light"] .terra-card .text-white\/50          { color: rgba(15,23,42,0.5) !important; }
 [data-theme="light"] .text-white\/60,
 [data-theme="light"] .text-white\/70,
-[data-theme="light"] .text-white\/80 { color: rgba(15,23,42,0.65) !important; }
-[data-theme="light"] .stat-card .text-white { color: #0F172A !important; }
-[data-theme="light"] .stat-card .text-white\/60 { color: rgba(15,23,42,0.6) !important; }
+[data-theme="light"] .text-white\/80                      { color: rgba(15,23,42,0.65) !important; }
+[data-theme="light"] .stat-card .text-white               { color: #0F172A !important; }
+[data-theme="light"] .stat-card .text-white\/60           { color: rgba(15,23,42,0.6) !important; }
 
+/* ── Animation delay helpers ── */
 .delay-1 { animation-delay: .1s; }
 .delay-2 { animation-delay: .2s; }
 .delay-3 { animation-delay: .3s; }

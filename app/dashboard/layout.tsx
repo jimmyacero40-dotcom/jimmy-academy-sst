@@ -8,11 +8,12 @@ import {
   LayoutDashboard, Users, BookOpen, PenTool, Award,
   BarChart2, Brain, Bell, Settings, LogOut, Shield,
   ChevronLeft, ChevronRight, Search, Menu, X,
-  Sun, Moon, Building2, Layers, UserCheck, Briefcase,
-  CalendarDays, GraduationCap, TrendingUp, FileCheck,
-  ClipboardList, Home, History, Activity
+  Palette, Building2, Layers, UserCheck, Briefcase,
+  CalendarDays, GraduationCap, TrendingUp,
+  ClipboardList, Home, Activity
 } from 'lucide-react'
 import { CommandPalette } from '@/components/CommandPalette'
+import { useTheme, THEMES, type ThemeId } from '@/components/ThemeProvider'
 
 // ── Admin navigation (grouped) ────────────────────────────────────
 const ADMIN_NAV = [
@@ -77,8 +78,9 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   const [activeCompany, setActiveCompany] = useState<{ name: string; logo_url?: string; color?: string } | null>(null)
   const [collapsed, setCollapsed] = useState(false)
   const [mobileOpen, setMobileOpen] = useState(false)
-  const [theme, setTheme] = useState<'dark' | 'light'>('dark')
   const [searchOpen, setSearchOpen] = useState(false)
+  const [themePickerOpen, setThemePickerOpen] = useState(false)
+  const { theme, setTheme } = useTheme()
 
   // Ctrl+K / Cmd+K global shortcut
   useEffect(() => {
@@ -100,28 +102,21 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         .then(data => {
           if (Array.isArray(data)) {
             const active = data.find((c: any) => c.id === match[1])
-            if (active) setActiveCompany({ name: active.name, logo_url: active.logo_url, color: active.color })
+            if (active) {
+              setActiveCompany({ name: active.name, logo_url: active.logo_url, color: active.color })
+              // Apply company theme if not already overridden by localStorage
+              const stored = localStorage.getItem('sst-theme')
+              const validThemes = ['dark', 'light', 'navy', 'verde', 'academy']
+              if (active.color && validThemes.includes(active.color) && !stored) {
+                setTheme(active.color as ThemeId, false)
+              }
+            }
           }
         })
     }
   }, [])
 
-  useEffect(() => {
-    const saved = localStorage.getItem('sst-theme') as 'dark' | 'light' | null
-    if (saved) {
-      setTheme(saved)
-      document.documentElement.setAttribute('data-theme', saved)
-    }
-  }, [])
-
   useEffect(() => { setMobileOpen(false) }, [pathname])
-
-  const toggleTheme = () => {
-    const next = theme === 'dark' ? 'light' : 'dark'
-    setTheme(next)
-    document.documentElement.setAttribute('data-theme', next)
-    localStorage.setItem('sst-theme', next)
-  }
 
   const isActive = (href: string) => {
     if (href === '/dashboard') return pathname === '/dashboard'
@@ -311,12 +306,53 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           </div>
 
           <div className="flex items-center gap-2">
-            <button onClick={toggleTheme}
-              className="w-9 h-9 rounded-lg flex items-center justify-center transition-all"
-              style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', color: 'var(--text-dim)' }}
-              title={theme === 'dark' ? 'Modo claro' : 'Modo oscuro'}>
-              {theme === 'dark' ? <Sun size={17} strokeWidth={2} /> : <Moon size={17} strokeWidth={2} />}
-            </button>
+            {/* Theme picker */}
+            <div className="relative">
+              <button onClick={() => setThemePickerOpen(o => !o)}
+                className="w-9 h-9 rounded-lg flex items-center justify-center transition-all"
+                style={{ background: 'var(--bg-card)', border: `1px solid ${themePickerOpen ? 'var(--primary)' : 'var(--border)'}`, color: 'var(--text-dim)' }}
+                title="Cambiar tema">
+                <Palette size={17} strokeWidth={2} />
+              </button>
+
+              {themePickerOpen && (
+                <>
+                  {/* backdrop */}
+                  <div className="fixed inset-0 z-40" onClick={() => setThemePickerOpen(false)} />
+                  <div className="absolute right-0 top-11 z-50 p-3 rounded-2xl shadow-2xl w-56"
+                    style={{ background: 'var(--bg-surface)', border: '1px solid var(--border)' }}>
+                    <p className="text-[10px] font-bold uppercase tracking-widest mb-2.5 px-1" style={{ color: 'var(--text-faint)' }}>
+                      Tema visual
+                    </p>
+                    <div className="space-y-1">
+                      {THEMES.map(t => (
+                        <button key={t.id} onClick={() => { setTheme(t.id); setThemePickerOpen(false) }}
+                          className="w-full flex items-center gap-2.5 px-2.5 py-2 rounded-xl text-left transition-all"
+                          style={{
+                            background: theme === t.id ? 'var(--primary-dim)' : 'transparent',
+                            border: `1px solid ${theme === t.id ? 'var(--primary-border)' : 'transparent'}`,
+                          }}>
+                          {/* Color swatch */}
+                          <div className="flex gap-0.5 flex-shrink-0">
+                            <div className="w-3.5 h-6 rounded-l-md" style={{ background: t.preview.sidebar }} />
+                            <div className="w-3 h-3 rounded-sm mt-0.5" style={{ background: t.preview.primary }} />
+                          </div>
+                          <div className="min-w-0">
+                            <div className="text-xs font-semibold" style={{ color: theme === t.id ? 'var(--primary)' : 'var(--text)' }}>
+                              {t.name}
+                            </div>
+                            <div className="text-[9px] truncate" style={{ color: 'var(--text-faint)' }}>{t.description}</div>
+                          </div>
+                          {theme === t.id && (
+                            <div className="ml-auto w-1.5 h-1.5 rounded-full flex-shrink-0" style={{ background: 'var(--primary)' }} />
+                          )}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                </>
+              )}
+            </div>
 
             {isAdmin && (
               <Link href="/dashboard/notifications"
