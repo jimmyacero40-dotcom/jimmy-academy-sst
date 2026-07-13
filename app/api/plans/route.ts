@@ -8,7 +8,7 @@ export async function GET() {
 
   let query = supabase
     .from('annual_plans')
-    .select('id, name, year, status, company_id, created_at, plan_items(count)')
+    .select('id, name, year, status, profile_id, company_id, created_at, plan_items(count)')
     .order('year', { ascending: false })
   if (companyId) query = query.eq('company_id', companyId)
 
@@ -28,13 +28,13 @@ export async function POST(req: NextRequest) {
   if (!authorized) return NextResponse.json({ error: 'No autorizado' }, { status: 403 })
   if (!companyId) return NextResponse.json({ error: 'Selecciona una empresa primero' }, { status: 400 })
 
-  const { name, year } = await req.json()
+  const { name, year, profile_id } = await req.json()
   if (!name?.trim() || !year) return NextResponse.json({ error: 'Nombre y año son requeridos' }, { status: 400 })
 
   const { data, error } = await supabase
     .from('annual_plans')
-    .insert({ name: name.trim(), year: Number(year), status: 'draft', company_id: companyId })
-    .select('id, name, year, status, company_id, created_at')
+    .insert({ name: name.trim(), year: Number(year), status: 'draft', company_id: companyId, profile_id: profile_id || null })
+    .select('id, name, year, status, profile_id, company_id, created_at')
     .single()
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })

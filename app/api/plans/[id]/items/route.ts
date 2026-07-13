@@ -9,8 +9,8 @@ export async function GET(_req: NextRequest, { params }: { params: { id: string 
   const { data, error } = await supabase
     .from('plan_items')
     .select(`
-      id, month, scheduled_date, periodicity, required, valid_days, created_at,
-      trainings(id, title, duration),
+      id, month, scheduled_date, end_date, periodicity, required, valid_days, estado, reinduccion, observaciones, modalidad, created_at,
+      trainings(id, title, duration, category),
       plan_item_targets(id, target_type, target_id)
     `)
     .eq('plan_id', params.id)
@@ -55,14 +55,53 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
   const { data: full } = await supabase
     .from('plan_items')
     .select(`
-      id, month, scheduled_date, periodicity, required, valid_days, created_at,
-      trainings(id, title, duration),
+      id, month, scheduled_date, end_date, periodicity, required, valid_days, estado, reinduccion, observaciones, modalidad, created_at,
+      trainings(id, title, duration, category),
       plan_item_targets(id, target_type, target_id)
     `)
     .eq('id', item.id)
     .single()
 
   return NextResponse.json(full, { status: 201 })
+}
+
+// PATCH — update a single plan item (side panel edits)
+export async function PATCH(req: NextRequest, { params }: { params: { id: string } }) {
+  const { authorized } = await isAdminOrSuper()
+  if (!authorized) return NextResponse.json({ error: 'No autorizado' }, { status: 403 })
+
+  const { item_id, target_type, target_id, ...rest } = await req.json()
+  if (!item_id) return NextResponse.json({ error: 'item_id requerido' }, { status: 400 })
+
+  const ALLOWED = ['month','scheduled_date','end_date','periodicity','required','valid_days','estado','reinduccion','observaciones','modalidad']
+  const updates: Record<string, any> = {}
+  for (const [k, v] of Object.entries(rest)) {
+    if (ALLOWED.includes(k)) updates[k] = v === '' ? null : v
+  }
+
+  if (Object.keys(updates).length > 0) {
+    const { error } = await supabase.from('plan_items').update(updates).eq('id', item_id)
+    if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+  }
+
+  // Update target if provided
+  if (target_type !== undefined) {
+    await supabase.from('plan_item_targets').delete().eq('plan_item_id', item_id)
+    await supabase.from('plan_item_targets').insert({
+      plan_item_id: item_id,
+      target_type: target_type || 'all',
+      target_id: target_id || null,
+    })
+  }
+
+  // Return updated item
+  const { data } = await supabase
+    .from('plan_items')
+    .select('id, month, scheduled_date, end_date, periodicity, required, valid_days, estado, reinduccion, observaciones, modalidad, trainings(id, title, duration), plan_item_targets(id, target_type, target_id)')
+    .eq('id', item_id)
+    .single()
+
+  return NextResponse.json(data)
 }
 
 export async function DELETE(req: NextRequest, _ctx: { params: { id: string } }) {

@@ -37,6 +37,37 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
   return NextResponse.json({ success: true })
 }
 
+// PUT — replace all assignments (bulk save with sort_order)
+export async function PUT(req: NextRequest, { params }: { params: { id: string } }) {
+  const { authorized } = await isAdminOrSuper()
+  if (!authorized) return NextResponse.json({ error: 'No autorizado' }, { status: 403 })
+
+  const { assignments } = await req.json()
+  if (!Array.isArray(assignments)) return NextResponse.json({ error: 'assignments debe ser un array' }, { status: 400 })
+
+  // Delete all existing
+  const { error: delErr } = await supabase
+    .from('profile_trainings')
+    .delete()
+    .eq('profile_id', params.id)
+
+  if (delErr) return NextResponse.json({ error: delErr.message }, { status: 500 })
+
+  // Insert new ordered list
+  if (assignments.length > 0) {
+    const rows = assignments.map((a: any, i: number) => ({
+      profile_id:  params.id,
+      training_id: a.training_id,
+      required:    a.required ?? true,
+      sort_order:  i,
+    }))
+    const { error: insErr } = await supabase.from('profile_trainings').insert(rows)
+    if (insErr) return NextResponse.json({ error: insErr.message }, { status: 500 })
+  }
+
+  return NextResponse.json({ success: true, count: assignments.length })
+}
+
 // DELETE — quitar curso del perfil
 export async function DELETE(req: NextRequest, { params }: { params: { id: string } }) {
   const { authorized } = await isAdminOrSuper()
