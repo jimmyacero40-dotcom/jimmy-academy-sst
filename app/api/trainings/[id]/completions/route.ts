@@ -15,11 +15,10 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
 
   if (!from || !to) return NextResponse.json({ error: 'Se requieren from y to' }, { status: 400 })
 
-  // Fetch ALL completed enrollments for this training — no company_id filter here
-  // (enrollments may not have company_id set). Date range applied in memory below.
+  // Fetch all completed enrollments for this training (no company_id filter — field may be null)
   const { data: enrollments, error } = await supabase
     .from('enrollments')
-    .select('id, user_id, completed_at, updated_at, users(id, name, cedula, area)')
+    .select('id, user_id, completed_at, users(id, name, cedula, area)')
     .eq('training_id', trainingId)
     .eq('status', 'completed')
 
@@ -30,11 +29,10 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
 
   const participants = []
   for (const e of (enrollments || [])) {
-    // Use completed_at if set, otherwise fall back to updated_at
-    const dateStr = (e.completed_at || e.updated_at || '') as string
-    if (dateStr) {
-      const ms = new Date(dateStr).getTime()
-      if (ms < fromMs || ms > toMs) continue  // outside selected range
+    // If completed_at is set, filter by range. If null, include (no date to compare).
+    if (e.completed_at) {
+      const ms = new Date(e.completed_at as string).getTime()
+      if (ms < fromMs || ms > toMs) continue
     }
 
     const usr = e.users as any
@@ -49,9 +47,9 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
       if (sig) signatureData = sig.signature_data
     }
     participants.push({
-      name:      usr?.name    || '',
-      cedula:    usr?.cedula  || '',
-      cargo:     usr?.area    || '',
+      name:      usr?.name   || '',
+      cedula:    usr?.cedula || '',
+      cargo:     usr?.area   || '',
       signature: signatureData,
     })
   }
