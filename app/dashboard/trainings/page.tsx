@@ -65,9 +65,15 @@ function calcIntensidad(horario: string): string {
 }
 
 async function downloadAttendanceList(training: any) {
-  const horario = prompt('Ingrese el HORARIO (ej: 8:00 AM - 4:30 PM):')
-  if (horario === null) return
-  const dirigidoA = prompt('DIRIGIDO A (ej: TRABAJADORES, ÁREA OPERATIVA, COPASST):') ?? 'TRABAJADORES'
+  let horario = ''
+  let dirigidoA = 'TRABAJADORES'
+
+  if (!training._skipPrompt) {
+    const h = prompt('Ingrese el HORARIO (ej: 8:00 AM - 4:30 PM):')
+    if (h === null) return
+    horario = h
+    dirigidoA = prompt('DIRIGIDO A (ej: TRABAJADORES, ÁREA OPERATIVA, COPASST):') ?? 'TRABAJADORES'
+  }
 
   try {
     const dateParam = training._filterDate ? `?date=${encodeURIComponent(training._filterDate)}` : ''
@@ -247,10 +253,16 @@ export default function BibliotecaPage() {
   const [isDirtyValidity, setIsDirtyValidity] = useState(false)
   const [confirmValidity, setConfirmValidity] = useState(false)
 
-  // ── Attendance history modal ──────────────────────────────────────────────
+  // ── Attendance history modal (per-training) ───────────────────────────────
   const [historyTraining, setHistoryTraining] = useState<any>(null)
   const [historySessions, setHistorySessions] = useState<{ date: string; count: number }[]>([])
   const [historyLoading, setHistoryLoading] = useState(false)
+
+  // ── Registro de Capacitaciones panel ─────────────────────────────────────
+  const [showRegister, setShowRegister] = useState(false)
+  const [registerSessions, setRegisterSessions] = useState<{ course: string; date: string; trainingId: number | null; count: number }[]>([])
+  const [registerLoading, setRegisterLoading] = useState(false)
+  const [registerSearch, setRegisterSearch] = useState('')
 
   const openEditCourse = (t: any) => {
     setEditCourse(t)
@@ -269,6 +281,26 @@ export default function BibliotecaPage() {
     setEditProgress('')
     setEditTab('info')
     setIsDirtyEdit(false); setConfirmEdit(false)
+  }
+
+  const openRegister = async () => {
+    setShowRegister(true)
+    setRegisterSessions([])
+    setRegisterLoading(true)
+    try {
+      const res = await fetch('/api/trainings/attendance-log')
+      if (res.ok) {
+        const data = await res.json()
+        setRegisterSessions(data.sessions || [])
+      }
+    } catch {}
+    setRegisterLoading(false)
+  }
+
+  const downloadSessionPDF = async (session: { course: string; date: string; trainingId: number | null; count: number }) => {
+    if (!session.trainingId) { alert('No se encontró el ID de la capacitación'); return }
+    const fakeTraining = { id: session.trainingId, _filterDate: session.date, _skipPrompt: true }
+    await downloadAttendanceList(fakeTraining)
   }
 
   const openAttendanceHistory = async (e: React.MouseEvent, t: any) => {
@@ -728,6 +760,10 @@ export default function BibliotecaPage() {
           </div>
           {isAdmin && (
             <div className="flex gap-2 flex-wrap">
+              <button onClick={openRegister} className="terra-btn-outline text-sm py-2.5 px-4"
+                style={{ borderColor: 'rgba(20,184,166,0.35)', color: '#2dd4bf' }}>
+                <History size={15} /> Registro de Capacitaciones
+              </button>
               <button onClick={() => router.push('/dashboard/trainings/create')} className="terra-btn text-sm py-2.5 px-4">
                 <Zap size={15} /> Generar con IA
               </button>
@@ -972,11 +1008,6 @@ export default function BibliotecaPage() {
                           <Download size={13} className="text-emerald-400" />
                         </button>
 
-                        {/* Attendance history */}
-                        <button onClick={(e) => openAttendanceHistory(e, t)}
-                          className="p-1.5 rounded-lg hover:bg-teal-500/15 transition-colors" title="Historial de listas de asistencia">
-                          <History size={13} className="text-teal-400" />
-                        </button>
 
                         {/* Download original PPTX */}
                         {t.file_name && (
@@ -1521,18 +1552,20 @@ export default function BibliotecaPage() {
         </div>
       )}
 
-      {/* ── Attendance history modal ─────────────────────────────────────── */}
-      {historyTraining && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4"
-          style={{ background: 'rgba(0,0,0,0.7)', backdropFilter: 'blur(4px)' }}
-          onClick={() => setHistoryTraining(null)}>
-          <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }}
-            className="relative w-full max-w-md rounded-2xl overflow-hidden"
-            style={{ background: 'var(--bg-surface)', border: '1px solid var(--border-strong)' }}
+      {/* ── Registro de Capacitaciones — slide-in panel ──────────────────── */}
+      {showRegister && (
+        <div className="fixed inset-0 z-50 flex"
+          style={{ background: 'rgba(0,0,0,0.55)', backdropFilter: 'blur(3px)' }}
+          onClick={() => setShowRegister(false)}>
+          <motion.div
+            initial={{ x: -360, opacity: 0 }} animate={{ x: 0, opacity: 1 }}
+            exit={{ x: -360, opacity: 0 }} transition={{ type: 'spring', damping: 28, stiffness: 260 }}
+            className="relative flex flex-col h-full w-full max-w-sm"
+            style={{ background: 'var(--bg-surface)', borderRight: '1px solid var(--border-strong)' }}
             onClick={e => e.stopPropagation()}>
 
-            {/* Header */}
-            <div className="flex items-center justify-between px-5 py-4"
+            {/* Panel header */}
+            <div className="flex items-center justify-between px-5 py-4 shrink-0"
               style={{ borderBottom: '1px solid var(--border-subtle)' }}>
               <div className="flex items-center gap-3">
                 <div className="w-8 h-8 rounded-lg flex items-center justify-center"
@@ -1540,60 +1573,86 @@ export default function BibliotecaPage() {
                   <History size={15} className="text-teal-400" />
                 </div>
                 <div>
-                  <p className="text-xs text-gray-400">Historial de listas</p>
-                  <p className="text-sm font-semibold text-white leading-tight truncate max-w-[220px]">
-                    {historyTraining.title}
-                  </p>
+                  <p className="text-base font-bold" style={{ color: 'var(--text)' }}>Registro de Capacitaciones</p>
+                  <p className="text-xs" style={{ color: 'var(--text-dim)' }}>Listas de asistencia generadas</p>
                 </div>
               </div>
-              <button onClick={() => setHistoryTraining(null)}
+              <button onClick={() => setShowRegister(false)}
                 className="p-1.5 rounded-lg hover:bg-white/5 transition-colors">
                 <X size={15} className="text-gray-400" />
               </button>
             </div>
 
-            {/* Body */}
-            <div className="p-5">
-              {historyLoading ? (
-                <div className="flex items-center justify-center py-10 gap-2 text-gray-400">
-                  <Loader2 size={16} className="animate-spin" />
-                  <span className="text-sm">Cargando sesiones...</span>
-                </div>
-              ) : historySessions.length === 0 ? (
-                <div className="text-center py-10">
-                  <FileText size={32} className="text-gray-600 mx-auto mb-3" />
-                  <p className="text-sm text-gray-400">No hay certificados generados para esta capacitación.</p>
-                </div>
-              ) : (
-                <div className="space-y-2">
-                  <p className="text-xs text-gray-500 mb-3">
-                    {historySessions.length} sesión{historySessions.length !== 1 ? 'es' : ''} registrada{historySessions.length !== 1 ? 's' : ''}
-                  </p>
-                  {historySessions.map(s => {
-                    const displayDate = s.date !== 'sin-fecha'
-                      ? new Date(s.date + 'T12:00:00').toLocaleDateString('es-CO', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })
-                      : 'Fecha no registrada'
-                    return (
-                      <div key={s.date} className="flex items-center gap-3 rounded-xl px-4 py-3"
-                        style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid var(--border-subtle)' }}>
-                        <div className="flex-1 min-w-0">
-                          <p className="text-sm font-medium text-white capitalize">{displayDate}</p>
-                          <p className="text-xs text-gray-400 mt-0.5">{s.count} participante{s.count !== 1 ? 's' : ''} certificado{s.count !== 1 ? 's' : ''}</p>
-                        </div>
-                        <button
-                          title="Descargar lista de asistencia de esta sesión"
-                          onClick={() => downloadAttendanceList({ ...historyTraining, _filterDate: s.date })}
-                          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors"
-                          style={{ background: 'rgba(20,184,166,0.12)', color: '#2dd4bf', border: '1px solid rgba(20,184,166,0.25)' }}>
-                          <FileDown size={12} />
-                          PDF
-                        </button>
-                      </div>
-                    )
-                  })}
-                </div>
-              )}
+            {/* Search */}
+            <div className="px-4 py-3 shrink-0" style={{ borderBottom: '1px solid var(--border-subtle)' }}>
+              <div className="relative">
+                <Search size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500" />
+                <input value={registerSearch} onChange={e => setRegisterSearch(e.target.value)}
+                  placeholder="Buscar capacitación..."
+                  className="terra-input pl-8 text-sm py-2" />
+              </div>
             </div>
+
+            {/* Session list */}
+            <div className="flex-1 overflow-y-auto p-4 space-y-2">
+              {registerLoading ? (
+                <div className="flex items-center justify-center py-16 gap-2 text-gray-500">
+                  <Loader2 size={16} className="animate-spin" />
+                  <span className="text-sm">Cargando registro...</span>
+                </div>
+              ) : registerSessions.length === 0 ? (
+                <div className="text-center py-16">
+                  <FileText size={36} className="text-gray-700 mx-auto mb-3" />
+                  <p className="text-sm text-gray-500">No hay sesiones registradas aún.</p>
+                </div>
+              ) : (() => {
+                const filtered = registerSessions.filter(s =>
+                  !registerSearch || s.course.toLowerCase().includes(registerSearch.toLowerCase())
+                )
+                if (filtered.length === 0) return (
+                  <p className="text-sm text-center text-gray-500 py-8">Sin resultados para "{registerSearch}"</p>
+                )
+                return filtered.map((s, i) => {
+                  const displayDate = s.date !== 'sin-fecha'
+                    ? new Date(s.date + 'T12:00:00').toLocaleDateString('es-CO', { day: '2-digit', month: 'short', year: 'numeric' })
+                    : 'Sin fecha'
+                  return (
+                    <div key={`${s.course}||${s.date}||${i}`}
+                      className="flex items-center gap-3 rounded-xl px-3 py-3 group"
+                      style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid var(--border-subtle)' }}>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-semibold leading-tight truncate" style={{ color: 'var(--text)' }}>
+                          {s.course}
+                        </p>
+                        <div className="flex items-center gap-2 mt-1">
+                          <span className="text-xs font-medium" style={{ color: '#2dd4bf' }}>{displayDate}</span>
+                          <span className="text-xs" style={{ color: 'var(--text-faint)' }}>·</span>
+                          <span className="text-xs" style={{ color: 'var(--text-dim)' }}>
+                            {s.count} participante{s.count !== 1 ? 's' : ''}
+                          </span>
+                        </div>
+                      </div>
+                      <button
+                        title="Descargar lista de asistencia"
+                        onClick={() => downloadSessionPDF(s)}
+                        className="shrink-0 flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium transition-all opacity-70 group-hover:opacity-100"
+                        style={{ background: 'rgba(20,184,166,0.1)', color: '#2dd4bf', border: '1px solid rgba(20,184,166,0.2)' }}>
+                        <FileDown size={12} />
+                        PDF
+                      </button>
+                    </div>
+                  )
+                })
+              })()}
+            </div>
+
+            {/* Footer count */}
+            {!registerLoading && registerSessions.length > 0 && (
+              <div className="px-5 py-3 shrink-0 text-center text-xs"
+                style={{ borderTop: '1px solid var(--border-subtle)', color: 'var(--text-faint)' }}>
+                {registerSessions.length} sesión{registerSessions.length !== 1 ? 'es' : ''} en total
+              </div>
+            )}
           </motion.div>
         </div>
       )}
