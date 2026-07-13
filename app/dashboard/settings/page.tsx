@@ -52,7 +52,7 @@ export default function SettingsPage() {
   const { theme, setTheme } = useTheme()
 
   // ── Profile form (workers) ────────────────────────────────────────────
-  const [profileForm, setProfileForm] = useState({ nombre: '', email: '', telefono: '', ciudad: '' })
+  const [profileForm, setProfileForm] = useState({ nombre: '', email: '', telefono: '', ciudad: '', cargo: '' })
   const [profileLoaded, setProfileLoaded] = useState(false)
 
   useEffect(() => {
@@ -62,13 +62,43 @@ export default function SettingsPage() {
       .then((d: any) => {
         setProfileForm({
           nombre:   [d.nombres, d.apellidos].filter(Boolean).join(' '),
-          email:    d.email_personal   || '',
-          telefono: d.telefono         || '',
-          ciudad:   d.ciudad_residencia|| '',
+          email:    d.email_personal    || '',
+          telefono: d.telefono          || '',
+          ciudad:   d.ciudad_residencia || '',
+          cargo:    d.cargo_confirmado  || '',
         })
         setProfileLoaded(true)
       })
       .catch(() => setProfileLoaded(true))
+  }, [isWorker])
+
+  // ── Company form (admins) ─────────────────────────────────────────────
+  const [companyForm, setCompanyForm] = useState({
+    name: '', nit: '', correo: '', telefono: '', ciudad: '', sector: '',
+    responsable_nombre: '', responsable_cargo: '', responsable_email: '', responsable_licencia: '',
+  })
+  const [companyLoaded, setCompanyLoaded] = useState(false)
+
+  useEffect(() => {
+    if (isWorker) return
+    fetch('/api/company-info')
+      .then(r => r.ok ? r.json() : {})
+      .then((d: any) => {
+        setCompanyForm({
+          name:                 d.name                 || '',
+          nit:                  d.nit                  || '',
+          correo:               d.correo               || '',
+          telefono:             d.telefono             || '',
+          ciudad:               d.ciudad               || '',
+          sector:               d.sector               || '',
+          responsable_nombre:   d.responsable_nombre   || '',
+          responsable_cargo:    d.responsable_cargo    || '',
+          responsable_email:    d.responsable_email    || '',
+          responsable_licencia: d.responsable_licencia || '',
+        })
+        setCompanyLoaded(true)
+      })
+      .catch(() => setCompanyLoaded(true))
   }, [isWorker])
 
   // ── Password form ─────────────────────────────────────────────────────
@@ -112,9 +142,35 @@ export default function SettingsPage() {
             email_personal:    profileForm.email,
             telefono:          profileForm.telefono,
             ciudad_residencia: profileForm.ciudad,
+            cargo_confirmado:  profileForm.cargo,
           }),
         })
         if (res.ok) {
+          setSaved(true)
+          setTimeout(() => setSaved(false), 2500)
+        } else {
+          const b = await res.json().catch(() => ({}))
+          setSaveError(b.error ?? `Error ${res.status}`)
+        }
+      } catch (e: any) {
+        setSaveError(e?.message ?? 'Error de red')
+      } finally {
+        setSaving(false)
+      }
+      return
+    }
+
+    if (effectiveActive === 'empresa') {
+      setSaving(true)
+      try {
+        const res = await fetch('/api/company-info', {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(companyForm),
+        })
+        if (res.ok) {
+          const updated = await res.json()
+          setCompanyForm(prev => ({ ...prev, ...updated }))
           setSaved(true)
           setTimeout(() => setSaved(false), 2500)
         } else {
@@ -159,9 +215,7 @@ export default function SettingsPage() {
       return
     }
 
-    // Other sections: optimistic toast
-    setSaved(true)
-    setTimeout(() => setSaved(false), 2000)
+    // Sections without persistence (notificaciones, sistema): no fake toast
   }
 
   return (
@@ -210,6 +264,7 @@ export default function SettingsPage() {
                     { key: 'email',    label: 'Correo electrónico',    placeholder: 'tu@correo.com',       icon: Mail   },
                     { key: 'telefono', label: 'Teléfono',              placeholder: '+57 300 000 0000',    icon: Phone  },
                     { key: 'ciudad',   label: 'Ciudad de residencia',  placeholder: 'Bogotá',              icon: MapPin },
+                    { key: 'cargo',    label: 'Cargo',                 placeholder: 'Tu cargo en la empresa', icon: FileText },
                   ] as const).map(({ key, label, placeholder, icon: Icon }) => (
                     <div key={key}>
                       <label className="text-[var(--text-dim)] text-xs font-semibold mb-1.5 block">{label}</label>
@@ -235,46 +290,62 @@ export default function SettingsPage() {
           {/* ── EMPRESA (admin) ─────────────────────────────────────────── */}
           {effectiveActive === 'empresa' && !isWorker && (
             <>
-              <div className="bg-[var(--bg-surface)] border border-[var(--border)] rounded-2xl p-5">
-                <h2 className="text-[var(--text)] font-bold mb-4 flex items-center gap-2"><Building2 size={16} className="text-amber-400" /> Información de la Empresa</h2>
-                <div className="grid sm:grid-cols-2 gap-4">
-                  {[
-                    { label: 'Razón Social',        value: 'Jimmy Academy S.A.S',      icon: Building2 },
-                    { label: 'NIT',                 value: '900.123.456-7',            icon: FileText  },
-                    { label: 'Correo corporativo',  value: 'sst@jimmyacademy.co',      icon: Mail      },
-                    { label: 'Teléfono',            value: '+57 (1) 234 5678',         icon: Phone     },
-                    { label: 'Ciudad',              value: 'Bogotá D.C.',              icon: MapPin    },
-                    { label: 'Sector económico',    value: 'Educación y Capacitación', icon: Globe     },
-                  ].map(({ label, value, icon: Icon }) => (
-                    <div key={label}>
-                      <label className="text-[var(--text-dim)] text-xs font-semibold mb-1.5 block">{label}</label>
-                      <div className="relative">
-                        <Icon size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--text-faint)]" />
-                        <input defaultValue={value}
-                          className="w-full bg-[var(--bg-card)] border border-[var(--border)] rounded-xl pl-8 pr-4 py-2.5 text-sm text-[var(--text)] focus:outline-none focus:border-amber-500/40 transition-all" />
-                      </div>
-                    </div>
-                  ))}
+              {!companyLoaded ? (
+                <div className="flex items-center justify-center py-12">
+                  <Loader2 size={20} className="animate-spin text-[var(--text-faint)]" />
                 </div>
-              </div>
+              ) : (
+                <>
+                  <div className="bg-[var(--bg-surface)] border border-[var(--border)] rounded-2xl p-5">
+                    <h2 className="text-[var(--text)] font-bold mb-4 flex items-center gap-2"><Building2 size={16} className="text-amber-400" /> Información de la Empresa</h2>
+                    <div className="grid sm:grid-cols-2 gap-4">
+                      {([
+                        { key: 'name',   label: 'Razón Social',       placeholder: 'Nombre legal de la empresa', icon: Building2 },
+                        { key: 'nit',    label: 'NIT',                placeholder: '900.000.000-0',              icon: FileText  },
+                        { key: 'correo', label: 'Correo corporativo', placeholder: 'correo@empresa.co',          icon: Mail      },
+                        { key: 'telefono', label: 'Teléfono',         placeholder: '+57 (1) 000 0000',           icon: Phone     },
+                        { key: 'ciudad', label: 'Ciudad',             placeholder: 'Bogotá D.C.',                icon: MapPin    },
+                        { key: 'sector', label: 'Sector económico',   placeholder: 'Ej: Manufactura',            icon: Globe     },
+                      ] as const).map(({ key, label, placeholder, icon: Icon }) => (
+                        <div key={key}>
+                          <label className="text-[var(--text-dim)] text-xs font-semibold mb-1.5 block">{label}</label>
+                          <div className="relative">
+                            <Icon size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--text-faint)]" />
+                            <input
+                              value={companyForm[key]}
+                              onChange={e => setCompanyForm(p => ({ ...p, [key]: e.target.value }))}
+                              placeholder={placeholder}
+                              className="w-full bg-[var(--bg-card)] border border-[var(--border)] rounded-xl pl-8 pr-4 py-2.5 text-sm text-[var(--text)] focus:outline-none focus:border-amber-500/40 transition-all"
+                            />
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
 
-              <div className="bg-[var(--bg-surface)] border border-[var(--border)] rounded-2xl p-5">
-                <h2 className="text-[var(--text)] font-bold mb-4 flex items-center gap-2"><Users size={16} className="text-amber-400" /> Responsable SST</h2>
-                <div className="grid sm:grid-cols-2 gap-4">
-                  {[
-                    { label: 'Nombre completo', value: 'Diana Ruiz Morales' },
-                    { label: 'Cargo',           value: 'Coordinadora SST'   },
-                    { label: 'Correo',          value: 'd.ruiz@jimmyacademy.co' },
-                    { label: 'Licencia SSO N°', value: '12345-COL' },
-                  ].map(({ label, value }) => (
-                    <div key={label}>
-                      <label className="text-[var(--text-dim)] text-xs font-semibold mb-1.5 block">{label}</label>
-                      <input defaultValue={value}
-                        className="w-full bg-[var(--bg-card)] border border-[var(--border)] rounded-xl px-4 py-2.5 text-sm text-[var(--text)] focus:outline-none focus:border-amber-500/40 transition-all" />
+                  <div className="bg-[var(--bg-surface)] border border-[var(--border)] rounded-2xl p-5">
+                    <h2 className="text-[var(--text)] font-bold mb-4 flex items-center gap-2"><Users size={16} className="text-amber-400" /> Responsable SST</h2>
+                    <div className="grid sm:grid-cols-2 gap-4">
+                      {([
+                        { key: 'responsable_nombre',   label: 'Nombre completo', placeholder: 'Nombre del responsable SST' },
+                        { key: 'responsable_cargo',    label: 'Cargo',           placeholder: 'Ej: Coordinadora SST' },
+                        { key: 'responsable_email',    label: 'Correo',          placeholder: 'responsable@empresa.co' },
+                        { key: 'responsable_licencia', label: 'Licencia SSO N°', placeholder: '00000-COL' },
+                      ] as const).map(({ key, label, placeholder }) => (
+                        <div key={key}>
+                          <label className="text-[var(--text-dim)] text-xs font-semibold mb-1.5 block">{label}</label>
+                          <input
+                            value={companyForm[key]}
+                            onChange={e => setCompanyForm(p => ({ ...p, [key]: e.target.value }))}
+                            placeholder={placeholder}
+                            className="w-full bg-[var(--bg-card)] border border-[var(--border)] rounded-xl px-4 py-2.5 text-sm text-[var(--text)] focus:outline-none focus:border-amber-500/40 transition-all"
+                          />
+                        </div>
+                      ))}
                     </div>
-                  ))}
-                </div>
-              </div>
+                  </div>
+                </>
+              )}
             </>
           )}
 
