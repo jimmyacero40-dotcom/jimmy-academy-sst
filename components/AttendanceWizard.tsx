@@ -1,10 +1,10 @@
 'use client'
 
-import { useState, useCallback, useMemo } from 'react'
+import { useState, useCallback, useEffect, useMemo } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
   X, ChevronRight, ChevronLeft, Check,
-  Search, Plus, Trash2, Loader2, FileDown, AlertCircle,
+  Search, Plus, Trash2, Loader2, FileDown, AlertCircle, Users, Calendar, Edit3,
 } from 'lucide-react'
 import { generateAttendancePDF } from '@/lib/generate-attendance-pdf'
 
@@ -23,7 +23,7 @@ interface Props {
 
 const STEPS = ['Datos del evento', 'Seleccionar participantes', 'Vista previa']
 
-// Generate times every 10 minutes from 06:00 to 20:00
+// Times every 10 minutes from 06:00 to 20:00
 function buildTimes() {
   const times: { value: string; label: string }[] = []
   for (let h = 6; h <= 20; h++) {
@@ -39,19 +39,26 @@ function buildTimes() {
 
 const TIMES = buildTimes()
 
+// Exact duration options per specification
 const DURATIONS: { value: number; label: string }[] = [
-  { value: 30,  label: '30 min' },
-  { value: 45,  label: '45 min' },
+  { value: 20,  label: '20 minutos' },
+  { value: 30,  label: '30 minutos' },
+  { value: 40,  label: '40 minutos' },
+  { value: 50,  label: '50 minutos' },
   { value: 60,  label: '1 hora' },
-  { value: 90,  label: '1 hora 30 min' },
+  { value: 70,  label: '1 hora 10 minutos' },
+  { value: 80,  label: '1 hora 20 minutos' },
+  { value: 90,  label: '1 hora 30 minutos' },
+  { value: 100, label: '1 hora 40 minutos' },
+  { value: 110, label: '1 hora 50 minutos' },
   { value: 120, label: '2 horas' },
-  { value: 150, label: '2 horas 30 min' },
   { value: 180, label: '3 horas' },
   { value: 240, label: '4 horas' },
   { value: 300, label: '5 horas' },
   { value: 360, label: '6 horas' },
   { value: 420, label: '7 horas' },
   { value: 480, label: '8 horas' },
+  { value: 540, label: '9 horas' },
 ]
 
 function calcSchedule(startValue: string, durationMin: number): { schedule: string; intensity: string } {
@@ -63,7 +70,7 @@ function calcSchedule(startValue: string, durationMin: number): { schedule: stri
   const fmt = (hh: number, mm: number) => {
     const h12 = hh % 12 === 0 ? 12 : hh % 12
     const ampm = hh < 12 ? 'AM' : 'PM'
-    return `${h12}:${mm.toString().padStart(2,'0')} ${ampm}`
+    return `${h12}:${mm.toString().padStart(2, '0')} ${ampm}`
   }
   const schedule = `${fmt(h, m)} - ${fmt(endH, endM)}`
   const dur = DURATIONS.find(d => d.value === durationMin)
@@ -71,18 +78,21 @@ function calcSchedule(startValue: string, durationMin: number): { schedule: stri
   return { schedule, intensity }
 }
 
+type SearchMode = 'all' | 'range' | 'manual'
+
 export default function AttendanceWizard({ training, companyName, companyLogo, onClose, onSaved }: Props) {
   const [step, setStep] = useState(0)
 
-  // Step 1 fields
-  const [eventDate,    setEventDate]    = useState('')
-  const [startTime,    setStartTime]    = useState('8:00')
-  const [durationMin,  setDurationMin]  = useState(480)   // 8 hours default
-  const [instructor,   setInstructor]   = useState('Jimmy J. Acero. C.')
-  const [organizedBy,  setOrganizedBy]  = useState('SST-AGROVENTURE CAPITAL')
-  const [directedTo,   setDirectedTo]   = useState('TRABAJADORES')
+  // Step 1
+  const [eventDate,   setEventDate]   = useState('')
+  const [startTime,   setStartTime]   = useState('8:00')
+  const [durationMin, setDurationMin] = useState(480)
+  const [instructor,  setInstructor]  = useState('Jimmy J. Acero. C.')
+  const [organizedBy, setOrganizedBy] = useState('SST-AGROVENTURE CAPITAL')
+  const [directedTo,  setDirectedTo]  = useState('TRABAJADORES')
 
-  // Step 2 fields
+  // Step 2
+  const [searchMode,   setSearchMode]   = useState<SearchMode>('all')
   const [fromDate,     setFromDate]     = useState('')
   const [toDate,       setToDate]       = useState('')
   const [participants, setParticipants] = useState<Participant[]>([])
@@ -109,23 +119,36 @@ export default function AttendanceWizard({ training, companyName, companyLogo, o
     ? new Date(eventDate + 'T12:00:00').toLocaleDateString('es-CO', { day: '2-digit', month: '2-digit', year: 'numeric' })
     : ''
 
-  const fetchParticipants = useCallback(async () => {
-    if (!fromDate || !toDate) { setFetchError('Selecciona ambas fechas'); return }
+  // Auto-fetch when entering step 2 with mode=all
+  useEffect(() => {
+    if (step === 1 && searchMode === 'all' && !fetched && !fetching) {
+      fetchParticipants('all')
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [step, searchMode])
+
+  const fetchParticipants = useCallback(async (mode: SearchMode = searchMode) => {
+    if (mode === 'range' && (!fromDate || !toDate)) {
+      setFetchError('Selecciona ambas fechas'); return
+    }
     setFetching(true); setFetchError(''); setFetched(false)
     try {
-      const res = await fetch(
-        `/api/trainings/${training.id}/completions?from=${fromDate}&to=${toDate}`
-      )
+      let url = `/api/trainings/${training.id}/completions`
+      if (mode === 'range') url += `?from=${fromDate}&to=${toDate}`
+
+      const res  = await fetch(url)
       const data = await res.json()
       if (!res.ok) throw new Error(data?.error || 'Error al buscar participantes')
+
       const fetched = (data.participants || []).map((p: any) => ({ ...p, checked: true }))
+      // Preserve manually added participants
       setParticipants(prev => [...fetched, ...prev.filter(p => p.manual)])
       setFetched(true)
     } catch (e: any) {
       setFetchError(e.message)
     }
     setFetching(false)
-  }, [fromDate, toDate, training.id])
+  }, [fromDate, toDate, training.id, searchMode])
 
   const addManual = () => {
     if (!manualName.trim()) return
@@ -134,6 +157,15 @@ export default function AttendanceWizard({ training, companyName, companyLogo, o
       cargo: manualCargo.trim(), checked: true, manual: true,
     }])
     setManualName(''); setManualCedula(''); setManualCargo('')
+  }
+
+  // When search mode changes, clear previous results (keep manual entries)
+  const switchMode = (mode: SearchMode) => {
+    setSearchMode(mode)
+    setFetchError('')
+    setFetched(false)
+    setParticipants(prev => prev.filter(p => p.manual))
+    setFromDate(''); setToDate('')
   }
 
   const step1Valid = eventDate && startTime && durationMin && instructor && organizedBy && directedTo
@@ -160,7 +192,8 @@ export default function AttendanceWizard({ training, companyName, companyLogo, o
       })
       if (!res.ok) {
         const d = await res.json().catch(() => ({}))
-        throw new Error(d?.error || 'Error al guardar')
+        // Surface the real error — most likely missing SQL migration
+        throw new Error(d?.error || 'Error al guardar. Verifica que las tablas de BD existan.')
       }
 
       const blob = await generateAttendancePDF({
@@ -173,7 +206,7 @@ export default function AttendanceWizard({ training, companyName, companyLogo, o
       const url = URL.createObjectURL(blob)
       const a   = document.createElement('a')
       a.href    = url
-      a.download = `Asistencia_${training.title.replace(/[^a-zA-Z0-9]/g,'_').slice(0,30)}_${eventDate}.pdf`
+      a.download = `Asistencia_${training.title.replace(/[^a-zA-Z0-9]/g, '_').slice(0, 30)}_${eventDate}.pdf`
       a.click()
       URL.revokeObjectURL(url)
       onSaved(); onClose()
@@ -182,6 +215,12 @@ export default function AttendanceWizard({ training, companyName, companyLogo, o
     }
     setSaving(false)
   }
+
+  const MODE_OPTS: { mode: SearchMode; icon: React.ReactNode; label: string; desc: string }[] = [
+    { mode: 'all',    icon: <Users size={14} />,    label: 'Todos',        desc: 'Todos los que completaron la capacitación' },
+    { mode: 'range',  icon: <Calendar size={14} />, label: 'Por fechas',   desc: 'Certificados emitidos en un rango de fechas' },
+    { mode: 'manual', icon: <Edit3 size={14} />,    label: 'Solo manual',  desc: 'Ingresa participantes manualmente' },
+  ]
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4"
@@ -240,7 +279,6 @@ export default function AttendanceWizard({ training, companyName, companyLogo, o
                     className="terra-input w-full" />
                 </div>
 
-                {/* Time pickers */}
                 <div className="grid grid-cols-2 gap-3">
                   <div>
                     <label className="block text-xs font-medium mb-1.5" style={{ color: 'var(--text-dim)' }}>
@@ -266,7 +304,6 @@ export default function AttendanceWizard({ training, companyName, companyLogo, o
                   </div>
                 </div>
 
-                {/* Computed schedule preview */}
                 {schedule && (
                   <div className="flex items-center gap-2 px-3 py-2 rounded-lg text-sm"
                     style={{ background: 'rgba(16,185,129,0.08)', border: '1px solid rgba(16,185,129,0.2)' }}>
@@ -304,26 +341,60 @@ export default function AttendanceWizard({ training, companyName, companyLogo, o
             {step === 1 && (
               <motion.div key="s1" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }}
                 className="space-y-4">
-                <p className="text-xs" style={{ color: 'var(--text-dim)' }}>
-                  Selecciona el período en que los trabajadores finalizaron esta capacitación.
-                  El sistema busca por certificados emitidos en ese rango.
-                </p>
-                <div className="grid grid-cols-2 gap-3">
-                  <div>
-                    <label className="block text-xs font-medium mb-1.5" style={{ color: 'var(--text-dim)' }}>Fecha desde</label>
-                    <input type="date" value={fromDate} onChange={e => setFromDate(e.target.value)} className="terra-input w-full" />
-                  </div>
-                  <div>
-                    <label className="block text-xs font-medium mb-1.5" style={{ color: 'var(--text-dim)' }}>Fecha hasta</label>
-                    <input type="date" value={toDate} onChange={e => setToDate(e.target.value)} className="terra-input w-full" />
+
+                {/* Mode selector */}
+                <div>
+                  <p className="text-xs font-medium mb-2" style={{ color: 'var(--text-dim)' }}>Modo de selección</p>
+                  <div className="grid grid-cols-3 gap-2">
+                    {MODE_OPTS.map(({ mode, icon, label, desc }) => (
+                      <button key={mode} onClick={() => switchMode(mode)}
+                        className="flex flex-col items-center gap-1 px-2 py-2.5 rounded-xl text-center transition-all text-xs"
+                        style={searchMode === mode
+                          ? { background: 'rgba(59,130,246,0.15)', border: '1px solid var(--primary)', color: 'var(--primary)' }
+                          : { background: 'rgba(255,255,255,0.03)', border: '1px solid var(--border-subtle)', color: 'var(--text-dim)' }}>
+                        {icon}
+                        <span className="font-semibold">{label}</span>
+                        <span className="text-[10px] leading-tight opacity-70">{desc}</span>
+                      </button>
+                    ))}
                   </div>
                 </div>
-                <button onClick={fetchParticipants} disabled={fetching || !fromDate || !toDate}
-                  className="terra-btn-outline w-full py-2.5 justify-center text-sm flex items-center gap-2"
-                  style={fetching || !fromDate || !toDate ? { opacity: 0.55 } : {}}>
-                  {fetching ? <Loader2 size={14} className="animate-spin" /> : <Search size={14} />}
-                  {fetching ? 'Buscando...' : 'Buscar participantes'}
-                </button>
+
+                {/* Mode: all — auto-fetches, show spinner/results */}
+                {searchMode === 'all' && fetching && (
+                  <div className="flex items-center gap-2 text-sm" style={{ color: 'var(--text-dim)' }}>
+                    <Loader2 size={14} className="animate-spin" /> Cargando todos los participantes...
+                  </div>
+                )}
+
+                {/* Mode: range — date pickers + search button */}
+                {searchMode === 'range' && (
+                  <>
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <label className="block text-xs font-medium mb-1.5" style={{ color: 'var(--text-dim)' }}>Fecha desde</label>
+                        <input type="date" value={fromDate} onChange={e => setFromDate(e.target.value)} className="terra-input w-full" />
+                      </div>
+                      <div>
+                        <label className="block text-xs font-medium mb-1.5" style={{ color: 'var(--text-dim)' }}>Fecha hasta</label>
+                        <input type="date" value={toDate} onChange={e => setToDate(e.target.value)} className="terra-input w-full" />
+                      </div>
+                    </div>
+                    <button onClick={() => fetchParticipants('range')} disabled={fetching || !fromDate || !toDate}
+                      className="terra-btn-outline w-full py-2.5 justify-center text-sm flex items-center gap-2"
+                      style={fetching || !fromDate || !toDate ? { opacity: 0.55 } : {}}>
+                      {fetching ? <Loader2 size={14} className="animate-spin" /> : <Search size={14} />}
+                      {fetching ? 'Buscando...' : 'Buscar participantes'}
+                    </button>
+                  </>
+                )}
+
+                {/* Mode: manual — no search, only manual add */}
+                {searchMode === 'manual' && !fetched && (
+                  <p className="text-xs p-3 rounded-lg" style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid var(--border-subtle)', color: 'var(--text-dim)' }}>
+                    Ingresa los participantes manualmente usando el formulario de abajo.
+                  </p>
+                )}
 
                 {fetchError && (
                   <div className="flex items-center gap-2 text-red-400 text-xs p-3 rounded-lg"
@@ -332,7 +403,8 @@ export default function AttendanceWizard({ training, companyName, companyLogo, o
                   </div>
                 )}
 
-                {fetched && (
+                {/* Participant list (fetched or manual) */}
+                {(fetched || participants.some(p => p.manual)) && (
                   <div>
                     <p className="text-xs mb-2" style={{ color: 'var(--text-dim)' }}>
                       {participants.filter(p => !p.manual).length} encontrado(s) · {selectedParticipants.length} seleccionado(s)
@@ -367,7 +439,7 @@ export default function AttendanceWizard({ training, companyName, companyLogo, o
                   </div>
                 )}
 
-                {/* Manual add */}
+                {/* Manual add (always visible) */}
                 <div className="rounded-xl p-3 space-y-2"
                   style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid var(--border-subtle)' }}>
                   <p className="text-xs font-medium" style={{ color: 'var(--text-dim)' }}>Agregar manualmente</p>
@@ -395,14 +467,14 @@ export default function AttendanceWizard({ training, companyName, companyLogo, o
                 <p className="text-sm font-semibold" style={{ color: 'var(--text)' }}>Vista previa</p>
                 <div className="rounded-xl overflow-hidden text-sm" style={{ border: '1px solid var(--border)' }}>
                   {[
-                    ['Capacitación',  training.title],
-                    ['Fecha evento',  displayDate],
-                    ['Horario',       schedule],
-                    ['Intensidad',    intensity || '—'],
-                    ['Instructor',    instructor],
-                    ['Organizado por',organizedBy],
-                    ['Dirigido a',    directedTo],
-                    ['Participantes', String(selectedParticipants.length)],
+                    ['Capacitación',   training.title],
+                    ['Fecha evento',   displayDate],
+                    ['Horario',        schedule],
+                    ['Intensidad',     intensity || '—'],
+                    ['Instructor',     instructor],
+                    ['Organizado por', organizedBy],
+                    ['Dirigido a',     directedTo],
+                    ['Participantes',  String(selectedParticipants.length)],
                   ].map(([label, value], i) => (
                     <div key={label} className="flex px-4 py-2.5"
                       style={{ background: i % 2 === 0 ? 'rgba(255,255,255,0.025)' : 'transparent', borderBottom: i < 7 ? '1px solid var(--border-subtle)' : 'none' }}>
@@ -420,7 +492,7 @@ export default function AttendanceWizard({ training, companyName, companyLogo, o
                     {selectedParticipants.map((p, i) => (
                       <div key={i} className="flex items-center gap-2 text-xs py-1.5 px-3 rounded-lg"
                         style={{ background: 'rgba(255,255,255,0.03)' }}>
-                        <span className="w-5 text-center shrink-0" style={{ color: 'var(--text-faint)' }}>{i+1}</span>
+                        <span className="w-5 text-center shrink-0" style={{ color: 'var(--text-faint)' }}>{i + 1}</span>
                         <span className="flex-1 font-medium" style={{ color: 'var(--text)' }}>{p.name}</span>
                         <span style={{ color: 'var(--text-faint)' }}>{p.cedula}</span>
                       </div>

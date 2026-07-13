@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { supabase } from '@/lib/supabase'
+import { supabaseAdmin } from '@/lib/supabase-admin'
 import { getActiveCompanyId, getCurrentUser } from '@/lib/get-company'
 
 export async function GET(_req: NextRequest, { params }: { params: { id: string } }) {
@@ -61,7 +62,7 @@ export async function DELETE(_req: NextRequest, { params }: { params: { id: stri
   const { data } = await q.single()
   if (!data) return NextResponse.json({ error: 'No encontrado' }, { status: 404 })
 
-  const { error } = await supabase.from('attendance_lists').delete().eq('id', id)
+  const { error } = await supabaseAdmin.from('attendance_lists').delete().eq('id', id)
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
 
   return NextResponse.json({ ok: true })

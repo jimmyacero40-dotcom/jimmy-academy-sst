@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { supabase } from '@/lib/supabase'
+import { supabaseAdmin } from '@/lib/supabase-admin'
 import { getActiveCompanyId, getCurrentUser } from '@/lib/get-company'
 
 export async function GET() {
@@ -37,7 +38,8 @@ export async function POST(req: NextRequest) {
   if (!training_title || !event_date || !schedule || !instructor)
     return NextResponse.json({ error: 'Datos incompletos' }, { status: 400 })
 
-  const { data: list, error: listErr } = await supabase
+  // Use service-role client for writes — anon key is blocked by RLS on this table
+  const { data: list, error: listErr } = await supabaseAdmin
     .from('attendance_lists')
     .insert({
       training_id:    training_id || null,
@@ -67,7 +69,7 @@ export async function POST(req: NextRequest) {
       signature_data: p.signature || null,
       sort_order:     i,
     }))
-    const { error: pErr } = await supabase.from('attendance_list_participants').insert(rows)
+    const { error: pErr } = await supabaseAdmin.from('attendance_list_participants').insert(rows)
     if (pErr) return NextResponse.json({ error: pErr.message }, { status: 500 })
   }
 
