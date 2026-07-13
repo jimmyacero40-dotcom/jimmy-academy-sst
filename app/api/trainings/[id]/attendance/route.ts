@@ -58,13 +58,13 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
     }
 
     const { data: usr } = cert.user_id
-      ? await supabase.from('users').select('area').eq('id', cert.user_id).single()
+      ? await supabase.from('users').select('cargo').eq('id', cert.user_id).single()
       : { data: null }
 
     participants.push({
       name: cert.name,
       cedula: cert.cedula,
-      cargo: usr?.area || '',
+      cargo: usr?.cargo || '',
       issued: cert.issued,
       signature: signatureData,
     })

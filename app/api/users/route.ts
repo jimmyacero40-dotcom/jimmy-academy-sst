@@ -10,7 +10,7 @@ export async function GET() {
 
   let query = supabaseAdmin
     .from('users')
-    .select('id, email, name, cedula, role, area, area_id, active, company_id, created_at')
+    .select('id, email, name, cedula, role, area, cargo, area_id, active, company_id, created_at')
     .order('created_at', { ascending: false })
   if (companyId) query = query.eq('company_id', companyId)
 
@@ -76,7 +76,7 @@ export async function POST(req: NextRequest) {
       active: true,
       company_id: companyId,
     })
-    .select('id, email, name, cedula, role, area, area_id, active, company_id, created_at')
+    .select('id, email, name, cedula, role, area, cargo, area_id, active, company_id, created_at')
     .single()
 
   if (error) {

@@ -97,5 +97,15 @@ export async function PUT(req: NextRequest) {
     .single()
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+
+  // Keep users.cargo in sync — it is the single source of truth consumed by
+  // attendance lists, certificates, and all admin views.
+  if (sanitized.cargo_confirmado !== undefined) {
+    await supabase
+      .from('users')
+      .update({ cargo: sanitized.cargo_confirmado || null })
+      .eq('id', user.id)
+  }
+
   return NextResponse.json(data)
 }

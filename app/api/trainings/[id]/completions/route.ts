@@ -54,10 +54,10 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
 
     if (c.user_id) {
       const [usrRes, sigRes] = await Promise.all([
-        supabase.from('users').select('area').eq('id', c.user_id).single(),
+        supabase.from('users').select('cargo').eq('id', c.user_id).single(),
         supabase.from('signatures').select('signature_data').eq('user_id', c.user_id).limit(1).single(),
       ])
-      cargo         = usrRes.data?.area       || ''
+      cargo         = usrRes.data?.cargo || ''
       signatureData = sigRes.data?.signature_data || null
     }
 

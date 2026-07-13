@@ -7,7 +7,7 @@ import {
   ArrowLeft, User, Mail, CreditCard, Briefcase, MapPin,
   BookOpen, CheckCircle, Clock, AlertCircle, Award,
   Users, Calendar, TrendingUp, FileText, Loader2, X,
-  BarChart2, Star
+  BarChart2, Star, Pencil, Check
 } from 'lucide-react'
 
 interface Enrollment {
@@ -38,6 +38,7 @@ interface UserProfile {
   cedula: string
   role: string
   area: string | null
+  cargo: string | null
   active: boolean
   created_at: string
 }
@@ -65,6 +66,9 @@ export default function UserDetailPage() {
   const [loading, setLoading] = useState(true)
   const [tab, setTab] = useState<'entrenamientos' | 'certificados' | 'perfil'>('entrenamientos')
   const [statusFilter, setStatusFilter] = useState('todos')
+  const [editingCargo, setEditingCargo] = useState(false)
+  const [cargoInput, setCargoInput] = useState('')
+  const [savingCargo, setSavingCargo] = useState(false)
 
   useEffect(() => {
     fetch(`/api/users/${id}`)
@@ -91,6 +95,19 @@ export default function UserDetailPage() {
   }
 
   const { user, enrollments, certificates, groups, workerProfile } = data
+
+  async function saveCargo() {
+    setSavingCargo(true)
+    await fetch('/api/users', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id: user.id, cargo: cargoInput || null }),
+    })
+    // Reflect change locally
+    setData(prev => prev ? { ...prev, user: { ...prev.user, cargo: cargoInput || null } } : prev)
+    setSavingCargo(false)
+    setEditingCargo(false)
+  }
 
   const total      = enrollments.length
   const completed  = enrollments.filter(e => e.status === 'completed').length
@@ -141,6 +158,38 @@ export default function UserDetailPage() {
               {user.cedula && <span className="flex items-center gap-1"><CreditCard size={11} /> {user.cedula}</span>}
               {user.role && <span className="flex items-center gap-1"><Briefcase size={11} /> {user.role}</span>}
               {user.area && <span className="flex items-center gap-1"><MapPin size={11} /> {user.area}</span>}
+              <span className="flex items-center gap-1">
+                <Briefcase size={11} />
+                {editingCargo ? (
+                  <span className="flex items-center gap-1">
+                    <input
+                      value={cargoInput}
+                      onChange={e => setCargoInput(e.target.value)}
+                      onKeyDown={e => { if (e.key === 'Enter') saveCargo(); if (e.key === 'Escape') setEditingCargo(false) }}
+                      autoFocus
+                      className="bg-transparent border-b outline-none text-xs w-32"
+                      style={{ borderColor: 'var(--amber)', color: 'var(--text)' }}
+                      placeholder="Cargo..."
+                    />
+                    <button onClick={saveCargo} disabled={savingCargo} title="Guardar">
+                      {savingCargo ? <Loader2 size={10} className="animate-spin" /> : <Check size={10} style={{ color: '#10B981' }} />}
+                    </button>
+                    <button onClick={() => setEditingCargo(false)} title="Cancelar"><X size={10} style={{ color: '#EF4444' }} /></button>
+                  </span>
+                ) : (
+                  <span className="flex items-center gap-1">
+                    <span style={{ color: user.cargo ? 'var(--text-dim)' : 'var(--text-faint)' }}>
+                      {user.cargo || 'Sin registrar'}
+                    </span>
+                    <button
+                      onClick={() => { setCargoInput(user.cargo || ''); setEditingCargo(true) }}
+                      title="Editar cargo"
+                      className="opacity-50 hover:opacity-100 transition-opacity">
+                      <Pencil size={9} />
+                    </button>
+                  </span>
+                )}
+              </span>
               <span className="flex items-center gap-1"><Calendar size={11} /> Ingresó {fmtDate(user.created_at)}</span>
             </div>
 
