@@ -11,7 +11,7 @@ import {
   Users, Star, Play, Upload, ChevronRight, X, Award, Zap,
   FileText, Layers, Trash2, Loader2, Calendar, Save, Download,
   ImagePlus, Copy, Archive, ArchiveRestore, Tag, Filter, RotateCcw,
-  Pencil, RefreshCw, FileUp, AlignLeft, HelpCircle
+  Pencil, RefreshCw, FileUp, AlignLeft, HelpCircle, History, FileDown
 } from 'lucide-react'
 
 const GRADIENTS = [
@@ -70,7 +70,8 @@ async function downloadAttendanceList(training: any) {
   const dirigidoA = prompt('DIRIGIDO A (ej: TRABAJADORES, ÁREA OPERATIVA, COPASST):') ?? 'TRABAJADORES'
 
   try {
-    const res = await fetch(`/api/trainings/${training.id}/attendance`)
+    const dateParam = training._filterDate ? `?date=${encodeURIComponent(training._filterDate)}` : ''
+    const res = await fetch(`/api/trainings/${training.id}/attendance${dateParam}`)
     if (!res.ok) { alert('Error API: ' + res.status); return }
     const data = await res.json()
     if (!data?.training) { alert('Sin datos'); return }
@@ -246,6 +247,11 @@ export default function BibliotecaPage() {
   const [isDirtyValidity, setIsDirtyValidity] = useState(false)
   const [confirmValidity, setConfirmValidity] = useState(false)
 
+  // ── Attendance history modal ──────────────────────────────────────────────
+  const [historyTraining, setHistoryTraining] = useState<any>(null)
+  const [historySessions, setHistorySessions] = useState<{ date: string; count: number }[]>([])
+  const [historyLoading, setHistoryLoading] = useState(false)
+
   const openEditCourse = (t: any) => {
     setEditCourse(t)
     setEditForm({
@@ -263,6 +269,21 @@ export default function BibliotecaPage() {
     setEditProgress('')
     setEditTab('info')
     setIsDirtyEdit(false); setConfirmEdit(false)
+  }
+
+  const openAttendanceHistory = async (e: React.MouseEvent, t: any) => {
+    e.stopPropagation()
+    setHistoryTraining(t)
+    setHistorySessions([])
+    setHistoryLoading(true)
+    try {
+      const res = await fetch(`/api/trainings/${t.id}/attendance?sessions=1`)
+      if (res.ok) {
+        const data = await res.json()
+        setHistorySessions(data.sessions || [])
+      }
+    } catch {}
+    setHistoryLoading(false)
   }
 
   const handleEditSave = async () => {
@@ -947,8 +968,14 @@ export default function BibliotecaPage() {
 
                         {/* Download attendance */}
                         <button onClick={(e) => { e.stopPropagation(); downloadAttendanceList(t) }}
-                          className="p-1.5 rounded-lg hover:bg-emerald-500/15 transition-colors" title="Lista de asistencia PDF">
+                          className="p-1.5 rounded-lg hover:bg-emerald-500/15 transition-colors" title="Generar lista de asistencia">
                           <Download size={13} className="text-emerald-400" />
+                        </button>
+
+                        {/* Attendance history */}
+                        <button onClick={(e) => openAttendanceHistory(e, t)}
+                          className="p-1.5 rounded-lg hover:bg-teal-500/15 transition-colors" title="Historial de listas de asistencia">
+                          <History size={13} className="text-teal-400" />
                         </button>
 
                         {/* Download original PPTX */}
@@ -1489,6 +1516,83 @@ export default function BibliotecaPage() {
                   {savingValidity ? <Loader2 size={14} className="animate-spin" /> : <><Save size={14} /> Guardar</>}
                 </button>
               </div>
+            </div>
+          </motion.div>
+        </div>
+      )}
+
+      {/* ── Attendance history modal ─────────────────────────────────────── */}
+      {historyTraining && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4"
+          style={{ background: 'rgba(0,0,0,0.7)', backdropFilter: 'blur(4px)' }}
+          onClick={() => setHistoryTraining(null)}>
+          <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }}
+            className="relative w-full max-w-md rounded-2xl overflow-hidden"
+            style={{ background: 'var(--bg-surface)', border: '1px solid var(--border-strong)' }}
+            onClick={e => e.stopPropagation()}>
+
+            {/* Header */}
+            <div className="flex items-center justify-between px-5 py-4"
+              style={{ borderBottom: '1px solid var(--border-subtle)' }}>
+              <div className="flex items-center gap-3">
+                <div className="w-8 h-8 rounded-lg flex items-center justify-center"
+                  style={{ background: 'rgba(20,184,166,0.15)' }}>
+                  <History size={15} className="text-teal-400" />
+                </div>
+                <div>
+                  <p className="text-xs text-gray-400">Historial de listas</p>
+                  <p className="text-sm font-semibold text-white leading-tight truncate max-w-[220px]">
+                    {historyTraining.title}
+                  </p>
+                </div>
+              </div>
+              <button onClick={() => setHistoryTraining(null)}
+                className="p-1.5 rounded-lg hover:bg-white/5 transition-colors">
+                <X size={15} className="text-gray-400" />
+              </button>
+            </div>
+
+            {/* Body */}
+            <div className="p-5">
+              {historyLoading ? (
+                <div className="flex items-center justify-center py-10 gap-2 text-gray-400">
+                  <Loader2 size={16} className="animate-spin" />
+                  <span className="text-sm">Cargando sesiones...</span>
+                </div>
+              ) : historySessions.length === 0 ? (
+                <div className="text-center py-10">
+                  <FileText size={32} className="text-gray-600 mx-auto mb-3" />
+                  <p className="text-sm text-gray-400">No hay certificados generados para esta capacitación.</p>
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  <p className="text-xs text-gray-500 mb-3">
+                    {historySessions.length} sesión{historySessions.length !== 1 ? 'es' : ''} registrada{historySessions.length !== 1 ? 's' : ''}
+                  </p>
+                  {historySessions.map(s => {
+                    const displayDate = s.date !== 'sin-fecha'
+                      ? new Date(s.date + 'T12:00:00').toLocaleDateString('es-CO', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })
+                      : 'Fecha no registrada'
+                    return (
+                      <div key={s.date} className="flex items-center gap-3 rounded-xl px-4 py-3"
+                        style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid var(--border-subtle)' }}>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-medium text-white capitalize">{displayDate}</p>
+                          <p className="text-xs text-gray-400 mt-0.5">{s.count} participante{s.count !== 1 ? 's' : ''} certificado{s.count !== 1 ? 's' : ''}</p>
+                        </div>
+                        <button
+                          title="Descargar lista de asistencia de esta sesión"
+                          onClick={() => downloadAttendanceList({ ...historyTraining, _filterDate: s.date })}
+                          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors"
+                          style={{ background: 'rgba(20,184,166,0.12)', color: '#2dd4bf', border: '1px solid rgba(20,184,166,0.25)' }}>
+                          <FileDown size={12} />
+                          PDF
+                        </button>
+                      </div>
+                    )
+                  })}
+                </div>
+              )}
             </div>
           </motion.div>
         </div>

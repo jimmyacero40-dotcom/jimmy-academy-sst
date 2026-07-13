@@ -9,6 +9,9 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
 
   const companyId = await getActiveCompanyId()
   const trainingId = parseInt(params.id)
+  const url = new URL(req.url)
+  const sessionDate = url.searchParams.get('date')   // YYYY-MM-DD — filter to one session
+  const sessionsOnly = url.searchParams.get('sessions') === '1'  // return session list only
 
   const { data: training } = await supabase
     .from('trainings')
@@ -24,8 +27,22 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
     .eq('course', training.title)
 
   if (companyId) certQuery = certQuery.eq('company_id', companyId)
+  if (sessionDate) certQuery = certQuery.eq('issued', sessionDate)
 
   const { data: certs } = await certQuery
+
+  // Return grouped session list (dates + counts) without fetching signatures
+  if (sessionsOnly) {
+    const counts: Record<string, number> = {}
+    for (const c of (certs || [])) {
+      const d = c.issued || 'sin-fecha'
+      counts[d] = (counts[d] || 0) + 1
+    }
+    const sessions = Object.entries(counts)
+      .map(([date, count]) => ({ date, count }))
+      .sort((a, b) => b.date.localeCompare(a.date))
+    return NextResponse.json({ training, sessions })
+  }
 
   const participants = []
   for (const cert of (certs || [])) {
