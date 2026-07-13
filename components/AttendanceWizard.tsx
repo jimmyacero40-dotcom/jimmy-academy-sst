@@ -1,20 +1,16 @@
 'use client'
 
-import { useState, useCallback } from 'react'
+import { useState, useCallback, useMemo } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
-  X, ChevronRight, ChevronLeft, Calendar, Clock, Users,
-  Search, Check, Plus, Trash2, Loader2, FileDown, AlertCircle,
+  X, ChevronRight, ChevronLeft, Check,
+  Search, Plus, Trash2, Loader2, FileDown, AlertCircle,
 } from 'lucide-react'
 import { generateAttendancePDF } from '@/lib/generate-attendance-pdf'
 
 interface Participant {
-  name: string
-  cedula: string
-  cargo: string
-  signature?: string
-  checked: boolean
-  manual?: boolean
+  name: string; cedula: string; cargo: string; signature?: string
+  checked: boolean; manual?: boolean
 }
 
 interface Props {
@@ -27,13 +23,61 @@ interface Props {
 
 const STEPS = ['Datos del evento', 'Seleccionar participantes', 'Vista previa']
 
+// Generate times every 10 minutes from 06:00 to 20:00
+function buildTimes() {
+  const times: { value: string; label: string }[] = []
+  for (let h = 6; h <= 20; h++) {
+    for (let m = 0; m < 60; m += 10) {
+      const hh = h % 12 === 0 ? 12 : h % 12
+      const ampm = h < 12 ? 'AM' : 'PM'
+      const mm = m.toString().padStart(2, '0')
+      times.push({ value: `${h}:${mm}`, label: `${hh}:${mm} ${ampm}` })
+    }
+  }
+  return times
+}
+
+const TIMES = buildTimes()
+
+const DURATIONS: { value: number; label: string }[] = [
+  { value: 30,  label: '30 min' },
+  { value: 45,  label: '45 min' },
+  { value: 60,  label: '1 hora' },
+  { value: 90,  label: '1 hora 30 min' },
+  { value: 120, label: '2 horas' },
+  { value: 150, label: '2 horas 30 min' },
+  { value: 180, label: '3 horas' },
+  { value: 240, label: '4 horas' },
+  { value: 300, label: '5 horas' },
+  { value: 360, label: '6 horas' },
+  { value: 420, label: '7 horas' },
+  { value: 480, label: '8 horas' },
+]
+
+function calcSchedule(startValue: string, durationMin: number): { schedule: string; intensity: string } {
+  if (!startValue || !durationMin) return { schedule: '', intensity: '' }
+  const [h, m] = startValue.split(':').map(Number)
+  const endTotal = h * 60 + m + durationMin
+  const endH = Math.floor(endTotal / 60)
+  const endM = endTotal % 60
+  const fmt = (hh: number, mm: number) => {
+    const h12 = hh % 12 === 0 ? 12 : hh % 12
+    const ampm = hh < 12 ? 'AM' : 'PM'
+    return `${h12}:${mm.toString().padStart(2,'0')} ${ampm}`
+  }
+  const schedule = `${fmt(h, m)} - ${fmt(endH, endM)}`
+  const dur = DURATIONS.find(d => d.value === durationMin)
+  const intensity = dur ? dur.label : `${durationMin} min`
+  return { schedule, intensity }
+}
+
 export default function AttendanceWizard({ training, companyName, companyLogo, onClose, onSaved }: Props) {
   const [step, setStep] = useState(0)
 
   // Step 1 fields
   const [eventDate,    setEventDate]    = useState('')
-  const [schedule,     setSchedule]     = useState('')
-  const [intensity,    setIntensity]    = useState('')
+  const [startTime,    setStartTime]    = useState('8:00')
+  const [durationMin,  setDurationMin]  = useState(480)   // 8 hours default
   const [instructor,   setInstructor]   = useState('Jimmy J. Acero. C.')
   const [organizedBy,  setOrganizedBy]  = useState('SST-AGROVENTURE CAPITAL')
   const [directedTo,   setDirectedTo]   = useState('TRABAJADORES')
@@ -52,7 +96,12 @@ export default function AttendanceWizard({ training, companyName, companyLogo, o
   const [manualCargo,  setManualCargo]  = useState('')
 
   // Step 3
-  const [saving,       setSaving]       = useState(false)
+  const [saving, setSaving] = useState(false)
+
+  const { schedule, intensity } = useMemo(
+    () => calcSchedule(startTime, durationMin),
+    [startTime, durationMin]
+  )
 
   const selectedParticipants = participants.filter(p => p.checked)
 
@@ -67,13 +116,10 @@ export default function AttendanceWizard({ training, companyName, companyLogo, o
       const res = await fetch(
         `/api/trainings/${training.id}/completions?from=${fromDate}&to=${toDate}`
       )
-      if (!res.ok) throw new Error('Error al buscar participantes')
       const data = await res.json()
+      if (!res.ok) throw new Error(data?.error || 'Error al buscar participantes')
       const fetched = (data.participants || []).map((p: any) => ({ ...p, checked: true }))
-      setParticipants(prev => {
-        const manuals = prev.filter(p => p.manual)
-        return [...fetched, ...manuals]
-      })
+      setParticipants(prev => [...fetched, ...prev.filter(p => p.manual)])
       setFetched(true)
     } catch (e: any) {
       setFetchError(e.message)
@@ -90,15 +136,7 @@ export default function AttendanceWizard({ training, companyName, companyLogo, o
     setManualName(''); setManualCedula(''); setManualCargo('')
   }
 
-  const toggleParticipant = (i: number) => {
-    setParticipants(prev => prev.map((p, idx) => idx === i ? { ...p, checked: !p.checked } : p))
-  }
-
-  const removeManual = (i: number) => {
-    setParticipants(prev => prev.filter((_, idx) => idx !== i))
-  }
-
-  const step1Valid = eventDate && schedule && instructor && organizedBy && directedTo
+  const step1Valid = eventDate && startTime && durationMin && instructor && organizedBy && directedTo
 
   const handleGenerate = async () => {
     setSaving(true)
@@ -107,7 +145,6 @@ export default function AttendanceWizard({ training, companyName, companyLogo, o
         name: p.name, cedula: p.cedula, cargo: p.cargo, signature: p.signature,
       }))
 
-      // Save to DB first
       const res = await fetch('/api/attendance-lists', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -116,31 +153,30 @@ export default function AttendanceWizard({ training, companyName, companyLogo, o
           training_title:   training.title,
           training_temario: training.temario || training.description || '',
           event_date:       eventDate,
-          schedule, intensity, instructor, organized_by: organizedBy, directed_to: directedTo,
-          participants:     parts,
+          schedule, intensity, instructor,
+          organized_by: organizedBy, directed_to: directedTo,
+          participants: parts,
         }),
       })
-      if (!res.ok) throw new Error('Error al guardar en base de datos')
+      if (!res.ok) {
+        const d = await res.json().catch(() => ({}))
+        throw new Error(d?.error || 'Error al guardar')
+      }
 
-      // Generate and download PDF
       const blob = await generateAttendancePDF({
         trainingTitle:   training.title,
         trainingTemario: training.temario || training.description || '',
-        eventDate:       displayDate,
-        schedule, intensity, instructor, organizedBy, directedTo,
-        participants:    parts,
-        companyName, companyLogo,
+        eventDate: displayDate, schedule, intensity, instructor, organizedBy, directedTo,
+        participants: parts, companyName, companyLogo,
       })
 
-      const url  = URL.createObjectURL(blob)
-      const a    = document.createElement('a')
-      a.href     = url
+      const url = URL.createObjectURL(blob)
+      const a   = document.createElement('a')
+      a.href    = url
       a.download = `Asistencia_${training.title.replace(/[^a-zA-Z0-9]/g,'_').slice(0,30)}_${eventDate}.pdf`
       a.click()
       URL.revokeObjectURL(url)
-
-      onSaved()
-      onClose()
+      onSaved(); onClose()
     } catch (e: any) {
       alert('Error: ' + e.message)
     }
@@ -158,12 +194,8 @@ export default function AttendanceWizard({ training, companyName, companyLogo, o
         <div className="flex items-center justify-between px-5 py-4 shrink-0"
           style={{ borderBottom: '1px solid var(--border-subtle)' }}>
           <div>
-            <p className="text-xs font-medium" style={{ color: 'var(--text-dim)' }}>
-              Generar Lista de Asistencia
-            </p>
-            <p className="text-sm font-bold truncate max-w-[340px]" style={{ color: 'var(--text)' }}>
-              {training.title}
-            </p>
+            <p className="text-xs font-medium" style={{ color: 'var(--text-dim)' }}>Generar Lista de Asistencia</p>
+            <p className="text-sm font-bold truncate max-w-[340px]" style={{ color: 'var(--text)' }}>{training.title}</p>
           </div>
           <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-white/5 transition-colors">
             <X size={15} className="text-gray-400" />
@@ -186,9 +218,7 @@ export default function AttendanceWizard({ training, companyName, companyLogo, o
                 <span className="text-xs font-medium hidden sm:block"
                   style={{ color: i === step ? 'var(--text)' : 'var(--text-faint)' }}>{s}</span>
               </div>
-              {i < STEPS.length - 1 && (
-                <div className="w-6 h-px" style={{ background: 'var(--border)' }} />
-              )}
+              {i < STEPS.length - 1 && <div className="w-6 h-px" style={{ background: 'var(--border)' }} />}
             </div>
           ))}
         </div>
@@ -196,32 +226,56 @@ export default function AttendanceWizard({ training, companyName, companyLogo, o
         {/* Body */}
         <div className="flex-1 overflow-y-auto p-5">
           <AnimatePresence mode="wait">
+
+            {/* ── Step 1: Event data ─────────────────────────────────── */}
             {step === 0 && (
               <motion.div key="s0" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }}
                 className="space-y-4">
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-xs font-medium mb-1.5" style={{ color: 'var(--text-dim)' }}>
-                      Fecha del evento *
-                    </label>
-                    <input type="date" value={eventDate} onChange={e => setEventDate(e.target.value)}
-                      className="terra-input w-full" />
-                  </div>
-                  <div>
-                    <label className="block text-xs font-medium mb-1.5" style={{ color: 'var(--text-dim)' }}>
-                      Horario *
-                    </label>
-                    <input type="text" value={schedule} onChange={e => setSchedule(e.target.value)}
-                      placeholder="8:00 AM - 4:30 PM" className="terra-input w-full" />
-                  </div>
-                </div>
+
                 <div>
                   <label className="block text-xs font-medium mb-1.5" style={{ color: 'var(--text-dim)' }}>
-                    Intensidad
+                    Fecha del evento *
                   </label>
-                  <input type="text" value={intensity} onChange={e => setIntensity(e.target.value)}
-                    placeholder="8 horas" className="terra-input w-full" />
+                  <input type="date" value={eventDate} onChange={e => setEventDate(e.target.value)}
+                    className="terra-input w-full" />
                 </div>
+
+                {/* Time pickers */}
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-xs font-medium mb-1.5" style={{ color: 'var(--text-dim)' }}>
+                      Hora de inicio *
+                    </label>
+                    <select value={startTime} onChange={e => setStartTime(e.target.value)}
+                      className="terra-input w-full">
+                      {TIMES.map(t => (
+                        <option key={t.value} value={t.value}>{t.label}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium mb-1.5" style={{ color: 'var(--text-dim)' }}>
+                      Duración *
+                    </label>
+                    <select value={durationMin} onChange={e => setDurationMin(Number(e.target.value))}
+                      className="terra-input w-full">
+                      {DURATIONS.map(d => (
+                        <option key={d.value} value={d.value}>{d.label}</option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+
+                {/* Computed schedule preview */}
+                {schedule && (
+                  <div className="flex items-center gap-2 px-3 py-2 rounded-lg text-sm"
+                    style={{ background: 'rgba(16,185,129,0.08)', border: '1px solid rgba(16,185,129,0.2)' }}>
+                    <span className="font-medium" style={{ color: '#34d399' }}>Horario:</span>
+                    <span style={{ color: 'var(--text)' }}>{schedule}</span>
+                    <span className="ml-auto text-xs" style={{ color: 'var(--text-dim)' }}>{intensity}</span>
+                  </div>
+                )}
+
                 <div>
                   <label className="block text-xs font-medium mb-1.5" style={{ color: 'var(--text-dim)' }}>
                     Instructor / Realizó *
@@ -246,11 +300,13 @@ export default function AttendanceWizard({ training, companyName, companyLogo, o
               </motion.div>
             )}
 
+            {/* ── Step 2: Participants ───────────────────────────────── */}
             {step === 1 && (
               <motion.div key="s1" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }}
                 className="space-y-4">
                 <p className="text-xs" style={{ color: 'var(--text-dim)' }}>
-                  Busca los trabajadores que completaron esta capacitación en el período indicado.
+                  Selecciona el período en que los trabajadores finalizaron esta capacitación.
+                  El sistema busca por certificados emitidos en ese rango.
                 </p>
                 <div className="grid grid-cols-2 gap-3">
                   <div>
@@ -264,7 +320,7 @@ export default function AttendanceWizard({ training, companyName, companyLogo, o
                 </div>
                 <button onClick={fetchParticipants} disabled={fetching || !fromDate || !toDate}
                   className="terra-btn-outline w-full py-2.5 justify-center text-sm flex items-center gap-2"
-                  style={fetching ? { opacity: 0.6 } : {}}>
+                  style={fetching || !fromDate || !toDate ? { opacity: 0.55 } : {}}>
                   {fetching ? <Loader2 size={14} className="animate-spin" /> : <Search size={14} />}
                   {fetching ? 'Buscando...' : 'Buscar participantes'}
                 </button>
@@ -283,9 +339,9 @@ export default function AttendanceWizard({ training, companyName, companyLogo, o
                     </p>
                     <div className="space-y-1.5 max-h-48 overflow-y-auto pr-1">
                       {participants.map((p, i) => (
-                        <div key={i} className="flex items-center gap-2.5 rounded-lg px-3 py-2 cursor-pointer"
-                          style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid var(--border-subtle)' }}
-                          onClick={() => toggleParticipant(i)}>
+                        <div key={i} onClick={() => setParticipants(prev => prev.map((x, idx) => idx === i ? { ...x, checked: !x.checked } : x))}
+                          className="flex items-center gap-2.5 rounded-lg px-3 py-2 cursor-pointer"
+                          style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid var(--border-subtle)' }}>
                           <div className="w-4 h-4 rounded flex items-center justify-center shrink-0 transition-all"
                             style={p.checked
                               ? { background: 'var(--primary)', border: '1px solid var(--primary)' }
@@ -293,18 +349,15 @@ export default function AttendanceWizard({ training, companyName, companyLogo, o
                             {p.checked && <Check size={10} className="text-white" />}
                           </div>
                           <div className="flex-1 min-w-0">
-                            <span className="text-sm font-medium block truncate" style={{ color: 'var(--text)' }}>
-                              {p.name}
-                            </span>
+                            <span className="text-sm font-medium block truncate" style={{ color: 'var(--text)' }}>{p.name}</span>
                             <span className="text-xs" style={{ color: 'var(--text-dim)' }}>
                               {[p.cedula, p.cargo].filter(Boolean).join(' · ')}
                               {p.manual && <span className="ml-1 text-amber-400">(manual)</span>}
                             </span>
                           </div>
                           {p.manual && (
-                            <button onClick={e => { e.stopPropagation(); removeManual(i) }}
-                              className="p-1 rounded hover:bg-red-500/10 transition-colors"
-                              style={{ color: 'var(--text-faint)' }}>
+                            <button onClick={e => { e.stopPropagation(); setParticipants(prev => prev.filter((_, idx) => idx !== i)) }}
+                              className="p-1 rounded hover:bg-red-500/10" style={{ color: 'var(--text-faint)' }}>
                               <Trash2 size={12} />
                             </button>
                           )}
@@ -315,7 +368,8 @@ export default function AttendanceWizard({ training, companyName, companyLogo, o
                 )}
 
                 {/* Manual add */}
-                <div className="rounded-xl p-3 space-y-2" style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid var(--border-subtle)' }}>
+                <div className="rounded-xl p-3 space-y-2"
+                  style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid var(--border-subtle)' }}>
                   <p className="text-xs font-medium" style={{ color: 'var(--text-dim)' }}>Agregar manualmente</p>
                   <div className="grid grid-cols-3 gap-2">
                     <input value={manualName} onChange={e => setManualName(e.target.value)}
@@ -334,19 +388,20 @@ export default function AttendanceWizard({ training, companyName, companyLogo, o
               </motion.div>
             )}
 
+            {/* ── Step 3: Preview ────────────────────────────────────── */}
             {step === 2 && (
               <motion.div key="s2" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }}
                 className="space-y-4">
                 <p className="text-sm font-semibold" style={{ color: 'var(--text)' }}>Vista previa</p>
                 <div className="rounded-xl overflow-hidden text-sm" style={{ border: '1px solid var(--border)' }}>
                   {[
-                    ['Capacitación', training.title],
-                    ['Fecha del evento', displayDate],
-                    ['Horario', schedule],
-                    ['Intensidad', intensity || '—'],
-                    ['Instructor', instructor],
-                    ['Organizado por', organizedBy],
-                    ['Dirigido a', directedTo],
+                    ['Capacitación',  training.title],
+                    ['Fecha evento',  displayDate],
+                    ['Horario',       schedule],
+                    ['Intensidad',    intensity || '—'],
+                    ['Instructor',    instructor],
+                    ['Organizado por',organizedBy],
+                    ['Dirigido a',    directedTo],
                     ['Participantes', String(selectedParticipants.length)],
                   ].map(([label, value], i) => (
                     <div key={label} className="flex px-4 py-2.5"
@@ -385,8 +440,7 @@ export default function AttendanceWizard({ training, companyName, companyLogo, o
             </button>
           )}
           {step < 2 ? (
-            <button
-              onClick={() => setStep(s => s + 1)}
+            <button onClick={() => setStep(s => s + 1)}
               disabled={step === 0 ? !step1Valid : selectedParticipants.length === 0}
               className="terra-btn flex-1 py-2.5 justify-center flex items-center gap-2"
               style={(step === 0 ? !step1Valid : selectedParticipants.length === 0) ? { opacity: 0.5 } : {}}>
