@@ -11,8 +11,9 @@ import {
   Users, Star, Play, Upload, ChevronRight, X, Award, Zap,
   FileText, Layers, Trash2, Loader2, Calendar, Save, Download,
   ImagePlus, Copy, Archive, ArchiveRestore, Tag, Filter, RotateCcw,
-  Pencil, RefreshCw, FileUp, AlignLeft, HelpCircle, History, FileDown
+  Pencil, RefreshCw, FileUp, AlignLeft, HelpCircle, History, FileDown, ClipboardList
 } from 'lucide-react'
+import AttendanceWizard from '@/components/AttendanceWizard'
 
 const GRADIENTS = [
   'from-amber-500 to-red-500', 'from-red-500 to-rose-500', 'from-orange-500 to-amber-500',
@@ -258,6 +259,10 @@ export default function BibliotecaPage() {
   const [historySessions, setHistorySessions] = useState<{ date: string; count: number }[]>([])
   const [historyLoading, setHistoryLoading] = useState(false)
 
+  // ── Attendance wizard ─────────────────────────────────────────────────────
+  const [wizardTraining, setWizardTraining] = useState<any>(null)
+  const [companyInfo, setCompanyInfo] = useState({ name: '', logo: '' })
+
   // ── Registro de Capacitaciones panel ─────────────────────────────────────
   const [showRegister, setShowRegister] = useState(false)
   const [registerSessions, setRegisterSessions] = useState<{ course: string; date: string; trainingId: number | null; count: number }[]>([])
@@ -443,6 +448,12 @@ export default function BibliotecaPage() {
       alert('Error al descargar: ' + e.message)
     }
   }
+
+  useEffect(() => {
+    fetch('/api/company-info').then(r => r.ok ? r.json() : {}).then((d: any) => {
+      if (d?.name || d?.logo_url) setCompanyInfo({ name: d.name || '', logo: d.logo_url || '' })
+    }).catch(() => {})
+  }, [])
 
   useEffect(() => {
     async function loadAndMigrate() {
@@ -1002,10 +1013,10 @@ export default function BibliotecaPage() {
                             : <Copy size={13} className="text-violet-400" />}
                         </button>
 
-                        {/* Download attendance */}
-                        <button onClick={(e) => { e.stopPropagation(); downloadAttendanceList(t) }}
-                          className="p-1.5 rounded-lg hover:bg-emerald-500/15 transition-colors" title="Generar lista de asistencia">
-                          <Download size={13} className="text-emerald-400" />
+                        {/* Generate attendance list wizard */}
+                        <button onClick={(e) => { e.stopPropagation(); setWizardTraining(t) }}
+                          className="p-1.5 rounded-lg hover:bg-emerald-500/15 transition-colors" title="Generar Lista de Asistencia">
+                          <ClipboardList size={13} className="text-emerald-400" />
                         </button>
 
 
@@ -1550,6 +1561,17 @@ export default function BibliotecaPage() {
             </div>
           </motion.div>
         </div>
+      )}
+
+      {/* ── Attendance Wizard ─────────────────────────────────────────────── */}
+      {wizardTraining && (
+        <AttendanceWizard
+          training={wizardTraining}
+          companyName={companyInfo.name}
+          companyLogo={companyInfo.logo}
+          onClose={() => setWizardTraining(null)}
+          onSaved={() => setWizardTraining(null)}
+        />
       )}
 
       {/* ── Registro de Capacitaciones — slide-in panel ──────────────────── */}

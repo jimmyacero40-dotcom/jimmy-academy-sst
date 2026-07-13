@@ -1,226 +1,190 @@
-import jsPDF from 'jspdf'
-
-interface Participant {
-  name: string
-  cedula: string
-  cargo: string
-  signature: string | null
-}
-
-interface AttendanceData {
-  training: { title: string; duration: string; description: string; created_at: string }
-  participants: Participant[]
+export interface AttendancePDFParams {
+  trainingTitle: string
+  trainingTemario?: string
+  eventDate: string       // Display string, e.g. "20/07/2026"
+  schedule: string        // e.g. "8:00 AM - 4:30 PM"
+  intensity: string       // e.g. "8 horas"
+  instructor: string
+  organizedBy: string
+  directedTo: string
+  participants: { name: string; cedula: string; cargo: string; signature?: string }[]
   companyName: string
   companyLogo: string
 }
 
-export function generateAttendancePDF(data: AttendanceData) {
-  const { training, participants, companyName, companyLogo } = data
+function getImgDims(src: string): Promise<{ w: number; h: number }> {
+  return new Promise(resolve => {
+    const img = new window.Image()
+    img.onload  = () => resolve({ w: img.naturalWidth,  h: img.naturalHeight })
+    img.onerror = () => resolve({ w: 4, h: 1 })
+    img.src = src
+  })
+}
+
+export async function generateAttendancePDF(p: AttendancePDFParams): Promise<Blob> {
+  const jsPDF = (await import('jspdf')).default
   const doc = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'letter' })
-  const W = 279.4
-  const M = 8
-  const usable = W - 2 * M
-  const today = new Date().toLocaleDateString('es-CO')
 
-  // Colors
-  const C_GREEN: [number, number, number] = [56, 118, 29]
-  const C_ORANGE: [number, number, number] = [230, 145, 56]
-  const C_LIGHT_ORANGE: [number, number, number] = [248, 216, 176]
-  const C_LIGHT_GREEN: [number, number, number] = [198, 224, 180]
-  const C_WHITE: [number, number, number] = [255, 255, 255]
-  const C_BLACK: [number, number, number] = [0, 0, 0]
-
-  // Column positions (11 columns like the Excel: A-K)
-  // Proportional widths based on the original format
-  const colW = [16, 18, 18, 20, 20, 20, 20, 30, 30, 30, 41]
-  // Normalize to usable width
-  const totalRaw = colW.reduce((a, b) => a + b, 0)
-  const cols = colW.map(w => (w / totalRaw) * usable)
-  const colX = cols.reduce((acc: number[], w, i) => { acc.push(i === 0 ? M : acc[i - 1] + cols[i - 1]); return acc }, [] as number[])
-
-  function cellX(col: number) { return colX[col] }
-  function cellW(from: number, to: number) { let w = 0; for (let i = from; i <= to; i++) w += cols[i]; return w }
-
-  function fill(x: number, y: number, w: number, h: number, color: [number, number, number]) {
-    doc.setFillColor(color[0], color[1], color[2])
-    doc.rect(x, y, w, h, 'F')
+  const W = 279.4, M = 8, usable = W - 2 * M
+  const CG: [number,number,number] = [56,118,29]
+  const CO: [number,number,number] = [230,145,56]
+  const CLO: [number,number,number] = [248,216,176]
+  const CW: [number,number,number] = [255,255,255]
+  const CB: [number,number,number] = [0,0,0]
+  const rawW = [16,18,18,20,20,20,20,30,30,30,41]
+  const tot  = rawW.reduce((a,b) => a+b, 0)
+  const cols = rawW.map(w => (w/tot)*usable)
+  const colX = cols.reduce((a: number[], w, i) => {
+    a.push(i === 0 ? M : a[i-1] + cols[i-1]); return a
+  }, [] as number[])
+  const cX = (c: number) => colX[c]
+  const cW = (f: number, t: number) => { let w = 0; for (let i = f; i <= t; i++) w += cols[i]; return w }
+  const fl = (x: number, y: number, w: number, h: number, c: [number,number,number]) => {
+    doc.setFillColor(c[0], c[1], c[2]); doc.rect(x, y, w, h, 'F')
   }
-
-  function border(x: number, y: number, w: number, h: number) {
-    doc.setDrawColor(80, 80, 80)
-    doc.setLineWidth(0.25)
-    doc.rect(x, y, w, h, 'S')
+  const bd = (x: number, y: number, w: number, h: number) => {
+    doc.setDrawColor(80,80,80); doc.setLineWidth(0.25); doc.rect(x, y, w, h, 'S')
   }
-
-  function cell(x: number, y: number, w: number, h: number, txt: string, opts?: {
-    bg?: [number, number, number]; color?: [number, number, number]; bold?: boolean; size?: number; align?: 'left' | 'center'
-  }) {
-    if (opts?.bg) fill(x, y, w, h, opts.bg)
-    border(x, y, w, h)
+  const cl = (x: number, y: number, w: number, h: number, txt: string,
+    o?: { bg?: [number,number,number]; color?: [number,number,number]; bold?: boolean; size?: number; align?: 'left'|'center' }) => {
+    if (o?.bg) fl(x, y, w, h, o.bg)
+    bd(x, y, w, h)
     if (!txt) return
-    const size = opts?.size || 7
-    const bold = opts?.bold || false
-    const color = opts?.color || C_BLACK
-    const align = opts?.align || 'center'
-    doc.setFontSize(size)
-    doc.setFont('helvetica', bold ? 'bold' : 'normal')
-    doc.setTextColor(color[0], color[1], color[2])
-    const tx = align === 'center' ? x + w / 2 : x + 2
-    const ty = y + h / 2 + size * 0.12
-    let finalTxt = txt
-    const maxW = w - 4
-    while (doc.getTextWidth(finalTxt) > maxW && finalTxt.length > 1) finalTxt = finalTxt.slice(0, -1)
-    if (finalTxt !== txt && finalTxt.length > 0) finalTxt += '..'
-    doc.text(finalTxt, tx, ty, { align: align === 'center' ? 'center' : 'left' })
+    const sz = o?.size || 7, b = o?.bold || false, c = o?.color || CB, al = o?.align || 'center'
+    doc.setFontSize(sz); doc.setFont('helvetica', b ? 'bold' : 'normal'); doc.setTextColor(c[0], c[1], c[2])
+    const tx = al === 'center' ? x + w/2 : x + 2
+    const ty = y + h/2 + sz * 0.12
+    let ft = txt; const mw = w - 4
+    while (doc.getTextWidth(ft) > mw && ft.length > 1) ft = ft.slice(0, -1)
+    if (ft !== txt && ft.length > 0) ft += '..'
+    doc.text(ft, tx, ty, { align: al === 'center' ? 'center' : 'left' })
+  }
+
+  // Pre-load signature dimensions
+  const sigDims: Record<number, { w: number; h: number }> = {}
+  for (let r = 0; r < p.participants.length; r++) {
+    if (p.participants[r]?.signature) {
+      sigDims[r] = await getImgDims(p.participants[r].signature!)
+    }
+  }
+
+  const justifyLine = (line: string, x: number, y: number, maxW: number, isLast: boolean) => {
+    const words = line.trim().split(' ')
+    if (isLast || words.length <= 1) { doc.text(line, x+2, y); return }
+    const totalW = words.reduce((s, w) => s + doc.getTextWidth(w), 0)
+    const gap = (maxW - 4 - totalW) / (words.length - 1)
+    let cx = x + 2
+    words.forEach(w => { doc.text(w, cx, y); cx += doc.getTextWidth(w) + gap })
   }
 
   let y = M
+  const r0H = 14, logoW = cW(0, 1)
 
-  // ==========================================
-  // ROW 0: Logo (A:B) + Title (C:K) — height 14mm
-  // ==========================================
-  const r0H = 14
-  // Logo area
-  const logoW = cellW(0, 1)
-  if (companyLogo) {
-    border(cellX(0), y, logoW, r0H)
-    try { doc.addImage(companyLogo, 'PNG', cellX(0) + 2, y + 1, logoW - 4, r0H - 2) } catch {}
+  // Logo + title
+  if (p.companyLogo) {
+    bd(cX(0), y, logoW, r0H)
+    try { doc.addImage(p.companyLogo, 'PNG', cX(0)+2, y+1, logoW-4, r0H-2) } catch {}
   } else {
-    cell(cellX(0), y, logoW, r0H, companyName || '', { bold: true, size: 8 })
+    cl(cX(0), y, logoW, r0H, p.companyName || '', { bold: true, size: 8 })
   }
-  // Title
-  cell(cellX(2), y, cellW(2, 10), r0H, 'REGISTRO DE ASISTENCIA A CAPACITACIÓN Y/O EVENTOS', { bold: true, size: 12 })
+  cl(cX(2), y, cW(2,10), r0H, 'REGISTRO DE ASISTENCIA A CAPACITACIÓN Y/O EVENTOS', { bold: true, size: 12 })
   y += r0H
 
-  // ==========================================
-  // ROW 1: Headers — Versión | Código | Área | Fecha Elaboración | Fecha Revisión
-  // ==========================================
-  const r1H = 6
-  cell(cellX(0), y, logoW, r1H, '') // empty logo continuation
-  cell(cellX(2), y, cols[2], r1H, 'Versión', { bold: true, size: 6.5 })
-  cell(cellX(3), y, cellW(3, 4), r1H, 'Código', { bold: true, size: 6.5 })
-  cell(cellX(5), y, cols[5], r1H, 'Área', { bold: true, size: 6.5 })
-  cell(cellX(6), y, cellW(6, 8), r1H, 'Fecha de Elaboración', { bold: true, size: 6.5 })
-  cell(cellX(9), y, cellW(9, 10), r1H, 'Fecha de Revisión', { bold: true, size: 6.5 })
-  y += r1H
+  // Version/code labels
+  cl(cX(0), y, logoW, 6, '')
+  cl(cX(2), y, cols[2], 6, 'Versión', { bold: true, size: 6.5 })
+  cl(cX(3), y, cW(3,4), 6, 'Código',  { bold: true, size: 6.5 })
+  cl(cX(5), y, cols[5], 6, 'Área',    { bold: true, size: 6.5 })
+  cl(cX(6), y, cW(6,8), 6, 'Fecha de Elaboración', { bold: true, size: 6.5 })
+  cl(cX(9), y, cW(9,10), 6, 'Fecha de Revisión',   { bold: true, size: 6.5 })
+  y += 6
 
-  // ROW 2: Values
-  const r2H = 6
-  cell(cellX(0), y, logoW, r2H, '') // logo bottom
-  cell(cellX(2), y, cols[2], r2H, '1', { size: 7 })
-  cell(cellX(3), y, cellW(3, 4), r2H, 'AVC-FR05', { size: 7 })
-  cell(cellX(5), y, cols[5], r2H, 'CEO', { size: 7 })
-  cell(cellX(6), y, cellW(6, 8), r2H, '14/10/2025', { size: 7 })
-  cell(cellX(9), y, cellW(9, 10), r2H, '22/01/2026', { size: 7 })
-  y += r2H
+  // Version/code values
+  cl(cX(0), y, logoW, 6, '')
+  cl(cX(2), y, cols[2], 6, '1',          { size: 7 })
+  cl(cX(3), y, cW(3,4), 6, 'AVC-FR05',  { size: 7 })
+  cl(cX(5), y, cols[5], 6, 'CEO',        { size: 7 })
+  cl(cX(6), y, cW(6,8), 6, '14/10/2025',{ size: 7 })
+  cl(cX(9), y, cW(9,10), 6, '22/01/2026',{ size: 7 })
+  y += 6
 
-  // ==========================================
-  // ROW 3: FECHA | HORARIO | INTENSIDAD  (3 label+value pairs)
-  // ==========================================
-  const r3H = 9
-  // FECHA label (A:B)
-  cell(cellX(0), y, cellW(0, 1), r3H, 'FECHA', { bg: C_GREEN, color: C_WHITE, bold: true, size: 8 })
-  // FECHA value (C:D)
-  cell(cellX(2), y, cellW(2, 3), r3H, today, { size: 8 })
-  // HORARIO label (E:F)
-  cell(cellX(4), y, cellW(4, 5), r3H, 'HORARIO', { bg: C_GREEN, color: C_WHITE, bold: true, size: 8 })
-  // HORARIO value (G:H)
-  cell(cellX(6), y, cellW(6, 7), r3H, '', { size: 8 })
-  // INTENSIDAD label (I)
-  cell(cellX(8), y, cellW(8, 9), r3H, 'INTENSIDAD', { bg: C_GREEN, color: C_WHITE, bold: true, size: 8 })
-  // INTENSIDAD value (J:K)
-  cell(cellX(10), y, cols[10], r3H, training.duration || '4h', { size: 8 })
-  y += r3H
+  // Fecha / Horario / Intensidad
+  cl(cX(0), y, cW(0,1), 9, 'FECHA',      { bg: CG, color: CW, bold: true, size: 8 })
+  cl(cX(2), y, cW(2,3), 9, p.eventDate,  { size: 8 })
+  cl(cX(4), y, cW(4,5), 9, 'HORARIO',    { bg: CG, color: CW, bold: true, size: 8 })
+  cl(cX(6), y, cW(6,7), 9, p.schedule,   { size: 7 })
+  cl(cX(8), y, cW(8,9), 9, 'INTENSIDAD', { bg: CG, color: CW, bold: true, size: 8 })
+  cl(cX(10), y, cols[10], 9, p.intensity, { size: 7 })
+  y += 9
 
-  // ==========================================
-  // ROW 4: ORGANIZADO POR | REALIZADO POR | DIRIGIDO A
-  // ==========================================
-  const r4H = 9
-  cell(cellX(0), y, cellW(0, 1), r4H, 'ORGANIZADO POR', { bg: C_GREEN, color: C_WHITE, bold: true, size: 7 })
-  cell(cellX(2), y, cellW(2, 3), r4H, companyName || '', { size: 7 })
-  cell(cellX(4), y, cellW(4, 5), r4H, 'REALIZADO POR', { bg: C_GREEN, color: C_WHITE, bold: true, size: 7 })
-  cell(cellX(6), y, cellW(6, 7), r4H, companyName || '', { size: 7 })
-  cell(cellX(8), y, cellW(8, 9), r4H, 'DIRIGIDO A', { bg: C_GREEN, color: C_WHITE, bold: true, size: 7 })
-  cell(cellX(10), y, cols[10], r4H, 'TRABAJADORES', { size: 7 })
-  y += r4H
+  // Organizado / Realizado / Dirigido
+  cl(cX(0), y, cW(0,1), 9, 'ORGANIZADO POR', { bg: CG, color: CW, bold: true, size: 7 })
+  cl(cX(2), y, cW(2,3), 9, p.organizedBy,    { size: 6 })
+  cl(cX(4), y, cW(4,5), 9, 'REALIZADO POR',  { bg: CG, color: CW, bold: true, size: 7 })
+  const rpX = cX(6), rpW = cW(6,7)
+  fl(rpX, y, rpW, 9, CW); bd(rpX, y, rpW, 9)
+  doc.setFontSize(7); doc.setFont('helvetica','bold'); doc.setTextColor(0,0,0)
+  doc.text(p.instructor, rpX + rpW/2, y+3.5, { align: 'center' })
+  doc.setFontSize(5.5); doc.setFont('helvetica','normal')
+  doc.text('Profesional SST', rpX + rpW/2, y+7, { align: 'center' })
+  cl(cX(8), y, cW(8,9), 9, 'DIRIGIDO A', { bg: CG, color: CW, bold: true, size: 7 })
+  cl(cX(10), y, cols[10], 9, p.directedTo.toUpperCase(), { size: 7 })
+  y += 9
 
-  // ==========================================
-  // ROW 5: TEMARIO DEL EVENTO (full width, orange)
-  // ==========================================
-  const r5H = 7
-  cell(cellX(0), y, usable, r5H, 'TEMARIO DEL EVENTO', { bg: C_ORANGE, color: C_WHITE, bold: true, size: 9 })
-  y += r5H
-
-  // ==========================================
-  // ROWS 6-11: Temario content (6 rows, full width)
-  // ==========================================
-  const temarioH = 6
-  // First row: training title
-  cell(cellX(0), y, usable, temarioH, training.title, { bold: true, size: 8, align: 'left' })
-  y += temarioH
-  // Description rows
-  const descLines = training.description ? doc.splitTextToSize(training.description, usable - 6) : []
-  for (let i = 0; i < 5; i++) {
-    cell(cellX(0), y, usable, temarioH, descLines[i] || '', { size: 7, align: 'left' })
-    y += temarioH
+  // Temario
+  cl(cX(0), y, usable, 7, 'TEMARIO DEL EVENTO', { bg: CO, color: CW, bold: true, size: 9 })
+  y += 7
+  cl(cX(0), y, usable, 6, p.trainingTitle, { bold: true, size: 8, align: 'left' })
+  y += 6
+  const dl: string[] = p.trainingTemario ? doc.splitTextToSize(p.trainingTemario, usable-4) : []
+  for (let i = 0; i < 8; i++) {
+    if (!dl[i] && i > 0 && !dl[i-1]) break
+    fl(cX(0), y, usable, 6, CW); bd(cX(0), y, usable, 6)
+    if (dl[i]) {
+      doc.setFontSize(7); doc.setFont('helvetica','normal'); doc.setTextColor(0,0,0)
+      justifyLine(dl[i], cX(0), y+4.5, usable, i === dl.length-1)
+    }
+    y += 6
   }
 
-  // ==========================================
-  // ROW 12: REGISTRO DE PARTICIPANTES (full width, orange)
-  // ==========================================
-  cell(cellX(0), y, usable, r5H, 'REGISTRO DE PARTICIPANTES', { bg: C_ORANGE, color: C_WHITE, bold: true, size: 9 })
-  y += r5H
-
-  // ==========================================
-  // ROW 13: Table header — Nº | CÉDULA (B:C) | NOMBRES Y APELLIDOS (D:G) | CARGO (H:J) | FIRMA (K)
-  // ==========================================
+  // Participants
+  cl(cX(0), y, usable, 7, 'REGISTRO DE PARTICIPANTES', { bg: CO, color: CW, bold: true, size: 9 })
+  y += 7
   const thH = 8
-  cell(cellX(0), y, cols[0], thH, 'Nº', { bg: C_LIGHT_ORANGE, bold: true, size: 8 })
-  cell(cellX(1), y, cellW(1, 2), thH, 'CÉDULA', { bg: C_LIGHT_ORANGE, bold: true, size: 8 })
-  cell(cellX(3), y, cellW(3, 6), thH, 'NOMBRES Y APELLIDOS', { bg: C_LIGHT_ORANGE, bold: true, size: 8 })
-  cell(cellX(7), y, cellW(7, 9), thH, 'CARGO', { bg: C_LIGHT_ORANGE, bold: true, size: 8 })
-  cell(cellX(10), y, cols[10], thH, 'FIRMA', { bg: C_LIGHT_ORANGE, bold: true, size: 8 })
-  y += thH
+  const drawTH = () => {
+    cl(cX(0),  y, cols[0],  thH, 'Nº',                 { bg: CLO, bold: true, size: 8 })
+    cl(cX(1),  y, cW(1,2),  thH, 'CÉDULA',             { bg: CLO, bold: true, size: 8 })
+    cl(cX(3),  y, cW(3,6),  thH, 'NOMBRES Y APELLIDOS',{ bg: CLO, bold: true, size: 8 })
+    cl(cX(7),  y, cW(7,9),  thH, 'CARGO',              { bg: CLO, bold: true, size: 8 })
+    cl(cX(10), y, cols[10], thH, 'FIRMA',              { bg: CLO, bold: true, size: 8 })
+    y += thH
+  }
+  drawTH()
 
-  // ==========================================
-  // ROWS 14+: Participant data rows (25 rows)
-  // ==========================================
-  const rowH = 10
-  const totalRows = Math.max(participants.length, 25)
-
-  for (let r = 0; r < totalRows; r++) {
-    // New page if needed
-    if (y + rowH > 215.9 - M) {
-      doc.addPage()
-      y = M
-      // Repeat header on new page
-      cell(cellX(0), y, cols[0], thH, 'Nº', { bg: C_LIGHT_ORANGE, bold: true, size: 8 })
-      cell(cellX(1), y, cellW(1, 2), thH, 'CÉDULA', { bg: C_LIGHT_ORANGE, bold: true, size: 8 })
-      cell(cellX(3), y, cellW(3, 6), thH, 'NOMBRES Y APELLIDOS', { bg: C_LIGHT_ORANGE, bold: true, size: 8 })
-      cell(cellX(7), y, cellW(7, 9), thH, 'CARGO', { bg: C_LIGHT_ORANGE, bold: true, size: 8 })
-      cell(cellX(10), y, cols[10], thH, 'FIRMA', { bg: C_LIGHT_ORANGE, bold: true, size: 8 })
-      y += thH
+  const rowH = 10, totalR = Math.max(p.participants.length, 20)
+  for (let r = 0; r < totalR; r++) {
+    if (y + rowH > 215.9 - M) { doc.addPage(); y = M; drawTH() }
+    const part = p.participants[r]
+    cl(cX(0), y, cols[0],  rowH, String(r+1),       { bg: CW, bold: true, size: 8 })
+    cl(cX(1), y, cW(1,2),  rowH, part?.cedula || '', { bg: CW, size: 8 })
+    cl(cX(3), y, cW(3,6),  rowH, part?.name   || '', { bg: CW, size: 8, align: 'left' })
+    cl(cX(7), y, cW(7,9),  rowH, part?.cargo  || '', { bg: CW, size: 7, align: 'left' })
+    fl(cX(10), y, cols[10], rowH, CW); bd(cX(10), y, cols[10], rowH)
+    if (part?.signature && sigDims[r]) {
+      try {
+        const { w: iw, h: ih } = sigDims[r]
+        const aspect = iw / (ih || 1)
+        const maxH = rowH - 2, maxW = cols[10] - 4
+        const drawH = Math.min(maxH, maxW / aspect)
+        const drawW = drawH * aspect
+        doc.addImage(part.signature, 'PNG',
+          cX(10) + (cols[10] - drawW) / 2,
+          y      + (rowH    - drawH) / 2,
+          drawW, drawH)
+      } catch {}
     }
-
-    const p = participants[r]
-    const bg = r % 2 === 1 ? C_LIGHT_GREEN : C_WHITE
-
-    cell(cellX(0), y, cols[0], rowH, String(r + 1), { bg, bold: true, size: 8 })
-    cell(cellX(1), y, cellW(1, 2), rowH, p?.cedula || '', { bg, size: 8 })
-    cell(cellX(3), y, cellW(3, 6), rowH, p?.name || '', { bg, size: 8, align: 'left' })
-    cell(cellX(7), y, cellW(7, 9), rowH, p?.cargo || '', { bg, size: 7, align: 'left' })
-
-    // Firma column
-    const fX = cellX(10)
-    const fW = cols[10]
-    fill(fX, y, fW, rowH, bg)
-    border(fX, y, fW, rowH)
-    if (p?.signature) {
-      try { doc.addImage(p.signature, 'PNG', fX + 2, y + 1, fW - 4, rowH - 2) } catch {}
-    }
-
     y += rowH
   }
 
-  doc.save(`Lista_Asistencia_${training.title.replace(/[^a-zA-Z0-9áéíóúñÁÉÍÓÚÑ ]/g, '').replace(/\s+/g, '_').slice(0, 40)}.pdf`)
+  return doc.output('blob')
 }

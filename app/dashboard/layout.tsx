@@ -11,7 +11,7 @@ import {
   ChevronLeft, ChevronRight, Search, Menu, X,
   Palette, Building2, Layers, UserCheck, Briefcase,
   CalendarDays, GraduationCap, TrendingUp,
-  ClipboardList, Home, Activity
+  ClipboardList, Home, Activity, FileCheck2
 } from 'lucide-react'
 import { CommandPalette } from '@/components/CommandPalette'
 import { useTheme, THEMES, type ThemeId } from '@/components/ThemeProvider'
@@ -36,10 +36,11 @@ const ADMIN_NAV = [
   {
     section: 'FORMACIÓN',
     items: [
-      { href: '/dashboard/trainings',      icon: BookOpen,      label: 'Biblioteca' },
-      { href: '/dashboard/plan',           icon: CalendarDays,  label: 'Plan Anual' },
-      { href: '/dashboard/profiles',       icon: GraduationCap, label: 'Perfiles de Formación' },
-      { href: '/dashboard/enrollments',    icon: TrendingUp,    label: 'Trazabilidad' },
+      { href: '/dashboard/trainings',          icon: BookOpen,      label: 'Biblioteca' },
+      { href: '/dashboard/plan',               icon: CalendarDays,  label: 'Plan Anual' },
+      { href: '/dashboard/profiles',           icon: GraduationCap, label: 'Perfiles de Formación' },
+      { href: '/dashboard/enrollments',        icon: TrendingUp,    label: 'Trazabilidad' },
+      { href: '/dashboard/attendance-lists',   icon: FileCheck2,    label: 'Listas de Asistencia' },
     ]
   },
   {
