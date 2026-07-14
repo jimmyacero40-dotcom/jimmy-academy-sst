@@ -75,7 +75,7 @@ function ProfileCard({
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-1.5">
             <span className="font-semibold text-sm truncate" style={{ color: 'var(--text)' }}>{profile.name}</span>
-            {warn && <AlertTriangle size={11} className="text-amber-400 flex-shrink-0" title="Sin cursos asignados" />}
+            {warn && <AlertTriangle size={11} className="text-amber-400 flex-shrink-0" aria-label="Sin cursos asignados" />}
           </div>
           <div className="text-xs mt-0.5 flex items-center gap-1.5" style={{ color: 'var(--text-dim)' }}>
             <BookOpen size={9} />
