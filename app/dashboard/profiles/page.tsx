@@ -211,6 +211,8 @@ export default function ProfilesPage() {
   const [dragOverSlot, setDragOverSlot] = useState<number | null>(null) // insert before this index in assigned
   const [dragOverPool, setDragOverPool] = useState(false)
   const dragCounter                     = useRef(0)
+  // Sync dedup guard: tracks IDs currently being inserted (survives React state batching)
+  const insertingIds                    = useRef<Set<number>>(new Set())
 
   // ── Data loading ────────────────────────────────────────────────────────
   const loadProfiles = useCallback(async () => {
@@ -327,15 +329,26 @@ export default function ProfilesPage() {
 
   const moveFromPoolToAssigned = (trainingId: number, beforeIndex?: number) => {
     const training = allTrainings.find(t => t.id === trainingId)
-    if (!training || assignedIds.has(trainingId)) return
+    if (!training) return
+    // Sync guard: block if already inserting this id (survives React state batching)
+    if (insertingIds.current.has(trainingId)) return
+    // State guard: block if already in the assigned list
+    if (assignedIds.has(trainingId)) return
+    insertingIds.current.add(trainingId)
     const newAssignment: Assignment = { ...training, required: true, sort_order: assigned.length }
     if (beforeIndex !== undefined && beforeIndex >= 0 && beforeIndex <= assigned.length) {
       const next = [...assigned]
       next.splice(beforeIndex, 0, newAssignment)
       setAssigned(next)
     } else {
-      setAssigned(prev => [...prev, newAssignment])
+      setAssigned(prev => {
+        // Final guard inside functional updater (catches any remaining race)
+        if (prev.some(t => t.id === trainingId)) return prev
+        return [...prev, newAssignment]
+      })
     }
+    // Release after React flushes the update
+    setTimeout(() => insertingIds.current.delete(trainingId), 0)
   }
 
   const moveFromAssignedToPool = (trainingId: number) => {
@@ -369,6 +382,7 @@ export default function ProfilesPage() {
   const onPoolDragLeave = () => { dragCounter.current--; if (dragCounter.current <= 0) setDragOverPool(false) }
   const onPoolDrop = (e: React.DragEvent) => {
     e.preventDefault()
+    e.stopPropagation()
     setDragOverPool(false)
     dragCounter.current = 0
     if (dragSrc?.col === 'assigned') moveFromAssignedToPool(dragSrc.id)
@@ -382,6 +396,7 @@ export default function ProfilesPage() {
   }
   const onAssignedColumnDrop = (e: React.DragEvent, beforeIndex: number | null) => {
     e.preventDefault()
+    e.stopPropagation() // prevent bubbling to parent drop zones
     setDragOverSlot(null)
     if (!dragSrc) return
     if (dragSrc.col === 'pool') {
@@ -578,8 +593,8 @@ export default function ProfilesPage() {
                   <div
                     className="h-full min-h-40 flex flex-col items-center justify-center rounded-2xl border-2 border-dashed"
                     style={{ borderColor: 'var(--border)', color: 'var(--text-faint)' }}
-                    onDragOver={e => { e.preventDefault(); setDragOverSlot(0) }}
-                    onDrop={e => onAssignedColumnDrop(e, 0)}>
+                    onDragOver={e => { e.preventDefault(); e.stopPropagation(); setDragOverSlot(0) }}
+                    onDrop={e => { e.stopPropagation(); onAssignedColumnDrop(e, 0) }}>
                     <ArrowRight size={24} className="mb-2 opacity-30" />
                     <p className="text-sm font-semibold">Arrastra cursos aquí</p>
                     <p className="text-xs mt-1 opacity-60">o haz clic en un curso de la izquierda</p>
@@ -592,8 +607,8 @@ export default function ProfilesPage() {
                         <div
                           className="transition-all"
                           style={{ height: dragOverSlot === i && dragSrc ? 36 : 4 }}
-                          onDragOver={e => onAssignedDragOver(e, i)}
-                          onDrop={e => onAssignedColumnDrop(e, i)}>
+                          onDragOver={e => { e.stopPropagation(); onAssignedDragOver(e, i) }}
+                          onDrop={e => { e.stopPropagation(); onAssignedColumnDrop(e, i) }}>
                           {dragOverSlot === i && dragSrc && (
                             <div className="mx-2 h-8 rounded-xl border-2 border-dashed flex items-center justify-center"
                               style={{ borderColor: 'var(--primary)', background: 'var(--primary-dim)' }}>
@@ -626,8 +641,8 @@ export default function ProfilesPage() {
                     <div
                       className="transition-all"
                       style={{ height: dragOverSlot === assigned.length && dragSrc ? 36 : 8 }}
-                      onDragOver={e => onAssignedDragOver(e, assigned.length)}
-                      onDrop={e => onAssignedColumnDrop(e, null)}>
+                      onDragOver={e => { e.stopPropagation(); onAssignedDragOver(e, assigned.length) }}
+                      onDrop={e => { e.stopPropagation(); onAssignedColumnDrop(e, null) }}>
                       {dragOverSlot === assigned.length && dragSrc && (
                         <div className="mx-2 h-8 rounded-xl border-2 border-dashed flex items-center justify-center"
                           style={{ borderColor: 'var(--primary)', background: 'var(--primary-dim)' }}>
