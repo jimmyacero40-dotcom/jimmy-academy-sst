@@ -344,17 +344,20 @@ export default function PlanPage() {
   const [saving, setSaving]             = useState(false)
 
   // Editor
-  const [editingPlan, setEditingPlan]   = useState<Plan | null>(null)
-  const [items, setItems]               = useState<PlanItem[]>([])
+  const [editingPlan, setEditingPlan]     = useState<Plan | null>(null)
+  const [items, setItems]                 = useState<PlanItem[]>([])
   const [profileTrainings, setProfileTrainings] = useState<ProfileTraining[]>([])
   const [loadingEditor, setLoadingEditor] = useState(false)
-  const [selectedItem, setSelectedItem] = useState<PlanItem | null>(null)
-  const [deleting, setDeleting]         = useState<string | null>(null)
+  const [loadingProfile, setLoadingProfile] = useState(false)
+  const [selectedItem, setSelectedItem]   = useState<PlanItem | null>(null)
+  const [deleting, setDeleting]           = useState<string | null>(null)
+  // Active profile in the left panel (can be changed without affecting the plan record)
+  const [activePanelProfile, setActivePanelProfile] = useState<string>('')
 
   // DnD
-  const [dragSrc, setDragSrc]           = useState<{ type: 'pool' | 'item'; id: number | string } | null>(null)
+  const [dragSrc, setDragSrc]             = useState<{ type: 'pool' | 'item'; id: number | string } | null>(null)
   const [dragOverMonth, setDragOverMonth] = useState<number | null>(null)
-  const dragCounter                     = useRef<Record<number, number>>({})
+  const dragCounter                       = useRef<Record<number, number>>({})
 
   // ── Load ────────────────────────────────────────────────────────────────
   const loadPlans = useCallback(async () => {
@@ -375,9 +378,12 @@ export default function PlanPage() {
     setItems([])
     setProfileTrainings([])
 
+    const startProfileId = plan.profile_id ?? ''
+    setActivePanelProfile(startProfileId)
+
     const [iRes, ptRes] = await Promise.all([
       fetch(`/api/plans/${plan.id}/items`),
-      plan.profile_id ? fetch(`/api/profiles/${plan.profile_id}/trainings`) : Promise.resolve(null),
+      startProfileId ? fetch(`/api/profiles/${startProfileId}/trainings`) : Promise.resolve(null),
     ])
     if (iRes.ok) setItems(await iRes.json())
     if (ptRes?.ok) {
@@ -385,6 +391,19 @@ export default function PlanPage() {
       setProfileTrainings([...data].sort((a: any, b: any) => (a.sort_order ?? 0) - (b.sort_order ?? 0)))
     }
     setLoadingEditor(false)
+  }, [])
+
+  // Switch profile in the left panel
+  const switchPanelProfile = useCallback(async (profileId: string) => {
+    setActivePanelProfile(profileId)
+    if (!profileId) { setProfileTrainings([]); return }
+    setLoadingProfile(true)
+    const res = await fetch(`/api/profiles/${profileId}/trainings`)
+    if (res.ok) {
+      const data = await res.json()
+      setProfileTrainings([...data].sort((a: any, b: any) => (a.sort_order ?? 0) - (b.sort_order ?? 0)))
+    }
+    setLoadingProfile(false)
   }, [])
 
   useEffect(() => { loadPlans() }, [loadPlans])
@@ -424,6 +443,12 @@ export default function PlanPage() {
   // ── Item operations ──────────────────────────────────────────────────────
   const addItem = async (trainingId: number, month: number) => {
     if (!editingPlan) return
+    // If this training is already scheduled, move it instead of duplicating
+    const existing = items.find(i => i.trainings.id === trainingId)
+    if (existing) {
+      if (existing.month !== month) await moveItem(existing.id, month)
+      return
+    }
     const res = await fetch(`/api/plans/${editingPlan.id}/items`, {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ training_id: trainingId, month }),
@@ -490,8 +515,8 @@ export default function PlanPage() {
     setDragSrc(null)
   }
 
-  // ── Pool: profile trainings not yet in this month ────────────────────────
-  const scheduledTrainingIds = new Set(items.map(i => i.trainings.id))
+  // ── Map training id → scheduled month ───────────────────────────────────
+  const trainingMonthMap = new Map(items.map(i => [i.trainings.id, i.month]))
 
   // ── EDITOR VIEW ──────────────────────────────────────────────────────────
   if (editingPlan) {
@@ -533,48 +558,86 @@ export default function PlanPage() {
         </div>
 
         <div className="flex flex-1 overflow-hidden">
-          {/* ── LEFT: Profile courses pool ──────────────────────────────── */}
+          {/* ── LEFT: Profile selector + courses ────────────────────────── */}
           <div className="flex flex-col overflow-hidden border-r flex-shrink-0"
-            style={{ width: 220, borderColor: 'var(--border)', background: 'var(--bg-surface)' }}>
-            <div className="px-3 pt-3 pb-1">
-              <div className="text-[10px] font-bold uppercase tracking-widest mb-1" style={{ color: 'var(--text-faint)' }}>
-                {editingPlan.profile_id ? 'Cursos del perfil' : 'Sin perfil asignado'}
+            style={{ width: 236, borderColor: 'var(--border)', background: 'var(--bg-surface)' }}>
+
+            {/* Profile selector */}
+            <div className="px-3 pt-3 pb-2 flex-shrink-0" style={{ borderBottom: '1px solid var(--border)' }}>
+              <div className="text-[10px] font-bold uppercase tracking-widest mb-1.5" style={{ color: 'var(--text-faint)' }}>
+                Perfil
               </div>
+              <select
+                value={activePanelProfile}
+                onChange={e => switchPanelProfile(e.target.value)}
+                className="terra-input text-xs py-1.5 w-full">
+                <option value="">— Selecciona un perfil —</option>
+                {profiles.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+              </select>
             </div>
-            <div className="flex-1 overflow-y-auto px-2 pb-3 space-y-1">
-              {profileTrainings.map(t => {
-                const color = catColor(t.category)
-                const alreadyAll = scheduledTrainingIds.has(t.id)
-                return (
-                  <div key={t.id}
-                    draggable={!alreadyAll}
-                    onDragStart={() => !alreadyAll && setDragSrc({ type: 'pool', id: t.id })}
-                    onDragEnd={() => setDragSrc(null)}
-                    style={{ opacity: alreadyAll ? 0.35 : 1, cursor: alreadyAll ? 'default' : 'grab' }}>
-                    <div className="rounded-xl px-2 py-1.5"
-                      style={{ background: color + '10', border: `1px solid ${color}25` }}>
-                      <div className="flex items-center gap-1 min-w-0">
-                        {t.required && <Star size={8} fill="#FCD34D" style={{ color: '#FCD34D', flexShrink: 0 }} />}
-                        <span className="text-[11px] font-semibold truncate" style={{ color: 'var(--text)' }}>{t.title}</span>
-                      </div>
-                      <div className="text-[9px] mt-0.5 flex items-center gap-1" style={{ color: 'var(--text-faint)' }}>
-                        {alreadyAll && <Check size={8} className="text-emerald-400" />}
-                        <span className="truncate">{t.category}</span>
-                        {t.duration && <><span>·</span><span>{t.duration}</span></>}
+
+            {/* Course list */}
+            <div className="flex-1 overflow-y-auto px-2 py-2 space-y-1">
+              {loadingProfile ? (
+                <div className="flex items-center justify-center py-8">
+                  <Loader2 size={16} className="animate-spin" style={{ color: 'var(--primary)' }} />
+                </div>
+              ) : !activePanelProfile ? (
+                <div className="flex flex-col items-center justify-center py-8 text-center px-3">
+                  <GraduationCap size={22} className="mb-2 opacity-30" style={{ color: 'var(--text-faint)' }} />
+                  <p className="text-[10px]" style={{ color: 'var(--text-faint)' }}>
+                    Selecciona un perfil para ver sus cursos y arrastrarlos al calendario
+                  </p>
+                </div>
+              ) : profileTrainings.length === 0 ? (
+                <p className="text-[10px] text-center py-8 px-3" style={{ color: 'var(--text-faint)' }}>
+                  Este perfil no tiene cursos asignados. Ve a Perfiles de Formación para agregarlos.
+                </p>
+              ) : (
+                profileTrainings.map(t => {
+                  const color = catColor(t.category)
+                  const scheduledMonth = trainingMonthMap.get(t.id)
+                  const isScheduled = scheduledMonth !== undefined
+                  return (
+                    <div key={t.id}
+                      draggable
+                      onDragStart={() => setDragSrc({ type: 'pool', id: t.id })}
+                      onDragEnd={() => setDragSrc(null)}
+                      style={{ cursor: 'grab' }}>
+                      <div className="rounded-xl px-2 py-1.5 transition-all"
+                        style={{
+                          background: isScheduled ? color + '18' : color + '0d',
+                          border: `1px solid ${isScheduled ? color + '40' : color + '20'}`,
+                        }}>
+                        <div className="flex items-center gap-1 min-w-0">
+                          {t.required && <Star size={8} fill="#FCD34D" style={{ color: '#FCD34D', flexShrink: 0 }} />}
+                          <span className="text-[11px] font-semibold truncate" style={{ color: 'var(--text)' }}>{t.title}</span>
+                        </div>
+                        <div className="flex items-center justify-between mt-0.5">
+                          <span className="text-[9px] truncate" style={{ color: 'var(--text-faint)' }}>{t.category}</span>
+                          {isScheduled ? (
+                            <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full flex-shrink-0 ml-1"
+                              style={{ background: color + '20', color, border: `1px solid ${color}30` }}>
+                              {MONTHS_FULL[scheduledMonth - 1].slice(0, 3)}
+                            </span>
+                          ) : (
+                            <span className="text-[9px] px-1 rounded flex-shrink-0 ml-1" style={{ color: 'var(--text-faint)' }}>
+                              Sin prog.
+                            </span>
+                          )}
+                        </div>
                       </div>
                     </div>
-                  </div>
-                )
-              })}
-              {profileTrainings.length === 0 && (
-                <p className="text-[10px] text-center py-4" style={{ color: 'var(--text-faint)' }}>
-                  {editingPlan.profile_id ? 'El perfil no tiene cursos' : 'Asigna un perfil al plan para ver sus cursos aquí'}
-                </p>
+                  )
+                })
               )}
             </div>
-            <div className="px-2 pb-3 text-[9px] text-center" style={{ color: 'var(--text-faint)' }}>
-              Arrastra a un mes →
-            </div>
+
+            {activePanelProfile && profileTrainings.length > 0 && (
+              <div className="px-2 pb-2 text-[9px] text-center flex-shrink-0" style={{ color: 'var(--text-faint)' }}>
+                Arrastra a un mes → · arrastrar reprograma
+              </div>
+            )}
           </div>
 
           {/* ── RIGHT: Calendar grid ────────────────────────────────────── */}

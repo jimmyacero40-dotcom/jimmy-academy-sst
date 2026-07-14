@@ -315,9 +315,8 @@ export default function ProfilesPage() {
   // ── DnD helpers ──────────────────────────────────────────────────────────
   const assignedIds = new Set(assigned.map(t => t.id))
 
-  // Pool: all trainings not assigned, filtered by search
+  // Pool: ALL trainings (library never loses courses), filtered by search only
   const pool = allTrainings.filter(t => {
-    if (assignedIds.has(t.id)) return false
     if (!search) return true
     const q = search.toLowerCase()
     return t.title.toLowerCase().includes(q) || (t.category || '').toLowerCase().includes(q)
@@ -477,7 +476,7 @@ export default function ProfilesPage() {
               <div className="px-4 pt-4 pb-2 flex-shrink-0">
                 <div className="flex items-center justify-between mb-3">
                   <span className="text-xs font-bold uppercase tracking-widest" style={{ color: 'var(--text-faint)' }}>
-                    Biblioteca ({pool.length + assigned.length} cursos)
+                    Biblioteca ({allTrainings.length} cursos)
                   </span>
                   {dragSrc?.col === 'assigned' && (
                     <span className="text-[10px] px-2 py-0.5 rounded-full font-semibold"
@@ -504,7 +503,7 @@ export default function ProfilesPage() {
                   </p>
                 ) : categories.length === 0 ? (
                   <p className="text-center py-8 text-xs" style={{ color: 'var(--text-faint)' }}>
-                    Todos los cursos ya están asignados a este perfil
+                    La biblioteca no tiene cursos activos
                   </p>
                 ) : (
                   categories.map(cat => {
@@ -519,42 +518,36 @@ export default function ProfilesPage() {
                           </span>
                         </div>
                         <div className="space-y-1">
-                          {items.map(t => (
-                            <TrainingCard
-                              key={t.id}
-                              training={t}
-                              dragging={dragSrc?.id === t.id && dragSrc.col === 'pool'}
-                              assigned={false}
-                              onDragStart={() => setDragSrc({ col: 'pool', id: t.id })}
-                              onDragEnd={() => { setDragSrc(null); setDragOverSlot(null) }}
-                              onClick={() => moveFromPoolToAssigned(t.id)}
-                            />
-                          ))}
+                          {items.map(t => {
+                            const alreadyIn = assignedIds.has(t.id)
+                            return (
+                              <div key={t.id} className="relative">
+                                <TrainingCard
+                                  training={t}
+                                  dragging={dragSrc?.id === t.id && dragSrc.col === 'pool'}
+                                  assigned={false}
+                                  onDragStart={() => !alreadyIn && setDragSrc({ col: 'pool', id: t.id })}
+                                  onDragEnd={() => { setDragSrc(null); setDragOverSlot(null) }}
+                                  onClick={() => {
+                                    if (!alreadyIn) moveFromPoolToAssigned(t.id)
+                                  }}
+                                />
+                                {alreadyIn && (
+                                  <div className="absolute inset-0 rounded-xl flex items-center justify-end pr-2 pointer-events-none"
+                                    style={{ background: 'rgba(16,185,129,0.07)' }}>
+                                    <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full flex items-center gap-0.5"
+                                      style={{ background: 'rgba(16,185,129,0.15)', color: '#34D399', border: '1px solid rgba(16,185,129,0.25)' }}>
+                                      <Check size={7} /> En perfil
+                                    </span>
+                                  </div>
+                                )}
+                              </div>
+                            )
+                          })}
                         </div>
                       </div>
                     )
                   })
-                )}
-
-                {/* Assigned (greyed out) in pool */}
-                {assigned.length > 0 && !search && (
-                  <div className="mt-2 mb-1">
-                    <div className="flex items-center gap-1.5 mb-2 px-1">
-                      <Check size={9} className="text-emerald-400" />
-                      <span className="text-[10px] font-bold uppercase tracking-widest" style={{ color: 'var(--text-faint)' }}>
-                        Ya asignados ({assigned.length})
-                      </span>
-                    </div>
-                    <div className="space-y-1 opacity-40">
-                      {assigned.map(t => (
-                        <div key={t.id} className="flex items-center gap-2 px-2.5 py-1.5 rounded-xl"
-                          style={{ background: 'var(--bg-card)', border: '1px solid var(--border)' }}>
-                          <Check size={10} className="text-emerald-400 flex-shrink-0" />
-                          <span className="text-xs truncate" style={{ color: 'var(--text-dim)' }}>{t.title}</span>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
                 )}
               </div>
             </div>
