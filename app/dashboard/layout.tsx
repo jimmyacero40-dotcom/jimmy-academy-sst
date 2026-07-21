@@ -11,7 +11,7 @@ import {
   ChevronLeft, ChevronRight, Search, Menu, X,
   Palette, Building2, Layers, UserCheck, Briefcase,
   CalendarDays, GraduationCap, TrendingUp,
-  ClipboardList, Home, Activity, FileCheck2
+  ClipboardList, Home, Activity, FileCheck2, FileText
 } from 'lucide-react'
 import { CommandPalette } from '@/components/CommandPalette'
 import { useTheme, THEMES, type ThemeId } from '@/components/ThemeProvider'
@@ -47,6 +47,7 @@ const ADMIN_NAV = [
     section: 'GESTIÓN',
     items: [
       { href: '/dashboard/certificates',   icon: Award,         label: 'Certificados' },
+      { href: '/dashboard/legal-docs',     icon: FileText,      label: 'Documentos Legales' },
       { href: '/dashboard/reports',        icon: BarChart2,     label: 'Reportes' },
     ]
   },
@@ -65,6 +66,7 @@ const ADMIN_NAV = [
 const WORKER_NAV = [
   { href: '/dashboard/my-plan',      icon: Home,         label: 'Inicio' },
   { href: '/dashboard/certificates', icon: Award,        label: 'Mis Certificados' },
+  { href: '/dashboard/legal-docs',   icon: FileText,     label: 'Documentos Legales' },
   { href: '/dashboard/my-profile',   icon: Briefcase,    label: 'Mi Perfil' },
   { href: '/dashboard/my-signature', icon: PenTool,      label: 'Mi Firma' },
   { href: '/dashboard/settings',     icon: Settings,     label: 'Configuración' },
