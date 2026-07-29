@@ -18,7 +18,7 @@ interface LegalDoc {
 }
 interface Signature {
   id: string; document_version: string; user_name: string; user_cargo: string
-  company_id: string; ip_address: string; doc_hash: string; signed_at: string
+  user_id: string; company_id: string; ip_address: string; doc_hash: string; signed_at: string
   companies: { name: string } | null; signature_data: string
 }
 
@@ -307,7 +307,7 @@ export default function LegalDocsPage() {
   const [search, setSearch]           = useState('')
 
   // Admin states
-  const [editDoc, setEditDoc]         = useState<LegalDoc | null | 'new'>()
+  const [editDoc, setEditDoc]         = useState<LegalDoc | 'new' | undefined>(undefined)
   const [historyDoc, setHistoryDoc]   = useState<LegalDoc | null>(null)
   const [expanded, setExpanded]       = useState<string | null>(null)
 
@@ -533,9 +533,9 @@ export default function LegalDocsPage() {
 
       {/* Modals & panels */}
       <AnimatePresence>
-        {(editDoc === 'new' || (editDoc && editDoc !== 'new')) && (
+        {editDoc !== undefined && (
           <DocModal
-            doc={editDoc === 'new' ? null : editDoc as LegalDoc}
+            doc={editDoc === 'new' ? null : editDoc}
             onClose={() => setEditDoc(undefined)}
             onSaved={saved => {
               setDocs(prev => {
