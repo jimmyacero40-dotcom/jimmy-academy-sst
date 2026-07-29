@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { supabase } from '@/lib/supabase'
+import { supabaseAdmin as supabase } from '@/lib/supabase-admin'
 import { getCurrentUser, getActiveCompanyId } from '@/lib/get-company'
 
 function calcCompletion(d: Record<string, any>): number {

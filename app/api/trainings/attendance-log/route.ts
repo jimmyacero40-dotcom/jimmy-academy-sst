@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server'
-import { supabase } from '@/lib/supabase'
+import { supabaseAdmin as supabase } from '@/lib/supabase-admin'
 import { getActiveCompanyId, getCurrentUser } from '@/lib/get-company'
 
 // Returns all certificate sessions grouped by (course title, issued date)

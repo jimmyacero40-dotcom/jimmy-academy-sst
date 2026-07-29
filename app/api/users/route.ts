@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { supabase } from '@/lib/supabase'
 import { supabaseAdmin } from '@/lib/supabase-admin'
+const supabase = supabaseAdmin
 import { isAdminOrSuper } from '@/lib/get-company'
 import bcrypt from 'bcryptjs'
 

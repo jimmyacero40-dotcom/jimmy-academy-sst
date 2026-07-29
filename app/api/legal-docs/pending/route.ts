@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server'
-import { supabase } from '@/lib/supabase'
+import { supabaseAdmin as supabase } from '@/lib/supabase-admin'
 import { getCurrentUser } from '@/lib/get-company'
 
 // GET — returns active required documents that the current user has NOT signed (current version)

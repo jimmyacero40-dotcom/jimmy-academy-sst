@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { supabase } from '@/lib/supabase'
+import { supabaseAdmin as supabase } from '@/lib/supabase-admin'
 import { isAdminOrSuper, getCurrentUser } from '@/lib/get-company'
 
 // GET — list all signatures for a document (admin) or own signature (worker)

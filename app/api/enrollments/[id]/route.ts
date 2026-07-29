@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { supabase } from '@/lib/supabase'
+import { supabaseAdmin as supabase } from '@/lib/supabase-admin'
 import { getCurrentUser } from '@/lib/get-company'
 
 // PATCH — update enrollment status (start or complete)
