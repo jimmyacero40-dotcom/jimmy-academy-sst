@@ -13,14 +13,6 @@ export default withAuth(
       }
     }
 
-    // Legal gate: if accessing dashboard without having signed all required docs
-    if (path.startsWith('/dashboard') && token?.email) {
-      const ldOk = req.cookies.get('ld_ok')?.value
-      if (!ldOk || ldOk !== token.email) {
-        return NextResponse.redirect(new URL('/legal-gate', req.url))
-      }
-    }
-
     return NextResponse.next()
   },
   { pages: { signIn: '/login' } }
