@@ -91,54 +91,54 @@
   --glow-amber:     0 0 40px rgba(232,146,10,0.2);
 }
 
-/* ── TEMA 2: AgroSafe Navy — sidebar navy, contenido blanco ──────── */
+/* ── TEMA: AgroSafe Navy — sidebar #0B1829, contenido blanco ────── */
 [data-theme="light"] {
   --primary:        #1A5C1A;
   --primary-light:  #5BAD1F;
-  --primary-dim:    rgba(26,92,26,0.09);
-  --primary-border: rgba(26,92,26,0.22);
+  --primary-dim:    rgba(26,92,26,0.08);
+  --primary-border: rgba(26,92,26,0.18);
 
   --accent:         #E8920A;
-  --accent-dim:     rgba(232,146,10,0.10);
-  --accent-border:  rgba(232,146,10,0.25);
+  --accent-dim:     rgba(232,146,10,0.09);
+  --accent-border:  rgba(232,146,10,0.22);
 
   --bg:             #F4F7F5;
   --bg-surface:     #FFFFFF;
   --bg-card:        #FFFFFF;
-  --bg-card-hover:  #F0F7F2;
+  --bg-card-hover:  #F4F7F5;
 
-  --border:         #E2EDE6;
-  --border-strong:  #C8DED0;
+  --border:         #E4E9E6;
+  --border-strong:  #C8D4CE;
 
-  --text:           #0D2410;
-  --text-dim:       #4A6B52;
-  --text-faint:     #8AA892;
+  --text:           #0D1B14;
+  --text-dim:       #566360;
+  --text-faint:     #9DABA6;
 
-  --grad-main:      linear-gradient(135deg, #1A5C1A, #5BAD1F);
-  --grad-subtle:    linear-gradient(135deg, rgba(26,92,26,0.08), rgba(91,173,31,0.04));
+  /* Sólido — sin gradientes */
+  --grad-main:      #1A5C1A;
+  --grad-subtle:    rgba(26,92,26,0.06);
 
-  --glow-primary:   0 0 40px rgba(26,92,26,0.10);
-  --glow-accent:    0 0 40px rgba(232,146,10,0.10);
+  --glow-primary:   none;
+  --glow-accent:    none;
 
-  --header-bg:      rgba(255,255,255,0.97);
+  --header-bg:      #FFFFFF;
 
-  /* Sidebar navy — igual que en dark para consistencia de marca */
   --sidebar-bg:          #0B1829;
-  --sidebar-border:      rgba(255,255,255,0.07);
-  --sidebar-text:        rgba(255,255,255,0.90);
-  --sidebar-dim:         rgba(255,255,255,0.50);
-  --sidebar-faint:       rgba(255,255,255,0.26);
-  --sidebar-hover-bg:    rgba(255,255,255,0.06);
-  --sidebar-active-bg:   rgba(126,200,0,0.14);
-  --sidebar-active-text: #A3E635;
-  --sidebar-active-bdr:  rgba(126,200,0,0.28);
+  --sidebar-border:      rgba(255,255,255,0.08);
+  --sidebar-text:        rgba(255,255,255,0.92);
+  --sidebar-dim:         rgba(255,255,255,0.52);
+  --sidebar-faint:       rgba(255,255,255,0.28);
+  --sidebar-hover-bg:    rgba(255,255,255,0.07);
+  --sidebar-active-bg:   rgba(91,173,31,0.18);
+  --sidebar-active-text: #5BAD1F;
+  --sidebar-active-bdr:  rgba(91,173,31,0.26);
 
   --amber:          #E8920A;
   --amber-light:    #F5A823;
-  --amber-dim:      rgba(232,146,10,0.10);
-  --amber-border:   rgba(232,146,10,0.25);
-  --glow-amber:     0 0 40px rgba(232,146,10,0.12);
-  --glow-red:       0 0 40px rgba(239,68,68,0.08);
+  --amber-dim:      rgba(232,146,10,0.09);
+  --amber-border:   rgba(232,146,10,0.22);
+  --glow-amber:     none;
+  --glow-red:       none;
   --red-dim:        rgba(239,68,68,0.08);
 }
 
@@ -190,56 +190,56 @@
   --sidebar-active-bdr:  rgba(129,140,248,0.32);
 }
 
-/* ── AgroSafe Green — sidebar bosque oscuro + contenido claro ──────── */
+/* ── TEMA: AgroSafe Green — sidebar #071A0C, contenido blanco ───── */
 [data-theme="verde"] {
   --primary:        #1A5C1A;
   --primary-light:  #5BAD1F;
-  --primary-dim:    rgba(26,92,26,0.10);
-  --primary-border: rgba(26,92,26,0.24);
+  --primary-dim:    rgba(26,92,26,0.08);
+  --primary-border: rgba(26,92,26,0.18);
 
   --accent:         #E8920A;
-  --accent-dim:     rgba(232,146,10,0.10);
-  --accent-border:  rgba(232,146,10,0.25);
+  --accent-dim:     rgba(232,146,10,0.09);
+  --accent-border:  rgba(232,146,10,0.22);
 
-  /* Contenido: claro con tinte verde suave */
-  --bg:             #EFF7F2;
+  --bg:             #F4F7F5;
   --bg-surface:     #FFFFFF;
   --bg-card:        #FFFFFF;
-  --bg-card-hover:  #F0FAF4;
+  --bg-card-hover:  #F4F7F5;
 
-  --border:         #D0E8D8;
-  --border-strong:  #AECFB8;
+  --border:         #E0E8E3;
+  --border-strong:  #C4D4CB;
 
-  --text:           #0A2010;
-  --text-dim:       #3D6348;
-  --text-faint:     #7FA88A;
+  --text:           #0D1B14;
+  --text-dim:       #546060;
+  --text-faint:     #9DABA6;
 
-  --grad-main:      linear-gradient(135deg, #1A5C1A, #5BAD1F);
-  --grad-subtle:    linear-gradient(135deg, rgba(26,92,26,0.10), rgba(91,173,31,0.05));
+  /* Sólido — sin gradientes */
+  --grad-main:      #1A5C1A;
+  --grad-subtle:    rgba(26,92,26,0.06);
 
-  --glow-primary:   0 0 40px rgba(26,92,26,0.12);
-  --glow-accent:    0 0 40px rgba(232,146,10,0.10);
+  --glow-primary:   none;
+  --glow-accent:    none;
 
-  --header-bg:      rgba(255,255,255,0.97);
+  --header-bg:      #FFFFFF;
 
   --amber:          #E8920A;
   --amber-light:    #F5A823;
-  --amber-dim:      rgba(232,146,10,0.10);
+  --amber-dim:      rgba(232,146,10,0.09);
   --amber-border:   rgba(232,146,10,0.22);
-  --glow-amber:     0 0 40px rgba(232,146,10,0.12);
-  --glow-red:       0 0 40px rgba(239,68,68,0.08);
+  --glow-amber:     none;
+  --glow-red:       none;
   --red-dim:        rgba(239,68,68,0.08);
 
-  /* Sidebar: bosque oscuro */
+  /* Sidebar: verde bosque oscuro */
   --sidebar-bg:          #071A0C;
-  --sidebar-border:      rgba(255,255,255,0.07);
-  --sidebar-text:        rgba(255,255,255,0.90);
-  --sidebar-dim:         rgba(255,255,255,0.50);
-  --sidebar-faint:       rgba(255,255,255,0.26);
-  --sidebar-hover-bg:    rgba(255,255,255,0.06);
+  --sidebar-border:      rgba(255,255,255,0.08);
+  --sidebar-text:        rgba(255,255,255,0.92);
+  --sidebar-dim:         rgba(255,255,255,0.52);
+  --sidebar-faint:       rgba(255,255,255,0.28);
+  --sidebar-hover-bg:    rgba(255,255,255,0.07);
   --sidebar-active-bg:   rgba(91,173,31,0.18);
-  --sidebar-active-text: #A3E635;
-  --sidebar-active-bdr:  rgba(91,173,31,0.32);
+  --sidebar-active-text: #5BAD1F;
+  --sidebar-active-bdr:  rgba(91,173,31,0.26);
 }
 
 /* ── TEMA 5: Academy (educativo — violeta/rosa) ──────────────────── */
@@ -336,7 +336,7 @@ body {
 
 /* ── BUTTONS ── */
 .terra-btn {
-  background: var(--grad-main);
+  background: var(--primary);
   color: white;
   border: none;
   border-radius: var(--radius);
@@ -345,15 +345,14 @@ body {
   font-size: 14px;
   font-weight: 700;
   cursor: pointer;
-  transition: all .25s;
+  transition: all .2s;
   display: inline-flex;
   align-items: center;
   gap: 8px;
 }
 .terra-btn:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 12px 32px var(--primary-dim);
-  filter: brightness(1.1);
+  background: var(--primary-light);
+  box-shadow: 0 4px 16px var(--primary-dim);
 }
 .terra-btn:disabled {
   opacity: 0.4;
@@ -424,7 +423,7 @@ select option { background: var(--bg-surface); color: var(--text); }
 .terra-divider {
   width: 36px;
   height: 3px;
-  background: var(--grad-main);
+  background: var(--primary);
   border-radius: 4px;
   flex-shrink: 0;
 }
@@ -437,7 +436,7 @@ select option { background: var(--bg-surface); color: var(--text); }
 
 /* ── PROGRESS BAR ── */
 .terra-progress-track { height: 6px; background: var(--border); border-radius: 100px; overflow: hidden; }
-.terra-progress-fill  { height: 100%; border-radius: 100px; background: var(--grad-main); transition: width 1s ease; }
+.terra-progress-fill  { height: 100%; border-radius: 100px; background: var(--primary); transition: width 1s ease; }
 
 /* ── GLOW EFFECTS ── */
 .glow-amber   { box-shadow: var(--glow-primary); }

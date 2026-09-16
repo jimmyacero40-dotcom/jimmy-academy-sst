@@ -17,7 +17,7 @@ import {
 import { CommandPalette } from '@/components/CommandPalette'
 import { useTheme, THEMES, type ThemeId } from '@/components/ThemeProvider'
 
-// ── Nav type definitions ─────────────────────────────────────────
+// ── Nav type definitions ──────────────────────────────────────────
 type NavLeaf = {
   href: string
   icon: React.ElementType
@@ -36,7 +36,7 @@ type NavEntry =
   | { kind: 'section'; label: string; items: NavLeaf[] }
   | { kind: 'module';  id: string; icon: React.ElementType; label: string; items: NavLeaf[] }
 
-// ── Admin navigation ─────────────────────────────────────────────
+// ── Admin navigation ──────────────────────────────────────────────
 const ADMIN_NAV: NavEntry[] = [
   {
     kind: 'link',
@@ -45,8 +45,10 @@ const ADMIN_NAV: NavEntry[] = [
     label: 'Dashboard',
   },
   {
-    kind: 'section',
-    label: 'PERSONAL',
+    kind: 'module',
+    id: 'personal',
+    icon: Users,
+    label: 'Personal',
     items: [
       { href: '/dashboard/users',           icon: Users,     label: 'Personas' },
       { href: '/dashboard/areas',           icon: Layers,    label: 'Áreas' },
@@ -74,10 +76,10 @@ const ADMIN_NAV: NavEntry[] = [
     icon: Shield,
     label: 'Gestión SST',
     items: [
-      { href: null, icon: HardHat,      label: 'EPP',            disabled: true },
-      { href: null, icon: FileText,     label: 'Documentos',     disabled: true },
-      { href: null, icon: AlertTriangle,label: 'Emergencias',    disabled: true },
-      { href: null, icon: MessageSquare,label: 'Comunicaciones', disabled: true },
+      { href: null, icon: HardHat,       label: 'EPP',            disabled: true },
+      { href: null, icon: FileText,      label: 'Documentos',     disabled: true },
+      { href: null, icon: AlertTriangle, label: 'Emergencias',    disabled: true },
+      { href: null, icon: MessageSquare, label: 'Comunicaciones', disabled: true },
     ],
   },
   {
@@ -117,8 +119,11 @@ const WORKER_NAV = [
   { href: '/dashboard/settings',     icon: Settings,  label: 'Configuración' },
 ]
 
-// Hrefs that belong to each module, used to auto-expand on load
+// Hrefs per module — used to auto-expand on load
 const MODULE_HREFS: Record<string, string[]> = {
+  'personal': [
+    '/dashboard/users', '/dashboard/areas', '/dashboard/groups', '/dashboard/worker-profiles',
+  ],
   'sstudio': [
     '/dashboard/trainings', '/dashboard/plan', '/dashboard/profiles',
     '/dashboard/enrollments', '/dashboard/attendance-lists', '/dashboard/certificates',
@@ -134,14 +139,14 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   const isAdmin = userRole === 'admin' || userRole === 'superadmin'
   const isSuperAdmin = userRole === 'superadmin'
 
-  const [activeCompany, setActiveCompany] = useState<{ name: string; logo_url?: string; color?: string } | null>(null)
+  const [activeCompany, setActiveCompany] = useState<{ name: string; logo_url?: string } | null>(null)
   const [workerDisplayName, setWorkerDisplayName] = useState<string | null>(null)
   const [collapsed, setCollapsed] = useState(false)
   const [mobileOpen, setMobileOpen] = useState(false)
   const [searchOpen, setSearchOpen] = useState(false)
   const { theme, setTheme } = useTheme()
 
-  // Which modules are expanded — auto-open the one matching the current route
+  // Which modules are expanded — auto-open whichever contains the current route
   const [expanded, setExpanded] = useState<Record<string, boolean>>(() => {
     const init: Record<string, boolean> = {}
     for (const [id, hrefs] of Object.entries(MODULE_HREFS)) {
@@ -150,9 +155,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     return init
   })
 
-  const toggleModule = (id: string) => {
-    setExpanded(prev => ({ ...prev, [id]: !prev[id] }))
-  }
+  const toggleModule = (id: string) => setExpanded(prev => ({ ...prev, [id]: !prev[id] }))
 
   // Ctrl+K / Cmd+K
   useEffect(() => {
@@ -168,33 +171,27 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
   useEffect(() => {
     const match = document.cookie.match(/x-active-company=([^;]+)/)
-    if (match) {
-      fetch('/api/companies')
-        .then(r => r.json())
-        .then(data => {
-          if (Array.isArray(data)) {
-            const active = data.find((c: any) => c.id === match[1])
-            if (active) {
-              setActiveCompany({ name: active.name, logo_url: active.logo_url, color: active.color })
-              const stored = localStorage.getItem('sst-theme')
-              const validThemes: ThemeId[] = ['light', 'verde']
-              if (active.color && validThemes.includes(active.color as ThemeId) && !stored) {
-                setTheme(active.color as ThemeId, false)
-              }
-            }
-          }
-        })
-    }
+    if (!match) return
+    fetch('/api/companies')
+      .then(r => r.json())
+      .then(data => {
+        if (!Array.isArray(data)) return
+        const active = data.find((c: any) => c.id === match[1])
+        if (!active) return
+        setActiveCompany({ name: active.name, logo_url: active.logo_url })
+        const stored = localStorage.getItem('sst-theme')
+        const validThemes: ThemeId[] = ['light', 'verde']
+        if (active.color && validThemes.includes(active.color as ThemeId) && !stored) {
+          setTheme(active.color as ThemeId, false)
+        }
+      })
   }, [])
 
   useEffect(() => {
     if (isAdmin) return
     fetch('/api/profile')
       .then(r => r.ok ? r.json() : {})
-      .then((d: any) => {
-        const first = d?.nombres?.trim()
-        if (first) setWorkerDisplayName(first)
-      })
+      .then((d: any) => { const f = d?.nombres?.trim(); if (f) setWorkerDisplayName(f) })
       .catch(() => {})
   }, [isAdmin])
 
@@ -213,11 +210,9 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     if (href === '/dashboard') return pathname === '/dashboard'
     return pathname.startsWith(href)
   }
+  const moduleHasActive = (id: string) => MODULE_HREFS[id]?.some(h => pathname.startsWith(h)) ?? false
 
-  const moduleHasActive = (id: string) =>
-    MODULE_HREFS[id]?.some(h => pathname.startsWith(h)) ?? false
-
-  const userInitials = session?.user?.name?.split(' ').map(w => w[0]).join('').slice(0, 2) ?? 'JA'
+  const userInitials = session?.user?.name?.split(' ').map(w => w[0]).join('').slice(0, 2) ?? 'AS'
   const otherTheme = theme === 'light' ? 'verde' : 'light'
   const otherThemeMeta = THEMES.find(t => t.id === otherTheme)!
 
@@ -239,50 +234,71 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         ${collapsed ? 'md:w-16' : isAdmin ? 'w-60' : 'w-56'}
       `} style={{ background: 'var(--sidebar-bg)', borderRight: '1px solid var(--sidebar-border)' }}>
 
-        {/* Logo */}
-        <div className="flex items-center h-16 px-3 gap-2.5 flex-shrink-0"
-          style={{ borderBottom: '1px solid var(--sidebar-border)' }}>
-          <div className="flex-shrink-0 flex items-center justify-center"
-            style={{ width: collapsed ? 36 : 40, height: collapsed ? 36 : 40 }}>
-            {activeCompany?.logo_url ? (
-              <img src={activeCompany.logo_url} alt={activeCompany.name}
-                className="w-full h-full object-contain rounded-lg" style={{ background: 'white', padding: 2 }} />
-            ) : (
-              <img src="/images/LOGO.png" alt="AgroSafe" className="w-full h-full object-contain" />
-            )}
-          </div>
-          {!collapsed && (
-            <div className="flex-1 min-w-0">
-              <div className="font-extrabold text-sm truncate"
-                style={{ color: 'var(--sidebar-text)', fontFamily: 'var(--font-display)', letterSpacing: '-0.01em' }}>
-                {activeCompany?.name || 'AgroSafe'}
-              </div>
-              <div className="text-[9px] font-bold uppercase tracking-widest"
-                style={{ color: 'var(--sidebar-active-text)' }}>
+        {/* ── Logo ─────────────────────────────────────────────── */}
+        <div className="relative flex-shrink-0 flex items-center justify-center"
+          style={{
+            borderBottom: '1px solid var(--sidebar-border)',
+            padding: collapsed ? '10px 8px' : '14px 16px',
+            minHeight: collapsed ? 56 : 80,
+          }}>
+
+          {collapsed ? (
+            /* Collapsed: icon-size logo */
+            <img
+              src="/images/LOGO.png"
+              alt="AgroSafe"
+              style={{ width: 36, height: 36, objectFit: 'contain' }}
+            />
+          ) : (
+            /* Expanded: full logo prominent */
+            <div className="w-full flex flex-col items-center gap-1.5">
+              {activeCompany?.logo_url ? (
+                /* Company has a custom logo */
+                <img
+                  src={activeCompany.logo_url}
+                  alt={activeCompany.name}
+                  style={{ height: 48, maxWidth: '85%', objectFit: 'contain',
+                    background: 'white', padding: '4px 8px', borderRadius: 8 }}
+                />
+              ) : (
+                /* Default: AgroSafe logo */
+                <img
+                  src="/images/LOGO.png"
+                  alt="AgroSafe"
+                  style={{ height: 52, maxWidth: '85%', objectFit: 'contain' }}
+                />
+              )}
+              <div className="text-[8px] font-bold uppercase tracking-[0.16em]"
+                style={{ color: 'var(--sidebar-faint)' }}>
                 {isAdmin ? 'Gestión del Personal' : 'Portal Trabajador'}
               </div>
             </div>
           )}
-          <button onClick={() => setMobileOpen(false)} className="md:hidden"
+
+          {/* Mobile close */}
+          <button
+            onClick={() => setMobileOpen(false)}
+            className="md:hidden absolute right-3 top-1/2 -translate-y-1/2"
             style={{ color: 'var(--sidebar-dim)' }}>
             <X size={18} />
           </button>
         </div>
 
-        {/* Nav */}
-        <nav className="flex-1 overflow-y-auto py-3 px-2.5">
+        {/* ── Navigation ───────────────────────────────────────── */}
+        <nav className="flex-1 overflow-y-auto py-2 px-2">
           {isAdmin ? (
             <div className="space-y-0.5">
               {ADMIN_NAV.map((entry, ei) => {
-                // ── Standalone link (Dashboard) ──────────────────
+
+                /* ── Standalone link ── */
                 if (entry.kind === 'link') {
                   const active = isActive(entry.href)
                   const Icon = entry.icon
                   return (
                     <Link key={entry.href} href={entry.href}
-                      className={`nav-item mb-0.5 ${active ? 'active' : ''} ${collapsed ? 'justify-center' : ''}`}
+                      className={`nav-item ${active ? 'active' : ''} ${collapsed ? 'justify-center' : ''}`}
                       title={collapsed ? entry.label : undefined}>
-                      <Icon size={17} strokeWidth={2} className="flex-shrink-0" />
+                      <Icon size={16} strokeWidth={2} className="flex-shrink-0" />
                       {!collapsed && <span className="truncate">{entry.label}</span>}
                       {active && !collapsed && (
                         <div className="ml-auto w-1.5 h-1.5 rounded-full flex-shrink-0"
@@ -292,13 +308,13 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                   )
                 }
 
-                // ── Section header + flat items ──────────────────
+                /* ── Section header + flat items ── */
                 if (entry.kind === 'section') {
                   return (
                     <div key={entry.label} className="mt-3">
                       {!collapsed && (
-                        <div className="px-2 pt-1 pb-1.5">
-                          <span className="text-[9px] font-bold tracking-widest uppercase"
+                        <div className="px-2 pt-1 pb-1">
+                          <span className="text-[9px] font-bold tracking-[0.14em] uppercase"
                             style={{ color: 'var(--sidebar-faint)' }}>
                             {entry.label}
                           </span>
@@ -310,13 +326,13 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                         if (item.disabled) {
                           return (
                             <div key={item.label}
-                              className={`nav-item mb-0.5 opacity-35 cursor-not-allowed ${collapsed ? 'justify-center' : ''}`}
+                              className={`nav-item opacity-35 cursor-not-allowed ${collapsed ? 'justify-center' : ''}`}
                               title={collapsed ? item.label : undefined}>
-                              <Icon size={17} strokeWidth={2} className="flex-shrink-0" />
+                              <Icon size={16} strokeWidth={2} className="flex-shrink-0" />
                               {!collapsed && (
                                 <>
                                   <span className="truncate">{item.label}</span>
-                                  <span className="ml-auto text-[8px] font-bold uppercase tracking-wider flex-shrink-0"
+                                  <span className="ml-auto text-[8px] font-bold uppercase tracking-wide flex-shrink-0"
                                     style={{ color: 'var(--sidebar-faint)' }}>Próx.</span>
                                 </>
                               )}
@@ -326,9 +342,9 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                         const active = isActive(item.href)
                         return (
                           <Link key={item.href} href={item.href}
-                            className={`nav-item mb-0.5 ${active ? 'active' : ''} ${collapsed ? 'justify-center' : ''}`}
+                            className={`nav-item ${active ? 'active' : ''} ${collapsed ? 'justify-center' : ''}`}
                             title={collapsed ? item.label : undefined}>
-                            <Icon size={17} strokeWidth={2} className="flex-shrink-0" />
+                            <Icon size={16} strokeWidth={2} className="flex-shrink-0" />
                             {!collapsed && <span className="truncate">{item.label}</span>}
                             {active && !collapsed && (
                               <div className="ml-auto w-1.5 h-1.5 rounded-full flex-shrink-0"
@@ -341,7 +357,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                   )
                 }
 
-                // ── Expandable module ────────────────────────────
+                /* ── Expandable module ── */
                 if (entry.kind === 'module') {
                   const Icon = entry.icon
                   const isOpen = expanded[entry.id] ?? false
@@ -349,48 +365,48 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                   const allDisabled = entry.items.every(i => i.disabled)
 
                   return (
-                    <div key={entry.id} className="mt-3">
-                      {/* Module trigger button */}
+                    <div key={entry.id} className="mt-1">
+                      {/* Module trigger */}
                       <button
                         onClick={() => !collapsed && toggleModule(entry.id)}
-                        className={`nav-item w-full mb-0.5 ${hasActive && !isOpen ? 'active' : ''} ${collapsed ? 'justify-center' : ''}`}
-                        title={collapsed ? entry.label : undefined}
-                        style={hasActive && !isOpen ? {} : {}}>
-                        <Icon size={17} strokeWidth={2} className="flex-shrink-0" />
+                        className={`nav-item w-full ${hasActive && !isOpen ? 'active' : ''} ${collapsed ? 'justify-center' : ''}`}
+                        title={collapsed ? entry.label : undefined}>
+                        <Icon size={16} strokeWidth={2} className="flex-shrink-0" />
                         {!collapsed && (
                           <>
-                            <span className="truncate font-semibold">{entry.label}</span>
+                            <span className="truncate font-semibold text-[13px]">{entry.label}</span>
                             {allDisabled && (
-                              <span className="ml-1 text-[8px] font-bold uppercase tracking-wider flex-shrink-0"
+                              <span className="ml-1 text-[8px] font-bold uppercase tracking-wide flex-shrink-0"
                                 style={{ color: 'var(--sidebar-faint)' }}>Próx.</span>
                             )}
-                            <ChevronDown
-                              size={13}
-                              strokeWidth={2.5}
+                            <ChevronDown size={12} strokeWidth={2.5}
                               className="ml-auto flex-shrink-0 transition-transform duration-200"
                               style={{
                                 transform: isOpen ? 'rotate(0deg)' : 'rotate(-90deg)',
                                 color: 'var(--sidebar-dim)',
-                              }}
-                            />
+                              }} />
                           </>
                         )}
                       </button>
 
-                      {/* Children — shown when expanded and sidebar not collapsed */}
+                      {/* Sub-items */}
                       {isOpen && !collapsed && (
-                        <div className="ml-3 mt-0.5 mb-1 space-y-0.5"
-                          style={{ borderLeft: '1px solid var(--sidebar-border)', paddingLeft: 8 }}>
+                        <div className="mt-0.5 mb-1 space-y-0.5"
+                          style={{
+                            marginLeft: 12,
+                            paddingLeft: 10,
+                            borderLeft: '1px solid var(--sidebar-border)',
+                          }}>
                           {entry.items.map((item) => {
                             const ChildIcon = item.icon
                             if (item.disabled) {
                               return (
                                 <div key={item.label}
-                                  className="nav-item mb-0 opacity-35 cursor-not-allowed"
-                                  style={{ fontSize: 12, paddingTop: 5, paddingBottom: 5 }}>
-                                  <ChildIcon size={14} strokeWidth={2} className="flex-shrink-0" />
+                                  className="nav-item opacity-35 cursor-not-allowed"
+                                  style={{ fontSize: 12, paddingTop: 6, paddingBottom: 6 }}>
+                                  <ChildIcon size={13} strokeWidth={2} className="flex-shrink-0" />
                                   <span className="truncate">{item.label}</span>
-                                  <span className="ml-auto text-[8px] font-bold uppercase tracking-wider flex-shrink-0"
+                                  <span className="ml-auto text-[8px] font-bold uppercase tracking-wide flex-shrink-0"
                                     style={{ color: 'var(--sidebar-faint)' }}>Próx.</span>
                                 </div>
                               )
@@ -398,9 +414,9 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                             const active = isActive(item.href)
                             return (
                               <Link key={item.href} href={item.href}
-                                className={`nav-item mb-0 ${active ? 'active' : ''}`}
-                                style={{ fontSize: 12, paddingTop: 5, paddingBottom: 5 }}>
-                                <ChildIcon size={14} strokeWidth={2} className="flex-shrink-0" />
+                                className={`nav-item ${active ? 'active' : ''}`}
+                                style={{ fontSize: 12, paddingTop: 6, paddingBottom: 6 }}>
+                                <ChildIcon size={13} strokeWidth={2} className="flex-shrink-0" />
                                 <span className="truncate">{item.label}</span>
                                 {active && (
                                   <div className="ml-auto w-1.5 h-1.5 rounded-full flex-shrink-0"
@@ -419,14 +435,14 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
               })}
             </div>
           ) : (
-            // ── Worker nav ───────────────────────────────────────
+            /* ── Worker nav ── */
             <div className="pt-1 space-y-0.5">
               {WORKER_NAV.map(({ href, icon: Icon, label }) => {
                 const active = isActive(href)
                 return (
                   <Link key={href} href={href}
                     className={`nav-item ${active ? 'active' : ''}`}>
-                    <Icon size={17} strokeWidth={2} className="flex-shrink-0" />
+                    <Icon size={16} strokeWidth={2} className="flex-shrink-0" />
                     <span className="truncate">{label}</span>
                     {active && (
                       <div className="ml-auto w-1.5 h-1.5 rounded-full flex-shrink-0"
@@ -439,7 +455,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           )}
         </nav>
 
-        {/* Theme toggle */}
+        {/* ── Theme toggle (Navy ↔ Green) ───────────────────────── */}
         {!collapsed && (
           <div className="px-3 pb-2">
             <button
@@ -464,13 +480,13 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           </div>
         )}
 
-        {/* User + actions */}
+        {/* ── User + sign-out ───────────────────────────────────── */}
         <div className="p-3" style={{ borderTop: '1px solid var(--sidebar-border)' }}>
           {!collapsed && (
             <div className="flex items-center gap-2.5 px-2 py-2 mb-2 rounded-lg"
               style={{ background: 'rgba(255,255,255,0.05)' }}>
               <div className="w-8 h-8 rounded-full flex items-center justify-center text-white text-xs font-bold flex-shrink-0"
-                style={{ background: 'var(--grad-main)' }}>
+                style={{ background: '#1A5C1A' }}>
                 {userInitials}
               </div>
               <div className="min-w-0 flex-1">
@@ -490,7 +506,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
               style={{ color: 'var(--sidebar-dim)' }}
               onMouseEnter={e => { e.currentTarget.style.color = '#FCA5A5'; e.currentTarget.style.background = 'rgba(239,68,68,0.10)' }}
               onMouseLeave={e => { e.currentTarget.style.color = 'var(--sidebar-dim)'; e.currentTarget.style.background = 'transparent' }}>
-              <LogOut size={15} strokeWidth={2} />
+              <LogOut size={14} strokeWidth={2} />
               {!collapsed && 'Cerrar sesión'}
             </button>
             {isAdmin && (
@@ -498,17 +514,18 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                 onClick={() => setCollapsed(!collapsed)}
                 className="hidden md:flex w-8 h-8 rounded-lg items-center justify-center transition-all flex-shrink-0"
                 style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid var(--sidebar-border)', color: 'var(--sidebar-dim)' }}>
-                {collapsed ? <ChevronRight size={14} /> : <ChevronLeft size={14} />}
+                {collapsed ? <ChevronRight size={13} /> : <ChevronLeft size={13} />}
               </button>
             )}
           </div>
         </div>
       </aside>
 
-      {/* ── MAIN ────────────────────────────────────────────────── */}
+      {/* ── MAIN CONTENT ────────────────────────────────────────── */}
       <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
 
-        <header className="h-16 flex items-center justify-between px-5 backdrop-blur-xl flex-shrink-0"
+        {/* Header */}
+        <header className="h-16 flex items-center justify-between px-5 flex-shrink-0"
           style={{ background: 'var(--header-bg)', borderBottom: '1px solid var(--border)' }}>
 
           <div className="flex items-center gap-3">
@@ -521,12 +538,12 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
             {isAdmin ? (
               <button
                 onClick={() => setSearchOpen(true)}
-                className="relative hidden sm:flex items-center gap-2 px-3 py-2 rounded-xl transition-all w-64"
-                style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', color: 'var(--text-faint)' }}
-                onMouseEnter={e => { (e.currentTarget as HTMLElement).style.borderColor = 'rgba(245,158,11,0.4)' }}
+                className="relative hidden sm:flex items-center gap-2 px-3 py-2 rounded-lg transition-all w-64"
+                style={{ background: 'var(--bg)', border: '1px solid var(--border)', color: 'var(--text-faint)' }}
+                onMouseEnter={e => { (e.currentTarget as HTMLElement).style.borderColor = 'var(--border-strong)' }}
                 onMouseLeave={e => { (e.currentTarget as HTMLElement).style.borderColor = 'var(--border)' }}>
                 <Search size={14} />
-                <span className="text-sm flex-1 text-left">Buscar cursos...</span>
+                <span className="text-sm flex-1 text-left">Buscar...</span>
                 <kbd className="text-[10px] px-1.5 py-0.5 rounded font-mono"
                   style={{ background: 'var(--bg-surface)', border: '1px solid var(--border)' }}>
                   ⌘K
@@ -543,15 +560,15 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
             {isAdmin && (
               <Link href="/dashboard/notifications"
                 className="relative w-9 h-9 rounded-lg flex items-center justify-center transition-all"
-                style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', color: 'var(--text-dim)' }}>
-                <Bell size={17} strokeWidth={2} />
+                style={{ background: 'var(--bg)', border: '1px solid var(--border)', color: 'var(--text-dim)' }}>
+                <Bell size={16} strokeWidth={2} />
                 <span className="absolute top-1.5 right-1.5 w-1.5 h-1.5 rounded-full"
                   style={{ background: 'var(--red)' }} />
               </Link>
             )}
             <div className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 rounded-lg"
-              style={{ background: 'rgba(26,92,26,0.08)', border: '1px solid rgba(26,92,26,0.2)' }}>
-              <div className="w-1.5 h-1.5 rounded-full animate-pulse" style={{ background: '#2D8A2D' }} />
+              style={{ background: 'var(--primary-dim)', border: '1px solid var(--primary-border)' }}>
+              <div className="w-1.5 h-1.5 rounded-full" style={{ background: 'var(--primary)' }} />
               <span className="text-xs font-semibold" style={{ color: 'var(--primary)' }}>
                 {isAdmin ? 'Sistema activo' : 'En línea'}
               </span>
