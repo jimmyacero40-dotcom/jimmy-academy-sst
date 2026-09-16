@@ -165,16 +165,17 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
       {/* ── SIDEBAR ─────────────────────────────────────────────── */}
       <aside className={`
+        sidebar-shell
         flex flex-col z-50 flex-shrink-0
         transition-all duration-300 ease-in-out
         fixed inset-y-0 left-0 md:relative md:translate-x-0
         ${mobileOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'}
         ${collapsed ? 'md:w-16' : isAdmin ? 'w-60' : 'w-56'}
-      `} style={{ background: 'var(--bg-surface)', borderRight: '1px solid var(--border)' }}>
+      `} style={{ background: 'var(--sidebar-bg)', borderRight: '1px solid var(--sidebar-border)' }}>
 
         {/* Logo */}
         <div className="flex items-center h-16 px-3 gap-2.5 flex-shrink-0"
-          style={{ borderBottom: '1px solid var(--border)' }}>
+          style={{ borderBottom: '1px solid var(--sidebar-border)' }}>
           {/* AgroSafe logo / company logo */}
           <div className="flex-shrink-0 flex items-center justify-center"
             style={{ width: collapsed ? 36 : 40, height: collapsed ? 36 : 40 }}>
@@ -189,15 +190,15 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           {!collapsed && (
             <div className="flex-1 min-w-0">
               <div className="font-extrabold text-sm truncate"
-                style={{ color: 'var(--text)', fontFamily: 'var(--font-display)', letterSpacing: '-0.01em' }}>
+                style={{ color: 'var(--sidebar-text)', fontFamily: 'var(--font-display)', letterSpacing: '-0.01em' }}>
                 {activeCompany?.name || 'AgroSafe'}
               </div>
-              <div className="text-[9px] font-bold uppercase tracking-widest" style={{ color: 'var(--amber)' }}>
+              <div className="text-[9px] font-bold uppercase tracking-widest" style={{ color: 'var(--sidebar-active-text)' }}>
                 {isAdmin ? 'Gestión del Personal' : 'Portal Trabajador'}
               </div>
             </div>
           )}
-          <button onClick={() => setMobileOpen(false)} className="md:hidden" style={{ color: 'var(--text-dim)' }}>
+          <button onClick={() => setMobileOpen(false)} className="md:hidden" style={{ color: 'var(--sidebar-dim)' }}>
             <X size={18} />
           </button>
         </div>
@@ -211,7 +212,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                 {group.section && !collapsed && (
                   <div className="px-2 pt-3 pb-1">
                     <span className="text-[9px] font-bold tracking-widest uppercase"
-                      style={{ color: 'var(--text-faint)' }}>
+                      style={{ color: 'var(--sidebar-faint)' }}>
                       {group.section}
                     </span>
                   </div>
@@ -227,7 +228,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                       {!collapsed && <span className="truncate">{label}</span>}
                       {active && !collapsed && (
                         <div className="ml-auto w-1.5 h-1.5 rounded-full flex-shrink-0"
-                          style={{ background: 'var(--amber)' }} />
+                          style={{ background: 'var(--sidebar-active-text)' }} />
                       )}
                     </Link>
                   )
@@ -246,7 +247,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                     <span className="truncate">{label}</span>
                     {active && (
                       <div className="ml-auto w-1.5 h-1.5 rounded-full flex-shrink-0"
-                        style={{ background: 'var(--amber)' }} />
+                        style={{ background: 'var(--sidebar-active-text)' }} />
                     )}
                   </Link>
                 )
@@ -256,19 +257,19 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         </nav>
 
         {/* User + actions */}
-        <div className="p-3" style={{ borderTop: '1px solid var(--border)' }}>
+        <div className="p-3" style={{ borderTop: '1px solid var(--sidebar-border)' }}>
           {!collapsed && (
             <div className="flex items-center gap-2.5 px-2 py-2 mb-2 rounded-lg"
-              style={{ background: 'var(--bg-card)' }}>
+              style={{ background: 'rgba(255,255,255,0.05)' }}>
               <div className="w-8 h-8 rounded-full flex items-center justify-center text-white text-xs font-bold flex-shrink-0"
                 style={{ background: 'var(--grad-main)' }}>
                 {userInitials}
               </div>
               <div className="min-w-0 flex-1">
-                <div className="text-xs font-semibold truncate" style={{ color: 'var(--text)' }}>
+                <div className="text-xs font-semibold truncate" style={{ color: 'var(--sidebar-text)' }}>
                   {session?.user?.name ?? 'Usuario'}
                 </div>
-                <div className="text-[10px] truncate" style={{ color: 'var(--text-faint)' }}>
+                <div className="text-[10px] truncate" style={{ color: 'var(--sidebar-dim)' }}>
                   {session?.user?.email ?? ''}
                 </div>
               </div>
@@ -278,9 +279,9 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
             <button
               onClick={() => signOut({ callbackUrl: '/login' })}
               className={`flex items-center gap-2 px-2.5 py-2 rounded-lg text-xs transition-all ${collapsed ? 'w-full justify-center' : 'flex-1'}`}
-              style={{ color: 'var(--text-dim)' }}
-              onMouseEnter={e => { e.currentTarget.style.color = '#FCA5A5'; e.currentTarget.style.background = 'rgba(239,68,68,0.08)' }}
-              onMouseLeave={e => { e.currentTarget.style.color = 'var(--text-dim)'; e.currentTarget.style.background = 'transparent' }}>
+              style={{ color: 'var(--sidebar-dim)' }}
+              onMouseEnter={e => { e.currentTarget.style.color = '#FCA5A5'; e.currentTarget.style.background = 'rgba(239,68,68,0.10)' }}
+              onMouseLeave={e => { e.currentTarget.style.color = 'var(--sidebar-dim)'; e.currentTarget.style.background = 'transparent' }}>
               <LogOut size={15} strokeWidth={2} />
               {!collapsed && 'Cerrar sesión'}
             </button>
@@ -288,7 +289,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
               <button
                 onClick={() => setCollapsed(!collapsed)}
                 className="hidden md:flex w-8 h-8 rounded-lg items-center justify-center transition-all flex-shrink-0"
-                style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', color: 'var(--text-dim)' }}>
+                style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid var(--sidebar-border)', color: 'var(--sidebar-dim)' }}>
                 {collapsed ? <ChevronRight size={14} /> : <ChevronLeft size={14} />}
               </button>
             )}

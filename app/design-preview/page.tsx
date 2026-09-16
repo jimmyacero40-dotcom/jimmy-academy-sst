@@ -183,7 +183,7 @@ function AuroraTheme() {
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.5"><path d="M12 2L3 7l9 5 9-5-9-5z"/><path d="M3 17l9 5 9-5M3 12l9 5 9-5" opacity=".6"/></svg>
           </div>
           <div>
-            <div style={{ fontFamily:'Cormorant Garamond', fontWeight:700, fontSize:18, letterSpacing:1 }}>Jimmy Academy</div>
+            <div style={{ fontFamily:'Cormorant Garamond', fontWeight:700, fontSize:18, letterSpacing:1 }}>AgroSafe</div>
             <div className="au-label" style={{ fontSize:9 }}>SST · Colombia</div>
           </div>
         </div>
@@ -309,7 +309,7 @@ function TerraTheme() {
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.5"><path d="M12 2L3 7l9 5 9-5-9-5z"/><path d="M3 17l9 5 9-5M3 12l9 5 9-5"/></svg>
           </div>
           <div>
-            <div style={{ fontFamily:'Fraunces', fontWeight:700, fontSize:17, letterSpacing:.5 }}>Jimmy Academy</div>
+            <div style={{ fontFamily:'Fraunces', fontWeight:700, fontSize:17, letterSpacing:.5 }}>AgroSafe</div>
             <div style={{ fontSize:10, color:'rgba(245,158,11,0.6)', letterSpacing:2, fontWeight:600, textTransform:'uppercase' }}>SST Colombia</div>
           </div>
         </div>

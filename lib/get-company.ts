@@ -12,7 +12,9 @@ export async function getActiveCompanyId(): Promise<string | null> {
 
   if (role === 'superadmin') {
     const cookieStore = cookies()
-    return cookieStore.get('x-active-company')?.value || null
+    const cookieCompanyId = cookieStore.get('x-active-company')?.value
+    // Cookie takes precedence; fall back to session companyId for auto-resolved context
+    return cookieCompanyId || sessionCompanyId || null
   }
 
   if (sessionCompanyId) return sessionCompanyId
@@ -50,7 +52,7 @@ export async function isAdminOrSuper() {
   let companyId = user.company_id
   if (user.role === 'superadmin') {
     const cookieStore = cookies()
-    companyId = cookieStore.get('x-active-company')?.value || null
+    companyId = cookieStore.get('x-active-company')?.value || user.company_id || null
   }
 
   return { authorized: true, user, companyId } as const

@@ -14,18 +14,18 @@ export interface ThemeMeta {
 
 export const THEMES: ThemeMeta[] = [
   {
-    id: 'dark',
-    name: 'Dark',
-    description: 'Verde bosque · Modo oscuro',
-    colors: { bg: '#071009', surface: '#0C1A0E', primary: '#2D8A2D', accent: '#E8920A' },
-    preview: { sidebar: '#0C1A0E', primary: '#2D8A2D', accent: '#E8920A', bg: '#071009' },
+    id: 'light',
+    name: 'AgroSafe Navy',
+    description: 'Sidebar navy · Contenido blanco · Recomendado',
+    colors: { bg: '#F4F7F5', surface: '#FFFFFF', primary: '#1A5C1A', accent: '#E8920A' },
+    preview: { sidebar: '#0B1829', primary: '#1A5C1A', accent: '#E8920A', bg: '#F4F7F5' },
   },
   {
-    id: 'light',
-    name: 'Light',
-    description: 'Verde profesional · Modo claro',
-    colors: { bg: '#F2F7EE', surface: '#FFFFFF', primary: '#1A5C1A', accent: '#E8920A' },
-    preview: { sidebar: '#FFFFFF', primary: '#1A5C1A', accent: '#E8920A', bg: '#F2F7EE' },
+    id: 'dark',
+    name: 'Bosque Oscuro',
+    description: 'Verde profundo · Modo noche',
+    colors: { bg: '#071009', surface: '#0C1A0E', primary: '#2D8A2D', accent: '#E8920A' },
+    preview: { sidebar: '#0B1829', primary: '#2D8A2D', accent: '#E8920A', bg: '#071009' },
   },
   {
     id: 'navy',
@@ -55,13 +55,13 @@ interface ThemeCtx {
   setTheme: (id: ThemeId, persist?: boolean) => void
 }
 
-const Ctx = createContext<ThemeCtx>({ theme: 'dark', setTheme: () => {} })
+const Ctx = createContext<ThemeCtx>({ theme: 'light', setTheme: () => {} })
 
 export function ThemeProvider({ children }: { children: React.ReactNode }) {
-  const [theme, setThemeState] = useState<ThemeId>('dark')
+  const [theme, setThemeState] = useState<ThemeId>('light')
 
   useEffect(() => {
-    const saved = (localStorage.getItem('sst-theme') as ThemeId) || 'dark'
+    const saved = (localStorage.getItem('sst-theme') as ThemeId) || 'light'
     setThemeState(saved)
     document.documentElement.setAttribute('data-theme', saved)
   }, [])

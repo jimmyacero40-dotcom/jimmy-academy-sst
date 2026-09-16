@@ -32,8 +32,14 @@ export default function RootLayout({
             try {
               var t = localStorage.getItem('sst-theme');
               var valid = ['dark','light','navy','verde','academy'];
-              if (t && valid.indexOf(t) !== -1) document.documentElement.setAttribute('data-theme', t);
-            } catch(e) {}
+              if (t && valid.indexOf(t) !== -1) {
+                document.documentElement.setAttribute('data-theme', t);
+              } else {
+                document.documentElement.setAttribute('data-theme', 'light');
+              }
+            } catch(e) {
+              document.documentElement.setAttribute('data-theme', 'light');
+            }
           })();
         `}} />
       </head>
