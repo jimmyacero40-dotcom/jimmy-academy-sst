@@ -1,0 +1,84 @@
+import { NextRequest, NextResponse } from 'next/server'
+import { supabaseAdmin } from '@/lib/supabase-admin'
+import { isAdminOrSuper } from '@/lib/get-company'
+
+export async function GET(req: NextRequest) {
+  const { authorized, companyId } = await isAdminOrSuper()
+  if (!authorized) return NextResponse.json({ error: 'No autorizado' }, { status: 403 })
+
+  const { searchParams } = new URL(req.url)
+  const period   = searchParams.get('period') || 'day'   // day | week | range
+  const dateFrom = searchParams.get('from')
+  const dateTo   = searchParams.get('to')
+  const userId   = searchParams.get('user_id')
+  const areaId   = searchParams.get('area_id')
+
+  let from: string, to: string
+  const now = new Date()
+  if (period === 'day') {
+    from = new Date(now.getFullYear(), now.getMonth(), now.getDate()).toISOString()
+    to   = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1).toISOString()
+  } else if (period === 'week') {
+    const day = now.getDay()
+    const diffToMon = (day === 0 ? -6 : 1 - day)
+    const monday = new Date(now); monday.setDate(now.getDate() + diffToMon); monday.setHours(0,0,0,0)
+    const sunday = new Date(monday); sunday.setDate(monday.getDate() + 7)
+    from = monday.toISOString(); to = sunday.toISOString()
+  } else {
+    from = dateFrom ? new Date(dateFrom).toISOString() : new Date(now.getFullYear(), now.getMonth(), now.getDate()).toISOString()
+    to   = dateTo   ? new Date(new Date(dateTo).setDate(new Date(dateTo).getDate() + 1)).toISOString() : new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1).toISOString()
+  }
+
+  let query = supabaseAdmin
+    .from('access_logs')
+    .select(`
+      id, entry_time, exit_time, notes, created_at,
+      user:users!access_logs_user_id_fkey(id, name, cedula, cargo, area_id),
+      area:areas!access_logs_area_id_fkey(id, name, color),
+      registered_by_user:users!access_logs_registered_by_fkey(id, name),
+      exit_by_user:users!access_logs_exit_by_fkey(id, name)
+    `)
+    .eq('company_id', companyId)
+    .gte('entry_time', from)
+    .lt('entry_time', to)
+    .order('entry_time', { ascending: false })
+
+  if (userId) query = query.eq('user_id', userId)
+  if (areaId) query = query.eq('area_id', areaId)
+
+  const { data, error } = await query
+  if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+
+  return NextResponse.json(data ?? [])
+}
+
+export async function POST(req: NextRequest) {
+  const { authorized, user, companyId } = await isAdminOrSuper()
+  if (!authorized) return NextResponse.json({ error: 'No autorizado' }, { status: 403 })
+
+  const body = await req.json()
+  const { user_id, area_id, notes } = body
+  if (!user_id) return NextResponse.json({ error: 'user_id requerido' }, { status: 400 })
+
+  // Check for open entry today (no exit_time)
+  const todayStart = new Date(); todayStart.setHours(0,0,0,0)
+  const { data: existing } = await supabaseAdmin
+    .from('access_logs')
+    .select('id')
+    .eq('company_id', companyId)
+    .eq('user_id', user_id)
+    .gte('entry_time', todayStart.toISOString())
+    .is('exit_time', null)
+    .maybeSingle()
+
+  if (existing) return NextResponse.json({ error: 'Este trabajador ya tiene un ingreso activo hoy sin salida registrada' }, { status: 409 })
+
+  const { data, error } = await supabaseAdmin
+    .from('access_logs')
+    .insert({ company_id: companyId, user_id, area_id: area_id || null, notes: notes || null, registered_by: user.id })
+    .select('id, entry_time')
+    .single()
+
+  if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+  return NextResponse.json(data, { status: 201 })
+}

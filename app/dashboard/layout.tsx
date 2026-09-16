@@ -12,7 +12,7 @@ import {
   CalendarDays, GraduationCap, TrendingUp,
   Home, Activity, FileCheck2,
   HardHat, FileText, ArrowLeftRight, AlertTriangle, MessageSquare,
-  Bell, Shield, Leaf
+  Bell, Shield, Leaf, LogIn, DoorOpen
 } from 'lucide-react'
 import { CommandPalette } from '@/components/CommandPalette'
 import { useTheme, THEMES, type ThemeId } from '@/components/ThemeProvider'
@@ -89,7 +89,9 @@ const ADMIN_NAV: NavEntry[] = [
     icon: ArrowLeftRight,
     label: 'Control Operativo',
     items: [
-      { href: null, icon: ArrowLeftRight, label: 'Ingreso / Salida', disabled: true },
+      { href: '/dashboard/control-operativo',          icon: ArrowLeftRight, label: 'Registro de Ingresos' },
+      { href: '/dashboard/control-operativo/porteria', icon: LogIn,          label: 'Portería' },
+      { href: '/dashboard/control-operativo/salida',   icon: DoorOpen,       label: 'Registro de Salida' },
     ],
   },
   {
@@ -127,7 +129,11 @@ const MODULE_HREFS: Record<string, string[]> = {
     '/dashboard/enrollments', '/dashboard/attendance-lists', '/dashboard/certificates',
   ],
   'gestion-sst': [],
-  'control-operativo': [],
+  'control-operativo': [
+    '/dashboard/control-operativo',
+    '/dashboard/control-operativo/porteria',
+    '/dashboard/control-operativo/salida',
+  ],
 }
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
