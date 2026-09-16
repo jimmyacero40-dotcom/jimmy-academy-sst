@@ -162,6 +162,7 @@ body {
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   font-size: 14px;
+  font-weight: 400;
 }
 
 /* ── SCROLLBAR ── */
@@ -306,7 +307,7 @@ select option { background: var(--bg-surface); color: var(--text); }
   padding: 8px 11px;
   border-radius: var(--radius-sm);
   font-size: 13px;
-  font-weight: 400;
+  font-weight: 500;
   color: var(--text-dim);
   cursor: pointer;
   transition: background .12s, color .12s;
@@ -347,14 +348,14 @@ select option { background: var(--bg-surface); color: var(--text); }
 .terra-table { width: 100%; border-collapse: collapse; }
 .terra-table thead { background: var(--bg-card-hover); }
 .terra-table th {
-  font-size: 11px; font-weight: 700; letter-spacing: .05em; text-transform: uppercase;
+  font-size: 11px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase;
   color: var(--text-label); padding: 10px 14px; text-align: left;
   border-bottom: 2px solid var(--border-strong); white-space: nowrap;
 }
 .terra-table th.text-center { text-align: center; }
 .terra-table td {
   padding: 10px 14px; border-bottom: 1px solid var(--border);
-  font-size: 13px; color: var(--text-table); vertical-align: middle;
+  font-size: 13px; font-weight: 400; color: var(--text-table); vertical-align: middle;
 }
 .terra-table tr:last-child td { border-bottom: none; }
 .terra-table tr:hover td { background: var(--bg-card-hover); }

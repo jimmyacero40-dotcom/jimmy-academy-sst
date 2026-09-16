@@ -552,13 +552,14 @@ export default function UsersPage() {
             style={{ borderRadius: 16, overflow: 'visible' }}>
             <table className="w-full" style={{ borderCollapse: 'collapse' }}>
               <colgroup>
-                <col style={{ width: 40 }} />
-                <col />                        {/* Trabajador — flexible */}
-                <col style={{ width: 115 }} /> {/* Cédula */}
-                <col style={{ width: 145 }} /> {/* Área */}
-                <col style={{ width: 210 }} /> {/* Grupos */}
-                <col style={{ width: 110 }} /> {/* Estado */}
-                <col style={{ width: 100 }} /> {/* Acciones */}
+                <col style={{ width: 36 }} />   {/* Checkbox */}
+                <col style={{ width: '28%' }} />{/* Trabajador — bloque principal */}
+                <col style={{ width: 110 }} />  {/* Cédula — cerca del nombre */}
+                <col style={{ width: 130 }} />  {/* Área */}
+                <col style={{ width: 180 }} />  {/* Grupos */}
+                <col style={{ width: 95 }} />   {/* Estado */}
+                <col />                          {/* Correo — flexible */}
+                <col style={{ width: 90 }} />   {/* Acciones */}
               </colgroup>
 
               {/* ── Table header with embedded filters ───────────────── */}
@@ -614,6 +615,12 @@ export default function UsersPage() {
                     />
                   </TH>
 
+                  {/* Correo */}
+                  <TH>
+                    <ColLabel>Correo</ColLabel>
+                    <div className="mt-1.5 h-6" />
+                  </TH>
+
                   {/* Acciones */}
                   <th className="px-4 py-3 text-right align-middle" style={{ borderBottom: '1px solid var(--border)' }}>
                     <span className="text-[10px] font-semibold uppercase tracking-widest" style={{ color: 'var(--text-faint)' }}>Acciones</span>
@@ -639,7 +646,7 @@ export default function UsersPage() {
                           className="w-4 h-4 rounded accent-blue-500" />
                       </td>
 
-                      {/* Trabajador: avatar + nombre + email */}
+                      {/* Trabajador: avatar + nombre */}
                       <td className="px-4 py-3">
                         <div className="flex items-center gap-3">
                           {u.photo_url
@@ -647,11 +654,11 @@ export default function UsersPage() {
                             : <div className="w-8 h-8 rounded-full flex items-center justify-center text-white text-[11px] font-bold flex-shrink-0" style={{ background: colorForUser(u.id) }}>{getInitials(u.name)}</div>
                           }
                           <div className="min-w-0">
-                            <div className="text-sm font-semibold leading-snug truncate" style={{ color: 'var(--text)' }}>
+                            <div className="text-sm font-semibold truncate" style={{ color: 'var(--text)' }}>
                               {u.name}
                             </div>
-                            <div className="text-[11px] truncate mt-0.5" style={{ color: 'var(--text-faint)' }}>
-                              {u.email || '—'}
+                            <div className="text-[11px] truncate" style={{ color: 'var(--text-faint)' }}>
+                              {u.role || 'Trabajador'}
                             </div>
                           </div>
                         </div>
@@ -659,7 +666,7 @@ export default function UsersPage() {
 
                       {/* Cédula */}
                       <td className="px-4 py-3">
-                        <span className="font-mono text-[12px]" style={{ color: 'var(--text-dim)' }}>
+                        <span className="font-mono text-[12px] font-semibold" style={{ color: 'var(--text-dim)' }}>
                           {u.cedula || '—'}
                         </span>
                       </td>
@@ -673,16 +680,15 @@ export default function UsersPage() {
                             disabled={cellSaving === u.id}
                             className="w-full text-[11px] font-medium rounded-lg pl-2.5 pr-6 py-1.5 transition-all appearance-none cursor-pointer"
                             style={{
-                              background: u.area_name ? 'rgba(59,130,246,0.08)' : 'var(--bg-card)',
-                              border: `1px solid ${u.area_name ? 'rgba(59,130,246,0.2)' : 'var(--border)'}`,
-                              color: u.area_name ? '#93C5FD' : 'var(--text-faint)',
-                              colorScheme: 'dark',
+                              background: u.area_name ? 'var(--primary-dim)' : 'var(--bg-card)',
+                              border: `1px solid ${u.area_name ? 'var(--primary-border)' : 'var(--border)'}`,
+                              color: u.area_name ? 'var(--primary)' : 'var(--text-faint)',
                             }}>
                             <option value="">Sin área</option>
                             {areas.map(a => <option key={a.id} value={a.id}>{a.name}</option>)}
                           </select>
                           <ChevronDown size={10} className="absolute right-2 pointer-events-none"
-                            style={{ color: u.area_name ? '#93C5FD' : 'var(--text-faint)' }} />
+                            style={{ color: u.area_name ? 'var(--primary)' : 'var(--text-faint)' }} />
                         </div>
                       </td>
 
@@ -697,13 +703,17 @@ export default function UsersPage() {
 
                       {/* Estado */}
                       <td className="px-4 py-3">
-                        <span className="inline-flex items-center gap-1.5 text-[11px] font-semibold px-2.5 py-1 rounded-full whitespace-nowrap"
-                          style={u.status === 'activo'
-                            ? { background: 'rgba(16,185,129,0.1)', color: '#6EE7B7', border: '1px solid rgba(16,185,129,0.2)' }
-                            : { background: 'rgba(239,68,68,0.08)', color: '#FCA5A5', border: '1px solid rgba(239,68,68,0.2)' }}>
+                        <span className={u.status === 'activo' ? 'badge-success' : 'badge-danger'}>
                           <span className="w-1.5 h-1.5 rounded-full flex-shrink-0"
                             style={{ background: u.status === 'activo' ? '#10B981' : '#EF4444' }} />
                           {u.status === 'activo' ? 'Activo' : 'Inactivo'}
+                        </span>
+                      </td>
+
+                      {/* Correo */}
+                      <td className="px-4 py-3">
+                        <span className="text-[12px] truncate block" style={{ color: 'var(--text-faint)', maxWidth: 220 }}>
+                          {u.email || '—'}
                         </span>
                       </td>
 

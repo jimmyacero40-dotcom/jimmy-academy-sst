@@ -6,11 +6,11 @@ import { useSession, signOut } from 'next-auth/react'
 import Link from 'next/link'
 import {
   LayoutDashboard, Users, BookOpen, PenTool, Award,
-  BarChart2, Brain, Settings, LogOut,
+  BarChart2, Settings, LogOut,
   ChevronLeft, ChevronRight, ChevronDown, Search, Menu, X,
   Layers, UserCheck, Briefcase,
   CalendarDays, GraduationCap, TrendingUp,
-  ClipboardList, Home, Activity, FileCheck2,
+  Home, Activity, FileCheck2,
   HardHat, FileText, ArrowLeftRight, AlertTriangle, MessageSquare,
   Bell, Shield, Leaf
 } from 'lucide-react'
@@ -54,6 +54,7 @@ const ADMIN_NAV: NavEntry[] = [
       { href: '/dashboard/areas',           icon: Layers,    label: 'Áreas' },
       { href: '/dashboard/groups',          icon: UserCheck, label: 'Grupos' },
       { href: '/dashboard/worker-profiles', icon: Activity,  label: 'Inf. Sociodemográfica' },
+      { href: '/dashboard/my-signature',    icon: PenTool,   label: 'Mi Firma' },
     ],
   },
   {
@@ -102,10 +103,7 @@ const ADMIN_NAV: NavEntry[] = [
     kind: 'section',
     label: 'SISTEMA',
     items: [
-      { href: '/dashboard/audit',        icon: ClipboardList, label: 'Auditoría' },
-      { href: '/dashboard/ai',           icon: Brain,         label: 'IA SST' },
-      { href: '/dashboard/my-signature', icon: PenTool,       label: 'Mi Firma' },
-      { href: '/dashboard/settings',     icon: Settings,      label: 'Configuración' },
+      { href: '/dashboard/settings', icon: Settings, label: 'Configuración' },
     ],
   },
 ]
@@ -122,7 +120,7 @@ const WORKER_NAV = [
 // Hrefs per module — used to auto-expand on load
 const MODULE_HREFS: Record<string, string[]> = {
   'personal': [
-    '/dashboard/users', '/dashboard/areas', '/dashboard/groups', '/dashboard/worker-profiles',
+    '/dashboard/users', '/dashboard/areas', '/dashboard/groups', '/dashboard/worker-profiles', '/dashboard/my-signature',
   ],
   'sstudio': [
     '/dashboard/trainings', '/dashboard/plan', '/dashboard/profiles',
