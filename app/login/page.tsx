@@ -343,7 +343,11 @@ export default function LoginPage() {
             </div>
 
             <p className="text-[11px] text-center mt-6 leading-relaxed" style={{ color: t.noteColor }}>
-              ¿No tienes acceso? Contacta al administrador SST de tu empresa.
+              ¿No tienes cuenta?{' '}
+              <Link href="/register" className="font-semibold underline-offset-2 hover:underline"
+                style={{ color: dark ? '#7EC800' : '#1A5C1A' }}>
+                Registrarse
+              </Link>
             </p>
           </motion.div>
         </div>
