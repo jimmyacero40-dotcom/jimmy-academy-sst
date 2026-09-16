@@ -2,7 +2,7 @@
 
 import { createContext, useContext, useEffect, useState, useCallback } from 'react'
 
-export type ThemeId = 'dark' | 'light' | 'navy' | 'verde' | 'academy'
+export type ThemeId = 'light' | 'verde'
 
 export interface ThemeMeta {
   id: ThemeId
@@ -21,32 +21,11 @@ export const THEMES: ThemeMeta[] = [
     preview: { sidebar: '#0B1829', primary: '#1A5C1A', accent: '#E8920A', bg: '#F4F7F5' },
   },
   {
-    id: 'dark',
-    name: 'Bosque Oscuro',
-    description: 'Verde profundo · Modo noche',
-    colors: { bg: '#071009', surface: '#0C1A0E', primary: '#2D8A2D', accent: '#E8920A' },
-    preview: { sidebar: '#0B1829', primary: '#2D8A2D', accent: '#E8920A', bg: '#071009' },
-  },
-  {
-    id: 'navy',
-    name: 'Navy',
-    description: 'SaaS Premium · Índigo / Cian',
-    colors: { bg: '#07090F', surface: '#0D1117', primary: '#818CF8', accent: '#22D3EE' },
-    preview: { sidebar: '#0D1117', primary: '#818CF8', accent: '#22D3EE', bg: '#07090F' },
-  },
-  {
     id: 'verde',
-    name: 'Verde Agro',
-    description: 'Agro & Campo · Esmeralda / Ámbar',
-    colors: { bg: '#051208', surface: '#0A1C0F', primary: '#10B981', accent: '#F59E0B' },
-    preview: { sidebar: '#0A1C0F', primary: '#10B981', accent: '#F59E0B', bg: '#051208' },
-  },
-  {
-    id: 'academy',
-    name: 'Academy',
-    description: 'Educativo · Violeta / Rosa',
-    colors: { bg: '#0C0814', surface: '#130D20', primary: '#A78BFA', accent: '#F472B6' },
-    preview: { sidebar: '#130D20', primary: '#A78BFA', accent: '#F472B6', bg: '#0C0814' },
+    name: 'AgroSafe Green',
+    description: 'Sidebar verde oscuro · Contenido claro',
+    colors: { bg: '#EFF7F2', surface: '#FFFFFF', primary: '#1A5C1A', accent: '#E8920A' },
+    preview: { sidebar: '#071A0C', primary: '#1A5C1A', accent: '#E8920A', bg: '#EFF7F2' },
   },
 ]
 
@@ -61,26 +40,19 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
   const [theme, setThemeState] = useState<ThemeId>('light')
 
   useEffect(() => {
-    const saved = (localStorage.getItem('sst-theme') as ThemeId) || 'light'
-    setThemeState(saved)
-    document.documentElement.setAttribute('data-theme', saved)
+    const saved = localStorage.getItem('sst-theme') as ThemeId | null
+    const valid: ThemeId[] = ['light', 'verde']
+    const resolved = saved && valid.includes(saved) ? saved : 'light'
+    setThemeState(resolved)
+    document.documentElement.setAttribute('data-theme', resolved)
   }, [])
 
   const setTheme = useCallback((id: ThemeId, persist = true) => {
     const html = document.documentElement
-
-    // 1. Suppress ALL CSS transitions so the switch is truly instant.
-    //    The universal * transition in globals.css makes color changes animate
-    //    over 200ms — dramatic theme changes (dark→verde) look "slow".
-    //    We freeze transitions for exactly one frame, then restore them.
     html.classList.add('theme-switching')
-
-    // 2. Apply the new theme immediately — CSS variables update synchronously.
     html.setAttribute('data-theme', id)
     setThemeState(id)
     if (persist) localStorage.setItem('sst-theme', id)
-
-    // 3. Restore transitions on the next painted frame.
     requestAnimationFrame(() => {
       requestAnimationFrame(() => {
         html.classList.remove('theme-switching')

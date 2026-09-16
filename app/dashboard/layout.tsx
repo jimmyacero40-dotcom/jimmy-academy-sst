@@ -1,22 +1,23 @@
 'use client'
 
-import { useState, useEffect, useCallback, useRef } from 'react'
-import { createPortal } from 'react-dom'
-import { usePathname, useRouter } from 'next/navigation'
+import { useState, useEffect, useCallback } from 'react'
+import { usePathname } from 'next/navigation'
 import { useSession, signOut } from 'next-auth/react'
 import Link from 'next/link'
 import {
   LayoutDashboard, Users, BookOpen, PenTool, Award,
-  BarChart2, Brain, Bell, Settings, LogOut, Shield,
+  BarChart2, Brain, Settings, LogOut, Shield,
   ChevronLeft, ChevronRight, Search, Menu, X,
-  Palette, Layers, UserCheck, Briefcase,
+  Layers, UserCheck, Briefcase,
   CalendarDays, GraduationCap, TrendingUp,
-  ClipboardList, Home, Activity, FileCheck2
+  ClipboardList, Home, Activity, FileCheck2,
+  HardHat, FileText, ArrowLeftRight, AlertTriangle, MessageSquare,
+  Bell
 } from 'lucide-react'
 import { CommandPalette } from '@/components/CommandPalette'
 import { useTheme, THEMES, type ThemeId } from '@/components/ThemeProvider'
 
-// ── Admin navigation (grouped) ────────────────────────────────────
+// ── Admin navigation ─────────────────────────────────────────────
 const ADMIN_NAV = [
   {
     items: [
@@ -24,49 +25,54 @@ const ADMIN_NAV = [
     ]
   },
   {
-    section: 'ORGANIZACIÓN',
+    section: 'PERSONAL',
     items: [
-      { href: '/dashboard/users',            icon: Users,     label: 'Usuarios' },
-      { href: '/dashboard/areas',            icon: Layers,    label: 'Áreas' },
-      { href: '/dashboard/groups',           icon: UserCheck, label: 'Grupos' },
-      { href: '/dashboard/worker-profiles',  icon: Activity,  label: 'Inf. Sociodemográfica' },
+      { href: '/dashboard/users',           icon: Users,        label: 'Personas' },
+      { href: '/dashboard/areas',           icon: Layers,       label: 'Áreas' },
+      { href: '/dashboard/groups',          icon: UserCheck,    label: 'Grupos' },
+      { href: '/dashboard/worker-profiles', icon: Activity,     label: 'Inf. Sociodemográfica' },
     ]
   },
   {
-    section: 'FORMACIÓN',
+    section: 'SSTUDIO',
     items: [
-      { href: '/dashboard/trainings',          icon: BookOpen,      label: 'Biblioteca' },
-      { href: '/dashboard/plan',               icon: CalendarDays,  label: 'Plan Anual' },
-      { href: '/dashboard/profiles',           icon: GraduationCap, label: 'Perfiles de Formación' },
-      { href: '/dashboard/enrollments',        icon: TrendingUp,    label: 'Trazabilidad' },
-      { href: '/dashboard/attendance-lists',   icon: FileCheck2,    label: 'Listas de Asistencia' },
+      { href: '/dashboard/trainings',        icon: BookOpen,      label: 'Biblioteca' },
+      { href: '/dashboard/plan',             icon: CalendarDays,  label: 'Plan Anual' },
+      { href: '/dashboard/profiles',         icon: GraduationCap, label: 'Perfiles de Formación' },
+      { href: '/dashboard/enrollments',      icon: TrendingUp,    label: 'Trazabilidad' },
+      { href: '/dashboard/attendance-lists', icon: FileCheck2,    label: 'Listas de Asistencia' },
+      { href: '/dashboard/certificates',     icon: Award,         label: 'Certificados' },
+      { href: null, icon: HardHat,          label: 'EPP',           disabled: true },
+      { href: null, icon: FileText,         label: 'Documentos',    disabled: true },
+      { href: null, icon: ArrowLeftRight,   label: 'Ingreso/Salida', disabled: true },
+      { href: null, icon: AlertTriangle,    label: 'Emergencias',   disabled: true },
+      { href: null, icon: MessageSquare,    label: 'Comunicaciones', disabled: true },
     ]
   },
   {
-    section: 'GESTIÓN',
+    section: 'REPORTES',
     items: [
-      { href: '/dashboard/certificates',   icon: Award,         label: 'Certificados' },
-      { href: '/dashboard/reports',        icon: BarChart2,     label: 'Reportes' },
+      { href: '/dashboard/reports', icon: BarChart2, label: 'Reportes' },
     ]
   },
   {
     section: 'SISTEMA',
     items: [
-      { href: '/dashboard/audit',          icon: ClipboardList, label: 'Auditoría' },
-      { href: '/dashboard/ai',             icon: Brain,         label: 'IA SST' },
-      { href: '/dashboard/my-signature',   icon: PenTool,       label: 'Mi Firma' },
-      { href: '/dashboard/settings',       icon: Settings,      label: 'Configuración' },
+      { href: '/dashboard/audit',        icon: ClipboardList, label: 'Auditoría' },
+      { href: '/dashboard/ai',           icon: Brain,         label: 'IA SST' },
+      { href: '/dashboard/my-signature', icon: PenTool,       label: 'Mi Firma' },
+      { href: '/dashboard/settings',     icon: Settings,      label: 'Configuración' },
     ]
   },
 ]
 
 // ── Worker navigation ─────────────────────────────────────────────
 const WORKER_NAV = [
-  { href: '/dashboard/my-plan',      icon: Home,         label: 'Inicio' },
-  { href: '/dashboard/certificates', icon: Award,        label: 'Mis Certificados' },
-  { href: '/dashboard/my-profile',   icon: Briefcase,    label: 'Mi Perfil' },
-  { href: '/dashboard/my-signature', icon: PenTool,      label: 'Mi Firma' },
-  { href: '/dashboard/settings',     icon: Settings,     label: 'Configuración' },
+  { href: '/dashboard/my-plan',      icon: Home,      label: 'Inicio' },
+  { href: '/dashboard/certificates', icon: Award,     label: 'Mis Certificados' },
+  { href: '/dashboard/my-profile',   icon: Briefcase, label: 'Mi Perfil' },
+  { href: '/dashboard/my-signature', icon: PenTool,   label: 'Mi Firma' },
+  { href: '/dashboard/settings',     icon: Settings,  label: 'Configuración' },
 ]
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
@@ -81,19 +87,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   const [collapsed, setCollapsed] = useState(false)
   const [mobileOpen, setMobileOpen] = useState(false)
   const [searchOpen, setSearchOpen] = useState(false)
-  const [themePickerOpen, setThemePickerOpen] = useState(false)
-  const [pickerPos, setPickerPos] = useState({ top: 0, right: 0 })
-  const [mounted, setMounted] = useState(false)
-  const themeButtonRef = useRef<HTMLButtonElement>(null)
   const { theme, setTheme } = useTheme()
-
-  const openThemePicker = () => {
-    if (themeButtonRef.current) {
-      const r = themeButtonRef.current.getBoundingClientRect()
-      setPickerPos({ top: r.bottom + 8, right: window.innerWidth - r.right })
-    }
-    setThemePickerOpen(o => !o)
-  }
 
   // Ctrl+K / Cmd+K global shortcut
   useEffect(() => {
@@ -117,10 +111,9 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
             const active = data.find((c: any) => c.id === match[1])
             if (active) {
               setActiveCompany({ name: active.name, logo_url: active.logo_url, color: active.color })
-              // Apply company theme if not already overridden by localStorage
               const stored = localStorage.getItem('sst-theme')
-              const validThemes = ['dark', 'light', 'navy', 'verde', 'academy']
-              if (active.color && validThemes.includes(active.color) && !stored) {
+              const validThemes: ThemeId[] = ['light', 'verde']
+              if (active.color && validThemes.includes(active.color as ThemeId) && !stored) {
                 setTheme(active.color as ThemeId, false)
               }
             }
@@ -129,8 +122,6 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     }
   }, [])
 
-  // Load worker's first name from their profile so the greeting shows the real name,
-  // not whatever was stored in the users.name column at registration.
   useEffect(() => {
     if (isAdmin) return
     fetch('/api/profile')
@@ -142,7 +133,6 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       .catch(() => {})
   }, [isAdmin])
 
-  useEffect(() => { setMounted(true) }, [])
   useEffect(() => { setMobileOpen(false) }, [pathname])
 
   const isActive = (href: string) => {
@@ -152,8 +142,11 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
   const userInitials = session?.user?.name?.split(' ').map(w => w[0]).join('').slice(0, 2) ?? 'JA'
 
+  const otherTheme = theme === 'light' ? 'verde' : 'light'
+  const otherThemeMeta = THEMES.find(t => t.id === otherTheme)!
+  const currentThemeMeta = THEMES.find(t => t.id === theme)!
+
   return (
-    <>
     <div className="flex h-screen overflow-hidden" style={{ background: 'var(--bg)' }}>
       <CommandPalette open={searchOpen} onClose={() => setSearchOpen(false)} />
 
@@ -176,7 +169,6 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         {/* Logo */}
         <div className="flex items-center h-16 px-3 gap-2.5 flex-shrink-0"
           style={{ borderBottom: '1px solid var(--sidebar-border)' }}>
-          {/* AgroSafe logo / company logo */}
           <div className="flex-shrink-0 flex items-center justify-center"
             style={{ width: collapsed ? 36 : 40, height: collapsed ? 36 : 40 }}>
             {activeCompany?.logo_url ? (
@@ -206,7 +198,6 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         {/* Nav */}
         <nav className="flex-1 overflow-y-auto py-3 px-2.5 space-y-0.5">
           {isAdmin ? (
-            // ── Admin navigation with section headers ──
             ADMIN_NAV.map((group, gi) => (
               <div key={gi} className={gi > 0 ? 'mt-2' : ''}>
                 {group.section && !collapsed && (
@@ -217,15 +208,34 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                     </span>
                   </div>
                 )}
-                {group.items.map(({ href, icon: Icon, label, superadminOnly }: any) => {
-                  if (superadminOnly && !isSuperAdmin) return null
-                  const active = isActive(href)
+                {group.items.map((item: any, idx: number) => {
+                  if (item.superadminOnly && !isSuperAdmin) return null
+                  const Icon = item.icon
+
+                  if (item.disabled) {
+                    return (
+                      <div key={idx}
+                        className={`nav-item mb-0.5 opacity-35 cursor-not-allowed ${collapsed ? 'justify-center' : ''}`}
+                        title={collapsed ? item.label : undefined}>
+                        <Icon size={17} strokeWidth={2} className="flex-shrink-0" />
+                        {!collapsed && (
+                          <>
+                            <span className="truncate">{item.label}</span>
+                            <span className="ml-auto text-[8px] font-bold uppercase tracking-wider flex-shrink-0"
+                              style={{ color: 'var(--sidebar-faint)' }}>Próx.</span>
+                          </>
+                        )}
+                      </div>
+                    )
+                  }
+
+                  const active = isActive(item.href)
                   return (
-                    <Link key={href} href={href}
+                    <Link key={item.href} href={item.href}
                       className={`nav-item mb-0.5 ${active ? 'active' : ''} ${collapsed ? 'justify-center' : ''}`}
-                      title={collapsed ? label : undefined}>
+                      title={collapsed ? item.label : undefined}>
                       <Icon size={17} strokeWidth={2} className="flex-shrink-0" />
-                      {!collapsed && <span className="truncate">{label}</span>}
+                      {!collapsed && <span className="truncate">{item.label}</span>}
                       {active && !collapsed && (
                         <div className="ml-auto w-1.5 h-1.5 rounded-full flex-shrink-0"
                           style={{ background: 'var(--sidebar-active-text)' }} />
@@ -236,7 +246,6 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
               </div>
             ))
           ) : (
-            // ── Worker navigation — clean and simple ──
             <div className="pt-1">
               {WORKER_NAV.map(({ href, icon: Icon, label }) => {
                 const active = isActive(href)
@@ -255,6 +264,33 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
             </div>
           )}
         </nav>
+
+        {/* Theme toggle — bottom of sidebar, above user section */}
+        {!collapsed && (
+          <div className="px-3 pb-2">
+            <button
+              onClick={() => setTheme(otherTheme)}
+              className="w-full flex items-center gap-2.5 px-2.5 py-2 rounded-lg text-xs transition-all"
+              style={{
+                background: 'rgba(255,255,255,0.05)',
+                border: '1px solid var(--sidebar-border)',
+                color: 'var(--sidebar-dim)',
+              }}
+              onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = 'rgba(255,255,255,0.09)' }}
+              onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = 'rgba(255,255,255,0.05)' }}
+              title={`Cambiar a ${otherThemeMeta.name}`}>
+              {/* Tiny sidebar swatch */}
+              <div className="flex items-center gap-1 flex-shrink-0">
+                <div className="w-2 h-5 rounded-sm" style={{ background: otherThemeMeta.preview.sidebar }} />
+                <div className="w-2 h-5 rounded-sm" style={{ background: otherThemeMeta.preview.bg }} />
+              </div>
+              <span className="flex-1 text-left font-medium truncate">{otherThemeMeta.name}</span>
+              <span className="text-[9px] uppercase tracking-wider flex-shrink-0" style={{ color: 'var(--sidebar-faint)' }}>
+                Cambiar
+              </span>
+            </button>
+          </div>
+        )}
 
         {/* User + actions */}
         <div className="p-3" style={{ borderTop: '1px solid var(--sidebar-border)' }}>
@@ -335,23 +371,6 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           </div>
 
           <div className="flex items-center gap-2">
-            {/* Theme picker */}
-            <div className="relative">
-              <button
-                ref={themeButtonRef}
-                onClick={openThemePicker}
-                className="w-9 h-9 rounded-lg flex items-center justify-center transition-all"
-                style={{
-                  background: themePickerOpen ? 'var(--primary-dim)' : 'var(--bg-card)',
-                  border: `1px solid ${themePickerOpen ? 'var(--primary-border)' : 'var(--border)'}`,
-                  color: themePickerOpen ? 'var(--primary)' : 'var(--text-dim)',
-                }}
-                title="Cambiar tema">
-                <Palette size={17} strokeWidth={2} />
-              </button>
-            </div>
-
-
             {isAdmin && (
               <Link href="/dashboard/notifications"
                 className="relative w-9 h-9 rounded-lg flex items-center justify-center transition-all"
@@ -362,9 +381,9 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
             )}
 
             <div className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 rounded-lg"
-              style={{ background: 'rgba(16,185,129,0.08)', border: '1px solid rgba(16,185,129,0.2)' }}>
-              <div className="w-1.5 h-1.5 rounded-full animate-pulse" style={{ background: '#10B981' }} />
-              <span className="text-xs font-semibold" style={{ color: '#6EE7B7' }}>
+              style={{ background: 'rgba(26,92,26,0.08)', border: '1px solid rgba(26,92,26,0.2)' }}>
+              <div className="w-1.5 h-1.5 rounded-full animate-pulse" style={{ background: '#2D8A2D' }} />
+              <span className="text-xs font-semibold" style={{ color: 'var(--primary)' }}>
                 {isAdmin ? 'Sistema activo' : 'En línea'}
               </span>
             </div>
@@ -377,86 +396,5 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         </main>
       </div>
     </div>
-
-    {/* Theme picker — rendered into document.body via Portal so it escapes the
-        header's backdrop-filter stacking context (which otherwise hijacks
-        position:fixed children and positions them relative to the header). */}
-    {mounted && themePickerOpen && createPortal(
-      <>
-        <div
-          className="fixed inset-0"
-          style={{ zIndex: 9998 }}
-          onClick={() => setThemePickerOpen(false)}
-        />
-        <div
-          className="fixed"
-          style={{
-            top: pickerPos.top,
-            right: pickerPos.right,
-            zIndex: 9999,
-            width: 232,
-            background: 'var(--bg-surface)',
-            border: '1px solid var(--border)',
-            borderRadius: 16,
-            boxShadow: '0 24px 64px rgba(0,0,0,0.5)',
-            padding: 10,
-          }}>
-
-          <p className="text-[10px] font-bold uppercase tracking-widest px-2 py-1.5"
-            style={{ color: 'var(--text-faint)' }}>
-            Tema visual
-          </p>
-
-          {THEMES.map(t => {
-            const active = theme === t.id
-            return (
-              <button
-                key={t.id}
-                onClick={() => { setTheme(t.id); setThemePickerOpen(false) }}
-                className="w-full flex items-center gap-3 px-2.5 py-2.5 rounded-xl text-left"
-                style={{
-                  background: active ? 'var(--primary-dim)' : 'transparent',
-                  border: `1px solid ${active ? 'var(--primary-border)' : 'transparent'}`,
-                }}
-                onMouseEnter={e => {
-                  if (!active) (e.currentTarget as HTMLElement).style.background = 'var(--bg-card-hover)'
-                }}
-                onMouseLeave={e => {
-                  if (!active) (e.currentTarget as HTMLElement).style.background = active ? 'var(--primary-dim)' : 'transparent'
-                }}>
-
-                <div className="flex-shrink-0 flex items-center gap-1">
-                  <div className="w-2 h-8 rounded" style={{ background: t.preview.sidebar }} />
-                  <div className="flex flex-col gap-1">
-                    <div className="w-3.5 h-3.5 rounded-sm" style={{ background: t.preview.primary }} />
-                    <div className="w-3.5 h-3.5 rounded-sm" style={{ background: t.preview.accent }} />
-                  </div>
-                </div>
-
-                <div className="flex-1 min-w-0">
-                  <div className="text-xs font-semibold" style={{ color: active ? 'var(--primary)' : 'var(--text)' }}>
-                    {t.name}
-                  </div>
-                  <div className="text-[9px] leading-tight mt-0.5 opacity-60" style={{ color: 'var(--text)' }}>
-                    {t.description}
-                  </div>
-                </div>
-
-                {active && (
-                  <div className="flex-shrink-0 w-4 h-4 rounded-full flex items-center justify-center"
-                    style={{ background: 'var(--primary)' }}>
-                    <svg width="8" height="8" viewBox="0 0 8 8" fill="none">
-                      <path d="M1.5 4L3.5 6L6.5 2" stroke="white" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-                    </svg>
-                  </div>
-                )}
-              </button>
-            )
-          })}
-        </div>
-      </>,
-      document.body
-    )}
-    </>
   )
 }
