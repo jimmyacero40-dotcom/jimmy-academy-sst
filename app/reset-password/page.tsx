@@ -51,7 +51,7 @@ function ResetPasswordForm() {
       <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="w-full max-w-sm">
 
         <div className="flex items-center gap-3 mb-10">
-          <div className="w-10 h-10 rounded-xl flex items-center justify-center" style={{ background: '#3b82f6' }}>
+          <div className="w-10 h-10 rounded-xl flex items-center justify-center" style={{ background: 'var(--primary)' }}>
             <Shield size={20} className="text-white" />
           </div>
           <div>
@@ -81,7 +81,7 @@ function ResetPasswordForm() {
               </p>
               <Link href="/forgot-password"
                 className="inline-block rounded-xl text-sm font-semibold px-5 py-3"
-                style={{ background: '#3b82f6', color: '#fff' }}>
+                style={{ background: 'var(--primary)', color: '#fff' }}>
                 Solicitar nuevo enlace
               </Link>
             </div>
@@ -160,7 +160,7 @@ function ResetPasswordForm() {
 
                 <button type="submit" disabled={loading}
                   className="w-full flex items-center justify-center gap-2 rounded-xl text-sm font-semibold mt-2"
-                  style={{ background: '#3b82f6', color: '#fff', border: 'none', padding: '13px 20px', cursor: loading ? 'not-allowed' : 'pointer', opacity: loading ? 0.8 : 1 }}>
+                  style={{ background: 'var(--primary)', color: '#fff', border: 'none', padding: '13px 20px', cursor: loading ? 'not-allowed' : 'pointer', opacity: loading ? 0.8 : 1 }}>
                   {loading
                     ? <><div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />Guardando...</>
                     : 'Guardar nueva contraseña'}

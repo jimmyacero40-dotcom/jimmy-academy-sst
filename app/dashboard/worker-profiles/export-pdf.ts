@@ -165,7 +165,7 @@ export async function exportToPDF(analytics: Analytics, company = 'Organización
   })
 
   // Disclaimer
-  text('Informe generado automáticamente por Campus SST', W / 2, H - 20, 8, C.gray, false, 'center')
+  text('Informe generado automáticamente por AgroSafe', W / 2, H - 20, 8, C.gray, false, 'center')
   text('Confidencial — Uso interno', W / 2, H - 15, 8, C.gray, false, 'center')
   pageNum = 1
 
@@ -449,7 +449,7 @@ export async function exportToPDF(analytics: Analytics, company = 'Organización
   if (y > H - 30) { newPage('Cierre'); y = 24 }
   rect(ML, y, CW, 0.5, C.navy)
   y += 5
-  text('Este informe fue generado automáticamente por Campus SST a partir de la información suministrada por los trabajadores.', W / 2, y, 7.5, C.gray, false, 'center')
+  text('Este informe fue generado automáticamente por AgroSafe a partir de la información suministrada por los trabajadores.', W / 2, y, 7.5, C.gray, false, 'center')
   y += 5
   text('La información contenida es confidencial y de uso exclusivo para gestión interna de Talento Humano y SG-SST.', W / 2, y, 7.5, C.gray, false, 'center')
 

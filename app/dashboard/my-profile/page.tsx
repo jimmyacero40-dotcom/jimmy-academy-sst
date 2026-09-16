@@ -202,7 +202,7 @@ function SectionCard({ title, icon: Icon, children, accent }: { title: string; i
 
 // ─── TABS ─────────────────────────────────────────────────────────────
 const TABS = [
-  { id: 'personal', label: 'Personal',       icon: User,          color: '#3B82F6' },
+  { id: 'personal', label: 'Personal',       icon: User,          color: 'var(--primary)' },
   { id: 'familia',  label: 'Familia',         icon: Home,          color: '#8B5CF6' },
   { id: 'laboral',  label: 'Laboral',         icon: Briefcase,     color: '#06B6D4' },
   { id: 'tallas',   label: 'Tallas / EPP',    icon: Shield,        color: '#10B981' },
@@ -486,7 +486,7 @@ export default function MyProfilePage() {
 
           {/* ════ PERSONAL ════ */}
           {tab === 'personal' && (
-            <SectionCard title="Información personal" icon={User} accent="#3B82F6">
+            <SectionCard title="Información personal" icon={User} accent="var(--primary)">
               <div className="grid grid-cols-2 gap-4">
                 <Field label="TIPO DE DOCUMENTO">
                   <select value={data.doc_type ?? ''} onChange={e => set('doc_type', e.target.value)} className={inp}>

@@ -18,13 +18,13 @@ export default function LoginPage() {
 
   // Persist theme preference
   useEffect(() => {
-    const saved = localStorage.getItem('campus-sst-theme')
+    const saved = localStorage.getItem('sst-theme')
     if (saved) setDark(saved === 'dark')
   }, [])
   const toggleTheme = () => {
     const next = !dark
     setDark(next)
-    localStorage.setItem('campus-sst-theme', next ? 'dark' : 'light')
+    localStorage.setItem('sst-theme', next ? 'dark' : 'light')
   }
 
   const validate = () => {
@@ -293,7 +293,7 @@ export default function LoginPage() {
               {/* Forgot password */}
               <div className="flex justify-end -mt-2">
                 <Link href="/forgot-password" className="text-[12px] transition-colors"
-                  style={{ color: '#3b82f6' }}>
+                  style={{ color: dark ? '#7EC800' : '#1A5C1A' }}>
                   ¿Olvidaste tu contraseña?
                 </Link>
               </div>
@@ -304,7 +304,7 @@ export default function LoginPage() {
                 disabled={loading}
                 className="w-full flex items-center justify-center gap-2 rounded-xl text-sm font-semibold transition-all"
                 style={{
-                  background: '#3b82f6',
+                  background: 'linear-gradient(135deg,#2D8A2D,#7EC800)',
                   color: '#fff',
                   border: 'none',
                   padding: '13px 20px',

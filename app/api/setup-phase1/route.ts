@@ -22,7 +22,7 @@ export async function POST() {
   // doesn't have DDL permissions. Return the SQL for the user to run manually.
   const sqlScript = `
 -- ════════════════════════════════════════════════
---  CAMPUS SST — FASE 1: Capa Organizacional
+--  AgroSafe — FASE 1: Capa Organizacional
 --  Ejecutar en Supabase SQL Editor
 -- ════════════════════════════════════════════════
 

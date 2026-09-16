@@ -311,7 +311,7 @@ export default function ReportsPage() {
               {/* KPI grid */}
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
                 {[
-                  { label: 'Usuarios activos', value: summary.activeUsers, sub: `de ${summary.users} totales`, icon: Users, color: '#3B82F6' },
+                  { label: 'Usuarios activos', value: summary.activeUsers, sub: `de ${summary.users} totales`, icon: Users, color: 'var(--primary)' },
                   { label: 'Cumplimiento',      value: `${summary.compliance}%`, sub: `${summary.completed} completados`, icon: TrendingUp, color: pct(summary.compliance) },
                   { label: 'Score promedio',    value: summary.avgScore != null ? `${summary.avgScore}%` : '—', sub: 'en completados', icon: Award, color: scoreColor(summary.avgScore) },
                   { label: 'Certificados',      value: summary.certificates, sub: summary.expiredCerts > 0 ? `${summary.expiredCerts} vencidos` : 'todos vigentes', icon: Shield, color: summary.expiredCerts > 0 ? '#F59E0B' : '#10B981' },
@@ -337,7 +337,7 @@ export default function ReportsPage() {
                   <div className="space-y-3">
                     {[
                       { label: 'Completados', val: summary.completed,  color: '#10B981', icon: CheckCircle },
-                      { label: 'En curso',    val: summary.inProgress, color: '#3B82F6', icon: Clock },
+                      { label: 'En curso',    val: summary.inProgress, color: 'var(--primary)', icon: Clock },
                       { label: 'Pendientes',  val: summary.pending,    color: '#94A3B8', icon: Clock },
                       { label: 'Vencidos',    val: summary.overdue,    color: '#EF4444', icon: XCircle },
                     ].map(({ label, val, color, icon: Icon }) => {

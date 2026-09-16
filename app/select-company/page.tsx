@@ -18,7 +18,7 @@ interface Company {
 
 const COLORS = [
   { label: 'Naranja', value: 'from-amber-500 to-orange-500', css: 'linear-gradient(135deg, #f59e0b, #f97316)' },
-  { label: 'Azul', value: 'from-blue-500 to-cyan-500', css: 'linear-gradient(135deg, #3b82f6, #06b6d4)' },
+  { label: 'Azul', value: 'from-blue-500 to-cyan-500', css: 'linear-gradient(135deg, var(--primary), #06b6d4)' },
   { label: 'Verde', value: 'from-emerald-500 to-teal-500', css: 'linear-gradient(135deg, #10b981, #14b8a6)' },
   { label: 'Rojo', value: 'from-red-500 to-rose-500', css: 'linear-gradient(135deg, #ef4444, #f43f5e)' },
   { label: 'Morado', value: 'from-violet-500 to-purple-500', css: 'linear-gradient(135deg, #8b5cf6, #a855f7)' },

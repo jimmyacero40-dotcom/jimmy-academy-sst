@@ -3,7 +3,7 @@ import { NextResponse } from 'next/server'
 export async function GET() {
   const sql = `
 -- ════════════════════════════════════════════════════
---  PERFIL INTEGRAL DEL TRABAJADOR — Campus SST
+--  PERFIL INTEGRAL DEL TRABAJADOR — AgroSafe
 --  Ejecutar en Supabase SQL Editor
 -- ════════════════════════════════════════════════════
 

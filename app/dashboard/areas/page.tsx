@@ -33,11 +33,11 @@ interface AreaStats {
 }
 
 const PRESET_COLORS = [
-  '#3B82F6', '#10B981', '#8B5CF6', '#F59E0B',
+  'var(--primary)', '#10B981', '#8B5CF6', '#F59E0B',
   '#EF4444', '#EC4899', '#06B6D4', '#84CC16',
 ]
 
-const EMPTY_FORM = { name: '', description: '', color: '#3B82F6' }
+const EMPTY_FORM = { name: '', description: '', color: 'var(--primary)' }
 
 function getInitials(name: string) {
   return name.trim().split(/\s+/).map(w => w[0]).join('').toUpperCase().slice(0, 2)
@@ -159,7 +159,7 @@ export default function AreasPage() {
   const openCreate = () => { setEditItem(null); setForm(EMPTY_FORM); setIsDirty(false); setConfirmClose(false); setShowModal(true) }
   const openEdit   = (area: Area) => {
     setEditItem(area)
-    setForm({ name: area.name, description: area.description || '', color: area.color || '#3B82F6' })
+    setForm({ name: area.name, description: area.description || '', color: area.color || 'var(--primary)' })
     setIsDirty(false); setConfirmClose(false); setShowModal(true)
   }
 
@@ -250,7 +250,7 @@ export default function AreasPage() {
               const count = allUsers.filter((u: any) => u.area === area.name).length
               const stats = areaStats[area.name]
               const pct   = stats?.pct ?? null
-              const color = area.color || '#3B82F6'
+              const color = area.color || 'var(--primary)'
               const pctColor = pct === null ? 'var(--text-faint)' : pct >= 80 ? '#10B981' : pct >= 50 ? '#F59E0B' : '#EF4444'
               const isActive = activeArea?.id === area.id
               return (

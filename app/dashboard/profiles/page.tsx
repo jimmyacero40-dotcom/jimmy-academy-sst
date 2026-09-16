@@ -33,7 +33,7 @@ interface Assignment extends Training {
 
 const SUGGESTED_PROFILES = [
   { name: 'Brigadista SST',          cargo: 'Brigadista de emergencias',  icon: Flame,  color: '#EF4444' },
-  { name: 'Miembro COPASST',         cargo: 'Comité Paritario SST',        icon: Shield, color: '#3B82F6' },
+  { name: 'Miembro COPASST',         cargo: 'Comité Paritario SST',        icon: Shield, color: 'var(--primary)' },
   { name: 'Trabajo en Alturas',      cargo: 'Operario alturas',            icon: HardHat,color: '#F59E0B' },
   { name: 'Conductor SST',           cargo: 'Conductor / Operador',        icon: Truck,  color: '#8B5CF6' },
   { name: 'Operario Producción',     cargo: 'Auxiliar de producción',      icon: Wrench, color: '#10B981' },
@@ -42,11 +42,11 @@ const SUGGESTED_PROFILES = [
   { name: 'Inducción General',       cargo: 'Nuevo ingreso',               icon: GraduationCap, color: '#A78BFA' },
 ]
 
-const PROFILE_COLORS = ['#3B82F6','#8B5CF6','#EC4899','#F59E0B','#10B981','#06B6D4','#F97316','#EF4444']
+const PROFILE_COLORS = ['var(--primary)','#8B5CF6','#EC4899','#F59E0B','#10B981','#06B6D4','#F97316','#EF4444']
 
 const CAT_COLORS: Record<string, string> = {
   'SST': '#10B981', 'Seguridad': '#EF4444', 'Salud': '#EC4899',
-  'Ambiental': '#84CC16', 'Calidad': '#3B82F6', 'Alturas': '#F59E0B',
+  'Ambiental': '#84CC16', 'Calidad': 'var(--primary)', 'Alturas': '#F59E0B',
   'Primeros Auxilios': '#F97316', 'Sin categoría': '#6B7280',
 }
 function catColor(cat: string | null) { return CAT_COLORS[cat ?? ''] ?? '#8B5CF6' }

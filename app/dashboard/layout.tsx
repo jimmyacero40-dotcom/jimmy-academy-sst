@@ -9,7 +9,7 @@ import {
   LayoutDashboard, Users, BookOpen, PenTool, Award,
   BarChart2, Brain, Bell, Settings, LogOut, Shield,
   ChevronLeft, ChevronRight, Search, Menu, X,
-  Palette, Building2, Layers, UserCheck, Briefcase,
+  Palette, Layers, UserCheck, Briefcase,
   CalendarDays, GraduationCap, TrendingUp,
   ClipboardList, Home, Activity, FileCheck2
 } from 'lucide-react'
@@ -20,8 +20,7 @@ import { useTheme, THEMES, type ThemeId } from '@/components/ThemeProvider'
 const ADMIN_NAV = [
   {
     items: [
-      { href: '/dashboard',         icon: LayoutDashboard, label: 'Dashboard' },
-      { href: '/select-company',    icon: Building2,        label: 'Cambiar Empresa', superadminOnly: true },
+      { href: '/dashboard', icon: LayoutDashboard, label: 'Dashboard' },
     ]
   },
   {

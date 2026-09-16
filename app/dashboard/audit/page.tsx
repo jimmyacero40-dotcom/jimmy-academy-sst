@@ -27,7 +27,7 @@ interface LogEntry {
 const ACTION_CFG: Record<string, { label: string; color: string; bg: string; border: string; icon: React.ElementType }> = {
   LOGIN:              { label: 'Login',         color: '#10B981', bg: 'rgba(16,185,129,0.1)',  border: 'rgba(16,185,129,0.25)',  icon: LogIn },
   LOGOUT:             { label: 'Logout',        color: '#94A3B8', bg: 'rgba(148,163,184,0.1)', border: 'rgba(148,163,184,0.2)',  icon: LogOut },
-  CREATE:             { label: 'Creación',      color: '#3B82F6', bg: 'rgba(59,130,246,0.1)',  border: 'rgba(59,130,246,0.25)',  icon: UserPlus },
+  CREATE:             { label: 'Creación',      color: 'var(--primary)', bg: 'rgba(59,130,246,0.1)',  border: 'rgba(59,130,246,0.25)',  icon: UserPlus },
   UPDATE:             { label: 'Edición',       color: '#F59E0B', bg: 'rgba(245,158,11,0.1)',  border: 'rgba(245,158,11,0.25)',  icon: Edit3 },
   DELETE:             { label: 'Eliminación',   color: '#EF4444', bg: 'rgba(239,68,68,0.1)',   border: 'rgba(239,68,68,0.25)',   icon: Trash2 },
   ENROLL:             { label: 'Matrícula',     color: '#8B5CF6', bg: 'rgba(139,92,246,0.1)',  border: 'rgba(139,92,246,0.25)', icon: BookOpen },
@@ -237,7 +237,7 @@ export default function AuditPage() {
             <button onClick={() => setShowFilters(f => !f)}
               className="flex items-center gap-2 px-4 py-2.5 rounded-xl font-semibold text-sm transition-all border"
               style={hasFilters
-                ? { borderColor: '#3B82F6', color: '#3B82F6', background: 'rgba(59,130,246,0.1)' }
+                ? { borderColor: 'var(--primary)', color: 'var(--primary)', background: 'rgba(59,130,246,0.1)' }
                 : { borderColor: 'var(--border)', color: 'var(--text-dim)', background: 'transparent' }}>
               <Filter size={14} /> Filtros{hasFilters ? ' •' : ''}
             </button>
@@ -407,7 +407,7 @@ export default function AuditPage() {
                   <button key={p} onClick={() => goPage(p)}
                     className="w-7 h-7 rounded-lg text-xs font-semibold transition-all"
                     style={p === page
-                      ? { background: '#3B82F6', color: '#fff' }
+                      ? { background: 'var(--primary)', color: '#fff' }
                       : { color: 'var(--text-dim)' }}>
                     {p}
                   </button>

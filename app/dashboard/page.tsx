@@ -191,7 +191,7 @@ export default function DashboardPage() {
       value: k ? String(k.thisMonthEnrollments - k.thisMonthCompleted) : '—',
       sub: k ? `${k.thisMonthCompleted} completadas este mes` : 'Sin plan activo',
       icon: CalendarDays,
-      accent: '#3B82F6',
+      accent: 'var(--primary)',
       bg: 'rgba(59,130,246,0.08)',
       href: '/dashboard/enrollments',
     },
@@ -206,7 +206,7 @@ export default function DashboardPage() {
     },
   ]
 
-  const AREA_COLORS = ['#10B981','#3B82F6','var(--amber)','#A78BFA','#F43F5E','#14B8A6']
+  const AREA_COLORS = ['#10B981','var(--primary)','var(--amber)','#A78BFA','#F43F5E','#14B8A6']
 
   return (
     <div className="p-6 max-w-7xl mx-auto">
@@ -334,7 +334,7 @@ export default function DashboardPage() {
                 label: 'En progreso / Pendientes',
                 value: k?.pending ?? 0,
                 icon: Clock,
-                color: '#3B82F6',
+                color: 'var(--primary)',
                 bg: 'rgba(59,130,246,0.08)',
               },
               {

@@ -14,11 +14,11 @@ interface Group {
   created_at: string
 }
 
-const GROUP_COLORS = ['#3B82F6','#10B981','#8B5CF6','#F59E0B','#EF4444','#EC4899','#06B6D4','#84CC16']
+const GROUP_COLORS = ['var(--primary)','#10B981','#8B5CF6','#F59E0B','#EF4444','#EC4899','#06B6D4','#84CC16']
 
 const SUGGESTED_GROUPS = [
   { name: 'Brigadistas', description: 'Brigada de emergencias y primera respuesta', color: '#EF4444' },
-  { name: 'COPASST', description: 'Comité Paritario de Seguridad y Salud en el Trabajo', color: '#3B82F6' },
+  { name: 'COPASST', description: 'Comité Paritario de Seguridad y Salud en el Trabajo', color: 'var(--primary)' },
   { name: 'Comité de Convivencia', description: 'Comité de Convivencia Laboral', color: '#8B5CF6' },
   { name: 'Conductores', description: 'Personal que conduce vehículos de la empresa', color: '#F59E0B' },
   { name: 'Trabajo en Alturas', description: 'Personal con permiso de trabajo en alturas', color: '#06B6D4' },
@@ -49,7 +49,7 @@ interface AppUser {
   role: string
 }
 
-const EMPTY_FORM = { name: '', description: '', color: '#3B82F6' }
+const EMPTY_FORM = { name: '', description: '', color: 'var(--primary)' }
 
 export default function GroupsPage() {
   const [groups, setGroups] = useState<Group[]>([])
@@ -107,7 +107,7 @@ export default function GroupsPage() {
   }
   const openEdit = (g: Group) => {
     setEditItem(g)
-    setForm({ name: g.name, description: g.description || '', color: g.color || '#3B82F6' })
+    setForm({ name: g.name, description: g.description || '', color: g.color || 'var(--primary)' })
     setIsDirty(false); setConfirmClose(false); setShowModal(true)
   }
 

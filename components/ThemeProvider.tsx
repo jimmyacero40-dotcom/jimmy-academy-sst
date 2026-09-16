@@ -16,16 +16,16 @@ export const THEMES: ThemeMeta[] = [
   {
     id: 'dark',
     name: 'Dark',
-    description: 'Azul profundo · Modo oscuro',
-    colors: { bg: '#060E1E', surface: '#0A1628', primary: '#3B82F6', accent: '#10B981' },
-    preview: { sidebar: '#0A1628', primary: '#3B82F6', accent: '#10B981', bg: '#060E1E' },
+    description: 'Verde bosque · Modo oscuro',
+    colors: { bg: '#071009', surface: '#0C1A0E', primary: '#2D8A2D', accent: '#E8920A' },
+    preview: { sidebar: '#0C1A0E', primary: '#2D8A2D', accent: '#E8920A', bg: '#071009' },
   },
   {
     id: 'light',
     name: 'Light',
-    description: 'Azul limpio · Modo claro',
-    colors: { bg: '#F0F4FF', surface: '#FFFFFF', primary: '#2563EB', accent: '#059669' },
-    preview: { sidebar: '#FFFFFF', primary: '#2563EB', accent: '#059669', bg: '#F0F4FF' },
+    description: 'Verde profesional · Modo claro',
+    colors: { bg: '#F2F7EE', surface: '#FFFFFF', primary: '#1A5C1A', accent: '#E8920A' },
+    preview: { sidebar: '#FFFFFF', primary: '#1A5C1A', accent: '#E8920A', bg: '#F2F7EE' },
   },
   {
     id: 'navy',

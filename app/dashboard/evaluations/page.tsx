@@ -39,7 +39,7 @@ interface Evaluation {
 // ─── Constants ───────────────────────────────────────────────────────────────
 
 const Q_TYPES: { value: QType; label: string; icon: React.ElementType; color: string }[] = [
-  { value: 'single',     label: 'Opción única',   icon: Circle,      color: '#3B82F6' },
+  { value: 'single',     label: 'Opción única',   icon: Circle,      color: 'var(--primary)' },
   { value: 'multiple',   label: 'Múltiple',        icon: CheckSquare, color: '#8B5CF6' },
   { value: 'true_false', label: 'Verdadero / Falso', icon: ToggleLeft, color: '#10B981' },
 ]
@@ -230,7 +230,7 @@ function QuestionEditor({
                     onClick={async () => { await onSave(form); setDirty(false) }}
                     disabled={saving || !form.text.trim() || form.correct.length === 0}
                     className="flex-1 py-2 rounded-lg text-xs font-bold transition-all"
-                    style={{ background: '#3B82F6', color: '#fff', opacity: saving ? 0.6 : 1 }}
+                    style={{ background: 'var(--primary)', color: '#fff', opacity: saving ? 0.6 : 1 }}
                   >
                     {saving ? 'Guardando…' : 'Guardar pregunta'}
                   </button>
@@ -390,7 +390,7 @@ function NewQuestionForm({ evaluationId, onCreated }: { evaluationId: string; on
         onClick={save}
         disabled={saving || !form.text.trim() || form.correct.length === 0}
         className="w-full py-2.5 rounded-xl text-sm font-bold transition-all"
-        style={{ background: '#3B82F6', color: '#fff', opacity: saving || !form.text.trim() || form.correct.length === 0 ? 0.5 : 1 }}
+        style={{ background: 'var(--primary)', color: '#fff', opacity: saving || !form.text.trim() || form.correct.length === 0 ? 0.5 : 1 }}
       >
         {saving ? 'Guardando…' : 'Guardar pregunta'}
       </button>
@@ -674,7 +674,7 @@ CREATE TABLE IF NOT EXISTS questions (
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-6">
         {[
           { label: 'Evaluaciones', value: evals.length, color: '#8B5CF6' },
-          { label: 'Total preguntas', value: evals.length > 0 ? '—' : 0, color: '#3B82F6', note: 'selecciona una' },
+          { label: 'Total preguntas', value: evals.length > 0 ? '—' : 0, color: 'var(--primary)', note: 'selecciona una' },
           { label: 'Prom. puntaje mín.', value: evals.length ? `${Math.round(evals.reduce((a, e) => a + e.min_score, 0) / evals.length)}%` : '—', color: '#10B981' },
           { label: 'Con capacitación', value: evals.filter(e => e.training_id).length, color: '#F59E0B' },
         ].map(({ label, value, color }, i) => (

@@ -19,7 +19,7 @@ interface Enrollment {
 
 const STATUS_META = {
   pending:     { label: 'Pendiente',  color: '#F59E0B', bg: 'rgba(245,158,11,0.1)'  },
-  in_progress: { label: 'En curso',   color: '#3B82F6', bg: 'rgba(59,130,246,0.1)'  },
+  in_progress: { label: 'En curso',   color: 'var(--primary)', bg: 'rgba(59,130,246,0.1)'  },
   completed:   { label: 'Completado', color: '#10B981', bg: 'rgba(16,185,129,0.1)'  },
   expired:     { label: 'Vencido',    color: '#EF4444', bg: 'rgba(239,68,68,0.1)'   },
 }
@@ -101,7 +101,7 @@ export default function EnrollmentsPage() {
         <div className="terra-progress-track">
           <motion.div className="terra-progress-fill" initial={{ width: 0 }} animate={{ width: `${compliance}%` }}
             transition={{ duration: 1, ease: 'easeOut' }}
-            style={{ background: 'linear-gradient(90deg, #3B82F6, #10B981)' }} />
+            style={{ background: 'linear-gradient(90deg, var(--primary), #10B981)' }} />
         </div>
         <div className="flex justify-between mt-1.5 text-[10px]" style={{ color: 'var(--text-faint)' }}>
           <span>{completed} completados</span>

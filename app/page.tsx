@@ -77,7 +77,7 @@ export default function LandingPage() {
             </div>
             <div style={{ display: 'flex', alignItems: 'center', gap: 14, marginTop: 36, flexWrap: 'wrap' }}>
               <div style={{ display: 'flex' }}>
-                {['#F59E0B','#EF4444','#10B981','#3B82F6'].map((c, i) => (
+                {['#F59E0B','#EF4444','#10B981','var(--primary)'].map((c, i) => (
                   <div key={i} style={{ width: 28, height: 28, borderRadius: '50%', background: c, border: '2px solid var(--bg)', marginLeft: i > 0 ? -7 : 0 }} />
                 ))}
               </div>
@@ -98,7 +98,7 @@ export default function LandingPage() {
               {[
                 { label: 'Cumplimiento SG-SST', v: 94, c: '#F59E0B' },
                 { label: 'Capacitaciones al día', v: 87, c: '#10B981' },
-                { label: 'Certificados vigentes', v: 96, c: '#3B82F6' },
+                { label: 'Certificados vigentes', v: 96, c: 'var(--primary)' },
                 { label: 'Firmas completadas',   v: 88, c: '#EF4444' },
               ].map(({ label, v, c }, i) => (
                 <div key={label} style={{ marginBottom: 16 }}>

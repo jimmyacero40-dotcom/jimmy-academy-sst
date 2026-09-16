@@ -14,9 +14,9 @@ import { exportToExcel } from './export-excel'
 import { exportToPDF } from './export-pdf'
 
 // ── Chart primitives ──────────────────────────────────────────────────
-const PAL = ['#3B82F6','#10B981','#F59E0B','#8B5CF6','#EF4444','#06B6D4','#F97316','#EC4899','#14B8A6','#A78BFA']
+const PAL = ['var(--primary)','#10B981','#F59E0B','#8B5CF6','#EF4444','#06B6D4','#F97316','#EC4899','#14B8A6','#A78BFA']
 
-function HBar({ label, n, pct, max, color = '#3B82F6', total }: FreqRow & { max: number; total: number; color?: string }) {
+function HBar({ label, n, pct, max, color = 'var(--primary)', total }: FreqRow & { max: number; total: number; color?: string }) {
   return (
     <div className="flex items-center gap-2 text-xs">
       <span className="flex-shrink-0 truncate text-right" style={{ width: 130, color: 'var(--text-dim)' }} title={label}>{label}</span>
@@ -110,7 +110,7 @@ function Sec({ title, children, accent = 'var(--primary)' }: { title: string; ch
   )
 }
 
-function FreqTable({ data, color = '#3B82F6' }: { data: FreqRow[]; color?: string }) {
+function FreqTable({ data, color = 'var(--primary)' }: { data: FreqRow[]; color?: string }) {
   if (!data.length) return <p className="text-xs py-4" style={{ color: 'var(--text-faint)' }}>Sin datos aún</p>
   const max = data[0]?.n ?? 1
   return <div className="space-y-2">{data.slice(0, 10).map((r, i) => <HBar key={r.label} {...r} max={max} total={data.reduce((s, d) => s + d.n, 0)} color={PAL[i % PAL.length] ?? color} />)}</div>
@@ -293,8 +293,8 @@ export default function WorkerProfilesPage() {
                 </div>
               )}
               {a.actividadFisica.pctSi < 40 && (
-                <div className="terra-card p-4 flex items-start gap-3" style={{ borderLeft: '3px solid #3B82F6' }}>
-                  <Activity size={16} style={{ color: '#3B82F6', flexShrink: 0, marginTop: 2 }} />
+                <div className="terra-card p-4 flex items-start gap-3" style={{ borderLeft: '3px solid var(--primary)' }}>
+                  <Activity size={16} style={{ color: 'var(--primary)', flexShrink: 0, marginTop: 2 }} />
                   <div>
                     <p className="text-sm font-bold" style={{ color: 'var(--text)' }}>Sedentarismo elevado</p>
                     <p className="text-xs mt-0.5" style={{ color: 'var(--text-dim)' }}>Solo el {a.actividadFisica.pctSi}% realiza actividad física. Promover programas de bienestar físico y deporte.</p>
@@ -317,7 +317,7 @@ export default function WorkerProfilesPage() {
                 <Sec title="Distribución por sexo"><DonutChart data={a.sexo} size={150} /></Sec>
                 <Sec title="Estado civil" accent="#F59E0B"><FreqTable data={a.estadoCivil} color="#F59E0B" /></Sec>
               </div>
-              <Sec title="Grupos de edad"><FreqTable data={a.ageGroups} color="#3B82F6" /></Sec>
+              <Sec title="Grupos de edad"><FreqTable data={a.ageGroups} color="var(--primary)" /></Sec>
               <Sec title="Ciudad de residencia (top 10)" accent="#06B6D4"><FreqTable data={a.ciudad} color="#06B6D4" /></Sec>
               <div className="grid lg:grid-cols-3 gap-4">
                 <Sec title="Tipo de vivienda"><FreqTable data={a.tipoVivienda} /></Sec>
@@ -810,7 +810,7 @@ export default function WorkerProfilesPage() {
                 <p className="text-xs mb-5" style={{ color: 'var(--text-dim)' }}>Genera informes profesionales basados en los datos actuales de {a.total} trabajadores. Los reportes se construyen automáticamente con interpretación de resultados.</p>
                 <div className="grid sm:grid-cols-2 gap-4">
                   {[
-                    { title: 'Informe General', desc: 'Resumen ejecutivo completo con todos los indicadores, gráficas y conclusiones automáticas.', color: '#3B82F6', type: 'pdf' },
+                    { title: 'Informe General', desc: 'Resumen ejecutivo completo con todos los indicadores, gráficas y conclusiones automáticas.', color: 'var(--primary)', type: 'pdf' },
                     { title: 'Informe Demográfico', desc: 'Análisis de edad, sexo, estado civil, nivel educativo, estrato y municipio.', color: '#8B5CF6', type: 'pdf' },
                     { title: 'Informe de Salud', desc: 'Enfermedades, restricciones, cirugías, riesgo psicosocial y salud ocupacional.', color: '#EF4444', type: 'pdf' },
                     { title: 'Informe de Estilos de Vida', desc: 'Actividad física, hábitos alimenticios, tabaquismo, alcohol y calidad del sueño.', color: '#10B981', type: 'pdf' },

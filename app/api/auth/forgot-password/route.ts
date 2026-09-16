@@ -45,13 +45,13 @@ export async function POST(req: NextRequest) {
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        from: process.env.EMAIL_FROM || 'Campus SST <noreply@jimmyacademy.co>',
+        from: process.env.EMAIL_FROM || 'AgroSafe <noreply@jimmyacademy.co>',
         to: user.email,
-        subject: 'Recuperación de contraseña — Campus SST',
+        subject: 'Recuperación de contraseña — AgroSafe',
         html: `
           <div style="font-family:sans-serif;max-width:480px;margin:0 auto;padding:32px;background:#0f172a;color:#f8fafc;border-radius:12px">
             <div style="margin-bottom:24px">
-              <span style="background:#3b82f6;color:#fff;padding:8px 14px;border-radius:8px;font-size:13px;font-weight:600">Campus SST</span>
+              <span style="background:#2D8A2D;color:#fff;padding:8px 14px;border-radius:8px;font-size:13px;font-weight:600">AgroSafe</span>
             </div>
             <h1 style="font-size:22px;font-weight:600;margin:0 0 8px">Recupera tu contraseña</h1>
             <p style="color:#94a3b8;font-size:14px;line-height:1.6;margin:0 0 24px">
@@ -59,7 +59,7 @@ export async function POST(req: NextRequest) {
               Si no fuiste tú, puedes ignorar este mensaje.
             </p>
             <a href="${resetUrl}"
-              style="display:inline-block;background:#3b82f6;color:#fff;text-decoration:none;padding:13px 28px;border-radius:10px;font-size:14px;font-weight:600;margin-bottom:24px">
+              style="display:inline-block;background:#2D8A2D;color:#fff;text-decoration:none;padding:13px 28px;border-radius:10px;font-size:14px;font-weight:600;margin-bottom:24px">
               Restablecer contraseña
             </a>
             <p style="color:#475569;font-size:12px;line-height:1.5;margin:0">

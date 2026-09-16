@@ -421,7 +421,7 @@ function CourseCard({ enrollment: e, index, gradIndex, onStart, onCert }: {
             <div className="h-1.5 rounded-full overflow-hidden"
               style={{ background: 'var(--border)' }}>
               <div className="h-full rounded-full"
-                style={{ width: '35%', background: 'linear-gradient(90deg, #3B82F6, #60A5FA)' }} />
+                style={{ width: '35%', background: 'linear-gradient(90deg, var(--primary), #60A5FA)' }} />
             </div>
             <p className="text-[10px] mt-1" style={{ color: 'var(--text-faint)' }}>En progreso</p>
           </div>
@@ -469,7 +469,7 @@ function CourseCard({ enrollment: e, index, gradIndex, onStart, onCert }: {
             <button
               onClick={ev => { ev.stopPropagation(); onStart(e) }}
               className="w-full py-2 rounded-xl text-xs font-bold flex items-center justify-center gap-2 transition-all hover:opacity-90"
-              style={{ background: isActive ? 'linear-gradient(135deg,#3B82F6,#60A5FA)' : 'linear-gradient(135deg,#7C3AED,#A78BFA)', color: '#fff' }}>
+              style={{ background: isActive ? 'linear-gradient(135deg,var(--primary),#60A5FA)' : 'linear-gradient(135deg,#7C3AED,#A78BFA)', color: '#fff' }}>
               <Play size={12} fill="currentColor" />
               {isActive ? 'Continuar' : 'Iniciar'}
             </button>

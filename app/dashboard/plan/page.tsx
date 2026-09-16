@@ -59,7 +59,7 @@ const ESTADO_LABELS: Record<string,string> = {
   completada:'Completada', cancelada:'Cancelada', postergada:'Postergada',
 }
 const ESTADO_COLORS: Record<string,string> = {
-  pendiente:'#6B7280', programada:'#3B82F6', en_curso:'#F59E0B',
+  pendiente:'#6B7280', programada:'var(--primary)', en_curso:'#F59E0B',
   completada:'#10B981', cancelada:'#EF4444', postergada:'#8B5CF6',
 }
 
@@ -71,7 +71,7 @@ const PERIOD_LABELS: Record<string,string> = {
 
 const CAT_COLORS: Record<string,string> = {
   'SST':'#10B981','Seguridad':'#EF4444','Salud':'#EC4899',
-  'Ambiental':'#84CC16','Calidad':'#3B82F6','Alturas':'#F59E0B',
+  'Ambiental':'#84CC16','Calidad':'var(--primary)','Alturas':'#F59E0B',
   'Primeros Auxilios':'#F97316',
 }
 function catColor(cat: string | null) { return CAT_COLORS[cat ?? ''] ?? '#8B5CF6' }
@@ -660,7 +660,7 @@ export default function PlanPage() {
                       className="rounded-xl overflow-hidden transition-all"
                       style={{
                         background: isOver ? 'rgba(59,130,246,0.06)' : 'var(--bg-surface)',
-                        border: isOver ? '1.5px dashed #3B82F6' : '1px solid var(--border)',
+                        border: isOver ? '1.5px dashed var(--primary)' : '1px solid var(--border)',
                         minHeight: 140,
                       }}>
                       <div className="flex items-center justify-between px-3 py-2"
@@ -675,7 +675,7 @@ export default function PlanPage() {
                               {monthItems.length}
                             </span>
                           )}
-                          {isOver && <span className="text-[10px] font-bold" style={{ color: '#3B82F6' }}>+</span>}
+                          {isOver && <span className="text-[10px] font-bold" style={{ color: 'var(--primary)' }}>+</span>}
                         </div>
                       </div>
                       <div className="p-1.5 space-y-1">
@@ -793,7 +793,7 @@ export default function PlanPage() {
         <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} className="text-center py-16">
           <div className="w-14 h-14 rounded-2xl flex items-center justify-center mb-3 mx-auto"
             style={{ background: 'rgba(59,130,246,0.1)' }}>
-            <Calendar size={24} style={{ color: '#3B82F6' }} />
+            <Calendar size={24} style={{ color: 'var(--primary)' }} />
           </div>
           <h3 className="font-semibold mb-1" style={{ color: 'var(--text)' }}>Sin planes creados</h3>
           <p className="text-sm mb-6" style={{ color: 'var(--text-dim)' }}>
@@ -828,7 +828,7 @@ export default function PlanPage() {
                       <div className="flex items-center gap-3">
                         <div className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0"
                           style={{ background: 'rgba(59,130,246,0.1)', border: '1px solid rgba(59,130,246,0.2)' }}>
-                          <Calendar size={16} style={{ color: '#3B82F6' }} />
+                          <Calendar size={16} style={{ color: 'var(--primary)' }} />
                         </div>
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center gap-2">

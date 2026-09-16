@@ -454,7 +454,7 @@ export default function ExperienceDesigner() {
                     </div>
                     <div className="flex-1 min-w-0">
                       <div className="text-xs font-semibold truncate"
-                        style={{ color: block.block_type === 'question' ? '#c4b5fd' : '#93c5fd' }}>
+                        style={{ color: block.block_type === 'question' ? '#c4b5fd' : 'var(--primary-light)' }}>
                         {block.block_type === 'slide'
                           ? (block.title ?? `Diapositiva ${block.training_slides?.slide_index != null ? block.training_slides.slide_index + 1 : idx + 1}`)
                           : (block.title ?? block.training_questions?.question?.slice(0, 50) ?? 'Pregunta')}
@@ -521,7 +521,7 @@ export default function ExperienceDesigner() {
                   {selected.block_type === 'question' ? '❓' : '🖼'}
                 </div>
                 <span className="text-xs font-bold uppercase tracking-wide"
-                  style={{ color: selected.block_type === 'question' ? '#c4b5fd' : '#93c5fd' }}>
+                  style={{ color: selected.block_type === 'question' ? '#c4b5fd' : 'var(--primary-light)' }}>
                   {selected.block_type === 'question' ? 'Pregunta' : 'Diapositiva'}
                 </span>
               </div>
@@ -571,7 +571,7 @@ export default function ExperienceDesigner() {
                   <span className="text-xs" style={{ color: 'var(--text-dim)' }}>Obligatorio</span>
                   <button onClick={() => updateBlock(selected.id, { is_required: !selected.is_required })}
                     className="w-10 h-5 rounded-full transition-all relative"
-                    style={{ background: selected.is_required ? '#3B82F6' : '#374151' }}>
+                    style={{ background: selected.is_required ? 'var(--primary)' : '#374151' }}>
                     <div className="absolute top-0.5 w-4 h-4 bg-white rounded-full transition-all"
                       style={{ left: selected.is_required ? '22px' : '2px' }} />
                   </button>
@@ -611,7 +611,7 @@ export default function ExperienceDesigner() {
             </div>
             <div className="space-y-2">
               {[
-                { label: 'Diapositivas', value: blocks.filter(b => b.block_type === 'slide').length, color: '#93c5fd' },
+                { label: 'Diapositivas', value: blocks.filter(b => b.block_type === 'slide').length, color: 'var(--primary-light)' },
                 { label: 'Preguntas inline', value: blocks.filter(b => b.block_type === 'question').length, color: '#c4b5fd' },
                 { label: 'Con timer', value: blocks.filter(b => b.minimum_seconds > 0).length, color: '#fcd34d' },
                 { label: 'Inactivos', value: blocks.filter(b => !b.is_active).length, color: '#64748b' },
