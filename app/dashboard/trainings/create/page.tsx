@@ -280,7 +280,7 @@ function Certificate({ training, score, userName, onRetry }: { training: Generat
             <div className="w-16 h-16 rounded-full bg-white/20 border border-white/30 flex items-center justify-center mx-auto mb-3">
               <Award size={32} className="text-white" />
             </div>
-            <p className="text-blue-100 text-xs font-bold uppercase tracking-widest mb-1">Jimmy Academy · SG-SST Colombia</p>
+            <p className="text-blue-100 text-xs font-bold uppercase tracking-widest mb-1">AgroSafe · SG-SST Colombia</p>
             <h2 className="text-white font-black text-xl">Certificado de Competencia</h2>
           </div>
           <div className="p-6 text-center">

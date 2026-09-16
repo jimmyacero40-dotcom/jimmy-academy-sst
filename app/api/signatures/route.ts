@@ -64,7 +64,7 @@ export async function POST(req: NextRequest) {
 
   const legalText = `AUTORIZACIÓN PARA EL TRATAMIENTO DE DATOS PERSONALES Y USO DE FIRMA DIGITAL
 
-En cumplimiento de la Ley 1581 de 2012 "Ley de Protección de Datos Personales", el Decreto 1377 de 2013, y demás normatividad vigente en la República de Colombia, yo ${fullName}, identificado(a) con cédula de ciudadanía No. ${cedula}, de manera libre, voluntaria, previa, expresa e informada, AUTORIZO a AGROVENTURE CAPITAL S.A.S. y su plataforma Jimmy Academy SST para:
+En cumplimiento de la Ley 1581 de 2012 "Ley de Protección de Datos Personales", el Decreto 1377 de 2013, y demás normatividad vigente en la República de Colombia, yo ${fullName}, identificado(a) con cédula de ciudadanía No. ${cedula}, de manera libre, voluntaria, previa, expresa e informada, AUTORIZO a AGROVENTURE CAPITAL S.A.S. y su plataforma AgroSafe para:
 
 1. Recolectar, almacenar, usar, circular y suprimir mis datos personales, incluyendo mi firma digital, con el fin de gestionar el Sistema de Gestión de Seguridad y Salud en el Trabajo (SG-SST) conforme al Decreto 1072 de 2015 y la Resolución 0312 de 2019.
 
@@ -76,7 +76,7 @@ Declaro que he sido informado(a) sobre mis derechos como titular de datos person
 
 Fecha de autorización: ${new Date().toLocaleString('es-CO', { timeZone: 'America/Bogota' })}
 IP de registro: ${ip}
-Plataforma: Jimmy Academy SST`
+Plataforma: AgroSafe`
 
   // Save signature
   const { error: sigError } = await supabase

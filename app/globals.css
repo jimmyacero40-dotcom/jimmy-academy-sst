@@ -5,12 +5,13 @@
 @tailwind utilities;
 
 /* ═══════════════════════════════════════════════════════════════════
-   JIMMY ACADEMY — DESIGN SYSTEM
+   AGROSAFE — DESIGN SYSTEM
+   Plataforma Integral de Gestión del Personal
    Full theme system via [data-theme] CSS variables.
    Components NEVER hardcode colors — always use variables.
    ═══════════════════════════════════════════════════════════════════ */
 
-/* ── Shared structural tokens (never change across themes) ────────── */
+/* ── AgroSafe Brand Tokens (fijos, no cambian entre temas) ────────── */
 :root {
   --font-display: 'Fraunces', Georgia, serif;
   --font-body:    'Plus Jakarta Sans', system-ui, sans-serif;
@@ -22,88 +23,99 @@
   --red-dim:      rgba(239,68,68,0.12);
   --glow-red:     0 0 40px rgba(239,68,68,0.15);
   /* success / warning shared semantics */
-  --success:      #10B981;
+  --success:      #22C55E;
   --warning:      #F59E0B;
   --danger:       #EF4444;
   --info:         #60A5FA;
+
+  /* ── AgroSafe Brand Colors ── */
+  --agrosafe-green-dark:   #1A5C1A;   /* verde bosque — identidad AGR */
+  --agrosafe-green:        #2D8A2D;   /* verde natural — acciones positivas */
+  --agrosafe-green-light:  #5BAD1F;   /* verde medio */
+  --agrosafe-lime:         #7EC800;   /* verde lima — SAFE / acentos */
+  --agrosafe-lime-light:   #A3E635;
+  --agrosafe-orange:       #E8920A;   /* naranja — casco / atención */
+  --agrosafe-orange-light: #F5A823;
+  --agrosafe-navy:         #0D1F12;   /* navy verde oscuro */
+  --agrosafe-bg-light:     #F2F7EE;   /* fondo claro neutro */
 }
 
-/* ── TEMA 1: Dark (default — azul profundo) ───────────────────────── */
+/* ── TEMA 1 (Default): AgroSafe Dark — bosque profundo ───────────── */
 :root,
 [data-theme="dark"] {
-  --primary:        #3B82F6;
-  --primary-light:  #93C5FD;
-  --primary-dim:    rgba(59,130,246,0.12);
-  --primary-border: rgba(59,130,246,0.22);
+  --primary:        #2D8A2D;
+  --primary-light:  #7EC800;
+  --primary-dim:    rgba(45,138,45,0.14);
+  --primary-border: rgba(45,138,45,0.28);
 
-  --accent:         #10B981;
-  --accent-dim:     rgba(16,185,129,0.12);
-  --accent-border:  rgba(16,185,129,0.22);
+  --accent:         #E8920A;
+  --accent-dim:     rgba(232,146,10,0.12);
+  --accent-border:  rgba(232,146,10,0.28);
 
-  --bg:             #060E1E;
-  --bg-surface:     #0A1628;
-  --bg-card:        rgba(59,130,246,0.03);
-  --bg-card-hover:  rgba(59,130,246,0.07);
+  --bg:             #071009;
+  --bg-surface:     #0C1A0E;
+  --bg-card:        rgba(45,138,45,0.04);
+  --bg-card-hover:  rgba(45,138,45,0.09);
 
-  --border:         rgba(59,130,246,0.1);
-  --border-strong:  rgba(59,130,246,0.22);
+  --border:         rgba(45,138,45,0.12);
+  --border-strong:  rgba(45,138,45,0.26);
 
-  --text:           #EEF2FF;
-  --text-dim:       rgba(238,242,255,0.55);
-  --text-faint:     rgba(238,242,255,0.28);
+  --text:           #EDF7ED;
+  --text-dim:       rgba(237,247,237,0.58);
+  --text-faint:     rgba(237,247,237,0.30);
 
-  --grad-main:      linear-gradient(135deg, #3B82F6, #10B981);
-  --grad-subtle:    linear-gradient(135deg, rgba(59,130,246,0.15), rgba(16,185,129,0.08));
+  --grad-main:      linear-gradient(135deg, #1A5C1A, #7EC800);
+  --grad-subtle:    linear-gradient(135deg, rgba(45,138,45,0.16), rgba(126,200,0,0.08));
 
-  --glow-primary:   0 0 40px rgba(59,130,246,0.2);
-  --glow-accent:    0 0 40px rgba(16,185,129,0.15);
+  --glow-primary:   0 0 40px rgba(45,138,45,0.22);
+  --glow-accent:    0 0 40px rgba(232,146,10,0.18);
 
-  --header-bg:      rgba(6,14,30,0.88);
+  --header-bg:      rgba(7,16,9,0.90);
 
-  /* legacy aliases */
-  --amber:          #3B82F6;
-  --amber-light:    #93C5FD;
-  --amber-dim:      rgba(59,130,246,0.12);
-  --amber-border:   rgba(59,130,246,0.22);
-  --glow-amber:     0 0 40px rgba(59,130,246,0.2);
+  /* alias legacy */
+  --amber:          #E8920A;
+  --amber-light:    #F5A823;
+  --amber-dim:      rgba(232,146,10,0.12);
+  --amber-border:   rgba(232,146,10,0.28);
+  --glow-amber:     0 0 40px rgba(232,146,10,0.2);
 }
 
-/* ── TEMA 2: Light (claro — azul limpio) ─────────────────────────── */
+/* ── TEMA 2: AgroSafe Light — claro profesional ──────────────────── */
 [data-theme="light"] {
-  --primary:        #2563EB;
-  --primary-light:  #93C5FD;
-  --primary-dim:    rgba(37,99,235,0.08);
-  --primary-border: rgba(37,99,235,0.22);
+  --primary:        #1A5C1A;
+  --primary-light:  #5BAD1F;
+  --primary-dim:    rgba(26,92,26,0.08);
+  --primary-border: rgba(26,92,26,0.22);
 
-  --accent:         #059669;
-  --accent-dim:     rgba(5,150,105,0.1);
-  --accent-border:  rgba(5,150,105,0.22);
+  --accent:         #E8920A;
+  --accent-dim:     rgba(232,146,10,0.10);
+  --accent-border:  rgba(232,146,10,0.25);
 
-  --bg:             #F0F4FF;
+  --bg:             #F2F7EE;
   --bg-surface:     #FFFFFF;
-  --bg-card:        rgba(37,99,235,0.04);
-  --bg-card-hover:  rgba(37,99,235,0.09);
+  --bg-card:        rgba(26,92,26,0.04);
+  --bg-card-hover:  rgba(26,92,26,0.08);
 
-  --border:         rgba(0,0,0,0.08);
-  --border-strong:  rgba(0,0,0,0.16);
+  --border:         rgba(26,92,26,0.10);
+  --border-strong:  rgba(26,92,26,0.20);
 
-  --text:           #0F172A;
-  --text-dim:       rgba(15,23,42,0.6);
-  --text-faint:     rgba(15,23,42,0.35);
+  --text:           #0D2410;
+  --text-dim:       rgba(13,36,16,0.60);
+  --text-faint:     rgba(13,36,16,0.35);
 
-  --grad-main:      linear-gradient(135deg, #2563EB, #059669);
-  --grad-subtle:    linear-gradient(135deg, rgba(37,99,235,0.1), rgba(5,150,105,0.05));
+  --grad-main:      linear-gradient(135deg, #1A5C1A, #5BAD1F);
+  --grad-subtle:    linear-gradient(135deg, rgba(26,92,26,0.10), rgba(91,173,31,0.05));
 
-  --glow-primary:   0 0 40px rgba(37,99,235,0.12);
-  --glow-accent:    0 0 40px rgba(5,150,105,0.08);
+  --glow-primary:   0 0 40px rgba(26,92,26,0.12);
+  --glow-accent:    0 0 40px rgba(232,146,10,0.10);
 
-  --header-bg:      rgba(255,255,255,0.92);
+  --header-bg:      rgba(255,255,255,0.94);
 
-  --amber:          #2563EB;
-  --amber-light:    #93C5FD;
-  --amber-dim:      rgba(37,99,235,0.08);
-  --amber-border:   rgba(37,99,235,0.22);
-  --glow-amber:     0 0 40px rgba(37,99,235,0.12);
+  --amber:          #E8920A;
+  --amber-light:    #F5A823;
+  --amber-dim:      rgba(232,146,10,0.10);
+  --amber-border:   rgba(232,146,10,0.25);
+  --glow-amber:     0 0 40px rgba(232,146,10,0.12);
   --glow-red:       0 0 40px rgba(239,68,68,0.08);
   --red-dim:        rgba(239,68,68,0.08);
 }
@@ -146,7 +158,7 @@
   --glow-amber:     0 0 40px rgba(129,140,248,0.2);
 }
 
-/* ── TEMA 4: Verde Agro (bosque oscuro — esmeralda/ámbar) ─────────── */
+/* ── TEMA 4: AgroSafe Verde intenso (bosque oscuro — esmeralda/naranja) ── */
 [data-theme="verde"] {
   --primary:        #10B981;
   --primary-light:  #6EE7B7;

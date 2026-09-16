@@ -37,7 +37,7 @@ export default function LandingPage() {
               <Shield size={17} color="white" />
             </div>
             <div>
-              <div style={{ fontFamily: 'var(--font-display)', fontWeight: 900, fontSize: 16, lineHeight: 1 }}>Jimmy Academy</div>
+              <div style={{ fontFamily: 'var(--font-display)', fontWeight: 900, fontSize: 16, lineHeight: 1 }}>AgroSafe</div>
               <div style={{ fontSize: 9, fontWeight: 700, letterSpacing: 2, textTransform: 'uppercase', color: 'var(--amber)', lineHeight: 1, marginTop: 2 }}>SST Colombia</div>
             </div>
           </div>
@@ -211,7 +211,7 @@ export default function LandingPage() {
           <div style={{ width: 28, height: 28, borderRadius: 7, background: 'var(--grad-main)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
             <Shield size={13} color="white" />
           </div>
-          <span style={{ fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: 14 }}>Jimmy Academy SST</span>
+          <span style={{ fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: 14 }}>AgroSafe</span>
         </div>
         <span style={{ fontSize: 11, color: 'var(--text-faint)' }}>© 2026 · Plataforma SG-SST Colombia · Decreto 1072 de 2015</span>
       </footer>

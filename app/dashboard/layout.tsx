@@ -174,27 +174,27 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       `} style={{ background: 'var(--bg-surface)', borderRight: '1px solid var(--border)' }}>
 
         {/* Logo */}
-        <div className="flex items-center h-16 px-4 gap-3 flex-shrink-0"
+        <div className="flex items-center h-16 px-3 gap-2.5 flex-shrink-0"
           style={{ borderBottom: '1px solid var(--border)' }}>
-          {activeCompany?.logo_url ? (
-            <div className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 overflow-hidden"
-              style={{ background: 'white' }}>
-              <img src={activeCompany.logo_url} alt={activeCompany.name} className="w-7 h-7 object-contain" />
-            </div>
-          ) : (
-            <div className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0"
-              style={{ background: 'var(--grad-main)', boxShadow: '0 4px 16px rgba(245,158,11,0.25)' }}>
-              <Shield size={16} className="text-white" strokeWidth={2.5} />
-            </div>
-          )}
+          {/* AgroSafe logo / company logo */}
+          <div className="flex-shrink-0 flex items-center justify-center"
+            style={{ width: collapsed ? 36 : 40, height: collapsed ? 36 : 40 }}>
+            {activeCompany?.logo_url ? (
+              <img src={activeCompany.logo_url} alt={activeCompany.name}
+                className="w-full h-full object-contain rounded-lg" style={{ background: 'white', padding: 2 }} />
+            ) : (
+              <img src="/images/LOGO.png" alt="AgroSafe"
+                className="w-full h-full object-contain" />
+            )}
+          </div>
           {!collapsed && (
             <div className="flex-1 min-w-0">
               <div className="font-extrabold text-sm truncate"
-                style={{ color: 'var(--text)', fontFamily: 'var(--font-display)' }}>
-                {activeCompany?.name || 'Jimmy Academy'}
+                style={{ color: 'var(--text)', fontFamily: 'var(--font-display)', letterSpacing: '-0.01em' }}>
+                {activeCompany?.name || 'AgroSafe'}
               </div>
-              <div className="text-[10px] font-semibold" style={{ color: 'var(--amber)' }}>
-                {isAdmin ? 'Administrador SST' : 'Portal Trabajador'}
+              <div className="text-[9px] font-bold uppercase tracking-widest" style={{ color: 'var(--amber)' }}>
+                {isAdmin ? 'Gestión del Personal' : 'Portal Trabajador'}
               </div>
             </div>
           )}

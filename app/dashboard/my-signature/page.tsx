@@ -402,7 +402,7 @@ export default function MySignaturePage() {
                   yo <strong style={{ color: 'var(--text)' }}>{fullName}</strong>, identificado(a) con cédula de ciudadanía
                   No. <strong style={{ color: 'var(--text)' }}>{cedula}</strong>, de manera libre, voluntaria, previa,
                   expresa e informada, AUTORIZO a <strong>AGROVENTURE CAPITAL S.A.S.</strong> y su plataforma
-                  Jimmy Academy SST para:
+                  AgroSafe para:
                 </p>
 
                 <ol className="list-decimal pl-4 space-y-2">

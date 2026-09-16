@@ -38,7 +38,7 @@ export default function ForgotPasswordPage() {
             <Shield size={20} className="text-white" />
           </div>
           <div>
-            <div className="text-[15px] font-medium text-white">CAMPUS SST</div>
+            <div className="text-[15px] font-medium text-white">AgroSafe</div>
             <div className="text-[10px] uppercase tracking-widest" style={{ color: '#475569' }}>Seguridad y Salud en el Trabajo</div>
           </div>
         </div>

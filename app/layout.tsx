@@ -4,14 +4,14 @@ import SessionProviderWrapper from '@/components/SessionProviderWrapper'
 import { ThemeProvider } from '@/components/ThemeProvider'
 
 export const metadata: Metadata = {
-  title: 'Jimmy Academy SST — Plataforma #1 en Colombia para SG-SST',
+  title: 'AgroSafe — Plataforma Integral de Gestión del Personal',
   description:
-    'Gestiona la Seguridad y Salud en el Trabajo de tu empresa con IA. Capacitaciones digitales, firma electrónica con validez legal y certificados automáticos.',
-  keywords: 'SG-SST, seguridad salud trabajo, capacitaciones SST, firma electronica, Colombia',
-  authors: [{ name: 'Jimmy Academy' }],
+    'AgroSafe: plataforma profesional para la gestión integral del personal agroindustrial. Seguridad y Salud en el Trabajo, capacitaciones SSTudio, firma electrónica y certificados.',
+  keywords: 'AgroSafe, SG-SST, gestión personal, seguridad agroindustrial, capacitaciones, Colombia',
+  authors: [{ name: 'AgroSafe' }],
   openGraph: {
-    title: 'Jimmy Academy SST',
-    description: 'La plataforma más avanzada para gestión SST en Colombia',
+    title: 'AgroSafe — La cultura que nos protege',
+    description: 'Plataforma integral de gestión del personal para el sector agroindustrial',
     type: 'website',
     locale: 'es_CO',
   },
@@ -25,6 +25,8 @@ export default function RootLayout({
   return (
     <html lang="es" suppressHydrationWarning>
       <head>
+        <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+        <link rel="shortcut icon" href="/favicon.svg" />
         <script dangerouslySetInnerHTML={{ __html: `
           (function(){
             try {

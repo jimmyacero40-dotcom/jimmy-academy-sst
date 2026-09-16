@@ -46,7 +46,7 @@ export async function exportToPDF(analytics: Analytics, company = 'Organización
 
   function header(title: string, sub = '') {
     rect(0, 0, W, 18, C.navy)
-    text(`CAMPUS SST  ·  ${company}`, ML, 8, 7, C.teal, true)
+    text(`AgroSafe  ·  ${company}`, ML, 8, 7, C.teal, true)
     text(title.toUpperCase(), ML, 13.5, 8, C.white, true)
     if (sub) { text(sub, W - MR, 13.5, 7, [180,200,220], false, 'right') }
     pageNum++

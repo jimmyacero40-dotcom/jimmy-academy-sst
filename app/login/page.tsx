@@ -57,71 +57,71 @@ export default function LoginPage() {
     }
   }
 
-  // ── Theme tokens ──────────────────────────────────────────────
+  // ── AgroSafe Theme tokens ─────────────────────────────────────
   const t = dark ? {
-    pageBg:       '#0f172a',
-    leftBg:       '#0f172a',
-    rightBg:      '#0d1f3c',
-    rightBorder:  '#1e293b',
-    orbColor:     'rgba(59,130,246,0.08)',
-    logoName:     '#f8fafc',
-    logoSub:      '#475569',
-    eyebrow:      '#3b82f6',
-    h1:           '#f8fafc',
-    h1Accent:     '#3b82f6',
-    desc:         '#64748b',
-    pillText:     '#475569',
-    formTitle:    '#f8fafc',
-    formSub:      '#475569',
-    label:        '#64748b',
-    inputBg:      '#0a0f1e',
-    inputBorder:  '#1e293b',
-    inputText:    '#f8fafc',
-    inputPh:      '#334155',
-    iconColor:    '#334155',
-    badgeBg:      'rgba(16,185,129,0.08)',
-    badgeColor:   '#34d399',
-    badgeBorder:  'rgba(16,185,129,0.2)',
-    noteColor:    '#334155',
-    toggleBg:     '#1e293b',
-    toggleIcon:   '#64748b',
+    pageBg:       '#071009',
+    leftBg:       '#0C1A0E',
+    rightBg:      '#0F1F12',
+    rightBorder:  '#1A3020',
+    orbColor:     'rgba(45,138,45,0.10)',
+    logoName:     '#EDF7ED',
+    logoSub:      '#4D7A55',
+    eyebrow:      '#7EC800',
+    h1:           '#EDF7ED',
+    h1Accent:     '#7EC800',
+    desc:         '#6B9475',
+    pillText:     '#4D7A55',
+    formTitle:    '#EDF7ED',
+    formSub:      '#4D7A55',
+    label:        '#6B9475',
+    inputBg:      '#071009',
+    inputBorder:  '#1A3020',
+    inputText:    '#EDF7ED',
+    inputPh:      '#2D4A35',
+    iconColor:    '#2D4A35',
+    badgeBg:      'rgba(126,200,0,0.08)',
+    badgeColor:   '#7EC800',
+    badgeBorder:  'rgba(126,200,0,0.2)',
+    noteColor:    '#2D4A35',
+    toggleBg:     '#1A3020',
+    toggleIcon:   '#6B9475',
     errorBg:      'rgba(239,68,68,0.08)',
     errorBorder:  'rgba(239,68,68,0.25)',
     errorText:    '#fca5a5',
   } : {
-    pageBg:       '#f1f5f9',
-    leftBg:       '#eff6ff',
-    rightBg:      '#ffffff',
-    rightBorder:  '#e2e8f0',
-    orbColor:     'rgba(59,130,246,0.12)',
-    logoName:     '#0f172a',
-    logoSub:      '#94a3b8',
-    eyebrow:      '#3b82f6',
-    h1:           '#0f172a',
-    h1Accent:     '#2563eb',
-    desc:         '#64748b',
-    pillText:     '#94a3b8',
-    formTitle:    '#0f172a',
-    formSub:      '#94a3b8',
-    label:        '#64748b',
-    inputBg:      '#f8fafc',
-    inputBorder:  '#e2e8f0',
-    inputText:    '#0f172a',
-    inputPh:      '#cbd5e1',
-    iconColor:    '#cbd5e1',
-    badgeBg:      'rgba(16,185,129,0.07)',
-    badgeColor:   '#059669',
-    badgeBorder:  'rgba(16,185,129,0.2)',
-    noteColor:    '#cbd5e1',
-    toggleBg:     '#e2e8f0',
-    toggleIcon:   '#94a3b8',
+    pageBg:       '#F2F7EE',
+    leftBg:       '#EBF3E4',
+    rightBg:      '#FFFFFF',
+    rightBorder:  '#D4E8C8',
+    orbColor:     'rgba(26,92,26,0.08)',
+    logoName:     '#0D2410',
+    logoSub:      '#5B8A5B',
+    eyebrow:      '#1A5C1A',
+    h1:           '#0D2410',
+    h1Accent:     '#1A5C1A',
+    desc:         '#4D6E50',
+    pillText:     '#5B8A5B',
+    formTitle:    '#0D2410',
+    formSub:      '#5B8A5B',
+    label:        '#4D6E50',
+    inputBg:      '#F8FAF6',
+    inputBorder:  '#C8DEC0',
+    inputText:    '#0D2410',
+    inputPh:      '#A8C4A0',
+    iconColor:    '#A8C4A0',
+    badgeBg:      'rgba(26,92,26,0.07)',
+    badgeColor:   '#1A5C1A',
+    badgeBorder:  'rgba(26,92,26,0.2)',
+    noteColor:    '#A8C4A0',
+    toggleBg:     '#D4E8C8',
+    toggleIcon:   '#5B8A5B',
     errorBg:      'rgba(239,68,68,0.06)',
     errorBorder:  'rgba(239,68,68,0.2)',
     errorText:    '#dc2626',
   }
 
   const BADGES = ['Decreto 1072', 'Res. 0312', 'Datos seguros']
-  const PILLS  = ['Cursos SST', 'Evaluaciones', 'Certificados']
+  const PILLS  = ['Gestión del Personal', 'SSTudio Formación', 'Certificados']
 
   return (
     <div className="min-h-screen flex" style={{ background: t.pageBg, transition: 'background 0.3s' }}>
@@ -130,54 +130,53 @@ export default function LoginPage() {
       <div className="hidden lg:flex lg:flex-1 flex-col justify-between p-12 relative overflow-hidden"
         style={{ background: t.leftBg, transition: 'background 0.3s' }}>
 
-        {/* Orb */}
-        <div className="absolute top-[-80px] right-[-80px] w-[300px] h-[300px] rounded-full pointer-events-none"
-          style={{ background: t.orbColor }} />
+        {/* Fondo decorativo */}
+        <div className="absolute top-[-100px] right-[-100px] w-[400px] h-[400px] rounded-full pointer-events-none"
+          style={{ background: t.orbColor, filter: 'blur(60px)' }} />
+        <div className="absolute bottom-[-60px] left-[-60px] w-[250px] h-[250px] rounded-full pointer-events-none"
+          style={{ background: dark ? 'rgba(126,200,0,0.05)' : 'rgba(26,92,26,0.06)', filter: 'blur(50px)' }} />
 
-        {/* Logo */}
-        <div className="relative z-10 flex items-center gap-3">
-          <div className="w-10 h-10 rounded-xl flex items-center justify-center" style={{ background: '#3b82f6' }}>
-            <Shield size={20} className="text-white" strokeWidth={2} />
-          </div>
-          <div>
-            <div className="text-[15px] font-medium tracking-wide" style={{ color: t.logoName }}>CAMPUS SST</div>
-            <div className="text-[10px] uppercase tracking-widest mt-0.5" style={{ color: t.logoSub }}>
-              Seguridad y Salud en el Trabajo
-            </div>
-          </div>
+        {/* Logo AgroSafe */}
+        <div className="relative z-10">
+          <img src="/images/LOGO.png" alt="AgroSafe" className="h-16 w-auto object-contain" />
         </div>
 
         {/* Hero */}
         <motion.div className="relative z-10"
           initial={{ opacity: 0, y: 24 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.6, delay: 0.1 }}>
-          <p className="text-[11px] uppercase tracking-[0.1em] mb-5" style={{ color: t.eyebrow }}>
-            Plataforma integral de formación
+          <p className="text-[11px] uppercase tracking-[0.12em] mb-5 font-bold" style={{ color: t.eyebrow }}>
+            Plataforma Integral de Gestión del Personal
           </p>
-          <h1 className="text-[32px] font-medium leading-[1.2] mb-5" style={{ color: t.h1 }}>
-            Aprende.<br />
-            <span style={{ color: t.h1Accent }}>Evalúa.</span><br />
+          <h1 className="text-[36px] font-medium leading-[1.15] mb-5" style={{ color: t.h1 }}>
+            Protege.<br />
+            <span style={{ color: t.h1Accent }}>Gestiona.</span><br />
             Certifica.
           </h1>
-          <p className="text-[13px] leading-[1.75] mb-8 max-w-[300px]" style={{ color: t.desc }}>
-            Accede a tus cursos, completa tus evaluaciones y obtén tus certificados desde un solo lugar.
-            Tu proceso de formación comienza aquí.
+          <p className="text-[13px] leading-[1.8] mb-8 max-w-[300px]" style={{ color: t.desc }}>
+            La cultura que nos protege. Gestión del personal, formación SST y cumplimiento normativo
+            desde un solo lugar.
           </p>
-          <div className="flex gap-5 flex-wrap">
+          <div className="flex flex-col gap-3">
             {PILLS.map(p => (
-              <div key={p} className="flex items-center gap-2" style={{ color: t.pillText, fontSize: 12 }}>
-                <div className="w-1.5 h-1.5 rounded-full flex-shrink-0" style={{ background: '#3b82f6' }} />
-                {p}
+              <div key={p} className="flex items-center gap-2.5" style={{ color: t.pillText, fontSize: 12 }}>
+                <div className="w-2 h-2 rounded-full flex-shrink-0"
+                  style={{ background: 'linear-gradient(135deg,#2D8A2D,#7EC800)' }} />
+                <span className="font-medium">{p}</span>
               </div>
             ))}
           </div>
         </motion.div>
 
-        {/* Bottom spacer — intentionally empty, stats removed */}
-        <div />
+        {/* Tagline */}
+        <div className="relative z-10">
+          <p className="text-[10px] uppercase tracking-widest font-bold" style={{ color: t.pillText }}>
+            La cultura que nos protege
+          </p>
+        </div>
       </div>
 
       {/* ── RIGHT PANEL ───────────────────────────────────────── */}
-      <div className="flex-1 lg:w-[400px] lg:flex-none flex flex-col relative"
+      <div className="flex-1 lg:w-[420px] lg:flex-none flex flex-col relative"
         style={{ background: t.rightBg, borderLeft: `1px solid ${t.rightBorder}`, transition: 'background 0.3s, border-color 0.3s' }}>
 
         {/* Theme toggle */}
@@ -198,24 +197,19 @@ export default function LoginPage() {
             initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4 }}>
 
             {/* Mobile logo */}
-            <div className="lg:hidden flex items-center gap-3 mb-10">
-              <div className="w-9 h-9 rounded-xl flex items-center justify-center" style={{ background: '#3b82f6' }}>
-                <Shield size={18} className="text-white" strokeWidth={2} />
-              </div>
-              <div>
-                <div className="text-sm font-medium tracking-wide" style={{ color: t.logoName }}>CAMPUS SST</div>
-                <div className="text-[10px] uppercase tracking-widest" style={{ color: t.logoSub }}>SG-SST Colombia</div>
-              </div>
+            <div className="lg:hidden flex items-center justify-center mb-10">
+              <img src="/images/LOGO.png" alt="AgroSafe" className="h-14 w-auto object-contain" />
             </div>
 
             {/* Header */}
             <div className="mb-8">
-              <div className="text-[11px] uppercase tracking-[0.1em] mb-3" style={{ color: '#3b82f6' }}>
+              <div className="text-[11px] uppercase tracking-[0.12em] mb-3 font-bold"
+                style={{ color: dark ? '#7EC800' : '#1A5C1A' }}>
                 Acceso seguro
               </div>
               <h2 className="text-[24px] font-medium mb-2" style={{ color: t.formTitle }}>Bienvenido</h2>
               <p className="text-[13px] leading-relaxed" style={{ color: t.formSub }}>
-                Ingresa tus credenciales para acceder a tu plataforma de formación SST.
+                Ingresa tus credenciales para acceder a la plataforma AgroSafe.
               </p>
             </div>
 

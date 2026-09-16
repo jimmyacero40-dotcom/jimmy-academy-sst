@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+  <defs>
+    <linearGradient id="g1" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#1A5C1A"/>
+      <stop offset="100%" style="stop-color:#7EC800"/>
+    </linearGradient>
+  </defs>
+  <rect width="64" height="64" rx="14" fill="url(#g1)"/>
+  <!-- Hoja / leaf -->
+  <path d="M32 8 C32 8 48 20 48 34 C48 44 40 52 32 52 C24 52 16 44 16 34 C16 20 32 8 32 8Z" fill="white" opacity="0.15"/>
+  <path d="M32 14 C32 14 44 24 44 36 C44 44 38 50 32 50 C26 50 20 44 20 36 C20 24 32 14 32 14Z" fill="white" opacity="0.9"/>
+  <path d="M32 22 C32 22 38 30 38 38 C38 42 35 46 32 46 C29 46 26 42 26 38 C26 30 32 22 32 22Z" fill="#1A5C1A" opacity="0.5"/>
+  <!-- Casco naranja -->
+  <ellipse cx="40" cy="18" rx="9" ry="6" fill="#E8920A"/>
+  <rect x="33" y="22" width="14" height="3" rx="1.5" fill="#C07000"/>
+</svg>

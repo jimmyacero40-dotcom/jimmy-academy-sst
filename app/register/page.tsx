@@ -72,7 +72,7 @@ export default function RegisterPage() {
               <Shield size={26} className="text-white" strokeWidth={2.5} />
             </div>
             <h1 className="text-2xl font-black text-white">Crea tu cuenta</h1>
-            <p className="text-slate-400 text-sm mt-1.5">Empieza gratis con Jimmy Academy SST</p>
+            <p className="text-slate-400 text-sm mt-1.5">Empieza gratis con AgroSafe</p>
           </div>
 
           {/* Benefits */}

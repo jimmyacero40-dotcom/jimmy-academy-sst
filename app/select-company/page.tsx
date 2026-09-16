@@ -143,7 +143,7 @@ export default function SelectCompanyPage() {
             <Shield size={18} className="text-white" strokeWidth={2.5} />
           </div>
           <div>
-            <div className="font-extrabold text-sm" style={{ color: 'var(--text)', fontFamily: 'var(--font-display)' }}>Jimmy Academy</div>
+            <div className="font-extrabold text-sm" style={{ color: 'var(--text)', fontFamily: 'var(--font-display)' }}>AgroSafe</div>
             <div className="text-[10px] font-semibold" style={{ color: 'var(--amber)' }}>SG-SST · Super Admin</div>
           </div>
         </div>

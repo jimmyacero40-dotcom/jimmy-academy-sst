@@ -73,7 +73,7 @@ async function exportPdf(title: string, headers: string[], rows: (string | numbe
   doc.setTextColor(255, 255, 255)
   doc.setFontSize(13)
   doc.setFont('helvetica', 'bold')
-  doc.text('Jimmy Academy — SG-SST', margin, 13)
+  doc.text('AgroSafe — SG-SST', margin, 13)
   doc.setFontSize(10)
   doc.setFont('helvetica', 'normal')
   doc.text(title, pageW - margin, 13, { align: 'right' })
