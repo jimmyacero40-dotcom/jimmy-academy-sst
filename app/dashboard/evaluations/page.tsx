@@ -1,4 +1,4 @@
-'use client'
+﻿'use client'
 
 import { useState, useEffect, useCallback } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
@@ -611,7 +611,7 @@ CREATE TABLE IF NOT EXISTS questions (
   const totalPoints = questions.reduce((a, q) => a + q.points, 0)
 
   return (
-    <div className="p-4 sm:p-6 max-w-7xl mx-auto" onClick={() => setMenuOpen(null)}>
+    <div className="p-4 sm:p-6" onClick={() => setMenuOpen(null)}>
 
       {/* Setup banner */}
       {needsSetup && (

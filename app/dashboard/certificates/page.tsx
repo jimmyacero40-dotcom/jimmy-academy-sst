@@ -1,4 +1,4 @@
-'use client'
+﻿'use client'
 
 import { useState, useEffect } from 'react'
 import { motion } from 'framer-motion'
@@ -117,7 +117,7 @@ export default function CertificatesPage() {
   })
 
   return (
-    <div className="p-4 sm:p-6 max-w-7xl mx-auto">
+    <div className="p-4 sm:p-6">
 
       <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} className="mb-6">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
@@ -274,11 +274,11 @@ export default function CertificatesPage() {
             className="bg-[var(--bg-surface)] border border-[var(--border-strong)] rounded-2xl w-full max-w-sm" onClick={e => e.stopPropagation()}>
 
             {/* Certificate card design */}
-            <div className="bg-gradient-to-br from-blue-600/20 to-violet-600/20 border border-amber-500/20 rounded-t-2xl p-6 text-center">
-              <div className="w-14 h-14 rounded-full bg-gradient-to-br from-blue-500 to-violet-500 flex items-center justify-center mx-auto mb-3">
-                <Award size={26} className="text-[var(--text)]" />
+            <div className="rounded-t-2xl p-6 text-center" style={{ background: 'var(--bg-card-hover)', borderBottom: '1px solid var(--border)' }}>
+              <div className="w-14 h-14 rounded-full flex items-center justify-center mx-auto mb-3" style={{ background: 'var(--primary-dim)', border: '1px solid var(--primary-border)' }}>
+                <Award size={26} style={{ color: 'var(--primary)' }} />
               </div>
-              <div className="text-xs text-amber-300 font-semibold mb-1">CERTIFICADO DE COMPETENCIA</div>
+              <div className="text-xs font-semibold mb-1" style={{ color: 'var(--primary)' }}>CERTIFICADO DE COMPETENCIA</div>
               <h2 className="text-[var(--text)] font-black text-lg leading-snug">{selected.course}</h2>
             </div>
 

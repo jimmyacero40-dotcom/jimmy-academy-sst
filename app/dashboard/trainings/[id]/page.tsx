@@ -630,7 +630,7 @@ export default function TrainingDetailPage() {
         {(phase === 'slides' || phase === 'quiz') && (
           <div className="terra-progress-track">
             <motion.div
-              className={`terra-progress-fill bg-gradient-to-r ${phase === 'slides' ? 'from-amber-500 to-red-500' : 'from-emerald-500 to-teal-500'}`}
+              className="terra-progress-fill"
               animate={{ width: `${phase === 'slides' ? ((currentSlide + 1) / slideCount) * 100 : ((currentQ + 1) / questions.length) * 100}%` }}
               transition={{ duration: 0.3 }}
             />

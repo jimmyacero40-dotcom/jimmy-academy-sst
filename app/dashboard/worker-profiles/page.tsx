@@ -1,4 +1,4 @@
-'use client'
+﻿'use client'
 
 import { useState, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
@@ -220,7 +220,7 @@ export default function WorkerProfilesPage() {
   )
 
   return (
-    <div className="p-5 max-w-7xl mx-auto space-y-4">
+    <div className="p-5 space-y-4">
 
       {/* ── Header ── */}
       <div className="flex items-start justify-between gap-3 flex-wrap">

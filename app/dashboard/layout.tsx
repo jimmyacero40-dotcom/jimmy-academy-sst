@@ -486,7 +486,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
             <div className="flex items-center gap-2.5 px-2 py-2 mb-2 rounded-lg"
               style={{ background: 'rgba(255,255,255,0.05)' }}>
               <div className="w-8 h-8 rounded-full flex items-center justify-center text-white text-xs font-bold flex-shrink-0"
-                style={{ background: '#1A5C1A' }}>
+                style={{ background: 'var(--primary)' }}>
                 {userInitials}
               </div>
               <div className="min-w-0 flex-1">

@@ -182,7 +182,7 @@ export default function DashboardPage() {
       value: k ? String(k.totalWorkers) : '—',
       sub: k && k.totalWorkers > 0 ? 'con acceso al sistema' : 'Importa desde Excel',
       icon: Users,
-      accent: 'var(--amber)',
+      accent: '#F59E0B',
       bg: 'rgba(245,158,11,0.08)',
       href: '/dashboard/users',
     },
@@ -192,7 +192,7 @@ export default function DashboardPage() {
       sub: k ? `${k.thisMonthCompleted} completadas este mes` : 'Sin plan activo',
       icon: CalendarDays,
       accent: 'var(--primary)',
-      bg: 'rgba(59,130,246,0.08)',
+      bg: 'var(--primary-dim)',
       href: '/dashboard/enrollments',
     },
     {
@@ -200,8 +200,8 @@ export default function DashboardPage() {
       value: k ? String(k.certificates) : '—',
       sub: k && k.expiringNext30 > 0 ? `${k.expiringNext30} vencen en 30 días` : 'Todos al día',
       icon: Award,
-      accent: '#A78BFA',
-      bg: 'rgba(167,139,250,0.08)',
+      accent: '#10B981',
+      bg: 'rgba(16,185,129,0.08)',
       href: '/dashboard/certificates',
     },
   ]
@@ -209,7 +209,7 @@ export default function DashboardPage() {
   const AREA_COLORS = ['#10B981','var(--primary)','var(--amber)','#A78BFA','#F43F5E','#14B8A6']
 
   return (
-    <div className="p-6 max-w-7xl mx-auto">
+    <div className="p-6 w-full">
 
       {/* Header */}
       <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} className="mb-8">

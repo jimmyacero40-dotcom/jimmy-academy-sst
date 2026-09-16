@@ -1,4 +1,4 @@
-'use client'
+﻿'use client'
 
 import { useState, useEffect, useRef } from 'react'
 import { useRouter } from 'next/navigation'
@@ -31,18 +31,14 @@ interface AppUser {
 interface Area  { id: string; name: string; color?: string }
 interface Group { id: string; name: string; color?: string }
 
-const COLORS = [
-  'from-amber-500 to-red-500', 'from-emerald-500 to-cyan-500',
-  'from-orange-500 to-rose-500', 'from-violet-500 to-pink-500',
-  'from-cyan-500 to-blue-500', 'from-rose-500 to-orange-500',
-]
+const AVATAR_COLORS = ['#06B6D4','#0891B2','#6BA644','#10B981','#F59E0B','#8595AD']
 
 function getInitials(name: string) {
   return name.trim().split(/\s+/).map(w => w[0]).join('').toUpperCase().slice(0, 2)
 }
 function colorForUser(id: string) {
   const sum = id.split('').reduce((a, c) => a + c.charCodeAt(0), 0)
-  return COLORS[sum % COLORS.length]
+  return AVATAR_COLORS[sum % AVATAR_COLORS.length]
 }
 
 const EMPTY_FORM = {
@@ -459,7 +455,7 @@ export default function UsersPage() {
 
   // ── Render ────────────────────────────────────────────────────────────────
   return (
-    <div className="p-6 max-w-7xl mx-auto">
+    <div className="p-6">
 
       {/* Header */}
       <div className="flex items-center justify-between mb-6">
@@ -648,7 +644,7 @@ export default function UsersPage() {
                         <div className="flex items-center gap-3">
                           {u.photo_url
                             ? <img src={u.photo_url} alt={u.name} className="w-8 h-8 rounded-full object-cover flex-shrink-0" />
-                            : <div className={`w-8 h-8 rounded-full bg-gradient-to-br ${colorForUser(u.id)} flex items-center justify-center text-white text-[11px] font-bold flex-shrink-0`}>{getInitials(u.name)}</div>
+                            : <div className="w-8 h-8 rounded-full flex items-center justify-center text-white text-[11px] font-bold flex-shrink-0" style={{ background: colorForUser(u.id) }}>{getInitials(u.name)}</div>
                           }
                           <div className="min-w-0">
                             <div className="text-sm font-semibold leading-snug truncate" style={{ color: 'var(--text)' }}>
@@ -798,7 +794,7 @@ export default function UsersPage() {
                     <div className="flex items-center gap-3 min-w-0">
                       {u.photo_url
                         ? <img src={u.photo_url} alt={u.name} className="w-10 h-10 rounded-full object-cover flex-shrink-0" />
-                        : <div className={`w-10 h-10 rounded-full bg-gradient-to-br ${colorForUser(u.id)} flex items-center justify-center text-white text-sm font-bold flex-shrink-0`}>{getInitials(u.name)}</div>
+                        : <div className="w-10 h-10 rounded-full flex items-center justify-center text-white text-sm font-bold flex-shrink-0" style={{ background: colorForUser(u.id) }}>{getInitials(u.name)}</div>
                       }
                       <div className="min-w-0">
                         <div className="font-semibold text-sm truncate" style={{ color: 'var(--text)' }}>{u.name}</div>

@@ -16,16 +16,16 @@ export const THEMES: ThemeMeta[] = [
   {
     id: 'light',
     name: 'AgroSafe Navy',
-    description: 'Sidebar navy · Contenido blanco · Recomendado',
-    colors: { bg: '#F4F7F5', surface: '#FFFFFF', primary: '#1A5C1A', accent: '#E8920A' },
-    preview: { sidebar: '#0B1829', primary: '#1A5C1A', accent: '#E8920A', bg: '#F4F7F5' },
+    description: 'Sidebar #0B1736 · Acento cian · Recomendado',
+    colors: { bg: '#F7F9FC', surface: '#FFFFFF', primary: '#06B6D4', accent: '#F59E0B' },
+    preview: { sidebar: '#0B1736', primary: '#06B6D4', accent: '#F59E0B', bg: '#F7F9FC' },
   },
   {
     id: 'verde',
     name: 'AgroSafe Green',
-    description: 'Sidebar verde oscuro · Contenido claro',
-    colors: { bg: '#EFF7F2', surface: '#FFFFFF', primary: '#1A5C1A', accent: '#E8920A' },
-    preview: { sidebar: '#071A0C', primary: '#1A5C1A', accent: '#E8920A', bg: '#EFF7F2' },
+    description: 'Sidebar #234B27 · Acento oliva · Naranja activo',
+    colors: { bg: '#F7F9FC', surface: '#FFFFFF', primary: '#6BA644', accent: '#C97C30' },
+    preview: { sidebar: '#234B27', primary: '#6BA644', accent: '#C97C30', bg: '#F7F9FC' },
   },
 ]
 

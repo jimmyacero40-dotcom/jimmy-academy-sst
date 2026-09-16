@@ -1,4 +1,4 @@
-'use client'
+﻿'use client'
 
 import { useState, useEffect } from 'react'
 import { motion } from 'framer-motion'
@@ -53,7 +53,7 @@ export default function EnrollmentsPage() {
   const compliance = total > 0 ? Math.round((completed / total) * 100) : 0
 
   return (
-    <div className="p-6 max-w-6xl mx-auto">
+    <div className="p-6">
 
       {/* Header */}
       <div className="flex items-center gap-3 mb-8">

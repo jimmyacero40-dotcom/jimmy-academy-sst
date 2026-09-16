@@ -1,4 +1,4 @@
-'use client'
+﻿'use client'
 
 import { useState, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
@@ -34,14 +34,7 @@ interface Certificate {
 
 const MONTHS_ES = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre']
 
-const GRADIENTS = [
-  'from-blue-600 to-indigo-800',
-  'from-emerald-600 to-teal-800',
-  'from-violet-600 to-purple-800',
-  'from-amber-500 to-orange-700',
-  'from-rose-600 to-pink-800',
-  'from-cyan-600 to-sky-800',
-]
+const CARD_ACCENT_COLORS = ['#06B6D4','#0891B2','#6BA644','#10B981','#F59E0B','#8595AD']
 
 function daysUntil(dateStr: string | null): number | null {
   if (!dateStr) return null
@@ -145,7 +138,7 @@ export default function MyPlanPage() {
   ] as const
 
   return (
-    <div className="p-6 max-w-6xl mx-auto">
+    <div className="p-6">
 
       {/* ── Header ──────────────────────────────────────────────────────── */}
       <div className="flex items-start justify-between mb-7">
@@ -339,7 +332,7 @@ function CourseCard({ enrollment: e, index, gradIndex, onStart, onCert }: {
   const isDone    = e.status === 'completed'
   const isExpired = e.status === 'expired'
   const isActive  = e.status === 'in_progress'
-  const grad      = GRADIENTS[gradIndex % GRADIENTS.length]
+  const grad = CARD_ACCENT_COLORS[gradIndex % CARD_ACCENT_COLORS.length]
   const hasCover  = e.trainings.cover_url && e.trainings.cover_url.startsWith('http')
 
   const statusColor = isDone ? '#34D399' : isExpired ? '#FCA5A5' : isUrgent ? '#F97316' : isActive ? '#60A5FA' : '#A78BFA'
@@ -370,7 +363,7 @@ function CourseCard({ enrollment: e, index, gradIndex, onStart, onCert }: {
             className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
           />
         ) : (
-          <div className={`w-full h-full bg-gradient-to-br ${grad} flex items-center justify-center`}>
+          <div className="w-full h-full flex items-center justify-center" style={{ background: "var(--bg-card-hover)" }}>
             <BookOpen size={40} className="opacity-30 text-white" />
           </div>
         )}
@@ -486,7 +479,7 @@ function LockedCard({ enrollment: e, index, gradIndex }: {
   index: number
   gradIndex: number
 }) {
-  const grad    = GRADIENTS[gradIndex % GRADIENTS.length]
+  const grad = CARD_ACCENT_COLORS[gradIndex % CARD_ACCENT_COLORS.length]
   const hasCover = e.trainings.cover_url && e.trainings.cover_url.startsWith('http')
   const availMonth = e.due_date ? fmtMonth(e.due_date) : null
 
@@ -507,7 +500,7 @@ function LockedCard({ enrollment: e, index, gradIndex }: {
         {hasCover ? (
           <img src={e.trainings.cover_url!} alt="" className="w-full h-full object-cover" />
         ) : (
-          <div className={`w-full h-full bg-gradient-to-br ${grad} flex items-center justify-center`}>
+          <div className="w-full h-full flex items-center justify-center" style={{ background: "var(--bg-card-hover)" }}>
             <BookOpen size={16} className="text-white opacity-50" />
           </div>
         )}

@@ -1,4 +1,4 @@
-'use client'
+﻿'use client'
 
 import { useState, useRef, useEffect } from 'react'
 import { motion } from 'framer-motion'
@@ -15,10 +15,9 @@ import {
 } from 'lucide-react'
 import AttendanceWizard from '@/components/AttendanceWizard'
 
-const GRADIENTS = [
-  'from-amber-500 to-red-500', 'from-red-500 to-rose-500', 'from-orange-500 to-amber-500',
-  'from-amber-600 to-orange-500', 'from-emerald-500 to-teal-500', 'from-yellow-500 to-amber-500',
-  'from-violet-500 to-purple-500', 'from-cyan-500 to-blue-500',
+const CARD_ACCENT_COLORS = [
+  '#06B6D4', '#0891B2', '#6BA644', '#10B981',
+  '#F59E0B', '#8595AD', '#3B82F6', '#0B1736',
 ]
 
 const CATEGORIES = ['Obligatorio', 'Especializado', 'Induccion', 'Reinduccion', 'Complementario']
@@ -568,7 +567,7 @@ export default function BibliotecaPage() {
           description: newCourse.description,
           slides_count: 0,
           cover_url: null,
-          color: GRADIENTS[trainings.length % GRADIENTS.length],
+          color: CARD_ACCENT_COLORS[trainings.length % CARD_ACCENT_COLORS.length],
           file_name: uploadedFile?.name,
           valid_from: newCourse.valid_from || null,
           valid_until: newCourse.valid_until || null,
@@ -754,7 +753,7 @@ export default function BibliotecaPage() {
   const archivedCount = trainings.filter(t => t.status === 'archivado').length
 
   return (
-    <div className="p-4 sm:p-6 max-w-7xl mx-auto">
+    <div className="p-4 sm:p-6">
 
       {/* Header */}
       <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} className="mb-6">
@@ -899,7 +898,7 @@ export default function BibliotecaPage() {
             const effectiveStatus = isExpired ? 'vencido' : (t.status || 'activo')
             const st = statusStyles[effectiveStatus as keyof typeof statusStyles] || statusStyles.activo
             const progress = (t.enrolled || 0) > 0 ? Math.round(((t.completed || 0) / t.enrolled) * 100) : 0
-            const gradColor = t.color || GRADIENTS[t.id % GRADIENTS.length]
+            const cardAccent = t.color || CARD_ACCENT_COLORS[t.id % CARD_ACCENT_COLORS.length]
             const isArchived = t.status === 'archivado'
             return (
               <motion.div key={t.id} id={`course-${t.id}`} initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.06 }}
@@ -911,11 +910,12 @@ export default function BibliotecaPage() {
                   {t.cover_url && t.cover_url.startsWith('http') ? (
                     <img src={t.cover_url} alt={t.title} className="w-full h-full object-cover" />
                   ) : (
-                    <div className={`w-full h-full bg-gradient-to-br ${gradColor} flex items-center justify-center`}>
-                      <BookOpen size={48} className="text-white/30" />
+                    <div className="w-full h-full flex items-center justify-center"
+                      style={{ background: 'var(--bg-card-hover)' }}>
+                      <BookOpen size={40} style={{ color: cardAccent, opacity: 0.5 }} />
                     </div>
                   )}
-                  <div className="absolute inset-0" style={{ background: 'linear-gradient(to top, var(--bg-surface), rgba(17,9,0,0.4), transparent)' }} />
+                  <div className="absolute inset-0" style={{ background: 'linear-gradient(to top, rgba(15,23,42,0.08), transparent)' }} />
 
                   {!isArchived && (
                     <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
@@ -981,7 +981,7 @@ export default function BibliotecaPage() {
                     </div>
                     <div className="terra-progress-track">
                       <motion.div initial={{ width: 0 }} animate={{ width: `${progress}%` }} transition={{ duration: 1, delay: 0.5 }}
-                        className={`terra-progress-fill bg-gradient-to-r ${gradColor}`} />
+                        style={{ background: cardAccent }} />
                     </div>
                   </div>
 
