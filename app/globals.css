@@ -15,29 +15,29 @@
 :root {
   --font-display: 'Fraunces', Georgia, serif;
   --font-body:    'Plus Jakarta Sans', system-ui, sans-serif;
-  --radius:       14px;
-  --radius-sm:    8px;
-  --radius-lg:    20px;
-  --radius-xl:    28px;
-  --red:          #EF4444;
-  --red-dim:      rgba(239,68,68,0.12);
-  --glow-red:     0 0 40px rgba(239,68,68,0.15);
-  /* success / warning shared semantics */
-  --success:      #22C55E;
-  --warning:      #F59E0B;
-  --danger:       #EF4444;
-  --info:         #60A5FA;
 
-  /* ── AgroSafe Brand Colors ── */
-  --agrosafe-green-dark:   #1A5C1A;   /* verde bosque — identidad AGR */
-  --agrosafe-green:        #2D8A2D;   /* verde natural — acciones positivas */
-  --agrosafe-green-light:  #5BAD1F;   /* verde medio */
-  --agrosafe-lime:         #7EC800;   /* verde lima — SAFE / acentos */
-  --agrosafe-lime-light:   #A3E635;
-  --agrosafe-orange:       #E8920A;   /* naranja — casco / atención */
-  --agrosafe-orange-light: #F5A823;
-  --agrosafe-navy:         #0D1F12;   /* navy verde oscuro */
-  --agrosafe-bg-light:     #F2F7EE;   /* fondo claro neutro */
+  /* Forma — radio 12px uniforme (tarjetas, botones, inputs) */
+  --radius:    12px;
+  --radius-sm: 8px;
+  --radius-lg: 16px;
+  --radius-xl: 24px;
+
+  /* Sombra corporativa — sin glow, sin color */
+  --shadow-card: 0 1px 3px rgba(15,23,42,.06), 0 6px 20px rgba(15,23,42,.05);
+
+  /* Estado semántico */
+  --red:     #EF4444;
+  --red-dim: rgba(239,68,68,0.12);
+  --success: #10B981;
+  --warning: #F59E0B;
+  --danger:  #EF4444;
+  --info:    #3B82F6;
+
+  /* Brand colors (referencia, componentes usan variables de tema) */
+  --agrosafe-navy-dark: #0B1829;
+  --agrosafe-green:     #1A5C1A;
+  --agrosafe-lime:      #5BAD1F;
+  --agrosafe-orange:    #E8920A;
 }
 
 /* ── TEMA 1 (Default): AgroSafe Dark — bosque profundo ───────────── */
@@ -93,53 +93,53 @@
 
 /* ── TEMA: AgroSafe Navy — sidebar #0B1829, contenido blanco ────── */
 [data-theme="light"] {
+  /* Marca AgroSafe */
   --primary:        #1A5C1A;
   --primary-light:  #5BAD1F;
-  --primary-dim:    rgba(26,92,26,0.08);
-  --primary-border: rgba(26,92,26,0.18);
+  --primary-dim:    rgba(26,92,26,0.10);
+  --primary-border: rgba(26,92,26,0.22);
 
   --accent:         #E8920A;
-  --accent-dim:     rgba(232,146,10,0.09);
-  --accent-border:  rgba(232,146,10,0.22);
+  --accent-dim:     rgba(232,146,10,0.10);
+  --accent-border:  rgba(232,146,10,0.25);
 
-  --bg:             #F4F7F5;
-  --bg-surface:     #FFFFFF;
-  --bg-card:        #FFFFFF;
-  --bg-card-hover:  #F4F7F5;
+  /* Escala neutra azul-gris (área de contenido — sin tinte verde) */
+  --bg:             #F7F9FC;   /* n900 */
+  --bg-surface:     #FFFFFF;   /* n800 */
+  --bg-card:        #FFFFFF;   /* n800 */
+  --bg-card-hover:  #EEF4FB;   /* n950 */
 
-  --border:         #E4E9E6;
-  --border-strong:  #C8D4CE;
+  --border:         #DFE7F3;   /* n600 */
+  --border-strong:  #C6D4E4;
 
-  --text:           #0D1B14;
-  --text-dim:       #566360;
-  --text-faint:     #9DABA6;
+  --text:           #172B4D;   /* n50  — texto principal */
+  --text-dim:       #6B778C;   /* n400 — texto secundario */
+  --text-faint:     #8595AD;   /* n500 — texto muted */
 
   /* Sólido — sin gradientes */
   --grad-main:      #1A5C1A;
   --grad-subtle:    rgba(26,92,26,0.06);
-
   --glow-primary:   none;
   --glow-accent:    none;
 
   --header-bg:      #FFFFFF;
 
+  /* Sidebar navy oscuro */
   --sidebar-bg:          #0B1829;
   --sidebar-border:      rgba(255,255,255,0.08);
   --sidebar-text:        rgba(255,255,255,0.92);
-  --sidebar-dim:         rgba(255,255,255,0.52);
-  --sidebar-faint:       rgba(255,255,255,0.28);
+  --sidebar-dim:         rgba(255,255,255,0.50);
+  --sidebar-faint:       rgba(255,255,255,0.30);
   --sidebar-hover-bg:    rgba(255,255,255,0.07);
-  --sidebar-active-bg:   rgba(91,173,31,0.18);
-  --sidebar-active-text: #5BAD1F;
-  --sidebar-active-bdr:  rgba(91,173,31,0.26);
+  --sidebar-active-bg:   #1A5C1A;
+  --sidebar-active-text: #FFFFFF;
+  --sidebar-active-bdr:  transparent;
 
-  --amber:          #E8920A;
-  --amber-light:    #F5A823;
-  --amber-dim:      rgba(232,146,10,0.09);
-  --amber-border:   rgba(232,146,10,0.22);
-  --glow-amber:     none;
-  --glow-red:       none;
-  --red-dim:        rgba(239,68,68,0.08);
+  --amber:     #E8920A;
+  --amber-dim: rgba(232,146,10,0.10);
+  --red-dim:   rgba(239,68,68,0.10);
+  --glow-red:  none;
+  --glow-amber:none;
 }
 
 /* ── TEMA 3: Navy (SaaS Premium — índigo/cian) ───────────────────── */
@@ -192,54 +192,52 @@
 
 /* ── TEMA: AgroSafe Green — sidebar #071A0C, contenido blanco ───── */
 [data-theme="verde"] {
+  /* Marca AgroSafe — idéntica al tema Navy */
   --primary:        #1A5C1A;
   --primary-light:  #5BAD1F;
-  --primary-dim:    rgba(26,92,26,0.08);
-  --primary-border: rgba(26,92,26,0.18);
+  --primary-dim:    rgba(26,92,26,0.10);
+  --primary-border: rgba(26,92,26,0.22);
 
   --accent:         #E8920A;
-  --accent-dim:     rgba(232,146,10,0.09);
-  --accent-border:  rgba(232,146,10,0.22);
+  --accent-dim:     rgba(232,146,10,0.10);
+  --accent-border:  rgba(232,146,10,0.25);
 
-  --bg:             #F4F7F5;
+  /* Área de contenido — misma escala azul-gris neutra */
+  --bg:             #F7F9FC;
   --bg-surface:     #FFFFFF;
   --bg-card:        #FFFFFF;
-  --bg-card-hover:  #F4F7F5;
+  --bg-card-hover:  #EEF4FB;
 
-  --border:         #E0E8E3;
-  --border-strong:  #C4D4CB;
+  --border:         #DFE7F3;
+  --border-strong:  #C6D4E4;
 
-  --text:           #0D1B14;
-  --text-dim:       #546060;
-  --text-faint:     #9DABA6;
+  --text:           #172B4D;
+  --text-dim:       #6B778C;
+  --text-faint:     #8595AD;
 
-  /* Sólido — sin gradientes */
   --grad-main:      #1A5C1A;
   --grad-subtle:    rgba(26,92,26,0.06);
-
   --glow-primary:   none;
   --glow-accent:    none;
 
   --header-bg:      #FFFFFF;
 
-  --amber:          #E8920A;
-  --amber-light:    #F5A823;
-  --amber-dim:      rgba(232,146,10,0.09);
-  --amber-border:   rgba(232,146,10,0.22);
-  --glow-amber:     none;
-  --glow-red:       none;
-  --red-dim:        rgba(239,68,68,0.08);
+  --amber:     #E8920A;
+  --amber-dim: rgba(232,146,10,0.10);
+  --red-dim:   rgba(239,68,68,0.10);
+  --glow-red:  none;
+  --glow-amber:none;
 
-  /* Sidebar: verde bosque oscuro */
+  /* Sidebar verde bosque oscuro */
   --sidebar-bg:          #071A0C;
   --sidebar-border:      rgba(255,255,255,0.08);
   --sidebar-text:        rgba(255,255,255,0.92);
-  --sidebar-dim:         rgba(255,255,255,0.52);
-  --sidebar-faint:       rgba(255,255,255,0.28);
+  --sidebar-dim:         rgba(255,255,255,0.50);
+  --sidebar-faint:       rgba(255,255,255,0.30);
   --sidebar-hover-bg:    rgba(255,255,255,0.07);
-  --sidebar-active-bg:   rgba(91,173,31,0.18);
-  --sidebar-active-text: #5BAD1F;
-  --sidebar-active-bdr:  rgba(91,173,31,0.26);
+  --sidebar-active-bg:   #5BAD1F;
+  --sidebar-active-text: #071A0C;
+  --sidebar-active-bdr:  transparent;
 }
 
 /* ── TEMA 5: Academy (educativo — violeta/rosa) ──────────────────── */
@@ -322,16 +320,13 @@ body {
 .terra-card {
   background: var(--bg-card);
   border: 1px solid var(--border);
-  border-radius: var(--radius-lg);
-  transition: background .25s, border-color .25s, transform .25s, box-shadow .25s;
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-card);
+  transition: border-color .2s, box-shadow .2s;
 }
 .terra-card:hover {
   background: var(--bg-card-hover);
   border-color: var(--border-strong);
-}
-.terra-card-lift:hover {
-  transform: translateY(-4px);
-  box-shadow: 0 16px 48px var(--primary-dim);
 }
 
 /* ── BUTTONS ── */
@@ -385,28 +380,30 @@ body {
 
 /* ── INPUT ── */
 .terra-input {
-  background: var(--primary-dim);
+  background: var(--bg-surface);
   border: 1px solid var(--border);
   border-radius: var(--radius-sm);
-  padding: 10px 16px;
+  padding: 10px 14px;
   font-family: var(--font-body);
-  font-size: 14px;
+  font-size: 13px;
   color: var(--text);
-  transition: border-color .2s, background .2s;
+  transition: border-color .2s, box-shadow .2s;
   outline: none;
   width: 100%;
 }
 .terra-input:focus {
-  border-color: var(--primary-border);
-  background: var(--bg-card-hover);
+  border-color: var(--primary);
+  box-shadow: 0 0 0 3px var(--primary-dim);
 }
 .terra-input::placeholder { color: var(--text-faint); }
 
 /* ── SELECT color-scheme ── */
 select { color-scheme: dark; }
 select option { background: var(--bg-surface); color: var(--text); }
-[data-theme="light"] select  { color-scheme: light; }
-[data-theme="light"] select option { background: #FFFFFF; color: #0F172A; }
+[data-theme="light"] select,
+[data-theme="verde"] select  { color-scheme: light; }
+[data-theme="light"] select option,
+[data-theme="verde"] select option { background: #FFFFFF; color: #172B4D; }
 
 /* ── TAG ── */
 .terra-tag {
@@ -428,11 +425,16 @@ select option { background: var(--bg-surface); color: var(--text); }
   flex-shrink: 0;
 }
 
-/* ── BADGES ── */
-.badge-amber { background: var(--primary-dim);  border: 1px solid var(--primary-border); color: var(--primary-light); font-size: 11px; font-weight: 600; padding: 3px 10px; border-radius: 100px; }
-.badge-green  { background: var(--accent-dim);   border: 1px solid var(--accent-border);  color: var(--accent);       font-size: 11px; font-weight: 600; padding: 3px 10px; border-radius: 100px; }
-.badge-red    { background: var(--red-dim,rgba(239,68,68,0.12)); border: 1px solid rgba(239,68,68,0.25); color: #FCA5A5; font-size: 11px; font-weight: 600; padding: 3px 10px; border-radius: 100px; }
-.badge-blue   { background: var(--primary-dim);  border: 1px solid var(--primary-border); color: var(--primary-light); font-size: 11px; font-weight: 600; padding: 3px 10px; border-radius: 100px; }
+/* ── BADGES — patrón: fondo 10%, borde 25%, texto pleno ── */
+.badge-green,
+.badge-success { background: rgba(16,185,129,.10); border: 1px solid rgba(16,185,129,.25); color: #0D9966; font-size: 11.5px; font-weight: 600; padding: 3px 10px; border-radius: 8px; display:inline-flex;align-items:center;gap:4px; }
+.badge-amber,
+.badge-warning { background: rgba(245,158,11,.10); border: 1px solid rgba(245,158,11,.28); color: #B4790B; font-size: 11.5px; font-weight: 600; padding: 3px 10px; border-radius: 8px; display:inline-flex;align-items:center;gap:4px; }
+.badge-red,
+.badge-danger  { background: rgba(239,68,68,.10);  border: 1px solid rgba(239,68,68,.28);  color: #DC2626; font-size: 11.5px; font-weight: 600; padding: 3px 10px; border-radius: 8px; display:inline-flex;align-items:center;gap:4px; }
+.badge-blue,
+.badge-info    { background: rgba(26,92,26,.10);   border: 1px solid rgba(26,92,26,.25);   color: #1A5C1A; font-size: 11.5px; font-weight: 600; padding: 3px 10px; border-radius: 8px; display:inline-flex;align-items:center;gap:4px; }
+.badge-gray    { background: #EEF4FB;               border: 1px solid #DFE7F3;               color: #6B778C; font-size: 11.5px; font-weight: 600; padding: 3px 10px; border-radius: 8px; display:inline-flex;align-items:center;gap:4px; }
 
 /* ── PROGRESS BAR ── */
 .terra-progress-track { height: 6px; background: var(--border); border-radius: 100px; overflow: hidden; }
@@ -481,20 +483,22 @@ select option { background: var(--bg-surface); color: var(--text); }
 .stat-card {
   background: var(--bg-card);
   border: 1px solid var(--border);
-  border-radius: var(--radius-lg);
-  padding: 24px;
-  transition: all .25s;
+  border-radius: var(--radius);
+  padding: 20px;
+  box-shadow: var(--shadow-card);
+  transition: border-color .2s;
 }
-.stat-card:hover { background: var(--bg-card-hover); border-color: var(--border-strong); }
+.stat-card:hover { border-color: var(--border-strong); }
 
 /* ── TABLE ── */
+.terra-table thead { background: var(--bg-card-hover); }
 .terra-table th {
-  font-size: 10px; font-weight: 700; letter-spacing: 1.5px; text-transform: uppercase;
-  color: var(--text-faint); padding: 12px 20px; text-align: left;
-  border-bottom: 1px solid var(--border);
+  font-size: 10.5px; font-weight: 800; letter-spacing: .06em; text-transform: uppercase;
+  color: var(--text-dim); padding: 11px 16px; text-align: left;
+  border-bottom: 2px solid var(--border-strong);
 }
 .terra-table th.text-center { text-align: center; }
-.terra-table td { padding: 14px 20px; border-bottom: 1px solid var(--border); font-size: 13px; }
+.terra-table td { padding: 12px 16px; border-bottom: 1px solid var(--border); font-size: 13px; color: var(--text); }
 .terra-table tr:hover td { background: var(--bg-card-hover); }
 
 /* ═══════════════════════════════════════════════════════════════════
@@ -522,29 +526,47 @@ select option { background: var(--bg-surface); color: var(--text); }
 }
 /* but don't slow down layout transitions */
 .terra-card, .terra-btn, .terra-btn-outline, .terra-input, .nav-item {
-  transition: background .25s, border-color .25s, color .2s, transform .25s, box-shadow .25s, filter .2s;
+  transition: background .15s, border-color .15s, color .15s, box-shadow .15s;
 }
 
-/* ── Light-mode Tailwind overrides ── */
-[data-theme="light"] .divide-white\/5 > :not([hidden]) ~ :not([hidden]) { border-color: rgba(0,0,0,0.06); }
-[data-theme="light"] .bg-white\/5  { background: rgba(0,0,0,0.04) !important; }
-[data-theme="light"] .bg-white\/8  { background: rgba(0,0,0,0.06) !important; }
-[data-theme="light"] .bg-white\/10 { background: rgba(0,0,0,0.06) !important; }
-[data-theme="light"] .bg-black\/60 { background: rgba(0,0,0,0.4) !important; }
-[data-theme="light"] .terra-card   { color: #0F172A; }
-[data-theme="light"] .terra-card .text-white              { color: #0F172A !important; }
+/* ── Light-mode Tailwind overrides (light + verde = contenido claro) ── */
+[data-theme="light"],
+[data-theme="verde"] {
+  /* Tailwind opacity-bg utilities en contexto de contenido claro */
+}
+[data-theme="light"] .divide-white\/5 > :not([hidden]) ~ :not([hidden]),
+[data-theme="verde"] .divide-white\/5 > :not([hidden]) ~ :not([hidden]) { border-color: rgba(0,0,0,0.06); }
+[data-theme="light"] .bg-white\/5,  [data-theme="verde"] .bg-white\/5  { background: rgba(0,0,0,0.03) !important; }
+[data-theme="light"] .bg-white\/8,  [data-theme="verde"] .bg-white\/8  { background: rgba(0,0,0,0.05) !important; }
+[data-theme="light"] .bg-white\/10, [data-theme="verde"] .bg-white\/10 { background: rgba(0,0,0,0.06) !important; }
+[data-theme="light"] .bg-black\/60, [data-theme="verde"] .bg-black\/60 { background: rgba(0,0,0,0.4) !important; }
+[data-theme="light"] .terra-card, [data-theme="verde"] .terra-card { color: #172B4D; }
+[data-theme="light"] .terra-card .text-white,
+[data-theme="verde"] .terra-card .text-white              { color: #172B4D !important; }
 [data-theme="light"] .terra-card .text-white\/60,
 [data-theme="light"] .terra-card .text-white\/70,
 [data-theme="light"] .terra-card .text-white\/80,
-[data-theme="light"] .terra-card .text-white\/90          { color: rgba(15,23,42,0.7) !important; }
+[data-theme="light"] .terra-card .text-white\/90,
+[data-theme="verde"] .terra-card .text-white\/60,
+[data-theme="verde"] .terra-card .text-white\/70,
+[data-theme="verde"] .terra-card .text-white\/80,
+[data-theme="verde"] .terra-card .text-white\/90          { color: rgba(23,43,77,0.65) !important; }
 [data-theme="light"] .terra-card .text-white\/30,
 [data-theme="light"] .terra-card .text-white\/40,
-[data-theme="light"] .terra-card .text-white\/50          { color: rgba(15,23,42,0.5) !important; }
+[data-theme="light"] .terra-card .text-white\/50,
+[data-theme="verde"] .terra-card .text-white\/30,
+[data-theme="verde"] .terra-card .text-white\/40,
+[data-theme="verde"] .terra-card .text-white\/50          { color: rgba(23,43,77,0.45) !important; }
 [data-theme="light"] .text-white\/60,
 [data-theme="light"] .text-white\/70,
-[data-theme="light"] .text-white\/80                      { color: rgba(15,23,42,0.65) !important; }
-[data-theme="light"] .stat-card .text-white               { color: #0F172A !important; }
-[data-theme="light"] .stat-card .text-white\/60           { color: rgba(15,23,42,0.6) !important; }
+[data-theme="light"] .text-white\/80,
+[data-theme="verde"] .text-white\/60,
+[data-theme="verde"] .text-white\/70,
+[data-theme="verde"] .text-white\/80                      { color: rgba(23,43,77,0.65) !important; }
+[data-theme="light"] .stat-card .text-white,
+[data-theme="verde"] .stat-card .text-white               { color: #172B4D !important; }
+[data-theme="light"] .stat-card .text-white\/60,
+[data-theme="verde"] .stat-card .text-white\/60           { color: rgba(23,43,77,0.6) !important; }
 
 /* ── Animation delay helpers ── */
 .delay-1 { animation-delay: .1s; }
