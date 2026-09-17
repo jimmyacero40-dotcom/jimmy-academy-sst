@@ -13,6 +13,8 @@ interface AccessLog {
   entry_time: string
   exit_time: string | null
   notes: string | null
+  auto_exit: boolean | null
+  auto_exit_reason: string | null
   user: { id: string; name: string; cedula: string; cargo: string | null; area_id: string | null }
   area: { id: string; name: string; color: string } | null
   gatehouse: { id: string; name: string; location: string | null } | null
@@ -39,6 +41,13 @@ function fmtDay(iso: string) {
 function fmtTime24(iso: string | null) {
   if (!iso) return '—'
   return new Date(iso).toLocaleTimeString('es-CO', { hour: '2-digit', minute: '2-digit', hour12: false })
+}
+
+function motivoSalida(reason: string | null) {
+  if (reason === 'ingreso_otra_porteria') return 'Cerrada automáticamente: la persona ingresó por otra portería'
+  if (reason === 'fin_jornada') return 'Cerrada automáticamente al terminar la jornada'
+  if (reason === 'normalizacion_duplicados') return 'Cerrada al normalizar ingresos duplicados'
+  return 'Salida registrada automáticamente por el sistema'
 }
 
 function permanencia(entry: string, exit: string | null) {
@@ -164,17 +173,16 @@ export default function ControlOperativoPage() {
       fmtDay(l.entry_time),
       fmtTime24(l.entry_time),
       fmtTime24(l.exit_time),
-      l.exit_time ? 'Salió' : 'Dentro',
+      !l.exit_time ? 'Dentro' : l.auto_exit ? 'Salió (auto)' : 'Salió',
       l.user?.name || '—',
       l.user?.cedula || '—',
       l.user?.cargo || '—',
       l.area?.name || 'Sin área',
       l.gatehouse?.name || '—',
-      l.registered_by_user?.name || '—',
     ])
   }
 
-  const REPORT_HEAD = ['F. ingreso','Entrada','Salida','Estado','Trabajador','Doc','Cargo','Área','Portería','Registró']
+  const REPORT_HEAD = ['F. ingreso','Entrada','Salida','Estado','Trabajador','Doc','Cargo','Área','Portería']
 
   async function exportPDF() {
     if (!filtered.length) return
@@ -199,9 +207,8 @@ export default function ControlOperativoPage() {
         alternateRowStyles: { fillColor: [244, 247, 245] },
         columnStyles: {
           0: { cellWidth: 20 }, 1: { cellWidth: 13 }, 2: { cellWidth: 13 },
-          3: { cellWidth: 15 }, 4: { cellWidth: 56 }, 5: { cellWidth: 22 },
-          6: { cellWidth: 32 }, 7: { cellWidth: 26 }, 8: { cellWidth: 26 },
-          9: { cellWidth: 28 },
+          3: { cellWidth: 22 }, 4: { cellWidth: 59 }, 5: { cellWidth: 22 },
+          6: { cellWidth: 38 }, 7: { cellWidth: 28 }, 8: { cellWidth: 28 },
         },
         didDrawPage: () => {
           doc.setFontSize(13); doc.setTextColor(15, 42, 32); doc.setFont('helvetica', 'bold')
@@ -234,7 +241,7 @@ export default function ControlOperativoPage() {
         REPORT_HEAD,
         ...reportRows(),
       ])
-      ws['!cols'] = [{ wch: 12 },{ wch: 10 },{ wch: 10 },{ wch: 9 },{ wch: 34 },{ wch: 14 },{ wch: 22 },{ wch: 18 },{ wch: 20 },{ wch: 20 }]
+      ws['!cols'] = [{ wch: 12 },{ wch: 10 },{ wch: 10 },{ wch: 9 },{ wch: 34 },{ wch: 14 },{ wch: 22 },{ wch: 18 },{ wch: 20 }]
       const wb = XLSX.utils.book_new()
       XLSX.utils.book_append_sheet(wb, ws, 'Ingresos')
       XLSX.writeFile(wb, `registro_ingresos_${rango.replace(/[^\d]/g, '')}.xlsx`)
@@ -480,7 +487,6 @@ export default function ControlOperativoPage() {
                   <th className="px-4 py-3 text-left">Área</th>
                   <th className="px-4 py-3 text-left">Portería</th>
                   <th className="px-4 py-3 text-left">Estado</th>
-                  <th className="px-4 py-3 text-left">Registrado por</th>
                 </tr>
               </thead>
               <tbody>
@@ -532,12 +538,15 @@ export default function ControlOperativoPage() {
                         : <span style={{ color: 'var(--text-faint)' }}>—</span>}
                     </td>
                     <td className="px-4 py-3">
-                      {log.exit_time
-                        ? <span className="badge-success text-[11px]">Salió</span>
-                        : <span className="badge-info text-[11px]">Dentro</span>}
-                    </td>
-                    <td className="px-4 py-3">
-                      <span className="text-xs" style={{ color: 'var(--text-faint)' }}>{log.registered_by_user?.name || '—'}</span>
+                      {!log.exit_time
+                        ? <span className="badge-info text-[11px]">Dentro</span>
+                        : log.auto_exit
+                          ? <span className="text-[10px] font-semibold px-2 py-0.5 rounded whitespace-nowrap"
+                              title={motivoSalida(log.auto_exit_reason)}
+                              style={{ background: 'rgba(245,158,11,0.12)', color: '#F59E0B', border: '1px solid rgba(245,158,11,0.35)' }}>
+                              Salida automática
+                            </span>
+                          : <span className="badge-success text-[11px]">Salió</span>}
                     </td>
                   </tr>
                 ))}

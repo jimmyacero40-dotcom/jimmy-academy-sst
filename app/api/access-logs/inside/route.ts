@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase-admin'
 import { isOperatorOrAdmin } from '@/lib/get-company'
+import { inicioJornada } from '@/lib/jornada'
 
 export async function GET(req: NextRequest) {
   const { authorized, companyId } = await isOperatorOrAdmin()
@@ -10,9 +11,9 @@ export async function GET(req: NextRequest) {
   const areaId    = searchParams.get('area_id')
   const gateId    = searchParams.get('gatehouse_id')
 
-  // Use UTC today's start to avoid timezone issues
-  const now = new Date()
-  const todayStart = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate(), 0, 0, 0))
+  // Inicio de la jornada en hora de Colombia: medianoche UTC son las 7 p.m. aquí,
+  // y con ese corte los ingresos de la tarde desaparecían del tablero.
+  const todayStart = inicioJornada()
 
   let query = supabaseAdmin
     .from('access_logs')

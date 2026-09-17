@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase-admin'
 import { isAdminOrSuper, isOperatorOrAdmin } from '@/lib/get-company'
+import { inicioJornada, finJornada, horaColombia, MOTIVO_OTRA_PORTERIA, MOTIVO_FIN_JORNADA } from '@/lib/jornada'
 
 export async function GET(req: NextRequest) {
   const { authorized, companyId } = await isOperatorOrAdmin()
@@ -34,7 +35,7 @@ export async function GET(req: NextRequest) {
   let query = supabaseAdmin
     .from('access_logs')
     .select(`
-      id, entry_time, exit_time, notes, created_at,
+      id, entry_time, exit_time, notes, created_at, auto_exit, auto_exit_reason,
       gatehouse:gatehouses!access_logs_gatehouse_id_fkey(id, name, location),
       user:users!access_logs_user_id_fkey(id, name, cedula, cargo, area_id),
       area:areas!access_logs_area_id_fkey(id, name, color),
@@ -76,6 +77,54 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Trabajador retirado — no puede registrar ingreso' }, { status: 409 })
   if (!worker.active)
     return NextResponse.json({ error: 'Trabajador inactivo' }, { status: 409 })
+
+  // Una persona solo puede estar en un sitio a la vez: como máximo un ingreso abierto.
+  const now = new Date()
+  const jornada = inicioJornada(now)
+  const porteriaNueva = gatehouse_id || null
+
+  const { data: abiertos } = await supabaseAdmin
+    .from('access_logs')
+    .select('id, entry_time, gatehouse_id')
+    .eq('company_id', companyId)
+    .eq('user_id', user_id)
+    .is('exit_time', null)
+
+  const deHoy   = (abiertos ?? []).filter(a => new Date(a.entry_time) >= jornada)
+  const deAyer  = (abiertos ?? []).filter(a => new Date(a.entry_time) <  jornada)
+
+  const mismaPorteria = deHoy.find(a => (a.gatehouse_id || null) === porteriaNueva)
+  if (mismaPorteria) {
+    return NextResponse.json({
+      error: `Ya tiene un ingreso abierto en esta portería desde las ${horaColombia(mismaPorteria.entry_time)}. Registre la salida antes de un nuevo ingreso.`,
+    }, { status: 409 })
+  }
+
+  // Entrar por otra portería prueba que ya salió de la anterior.
+  const enOtraPorteria = deHoy.filter(a => (a.gatehouse_id || null) !== porteriaNueva)
+  if (enOtraPorteria.length) {
+    await supabaseAdmin
+      .from('access_logs')
+      .update({
+        exit_time: now.toISOString(),
+        exit_by: user.id,
+        auto_exit: true,
+        auto_exit_reason: MOTIVO_OTRA_PORTERIA,
+      })
+      .in('id', enOtraPorteria.map(a => a.id))
+  }
+
+  // Ingresos que quedaron abiertos de días anteriores: se cierran al final de su jornada.
+  for (const a of deAyer) {
+    await supabaseAdmin
+      .from('access_logs')
+      .update({
+        exit_time: finJornada(new Date(a.entry_time)).toISOString(),
+        auto_exit: true,
+        auto_exit_reason: MOTIVO_FIN_JORNADA,
+      })
+      .eq('id', a.id)
+  }
 
   const { data, error } = await supabaseAdmin
     .from('access_logs')
