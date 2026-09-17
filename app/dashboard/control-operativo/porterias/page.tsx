@@ -138,7 +138,7 @@ export default function PorteriasPage() {
       {/* Header */}
       <div className="flex items-center justify-between flex-wrap gap-3">
         <div>
-          <h1 className="text-2xl font-bold" style={{ color: 'var(--text-strong)' }}>Porterías</h1>
+          <h1 className="text-2xl font-bold" style={{ color: 'var(--text-strong)' }}>Sedes</h1>
           <p className="text-sm" style={{ color: 'var(--text-dim)' }}>
             Administra los puntos de control de acceso de la empresa
           </p>
@@ -146,7 +146,7 @@ export default function PorteriasPage() {
         <button onClick={openCreate}
           className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-bold"
           style={{ background: 'var(--primary)', color: '#fff' }}>
-          <Plus size={15} /> Nueva portería
+          <Plus size={15} /> Nueva sede
         </button>
       </div>
 
@@ -156,8 +156,8 @@ export default function PorteriasPage() {
       ) : gatehouses.length === 0 ? (
         <div className="flex flex-col items-center justify-center py-16 gap-2">
           <DoorOpen size={40} style={{ color: 'var(--text-faint)' }} />
-          <p className="text-sm" style={{ color: 'var(--text-faint)' }}>No hay porterías configuradas</p>
-          <button onClick={openCreate} className="text-sm font-semibold" style={{ color: 'var(--primary)' }}>+ Crear la primera portería</button>
+          <p className="text-sm" style={{ color: 'var(--text-faint)' }}>No hay sedes configuradas</p>
+          <button onClick={openCreate} className="text-sm font-semibold" style={{ color: 'var(--primary)' }}>+ Crear la primera sede</button>
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
@@ -266,14 +266,14 @@ export default function PorteriasPage() {
             style={{ background: 'var(--bg-card)', border: '1px solid var(--border)' }}>
             <div className="flex items-center justify-between">
               <h2 className="text-lg font-bold" style={{ color: 'var(--text-strong)' }}>
-                {modal === 'create' ? 'Nueva portería' : 'Editar portería'}
+                {modal === 'create' ? 'Nueva sede' : 'Editar sede'}
               </h2>
               <button onClick={() => setModal(null)} style={{ color: 'var(--text-faint)' }}><X size={18} /></button>
             </div>
 
             <div className="space-y-3">
               {[
-                { label: 'Nombre *', key: 'name', placeholder: 'Ej: Portería Norte' },
+                { label: 'Nombre *', key: 'name', placeholder: 'Ej: Sede Norte' },
                 { label: 'Centro de trabajo / Ubicación', key: 'location', placeholder: 'Ej: Finca El Rosal' },
                 { label: 'Descripción', key: 'description', placeholder: 'Descripción opcional' },
               ].map(({ label, key, placeholder }) => (
@@ -294,7 +294,7 @@ export default function PorteriasPage() {
                 <input type="checkbox" id="is_active" checked={form.is_active}
                   onChange={e => setForm(f => ({ ...f, is_active: e.target.checked }))} />
                 <label htmlFor="is_active" className="text-sm font-semibold" style={{ color: 'var(--text)' }}>
-                  Portería activa
+                  Sede activa
                 </label>
               </div>
             </div>

@@ -94,7 +94,7 @@ const ADMIN_NAV: NavEntry[] = [
       { href: '/dashboard/control-operativo',           icon: ArrowLeftRight, label: 'Registro de Ingresos' },
       { href: '/dashboard/control-operativo/porteria', icon: LogIn,          label: 'Portería' },
       { href: '/dashboard/control-operativo/salida',   icon: DoorOpen,       label: 'Registro de Salida' },
-      { href: '/dashboard/control-operativo/porterias',icon: DoorOpen,       label: 'Porterías', adminOnly: true },
+      { href: '/dashboard/control-operativo/porterias',icon: DoorOpen,       label: 'Sedes', adminOnly: true },
     ],
   },
   {
