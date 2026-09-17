@@ -10,6 +10,7 @@ import {
   DoorOpen, UserPlus, KeyRound, RefreshCw, Trash2, RotateCcw
 } from 'lucide-react'
 import { useTheme, THEMES, type ThemeId } from '@/components/ThemeProvider'
+import { CATALOGO_PERMISOS, PERMISOS_POR_ROL, permisosEfectivos } from '@/lib/permisos'
 
 const ADMIN_SECTIONS = [
   { id: 'empresa',        label: 'Empresa',      icon: Building2, superadminOnly: false },
@@ -42,6 +43,37 @@ function Toggle({ defaultOn = false }: { defaultOn?: boolean }) {
 
 interface PlatformUser {
   id: string; name: string; email: string; role: string; active: boolean; cedula: string
+  permissions?: string[] | null
+}
+
+function PermisosGrid({ seleccionados, bloqueado, onToggle }: {
+  seleccionados: string[]; bloqueado?: boolean; onToggle: (id: string) => void
+}) {
+  return (
+    <div className="grid sm:grid-cols-2 gap-3">
+      {CATALOGO_PERMISOS.map(({ grupo, permisos }) => (
+        <div key={grupo} className="rounded-xl p-3" style={{ background: 'var(--bg-card)', border: '1px solid var(--border)' }}>
+          <div className="text-[11px] font-bold uppercase tracking-wide mb-2" style={{ color: 'var(--text-label)' }}>{grupo}</div>
+          <div className="space-y-1.5">
+            {permisos.map(p => {
+              const activo = seleccionados.includes(p.id)
+              return (
+                <label key={p.id} className={`flex items-start gap-2 ${bloqueado ? 'opacity-60 cursor-not-allowed' : 'cursor-pointer'}`}>
+                  <input type="checkbox" checked={activo} disabled={bloqueado}
+                    onChange={() => onToggle(p.id)}
+                    className="mt-0.5 w-3.5 h-3.5 rounded accent-amber-500 flex-shrink-0" />
+                  <span className="min-w-0">
+                    <span className="block text-[12px] font-medium leading-tight" style={{ color: activo ? 'var(--text)' : 'var(--text-dim)' }}>{p.label}</span>
+                    <span className="block text-[10px] leading-tight" style={{ color: 'var(--text-faint)' }}>{p.descripcion}</span>
+                  </span>
+                </label>
+              )
+            })}
+          </div>
+        </div>
+      ))}
+    </div>
+  )
 }
 
 export default function SettingsPage() {
@@ -119,7 +151,38 @@ export default function SettingsPage() {
   // ── Platform users (superadmin only) ─────────────────────────────────
   const [platformUsers, setPlatformUsers] = useState<PlatformUser[]>([])
   const [puLoading, setPuLoading] = useState(false)
-  const [puForm, setPuForm] = useState({ name: '', email: '', password: '', role: 'portero', cedula: '' })
+  const [puForm, setPuForm] = useState({
+    name: '', email: '', password: '', role: 'portero', cedula: '',
+    permissions: PERMISOS_POR_ROL['portero'],
+  })
+  const [permEditando, setPermEditando] = useState<string | null>(null)
+  const [permBorrador, setPermBorrador] = useState<string[]>([])
+  const [permGuardando, setPermGuardando] = useState(false)
+
+  /** Al cambiar el rol se propone su plantilla; el usuario puede ajustarla. */
+  function cambiarRol(role: string) {
+    setPuForm(p => ({ ...p, role, permissions: PERMISOS_POR_ROL[role] ?? [] }))
+  }
+
+  function alternarPermiso(lista: string[], id: string) {
+    return lista.includes(id) ? lista.filter(p => p !== id) : [...lista, id]
+  }
+
+  function abrirPermisos(u: PlatformUser) {
+    if (permEditando === u.id) { setPermEditando(null); return }
+    setPermEditando(u.id)
+    setPermBorrador(permisosEfectivos(u.role, u.permissions))
+  }
+
+  async function guardarPermisos(userId: string) {
+    setPermGuardando(true)
+    await fetch('/api/users', {
+      method: 'PUT', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id: userId, permissions: permBorrador }),
+    })
+    await loadPlatformUsers()
+    setPermGuardando(false); setPermEditando(null)
+  }
   const [puSaving, setPuSaving] = useState(false)
   const [puError, setPuError] = useState<string | null>(null)
   const [puSuccess, setPuSuccess] = useState(false)
@@ -143,7 +206,7 @@ export default function SettingsPage() {
       body: JSON.stringify(puForm),
     })
     if (res.ok) {
-      setPuForm({ name: '', email: '', password: '', role: 'portero', cedula: '' })
+      setPuForm({ name: '', email: '', password: '', role: 'portero', cedula: '', permissions: PERMISOS_POR_ROL['portero'] })
       setPuSuccess(true)
       setTimeout(() => setPuSuccess(false), 2500)
       await loadPlatformUsers()
@@ -590,13 +653,33 @@ export default function SettingsPage() {
                 </div>
                 <div className="mb-4">
                   <label className="text-[var(--text-dim)] text-xs font-semibold mb-1.5 block">Rol *</label>
-                  <select value={puForm.role} onChange={e => setPuForm(p => ({ ...p, role: e.target.value }))}
+                  <select value={puForm.role} onChange={e => cambiarRol(e.target.value)}
                     className="w-full bg-[var(--bg-card)] border border-[var(--border)] rounded-xl px-4 py-2.5 text-sm text-[var(--text)] focus:outline-none focus:border-amber-500/40 transition-all">
                     <option value="portero">Portero — acceso solo a portería/ingreso/salida</option>
                     <option value="admin">Administrador — gestión del personal y SSTudio</option>
                     <option value="superadmin">Superadministrador — control total de la plataforma</option>
                     <option value="worker">Trabajador — experiencia del trabajador</option>
                   </select>
+                </div>
+
+                {/* Permisos */}
+                <div className="mb-4">
+                  <div className="flex items-baseline justify-between mb-2">
+                    <label className="text-[var(--text-dim)] text-xs font-semibold">Permisos</label>
+                    <span className="text-[11px]" style={{ color: 'var(--text-faint)' }}>
+                      {puForm.role === 'superadmin'
+                        ? 'El superadministrador siempre tiene todos los permisos'
+                        : `${puForm.permissions.length} seleccionados · el rol propone una plantilla que puedes ajustar`}
+                    </span>
+                  </div>
+                  <PermisosGrid
+                    seleccionados={puForm.role === 'superadmin' ? PERMISOS_POR_ROL.superadmin : puForm.permissions}
+                    bloqueado={puForm.role === 'superadmin'}
+                    onToggle={id => setPuForm(p => ({ ...p, permissions: alternarPermiso(p.permissions, id) }))}
+                  />
+                  <p className="text-[11px] mt-2 px-3 py-2 rounded-lg" style={{ background: 'rgba(245,158,11,0.08)', border: '1px solid rgba(245,158,11,0.25)', color: '#F59E0B' }}>
+                    Estos permisos se guardan pero todavía no restringen el acceso: falta aplicarlos en el servidor.
+                  </p>
                 </div>
                 {puError && (
                   <div className="flex items-center gap-2 text-sm text-rose-400 bg-rose-400/10 border border-rose-400/20 rounded-xl px-4 py-2.5 mb-3">
@@ -632,23 +715,64 @@ export default function SettingsPage() {
                 ) : (
                   <div className="space-y-2">
                     {platformUsers.map(u => (
-                      <div key={u.id} className="flex items-center gap-3 px-3 py-2.5 rounded-xl"
-                        style={{ background: 'var(--bg-card)', border: '1px solid var(--border)' }}>
-                        <div className="w-8 h-8 rounded-full flex items-center justify-center text-white text-xs font-bold flex-shrink-0"
-                          style={{ background: 'var(--primary)' }}>
-                          {u.name.split(' ').slice(0,2).map((w: string) => w[0]).join('')}
+                      <div key={u.id} className="rounded-xl" style={{ background: 'var(--bg-card)', border: '1px solid var(--border)' }}>
+                        <div className="flex items-center gap-3 px-3 py-2.5">
+                          <div className="w-8 h-8 rounded-full flex items-center justify-center text-white text-xs font-bold flex-shrink-0"
+                            style={{ background: 'var(--primary)' }}>
+                            {u.name.split(' ').slice(0,2).map((w: string) => w[0]).join('')}
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <div className="text-sm font-semibold truncate" style={{ color: 'var(--text)' }}>{u.name}</div>
+                            <div className="text-xs truncate" style={{ color: 'var(--text-faint)' }}>{u.email}</div>
+                          </div>
+                          <span className="text-[11px] hidden sm:inline" style={{ color: 'var(--text-faint)' }}>
+                            {permisosEfectivos(u.role, u.permissions).length} permisos
+                          </span>
+                          <span className="text-[11px] font-bold px-2 py-0.5 rounded-full flex-shrink-0"
+                            style={{
+                              background: u.role === 'superadmin' ? 'rgba(239,68,68,0.12)' : u.role === 'admin' ? 'rgba(245,158,11,0.12)' : u.role === 'portero' ? 'rgba(6,182,212,0.12)' : 'rgba(16,185,129,0.12)',
+                              color: u.role === 'superadmin' ? '#EF4444' : u.role === 'admin' ? '#F59E0B' : u.role === 'portero' ? '#06B6D4' : '#10B981',
+                            }}>
+                            {u.role}
+                          </span>
+                          <button onClick={() => abrirPermisos(u)}
+                            className="text-[11px] font-semibold px-2.5 py-1 rounded-lg flex-shrink-0"
+                            style={{ border: '1px solid var(--border)', color: 'var(--text-dim)', background: 'var(--bg-surface)' }}>
+                            {permEditando === u.id ? 'Cerrar' : 'Permisos'}
+                          </button>
                         </div>
-                        <div className="flex-1 min-w-0">
-                          <div className="text-sm font-semibold truncate" style={{ color: 'var(--text)' }}>{u.name}</div>
-                          <div className="text-xs truncate" style={{ color: 'var(--text-faint)' }}>{u.email}</div>
-                        </div>
-                        <span className="text-[11px] font-bold px-2 py-0.5 rounded-full flex-shrink-0"
-                          style={{
-                            background: u.role === 'superadmin' ? 'rgba(239,68,68,0.12)' : u.role === 'admin' ? 'rgba(245,158,11,0.12)' : u.role === 'portero' ? 'rgba(6,182,212,0.12)' : 'rgba(16,185,129,0.12)',
-                            color: u.role === 'superadmin' ? '#EF4444' : u.role === 'admin' ? '#F59E0B' : u.role === 'portero' ? '#06B6D4' : '#10B981',
-                          }}>
-                          {u.role}
-                        </span>
+
+                        {permEditando === u.id && (
+                          <div className="px-3 pb-3 pt-1 border-t" style={{ borderColor: 'var(--border)' }}>
+                            {u.role === 'superadmin' ? (
+                              <p className="text-xs py-3" style={{ color: 'var(--text-faint)' }}>
+                                El superadministrador tiene todos los permisos y no se le pueden restringir.
+                              </p>
+                            ) : (
+                              <>
+                                <div className="my-3">
+                                  <PermisosGrid
+                                    seleccionados={permBorrador}
+                                    onToggle={id => setPermBorrador(prev => alternarPermiso(prev, id))}
+                                  />
+                                </div>
+                                <div className="flex items-center gap-2">
+                                  <button onClick={() => guardarPermisos(u.id)} disabled={permGuardando}
+                                    className="flex items-center gap-1.5 text-xs font-bold px-3 py-1.5 rounded-lg disabled:opacity-60"
+                                    style={{ background: 'var(--primary)', color: '#fff' }}>
+                                    {permGuardando ? <Loader2 size={12} className="animate-spin" /> : <Check size={12} />}
+                                    Guardar permisos
+                                  </button>
+                                  <button onClick={() => setPermBorrador(PERMISOS_POR_ROL[u.role] ?? [])}
+                                    className="text-xs px-3 py-1.5 rounded-lg"
+                                    style={{ border: '1px solid var(--border)', color: 'var(--text-dim)' }}>
+                                    Restaurar plantilla del rol
+                                  </button>
+                                </div>
+                              </>
+                            )}
+                          </div>
+                        )}
                       </div>
                     ))}
                     {platformUsers.length === 0 && (

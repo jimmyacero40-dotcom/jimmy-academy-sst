@@ -13,7 +13,7 @@ export async function GET(req: NextRequest) {
 
   let query = supabaseAdmin
     .from('users')
-    .select('id, email, name, cedula, role, area, cargo, area_id, active, company_id, created_at, retired_at')
+    .select('id, email, name, cedula, role, area, cargo, area_id, active, company_id, created_at, retired_at, permissions')
     .is('retired_at', null)  // exclude retired workers from main list
     .order('created_at', { ascending: false })
   if (companyId) query = query.eq('company_id', companyId)
@@ -76,7 +76,7 @@ export async function POST(req: NextRequest) {
   if (!companyId) return NextResponse.json({ error: 'Selecciona una empresa primero' }, { status: 400 })
 
   const body = await req.json()
-  const { email, password, name, cedula, role, area } = body
+  const { email, password, name, cedula, role, area, permissions } = body
 
   if (!email || !password || !name) {
     return NextResponse.json({ error: 'Email, contraseña y nombre son requeridos' }, { status: 400 })
@@ -94,8 +94,9 @@ export async function POST(req: NextRequest) {
       area: area || '',
       active: true,
       company_id: companyId,
+      permissions: Array.isArray(permissions) ? permissions : null,
     })
-    .select('id, email, name, cedula, role, area, cargo, area_id, active, company_id, created_at')
+    .select('id, email, name, cedula, role, area, cargo, area_id, active, company_id, created_at, permissions')
     .single()
 
   if (error) {
