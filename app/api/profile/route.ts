@@ -74,7 +74,20 @@ export async function PUT(req: NextRequest) {
   const companyId = await getActiveCompanyId()
   const body = await req.json()
 
-  const completion_pct = calcCompletion(body)
+  // El superadmin puede editar el perfil de cualquier trabajador de su empresa;
+  // cualquier otro rol solo puede escribir sobre el suyo.
+  let targetUserId = user.id
+  if (body.user_id && body.user_id !== user.id) {
+    if (user.role !== 'superadmin') {
+      return NextResponse.json({ error: 'Solo el superadmin puede editar el perfil de otro trabajador' }, { status: 403 })
+    }
+    const { data: target } = await supabase
+      .from('users').select('id, company_id').eq('id', body.user_id).maybeSingle()
+    if (!target || (companyId && target.company_id !== companyId)) {
+      return NextResponse.json({ error: 'Trabajador no encontrado' }, { status: 404 })
+    }
+    targetUserId = target.id
+  }
 
   // Strip any client-side-only fields that don't exist as DB columns
   const sanitized: Record<string, any> = {}
@@ -82,11 +95,16 @@ export async function PUT(req: NextRequest) {
     if (ALLOWED_COLS.has(k)) sanitized[k] = v
   }
 
+  // Una edición parcial (por ejemplo solo la sede desde administración) no puede
+  // recalcular el avance sobre lo recibido: hay que medirlo sobre el perfil completo.
+  const { data: actual } = await supabase
+    .from('worker_profiles').select('*').eq('user_id', targetUserId).maybeSingle()
+
   const payload = {
     ...sanitized,
-    user_id: user.id,
+    user_id: targetUserId,
     company_id: companyId,
-    completion_pct,
+    completion_pct: calcCompletion({ ...(actual ?? {}), ...sanitized }),
     updated_at: new Date().toISOString(),
   }
 
@@ -104,7 +122,7 @@ export async function PUT(req: NextRequest) {
     await supabase
       .from('users')
       .update({ cargo: sanitized.cargo_confirmado || null })
-      .eq('id', user.id)
+      .eq('id', targetUserId)
   }
 
   return NextResponse.json(data)

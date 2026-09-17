@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef } from 'react'
 import { useRouter } from 'next/navigation'
+import { useSession } from 'next-auth/react'
 import { motion, AnimatePresence } from 'framer-motion'
 import * as XLSX from 'xlsx'
 import {
@@ -275,6 +276,8 @@ export default function UsersPage() {
   const fileRef = useRef<HTMLInputElement>(null)
 
   const [cellSaving, setCellSaving] = useState<string | null>(null)
+  const { data: session } = useSession()
+  const isSuperadmin = (session?.user as any)?.role === 'superadmin'
   const [groupPopover, setGroupPopover] = useState<string | null>(null)
 
   // ── Data loading ─────────────────────────────────────────────────────────
@@ -447,6 +450,20 @@ export default function UsersPage() {
   const autoSaveArea = async (userId: string, areaName: string) => {
     setCellSaving(userId)
     await fetch('/api/users', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: userId, area: areaName }) })
+    await loadUsers(); setCellSaving(null)
+  }
+
+  /** Cargo vive en users; sede y fecha de ingreso en worker_profiles. */
+  const autoSaveCargo = async (userId: string, cargo: string) => {
+    setCellSaving(userId)
+    await fetch('/api/users', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: userId, cargo: cargo || null }) })
+    await loadUsers(); setCellSaving(null)
+  }
+
+  const autoSavePerfil = async (userId: string, patch: Record<string, any>) => {
+    setCellSaving(userId)
+    const res = await fetch('/api/profile', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ user_id: userId, ...patch }) })
+    if (!res.ok) alert((await res.json()).error || 'No fue posible guardar')
     await loadUsers(); setCellSaving(null)
   }
 
@@ -720,11 +737,24 @@ export default function UsersPage() {
                         </span>
                       </td>
 
-                      {/* Cargo */}
+                      {/* Cargo — editable por superadmin */}
                       <td className="px-4 py-3">
-                        <span className="text-[12px] truncate block" style={{ color: u.cargo ? 'var(--text-dim)' : 'var(--text-faint)' }} title={u.cargo || undefined}>
-                          {u.cargo || '—'}
-                        </span>
+                        {isSuperadmin ? (
+                          <input
+                            key={`cargo-${u.id}-${u.cargo}`}
+                            defaultValue={u.cargo}
+                            disabled={cellSaving === u.id}
+                            placeholder="—"
+                            onKeyDown={e => { if (e.key === 'Enter') (e.target as HTMLInputElement).blur() }}
+                            onBlur={e => { const v = e.target.value.trim(); if (v !== u.cargo) autoSaveCargo(u.id, v) }}
+                            className="w-full text-[12px] rounded-lg px-2 py-1 bg-transparent outline-none border border-transparent transition-colors hover:border-[var(--border)] focus:border-[var(--primary-border)] focus:bg-[var(--bg-card)]"
+                            style={{ color: u.cargo ? 'var(--text-dim)' : 'var(--text-faint)' }}
+                          />
+                        ) : (
+                          <span className="text-[12px] truncate block" style={{ color: u.cargo ? 'var(--text-dim)' : 'var(--text-faint)' }} title={u.cargo || undefined}>
+                            {u.cargo || '—'}
+                          </span>
+                        )}
                       </td>
 
                       {/* Área — compact inline select */}
@@ -748,11 +778,24 @@ export default function UsersPage() {
                         </div>
                       </td>
 
-                      {/* Sede — centro de trabajo del perfil */}
+                      {/* Sede — centro de trabajo del perfil, editable por superadmin */}
                       <td className="px-4 py-3">
-                        <span className="text-[12px] truncate block" style={{ color: u.sede ? 'var(--text-dim)' : 'var(--text-faint)' }} title={u.sede || undefined}>
-                          {u.sede || '—'}
-                        </span>
+                        {isSuperadmin ? (
+                          <input
+                            key={`sede-${u.id}-${u.sede}`}
+                            defaultValue={u.sede}
+                            disabled={cellSaving === u.id}
+                            placeholder="—"
+                            onKeyDown={e => { if (e.key === 'Enter') (e.target as HTMLInputElement).blur() }}
+                            onBlur={e => { const v = e.target.value.trim(); if (v !== u.sede) autoSavePerfil(u.id, { centro_trabajo: v || null }) }}
+                            className="w-full text-[12px] rounded-lg px-2 py-1 bg-transparent outline-none border border-transparent transition-colors hover:border-[var(--border)] focus:border-[var(--primary-border)] focus:bg-[var(--bg-card)]"
+                            style={{ color: u.sede ? 'var(--text-dim)' : 'var(--text-faint)' }}
+                          />
+                        ) : (
+                          <span className="text-[12px] truncate block" style={{ color: u.sede ? 'var(--text-dim)' : 'var(--text-faint)' }} title={u.sede || undefined}>
+                            {u.sede || '—'}
+                          </span>
+                        )}
                       </td>
 
                       {/* Grupos */}
@@ -764,11 +807,23 @@ export default function UsersPage() {
                         />
                       </td>
 
-                      {/* Fecha de ingreso */}
+                      {/* Fecha de ingreso — editable por superadmin */}
                       <td className="px-4 py-3">
-                        <span className="text-[12px] tabular-nums" style={{ color: u.fechaIngreso ? 'var(--text-dim)' : 'var(--text-faint)' }}>
-                          {u.fechaIngreso ? fmtFechaIngreso(u.fechaIngreso) : '—'}
-                        </span>
+                        {isSuperadmin ? (
+                          <input
+                            type="date"
+                            key={`fi-${u.id}-${u.fechaIngreso}`}
+                            defaultValue={u.fechaIngreso}
+                            disabled={cellSaving === u.id}
+                            onChange={e => { const v = e.target.value; if (v !== u.fechaIngreso) autoSavePerfil(u.id, { fecha_ingreso: v || null }) }}
+                            className="w-full text-[12px] tabular-nums rounded-lg px-2 py-1 bg-transparent outline-none border border-transparent transition-colors hover:border-[var(--border)] focus:border-[var(--primary-border)] focus:bg-[var(--bg-card)]"
+                            style={{ color: u.fechaIngreso ? 'var(--text-dim)' : 'var(--text-faint)' }}
+                          />
+                        ) : (
+                          <span className="text-[12px] tabular-nums" style={{ color: u.fechaIngreso ? 'var(--text-dim)' : 'var(--text-faint)' }}>
+                            {u.fechaIngreso ? fmtFechaIngreso(u.fechaIngreso) : '—'}
+                          </span>
+                        )}
                       </td>
 
                       {/* Estado */}
