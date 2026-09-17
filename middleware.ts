@@ -29,6 +29,12 @@ export default withAuth(
     const isAdmin = role === 'admin' || role === 'superadmin'
     const isPortero = role === 'portero'
 
+    // El portero no tiene nada que hacer en el tablero general: entra directo a
+    // su portería en vez de pasar por una pantalla que no puede usar.
+    if (isPortero && path === '/dashboard') {
+      return NextResponse.redirect(new URL('/dashboard/control-operativo/porteria', req.url))
+    }
+
     // Admin-only routes: portería admin
     if (path.startsWith('/dashboard/control-operativo/porterias')) {
       if (!isAdmin) return NextResponse.redirect(new URL('/dashboard', req.url))

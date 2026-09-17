@@ -7,8 +7,17 @@ import {
 } from '@/lib/jornada'
 
 export async function GET(req: NextRequest) {
-  const { authorized, companyId } = await isOperatorOrAdmin()
+  const { authorized, user, companyId, isAdmin } = await isOperatorOrAdmin()
   if (!authorized) return NextResponse.json({ error: 'No autorizado' }, { status: 403 })
+
+  // El portero solo ve el movimiento de las porterías que opera, no el de toda
+  // la empresa.
+  let porteriasPropias: string[] | null = null
+  if (!isAdmin) {
+    const { data: ops } = await supabaseAdmin
+      .from('gatehouse_operators').select('gatehouse_id').eq('user_id', user.id)
+    porteriasPropias = (ops ?? []).map((o: any) => o.gatehouse_id)
+  }
 
   const { searchParams } = new URL(req.url)
   const period      = searchParams.get('period') || 'day'
@@ -54,6 +63,7 @@ export async function GET(req: NextRequest) {
   if (userId)  query = query.eq('user_id', userId)
   if (areaId)  query = query.eq('area_id', areaId)
   if (gateId)  query = query.eq('gatehouse_id', gateId)
+  if (porteriasPropias) query = query.in('gatehouse_id', porteriasPropias.length ? porteriasPropias : ['_'])
 
   const { data, error } = await query
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })

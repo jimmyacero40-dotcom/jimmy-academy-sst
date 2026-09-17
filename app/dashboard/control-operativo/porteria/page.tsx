@@ -411,6 +411,12 @@ function PorteriaPageInner() {
     return <PorteriaOperativaView gateId={sedeId} gateName={name} />
   }
 
+  // Con una sola sede no hay nada que elegir: el portero entra directo. El
+  // selector solo tiene sentido cuando de verdad hay varias.
+  if (!loading && gatehouses.length === 1) {
+    return <PorteriaOperativaView gateId={gatehouses[0].id} gateName={gatehouses[0].name} />
+  }
+
   return <SedeSelectorView gatehouses={gatehouses} loading={loading} />
 }
 

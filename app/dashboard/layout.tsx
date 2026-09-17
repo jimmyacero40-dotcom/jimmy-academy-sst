@@ -154,8 +154,8 @@ const ADMIN_NAV: NavEntry[] = [
 // ── Portero navigation ────────────────────────────────────────────
 const PORTERO_NAV = [
   { href: '/dashboard/control-operativo/porteria', icon: MapPin,   label: 'Portería' },
-  { href: '/dashboard/control-operativo/salida',   icon: DoorOpen, label: 'Registro de Salida' },
-  { href: '/dashboard/control-operativo',          icon: LogIn,    label: 'Resumen de Ingresos' },
+  { href: '/dashboard/control-operativo',          icon: LogIn,    label: 'Registro de Ingresos' },
+  { href: '/dashboard/control-operativo/salida',   icon: DoorOpen, label: 'Registro de Salidas' },
 ]
 
 // ── Worker navigation ─────────────────────────────────────────────
@@ -187,7 +187,10 @@ const MODULE_HREFS: Record<string, string[]> = {
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname()
-  const { data: session } = useSession()
+  const { data: session, status } = useSession()
+  // Mientras la sesión carga no se conoce el rol. Sin esto se pinta el menú de
+  // trabajador y luego salta al del rol real, que es el parpadeo al entrar.
+  const sessionLoading = status === 'loading'
   const userRole = (session?.user as any)?.role || 'worker'
   const isAdmin = userRole === 'admin' || userRole === 'superadmin'
   const isSuperAdmin = userRole === 'superadmin'
@@ -322,7 +325,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
               )}
               <div className="text-[8px] font-bold uppercase tracking-[0.16em]"
                 style={{ color: 'var(--sidebar-faint)' }}>
-                {isAdmin ? 'Gestión del Personal' : isPortero ? 'Control de Acceso' : 'Portal Trabajador'}
+                {sessionLoading ? ' ' : isAdmin ? 'Gestión del Personal' : isPortero ? 'Control de Acceso' : 'Portal Trabajador'}
               </div>
             </div>
           )}
@@ -338,7 +341,13 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
         {/* ── Navigation ───────────────────────────────────────── */}
         <nav className="flex-1 overflow-y-auto py-2 px-2">
-          {isPortero ? (
+          {sessionLoading ? (
+            <div className="pt-1 space-y-1.5 px-2" aria-hidden>
+              {[0,1,2,3,4].map(i => (
+                <div key={i} className="h-8 rounded-lg animate-pulse" style={{ background: 'var(--sidebar-skeleton, rgba(255,255,255,0.06))' }} />
+              ))}
+            </div>
+          ) : isPortero ? (
             /* ── Portero nav (ingreso/salida only) ── */
             <div className="pt-1 space-y-0.5">
               {PORTERO_NAV.map(({ href, icon: Icon, label }) => {

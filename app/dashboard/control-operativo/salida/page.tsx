@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
+import { useSession } from 'next-auth/react'
 import Link from 'next/link'
 import {
   LogOut, ArrowLeft, RefreshCw, Users, CheckCircle2, Clock, DoorOpen
@@ -36,6 +37,8 @@ function permanencia(entry: string) {
 }
 
 export default function SalidaPage() {
+  const { data: session } = useSession()
+  const esPortero = (session?.user as any)?.role === 'portero'
   const [logs, setLogs]             = useState<InsideLog[]>([])
   const [areas, setAreas]           = useState<Area[]>([])
   const [gatehouses, setGatehouses] = useState<Gatehouse[]>([])
@@ -99,7 +102,8 @@ export default function SalidaPage() {
 
       {/* Header */}
       <div className="flex items-center gap-3 flex-wrap">
-        <Link href="/dashboard/control-operativo"
+        {/* El portero vuelve a su portería; el administrador, al registro general. */}
+        <Link href={esPortero ? '/dashboard/control-operativo/porteria' : '/dashboard/control-operativo'}
           className="flex items-center gap-1.5 text-sm font-semibold px-3 py-1.5 rounded-lg"
           style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', color: 'var(--text-dim)' }}>
           <ArrowLeft size={14} /> Volver
