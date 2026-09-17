@@ -404,7 +404,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                       {/* Module trigger */}
                       <button
                         onClick={() => !collapsed && toggleModule(entry.id)}
-                        className={`nav-item w-full ${hasActive && !isOpen ? 'active' : ''} ${collapsed ? 'justify-center' : ''}`}
+                        className={`nav-item w-full ${hasActive && collapsed ? 'active' : ''} ${collapsed ? 'justify-center' : ''}`}
                         title={collapsed ? entry.label : undefined}>
                         <Icon size={16} strokeWidth={2} className="flex-shrink-0" />
                         {!collapsed && (

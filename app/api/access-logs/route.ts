@@ -76,19 +76,6 @@ export async function POST(req: NextRequest) {
   if (!worker.active)
     return NextResponse.json({ error: 'Trabajador inactivo' }, { status: 409 })
 
-  // Check for open entry today
-  const todayStart = new Date(); todayStart.setHours(0,0,0,0)
-  const { data: existing } = await supabaseAdmin
-    .from('access_logs')
-    .select('id')
-    .eq('company_id', companyId)
-    .eq('user_id', user_id)
-    .gte('entry_time', todayStart.toISOString())
-    .is('exit_time', null)
-    .maybeSingle()
-
-  if (existing) return NextResponse.json({ error: 'Este trabajador ya tiene un ingreso activo hoy sin salida registrada' }, { status: 409 })
-
   const { data, error } = await supabaseAdmin
     .from('access_logs')
     .insert({

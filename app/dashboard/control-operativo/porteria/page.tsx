@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect, useRef, Suspense } from 'react'
-import { useSearchParams, useRouter } from 'next/navigation'
+import { useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import {
   LogIn, Search, CheckCircle2, XCircle,
@@ -22,7 +22,7 @@ interface Worker {
 interface Area { id: string; name: string; color: string }
 interface Gatehouse { id: string; name: string; location: string | null; is_active: boolean }
 
-type WorkerStatus = 'can_enter' | 'blocked' | 'already_inside'
+type WorkerStatus = 'active' | 'blocked'
 
 const AVATAR_COLORS = ['#06B6D4','#0891B2','#6BA644','#10B981','#F59E0B','#8595AD']
 function avatarColor(id: string) {
@@ -102,9 +102,10 @@ function PorteriaOperativaView({ gateId, gateName }: { gateId: string; gateName:
   const [loading, setLoading]     = useState(true)
   const [search, setSearch]       = useState('')
   const [filterArea, setFilterArea]     = useState('')
-  const [filterStatus, setFilterStatus] = useState<'' | 'can_enter' | 'blocked' | 'already_inside'>('')
+  const [filterStatus, setFilterStatus] = useState<'' | 'active' | 'blocked'>('')
   const [registering, setRegistering]   = useState<string | null>(null)
   const [toast, setToast] = useState<{ msg: string; type: 'ok' | 'err' } | null>(null)
+  const [confirm, setConfirm] = useState<{ name: string; cedula: string; time: string } | null>(null)
   const [cedula, setCedula] = useState('')
   const cedulaRef = useRef<HTMLInputElement>(null)
 
@@ -143,8 +144,7 @@ function PorteriaOperativaView({ gateId, gateName }: { gateId: string; gateName:
 
   function getStatus(w: Worker): WorkerStatus {
     if (!w.active) return 'blocked'
-    if (insideIds.has(w.id)) return 'already_inside'
-    return 'can_enter'
+    return 'active'
   }
 
   async function registerEntry(worker: Worker) {
@@ -155,7 +155,8 @@ function PorteriaOperativaView({ gateId, gateName }: { gateId: string; gateName:
       body: JSON.stringify({ user_id: worker.id, area_id: worker.area_id, gatehouse_id: gateId }),
     })
     if (res.ok) {
-      showToast(`✓ Ingreso registrado: ${worker.name}`, 'ok')
+      const now = new Date().toLocaleTimeString('es-CO', { hour: '2-digit', minute: '2-digit', hour12: true })
+      setConfirm({ name: worker.name, cedula: worker.cedula, time: now })
       await loadInsideIds()
     } else {
       showToast((await res.json()).error || 'Error al registrar ingreso', 'err')
@@ -169,7 +170,6 @@ function PorteriaOperativaView({ gateId, gateName }: { gateId: string; gateName:
     if (!found) { showToast('Cédula no encontrada en el sistema', 'err'); return }
     const st = getStatus(found)
     if (st === 'blocked') { showToast(`${found.name} está bloqueado — verificar estado`, 'err'); return }
-    if (st === 'already_inside') { showToast(`${found.name} ya está dentro`, 'err'); return }
     await registerEntry(found)
     setCedula('')
     cedulaRef.current?.focus()
@@ -183,16 +183,42 @@ function PorteriaOperativaView({ gateId, gateName }: { gateId: string; gateName:
     return w.name.toLowerCase().includes(q) || w.cedula.includes(q)
   })
 
-  const canEnterCount = workers.filter(w => getStatus(w) === 'can_enter').length
+  const canEnterCount = workers.filter(w => getStatus(w) === 'active').length
   const insideCount   = insideIds.size
   const blockedCount  = workers.filter(w => getStatus(w) === 'blocked').length
 
   return (
     <div className="p-6 w-full space-y-5">
+      {/* Error toast */}
       {toast && (
         <div className="fixed top-4 right-4 z-50 px-4 py-3 rounded-xl text-sm font-semibold shadow-lg"
-          style={{ background: toast.type === 'ok' ? '#10B981' : '#EF4444', color: '#fff', maxWidth: 360 }}>
+          style={{ background: '#EF4444', color: '#fff', maxWidth: 360 }}>
           {toast.msg}
+        </div>
+      )}
+
+      {/* Confirmation overlay */}
+      {confirm && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4"
+          style={{ background: 'rgba(0,0,0,0.65)' }}
+          onClick={() => setConfirm(null)}>
+          <div className="rounded-2xl p-8 text-center shadow-2xl max-w-sm w-full"
+            style={{ background: 'var(--bg-card)', border: '2px solid #10B981' }}
+            onClick={e => e.stopPropagation()}>
+            <div className="w-20 h-20 rounded-full flex items-center justify-center mx-auto mb-5"
+              style={{ background: 'rgba(16,185,129,0.15)' }}>
+              <CheckCircle2 size={48} color="#10B981" />
+            </div>
+            <div className="text-xl font-bold mb-1" style={{ color: '#10B981' }}>Ingreso Registrado</div>
+            <div className="text-2xl font-extrabold mb-1" style={{ color: 'var(--text-strong)' }}>{confirm.name}</div>
+            <div className="text-sm mb-1 font-mono" style={{ color: 'var(--text-dim)' }}>C.C. {confirm.cedula}</div>
+            <div className="text-sm font-semibold" style={{ color: 'var(--text-label)' }}>{confirm.time}</div>
+            <button onClick={() => setConfirm(null)}
+              className="mt-6 w-full py-3 rounded-xl font-bold text-white"
+              style={{ background: '#10B981' }}>
+              Aceptar
+            </button>
+          </div>
         </div>
       )}
 
@@ -219,9 +245,9 @@ function PorteriaOperativaView({ gateId, gateName }: { gateId: string; gateName:
       {/* KPIs */}
       <div className="grid grid-cols-3 gap-3">
         {[
-          { label: 'Pueden entrar', value: canEnterCount, color: '#10B981' },
-          { label: 'Ya dentro',     value: insideCount,   color: 'var(--primary)' },
-          { label: 'Bloqueados',    value: blockedCount,  color: '#EF4444' },
+          { label: 'Activos',    value: canEnterCount, color: '#10B981' },
+          { label: 'Dentro ahora',  value: insideCount,   color: 'var(--primary)' },
+          { label: 'Bloqueados', value: blockedCount,  color: '#EF4444' },
         ].map(({ label, value, color }) => (
           <div key={label} className="rounded-xl p-4 text-center"
             style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', boxShadow: 'var(--shadow-card)' }}>
@@ -270,8 +296,7 @@ function PorteriaOperativaView({ gateId, gateName }: { gateId: string; gateName:
           className="px-3 py-2 rounded-lg text-sm outline-none"
           style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', color: 'var(--text)' }}>
           <option value="">Todos los estados</option>
-          <option value="can_enter">Puede entrar</option>
-          <option value="already_inside">Ya dentro</option>
+          <option value="active">Activo</option>
           <option value="blocked">Bloqueado</option>
         </select>
       </div>
@@ -338,12 +363,11 @@ function PorteriaOperativaView({ gateId, gateName }: { gateId: string; gateName:
                         }
                       </td>
                       <td className="px-4 py-3">
-                        {st === 'can_enter'     && <span className="badge-success text-[11px] flex items-center gap-1 w-fit"><CheckCircle2 size={11} /> Puede entrar</span>}
-                        {st === 'already_inside'&& <span className="badge-info text-[11px] flex items-center gap-1 w-fit"><LogIn size={11} /> Ya dentro</span>}
-                        {st === 'blocked'       && <span className="badge-danger text-[11px] flex items-center gap-1 w-fit"><XCircle size={11} /> Bloqueado</span>}
+                        {st === 'active'  && <span className="badge-success text-[11px] flex items-center gap-1 w-fit"><CheckCircle2 size={11} /> Activo</span>}
+                        {st === 'blocked' && <span className="badge-danger text-[11px] flex items-center gap-1 w-fit"><XCircle size={11} /> Bloqueado</span>}
                       </td>
                       <td className="px-4 py-3">
-                        {st === 'can_enter' ? (
+                        {st === 'active' ? (
                           <button onClick={() => registerEntry(w)} disabled={registering === w.id}
                             className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold disabled:opacity-60"
                             style={{ background: 'var(--primary)', color: '#fff' }}>
