@@ -1,17 +1,18 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase-admin'
-import { isAdminOrSuper } from '@/lib/get-company'
+import { isAdminOrSuper, isOperatorOrAdmin } from '@/lib/get-company'
 
 export async function GET(req: NextRequest) {
-  const { authorized, companyId } = await isAdminOrSuper()
+  const { authorized, companyId } = await isOperatorOrAdmin()
   if (!authorized) return NextResponse.json({ error: 'No autorizado' }, { status: 403 })
 
   const { searchParams } = new URL(req.url)
-  const period   = searchParams.get('period') || 'day'   // day | week | range
-  const dateFrom = searchParams.get('from')
-  const dateTo   = searchParams.get('to')
-  const userId   = searchParams.get('user_id')
-  const areaId   = searchParams.get('area_id')
+  const period      = searchParams.get('period') || 'day'
+  const dateFrom    = searchParams.get('from')
+  const dateTo      = searchParams.get('to')
+  const userId      = searchParams.get('user_id')
+  const areaId      = searchParams.get('area_id')
+  const gateId      = searchParams.get('gatehouse_id')
 
   let from: string, to: string
   const now = new Date()
@@ -26,13 +27,14 @@ export async function GET(req: NextRequest) {
     from = monday.toISOString(); to = sunday.toISOString()
   } else {
     from = dateFrom ? new Date(dateFrom).toISOString() : new Date(now.getFullYear(), now.getMonth(), now.getDate()).toISOString()
-    to   = dateTo   ? new Date(new Date(dateTo).setDate(new Date(dateTo).getDate() + 1)).toISOString() : new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1).toISOString()
+    to   = dateTo ? new Date(new Date(dateTo).setDate(new Date(dateTo).getDate() + 1)).toISOString() : new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1).toISOString()
   }
 
   let query = supabaseAdmin
     .from('access_logs')
     .select(`
       id, entry_time, exit_time, notes, created_at,
+      gatehouse:gatehouses!access_logs_gatehouse_id_fkey(id, name, location),
       user:users!access_logs_user_id_fkey(id, name, cedula, cargo, area_id),
       area:areas!access_logs_area_id_fkey(id, name, color),
       registered_by_user:users!access_logs_registered_by_fkey(id, name),
@@ -43,24 +45,38 @@ export async function GET(req: NextRequest) {
     .lt('entry_time', to)
     .order('entry_time', { ascending: false })
 
-  if (userId) query = query.eq('user_id', userId)
-  if (areaId) query = query.eq('area_id', areaId)
+  if (userId)  query = query.eq('user_id', userId)
+  if (areaId)  query = query.eq('area_id', areaId)
+  if (gateId)  query = query.eq('gatehouse_id', gateId)
 
   const { data, error } = await query
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
-
   return NextResponse.json(data ?? [])
 }
 
 export async function POST(req: NextRequest) {
-  const { authorized, user, companyId } = await isAdminOrSuper()
+  const { authorized, user, companyId } = await isOperatorOrAdmin()
   if (!authorized) return NextResponse.json({ error: 'No autorizado' }, { status: 403 })
 
   const body = await req.json()
-  const { user_id, area_id, notes } = body
+  const { user_id, area_id, gatehouse_id, notes } = body
   if (!user_id) return NextResponse.json({ error: 'user_id requerido' }, { status: 400 })
 
-  // Check for open entry today (no exit_time)
+  // Verify worker is active and NOT retired
+  const { data: worker } = await supabaseAdmin
+    .from('users')
+    .select('id, active, retired_at, company_id')
+    .eq('id', user_id)
+    .single()
+
+  if (!worker || worker.company_id !== companyId)
+    return NextResponse.json({ error: 'Trabajador no encontrado' }, { status: 404 })
+  if (worker.retired_at)
+    return NextResponse.json({ error: 'Trabajador retirado — no puede registrar ingreso' }, { status: 409 })
+  if (!worker.active)
+    return NextResponse.json({ error: 'Trabajador inactivo' }, { status: 409 })
+
+  // Check for open entry today
   const todayStart = new Date(); todayStart.setHours(0,0,0,0)
   const { data: existing } = await supabaseAdmin
     .from('access_logs')
@@ -75,7 +91,14 @@ export async function POST(req: NextRequest) {
 
   const { data, error } = await supabaseAdmin
     .from('access_logs')
-    .insert({ company_id: companyId, user_id, area_id: area_id || null, notes: notes || null, registered_by: user.id })
+    .insert({
+      company_id: companyId,
+      user_id,
+      area_id: area_id || null,
+      gatehouse_id: gatehouse_id || null,
+      notes: notes || null,
+      registered_by: user.id,
+    })
     .select('id, entry_time')
     .single()
 

@@ -8,7 +8,7 @@ import {
   Users, Search, MoreVertical, CheckCircle,
   Building2, X, Edit2, Trash2, Download, ChevronDown,
   UserPlus, FileSpreadsheet, AlertCircle, Loader2,
-  Layers, UserCheck, Tag, Eye, BookOpen
+  Layers, UserCheck, Tag, Eye, BookOpen, UserX
 } from 'lucide-react'
 
 type UserStatus = 'activo' | 'inactivo'
@@ -253,6 +253,8 @@ export default function UsersPage() {
   const [form, setForm]                   = useState(EMPTY_FORM)
   const [formErrors, setFormErrors]       = useState<Record<string, string>>({})
   const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null)
+  const [retireConfirm, setRetireConfirm] = useState<AppUser | null>(null)
+  const [retiring, setRetiring]           = useState(false)
   const [excelError, setExcelError]       = useState('')
   const [saving, setSaving]               = useState(false)
   const [loadingGroups, setLoadingGroups] = useState(false)
@@ -384,6 +386,18 @@ export default function UsersPage() {
     if (!selected.size || !confirm(`¿Eliminar ${selected.size} usuario(s) permanentemente?`)) return
     for (const id of selected) await fetch('/api/users', { method: 'DELETE', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id }) })
     await loadUsers(); setSelected(new Set())
+  }
+
+  const handleRetire = async (u: AppUser) => {
+    setRetiring(true)
+    await fetch(`/api/users/${u.id}/retire`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'retire' }),
+    })
+    await loadUsers()
+    setRetireConfirm(null)
+    setRetiring(false)
   }
 
   const toggleStatus = async (id: string) => {
@@ -744,6 +758,14 @@ export default function UsersPage() {
                             onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = 'var(--text-faint)' }}>
                             <CheckCircle size={14} />
                           </button>
+                          <button onClick={() => setRetireConfirm(u)}
+                            title="Retirar trabajador"
+                            className="w-7 h-7 rounded-lg flex items-center justify-center transition-colors"
+                            style={{ color: 'var(--text-faint)' }}
+                            onMouseEnter={e => { e.currentTarget.style.background = 'rgba(245,158,11,0.1)'; e.currentTarget.style.color = '#F59E0B' }}
+                            onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = 'var(--text-faint)' }}>
+                            <UserX size={14} />
+                          </button>
                           <button onClick={() => setDeleteConfirm(u.id)}
                             title="Eliminar"
                             className="w-7 h-7 rounded-lg flex items-center justify-center transition-colors"
@@ -991,6 +1013,31 @@ export default function UsersPage() {
                 <button onClick={() => handleDelete(deleteConfirm!)}
                   className="flex-1 py-2.5 rounded-xl font-bold text-sm text-white"
                   style={{ background: 'var(--red)' }}>Eliminar</button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+        {retireConfirm && (
+          <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+            <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.95 }}
+              className="p-6 w-full max-w-sm text-center rounded-2xl"
+              style={{ background: 'var(--bg-surface)', border: '1px solid var(--border-strong)' }}>
+              <div className="w-12 h-12 rounded-full flex items-center justify-center mx-auto mb-4"
+                style={{ background: 'rgba(245,158,11,0.12)', border: '1px solid rgba(245,158,11,0.3)' }}>
+                <UserX size={22} style={{ color: '#F59E0B' }} />
+              </div>
+              <h3 className="font-bold text-lg mb-2" style={{ color: 'var(--text)' }}>¿Retirar trabajador?</h3>
+              <p className="text-sm mb-6" style={{ color: 'var(--text-dim)' }}>
+                <span className="font-semibold" style={{ color: 'var(--text)' }}>{retireConfirm.name}</span> desaparecerá de Personas activas y de las búsquedas de portería. Su historial se conserva y puede ser reactivado desde Retirados.
+              </p>
+              <div className="flex gap-3">
+                <button onClick={() => setRetireConfirm(null)} className="terra-btn-outline flex-1 py-2.5 justify-center">Cancelar</button>
+                <button onClick={() => handleRetire(retireConfirm)} disabled={retiring}
+                  className="flex-1 py-2.5 rounded-xl font-bold text-sm flex items-center justify-center gap-2"
+                  style={{ background: '#F59E0B', color: '#fff' }}>
+                  {retiring ? <Loader2 size={14} className="animate-spin" /> : <UserX size={14} />}
+                  Retirar
+                </button>
               </div>
             </motion.div>
           </div>

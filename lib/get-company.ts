@@ -57,3 +57,24 @@ export async function isAdminOrSuper() {
 
   return { authorized: true, user, companyId } as const
 }
+
+// Portero OR admin — for access to ingreso/salida operations
+export async function isOperatorOrAdmin() {
+  const user = await getCurrentUser()
+  if (!user) return { authorized: false, user: null, companyId: null, isAdmin: false } as const
+
+  const isAdmin = user.role === 'admin' || user.role === 'superadmin'
+  const isPortero = user.role === 'portero'
+
+  if (!isAdmin && !isPortero) {
+    return { authorized: false, user, companyId: null, isAdmin: false } as const
+  }
+
+  let companyId = user.company_id
+  if (user.role === 'superadmin') {
+    const cookieStore = cookies()
+    companyId = cookieStore.get('x-active-company')?.value || user.company_id || null
+  }
+
+  return { authorized: true, user, companyId, isAdmin } as const
+}

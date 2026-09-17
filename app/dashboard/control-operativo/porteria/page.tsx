@@ -3,8 +3,8 @@
 import { useState, useEffect, useRef } from 'react'
 import Link from 'next/link'
 import {
-  LogIn, Search, CheckCircle2, XCircle, AlertCircle,
-  Users, ArrowLeft, RefreshCw, ChevronRight
+  LogIn, Search, CheckCircle2, XCircle,
+  Users, ArrowLeft, RefreshCw, DoorOpen
 } from 'lucide-react'
 
 interface Worker {
@@ -13,13 +13,13 @@ interface Worker {
   cedula: string
   cargo: string | null
   area_id: string | null
-  area: string | null
   active: boolean
   area_name?: string
   area_color?: string
 }
 
 interface Area { id: string; name: string; color: string }
+interface Gatehouse { id: string; name: string; location: string | null; is_active: boolean }
 
 type WorkerStatus = 'can_enter' | 'blocked' | 'already_inside'
 
@@ -33,16 +33,18 @@ function initials(name: string) {
 }
 
 export default function PorteriaPage() {
-  const [workers, setWorkers] = useState<Worker[]>([])
-  const [areas, setAreas] = useState<Area[]>([])
-  const [insideIds, setInsideIds] = useState<Set<string>>(new Set())
-  const [loading, setLoading] = useState(true)
-  const [search, setSearch] = useState('')
-  const [filterArea, setFilterArea] = useState('')
+  const [workers, setWorkers]         = useState<Worker[]>([])
+  const [areas, setAreas]             = useState<Area[]>([])
+  const [gatehouses, setGatehouses]   = useState<Gatehouse[]>([])
+  const [activeGate, setActiveGate]   = useState<string>('')
+  const [insideIds, setInsideIds]     = useState<Set<string>>(new Set())
+  const [loading, setLoading]         = useState(true)
+  const [search, setSearch]           = useState('')
+  const [filterArea, setFilterArea]   = useState('')
   const [filterStatus, setFilterStatus] = useState<'' | 'can_enter' | 'blocked' | 'already_inside'>('')
   const [registering, setRegistering] = useState<string | null>(null)
-  const [toast, setToast] = useState<{ msg: string; type: 'ok' | 'err' } | null>(null)
-  const [cedula, setCedula] = useState('')
+  const [toast, setToast]             = useState<{ msg: string; type: 'ok' | 'err' } | null>(null)
+  const [cedula, setCedula]           = useState('')
   const cedulaRef = useRef<HTMLInputElement>(null)
 
   function showToast(msg: string, type: 'ok' | 'err') {
@@ -50,8 +52,11 @@ export default function PorteriaPage() {
     setTimeout(() => setToast(null), 3500)
   }
 
-  async function loadInsideIds() {
-    const res = await fetch('/api/access-logs/inside')
+  async function loadInsideIds(gateId?: string) {
+    const params = new URLSearchParams()
+    const g = gateId ?? activeGate
+    if (g) params.set('gatehouse_id', g)
+    const res = await fetch(`/api/access-logs/inside?${params}`)
     if (res.ok) {
       const data = await res.json()
       setInsideIds(new Set(data.map((l: any) => l.user.id)))
@@ -61,22 +66,40 @@ export default function PorteriaPage() {
   useEffect(() => {
     async function init() {
       setLoading(true)
-      const [wRes, aRes] = await Promise.all([fetch('/api/users'), fetch('/api/areas')])
+      const [wRes, aRes, ghRes] = await Promise.all([
+        fetch('/api/users'),
+        fetch('/api/areas'),
+        fetch('/api/gatehouses'),
+      ])
       const wData: any[] = wRes.ok ? await wRes.json() : []
       const aData: Area[] = aRes.ok ? await aRes.json() : []
+      const ghData: any[] = ghRes.ok ? await ghRes.json() : []
+
       const aMap: Record<string, Area> = {}
       for (const a of aData) aMap[a.id] = a
       setAreas(aData)
+
+      const activeGates = ghData.filter((g: Gatehouse) => g.is_active)
+      setGatehouses(activeGates)
+      const defaultGate = activeGates[0]?.id ?? ''
+      setActiveGate(defaultGate)
+
       setWorkers(wData.map((w: any) => ({
         ...w,
         area_name: w.area_id ? aMap[w.area_id]?.name : null,
         area_color: w.area_id ? aMap[w.area_id]?.color : null,
       })))
-      await loadInsideIds()
+
+      await loadInsideIds(defaultGate)
       setLoading(false)
     }
     init()
   }, [])
+
+  async function handleGateChange(gateId: string) {
+    setActiveGate(gateId)
+    await loadInsideIds(gateId)
+  }
 
   function getStatus(w: Worker): WorkerStatus {
     if (!w.active) return 'blocked'
@@ -84,12 +107,16 @@ export default function PorteriaPage() {
     return 'can_enter'
   }
 
-  async function registerEntry(worker: Worker, areaId?: string) {
+  async function registerEntry(worker: Worker) {
     setRegistering(worker.id)
     const res = await fetch('/api/access-logs', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ user_id: worker.id, area_id: areaId || worker.area_id }),
+      body: JSON.stringify({
+        user_id: worker.id,
+        area_id: worker.area_id,
+        gatehouse_id: activeGate || null,
+      }),
     })
     if (res.ok) {
       showToast(`✓ Ingreso registrado: ${worker.name}`, 'ok')
@@ -128,16 +155,14 @@ export default function PorteriaPage() {
   const blockedCount  = workers.filter(w => getStatus(w) === 'blocked').length
   const insideCount   = insideIds.size
 
+  const activeGateName = gatehouses.find(g => g.id === activeGate)?.name
+
   return (
     <div className="p-6 w-full space-y-5">
       {/* Toast */}
       {toast && (
         <div className="fixed top-4 right-4 z-50 px-4 py-3 rounded-xl text-sm font-semibold shadow-lg transition-all"
-          style={{
-            background: toast.type === 'ok' ? '#10B981' : '#EF4444',
-            color: '#fff',
-            maxWidth: 360,
-          }}>
+          style={{ background: toast.type === 'ok' ? '#10B981' : '#EF4444', color: '#fff', maxWidth: 360 }}>
           {toast.msg}
         </div>
       )}
@@ -150,15 +175,36 @@ export default function PorteriaPage() {
           <ArrowLeft size={14} /> Volver
         </Link>
         <div className="flex-1">
-          <h1 className="text-2xl font-bold" style={{ color: 'var(--text-strong)' }}>Portería · Registro de Ingreso</h1>
+          <h1 className="text-2xl font-bold" style={{ color: 'var(--text-strong)' }}>
+            Portería · Registro de Ingreso
+            {activeGateName && <span className="ml-2 text-base font-normal" style={{ color: 'var(--text-dim)' }}>— {activeGateName}</span>}
+          </h1>
           <p className="text-sm" style={{ color: 'var(--text-dim)' }}>Verifica por cédula o selecciona de la lista</p>
         </div>
-        <button onClick={() => { loadInsideIds() }}
+        {gatehouses.length > 1 && (
+          <select value={activeGate} onChange={e => handleGateChange(e.target.value)}
+            className="px-3 py-1.5 rounded-lg text-sm outline-none font-semibold"
+            style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', color: 'var(--text)' }}>
+            {gatehouses.map(g => <option key={g.id} value={g.id}>{g.name}</option>)}
+          </select>
+        )}
+        <button onClick={() => loadInsideIds()}
           className="flex items-center gap-1.5 text-sm px-3 py-1.5 rounded-lg"
           style={{ border: '1px solid var(--border)', color: 'var(--text-dim)', background: 'var(--bg-card)' }}>
           <RefreshCw size={14} /> Actualizar
         </button>
       </div>
+
+      {/* Gatehouse banner if none configured */}
+      {!loading && gatehouses.length === 0 && (
+        <div className="rounded-xl p-4 flex items-center gap-3"
+          style={{ background: 'rgba(245,158,11,0.08)', border: '1px solid rgba(245,158,11,0.3)' }}>
+          <DoorOpen size={20} style={{ color: '#F59E0B' }} />
+          <p className="text-sm font-semibold" style={{ color: '#F59E0B' }}>
+            No hay porterías activas configuradas. El ingreso se registrará sin portería asignada.
+          </p>
+        </div>
+      )}
 
       {/* KPIs */}
       <div className="grid grid-cols-3 gap-3">
@@ -199,7 +245,7 @@ export default function PorteriaPage() {
         </div>
       </div>
 
-      {/* Filtros lista */}
+      {/* Filtros */}
       <div className="flex flex-wrap gap-3 items-center">
         <div className="relative flex-1 min-w-48">
           <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2" style={{ color: 'var(--text-faint)' }} />
@@ -224,7 +270,7 @@ export default function PorteriaPage() {
         </select>
       </div>
 
-      {/* Tabla trabajadores autorizados */}
+      {/* Tabla */}
       <div className="rounded-xl overflow-hidden" style={{ background: 'var(--bg-card)', border: '1px solid var(--border)' }}>
         <div className="px-4 py-3 flex items-center justify-between" style={{ borderBottom: '1px solid var(--border)' }}>
           <span className="text-sm font-bold" style={{ color: 'var(--text-strong)' }}>
@@ -290,9 +336,9 @@ export default function PorteriaPage() {
                         }
                       </td>
                       <td className="px-4 py-3">
-                        {st === 'can_enter'    && <span className="badge-success text-[11px] flex items-center gap-1 w-fit"><CheckCircle2 size={11} /> Puede entrar</span>}
+                        {st === 'can_enter'     && <span className="badge-success text-[11px] flex items-center gap-1 w-fit"><CheckCircle2 size={11} /> Puede entrar</span>}
                         {st === 'already_inside'&& <span className="badge-info text-[11px] flex items-center gap-1 w-fit"><LogIn size={11} /> Ya dentro</span>}
-                        {st === 'blocked'      && <span className="badge-danger text-[11px] flex items-center gap-1 w-fit"><XCircle size={11} /> Bloqueado</span>}
+                        {st === 'blocked'       && <span className="badge-danger text-[11px] flex items-center gap-1 w-fit"><XCircle size={11} /> Bloqueado</span>}
                       </td>
                       <td className="px-4 py-3">
                         {st === 'can_enter' ? (

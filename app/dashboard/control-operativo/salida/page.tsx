@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import Link from 'next/link'
 import {
-  LogOut, ArrowLeft, RefreshCw, Users, CheckCircle2, Clock
+  LogOut, ArrowLeft, RefreshCw, Users, CheckCircle2, Clock, DoorOpen
 } from 'lucide-react'
 
 interface InsideLog {
@@ -15,6 +15,7 @@ interface InsideLog {
 }
 
 interface Area { id: string; name: string; color: string }
+interface Gatehouse { id: string; name: string; is_active: boolean }
 
 const AVATAR_COLORS = ['#06B6D4','#0891B2','#6BA644','#10B981','#F59E0B','#8595AD']
 function avatarColor(id: string) {
@@ -35,9 +36,11 @@ function permanencia(entry: string) {
 }
 
 export default function SalidaPage() {
-  const [logs, setLogs] = useState<InsideLog[]>([])
-  const [areas, setAreas] = useState<Area[]>([])
-  const [loading, setLoading] = useState(true)
+  const [logs, setLogs]             = useState<InsideLog[]>([])
+  const [areas, setAreas]           = useState<Area[]>([])
+  const [gatehouses, setGatehouses] = useState<Gatehouse[]>([])
+  const [activeGate, setActiveGate] = useState<string>('')
+  const [loading, setLoading]       = useState(true)
   const [filterArea, setFilterArea] = useState('')
   const [registering, setRegistering] = useState<string | null>(null)
   const [toast, setToast] = useState<{ msg: string; type: 'ok' | 'err' } | null>(null)
@@ -50,14 +53,23 @@ export default function SalidaPage() {
   const load = useCallback(async () => {
     setLoading(true)
     const params = new URLSearchParams()
-    if (filterArea) params.set('area_id', filterArea)
+    if (filterArea)  params.set('area_id', filterArea)
+    if (activeGate)  params.set('gatehouse_id', activeGate)
     const res = await fetch(`/api/access-logs/inside?${params}`)
     if (res.ok) setLogs(await res.json())
     setLoading(false)
-  }, [filterArea])
+  }, [filterArea, activeGate])
 
   useEffect(() => {
-    fetch('/api/areas').then(r => r.json()).then(d => setAreas(Array.isArray(d) ? d : []))
+    Promise.all([fetch('/api/areas'), fetch('/api/gatehouses')]).then(async ([aRes, ghRes]) => {
+      if (aRes.ok)  setAreas(await aRes.json())
+      if (ghRes.ok) {
+        const ghData: Gatehouse[] = await ghRes.json()
+        const active = ghData.filter(g => g.is_active)
+        setGatehouses(active)
+        if (active.length > 0) setActiveGate(active[0].id)
+      }
+    })
   }, [])
 
   useEffect(() => { load() }, [load])
@@ -116,7 +128,14 @@ export default function SalidaPage() {
             personas dentro · con ingreso sin salida hoy
           </span>
         </div>
-        <div className="ml-auto flex items-center gap-2">
+        <div className="ml-auto flex items-center gap-2 flex-wrap">
+          {gatehouses.length > 1 && (
+            <select value={activeGate} onChange={e => setActiveGate(e.target.value)}
+              className="px-3 py-1.5 rounded-lg text-sm outline-none font-semibold"
+              style={{ background: 'var(--bg)', border: '1px solid var(--border)', color: 'var(--text)' }}>
+              {gatehouses.map(g => <option key={g.id} value={g.id}>{g.name}</option>)}
+            </select>
+          )}
           <select value={filterArea} onChange={e => setFilterArea(e.target.value)}
             className="px-3 py-1.5 rounded-lg text-sm outline-none"
             style={{ background: 'var(--bg)', border: '1px solid var(--border)', color: 'var(--text)' }}>

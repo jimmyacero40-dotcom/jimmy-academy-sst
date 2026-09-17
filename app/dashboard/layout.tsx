@@ -12,7 +12,7 @@ import {
   CalendarDays, GraduationCap, TrendingUp,
   Home, Activity, FileCheck2,
   HardHat, FileText, ArrowLeftRight, AlertTriangle, MessageSquare,
-  Bell, Shield, Leaf, LogIn, DoorOpen
+  Bell, Shield, Leaf, LogIn, DoorOpen, UserX
 } from 'lucide-react'
 import { CommandPalette } from '@/components/CommandPalette'
 import { useTheme, THEMES, type ThemeId } from '@/components/ThemeProvider'
@@ -24,6 +24,7 @@ type NavLeaf = {
   label: string
   disabled?: false
   superadminOnly?: boolean
+  adminOnly?: boolean
 } | {
   href: null
   icon: React.ElementType
@@ -51,6 +52,7 @@ const ADMIN_NAV: NavEntry[] = [
     label: 'Personal',
     items: [
       { href: '/dashboard/users',           icon: Users,     label: 'Personas' },
+      { href: '/dashboard/users/retirados', icon: UserX,     label: 'Retirados' },
       { href: '/dashboard/areas',           icon: Layers,    label: 'Áreas' },
       { href: '/dashboard/groups',          icon: UserCheck, label: 'Grupos' },
       { href: '/dashboard/worker-profiles', icon: Activity,  label: 'Inf. Sociodemográfica' },
@@ -89,9 +91,10 @@ const ADMIN_NAV: NavEntry[] = [
     icon: ArrowLeftRight,
     label: 'Control Operativo',
     items: [
-      { href: '/dashboard/control-operativo',          icon: ArrowLeftRight, label: 'Registro de Ingresos' },
+      { href: '/dashboard/control-operativo',           icon: ArrowLeftRight, label: 'Registro de Ingresos' },
       { href: '/dashboard/control-operativo/porteria', icon: LogIn,          label: 'Portería' },
       { href: '/dashboard/control-operativo/salida',   icon: DoorOpen,       label: 'Registro de Salida' },
+      { href: '/dashboard/control-operativo/porterias',icon: DoorOpen,       label: 'Porterías', adminOnly: true },
     ],
   },
   {
@@ -110,6 +113,12 @@ const ADMIN_NAV: NavEntry[] = [
   },
 ]
 
+// ── Portero navigation ────────────────────────────────────────────
+const PORTERO_NAV = [
+  { href: '/dashboard/control-operativo/porteria', icon: LogIn,    label: 'Portería · Ingreso' },
+  { href: '/dashboard/control-operativo/salida',   icon: DoorOpen, label: 'Registro de Salida' },
+]
+
 // ── Worker navigation ─────────────────────────────────────────────
 const WORKER_NAV = [
   { href: '/dashboard/my-plan',      icon: Home,      label: 'Inicio' },
@@ -122,7 +131,7 @@ const WORKER_NAV = [
 // Hrefs per module — used to auto-expand on load
 const MODULE_HREFS: Record<string, string[]> = {
   'personal': [
-    '/dashboard/users', '/dashboard/areas', '/dashboard/groups', '/dashboard/worker-profiles', '/dashboard/my-signature',
+    '/dashboard/users', '/dashboard/users/retirados', '/dashboard/areas', '/dashboard/groups', '/dashboard/worker-profiles', '/dashboard/my-signature',
   ],
   'sstudio': [
     '/dashboard/trainings', '/dashboard/plan', '/dashboard/profiles',
@@ -133,6 +142,7 @@ const MODULE_HREFS: Record<string, string[]> = {
     '/dashboard/control-operativo',
     '/dashboard/control-operativo/porteria',
     '/dashboard/control-operativo/salida',
+    '/dashboard/control-operativo/porterias',
   ],
 }
 
@@ -142,6 +152,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   const userRole = (session?.user as any)?.role || 'worker'
   const isAdmin = userRole === 'admin' || userRole === 'superadmin'
   const isSuperAdmin = userRole === 'superadmin'
+  const isPortero = userRole === 'portero'
 
   const [activeCompany, setActiveCompany] = useState<{ name: string; logo_url?: string } | null>(null)
   const [workerDisplayName, setWorkerDisplayName] = useState<string | null>(null)
@@ -274,7 +285,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
               )}
               <div className="text-[8px] font-bold uppercase tracking-[0.16em]"
                 style={{ color: 'var(--sidebar-faint)' }}>
-                {isAdmin ? 'Gestión del Personal' : 'Portal Trabajador'}
+                {isAdmin ? 'Gestión del Personal' : isPortero ? 'Control de Acceso' : 'Portal Trabajador'}
               </div>
             </div>
           )}
@@ -290,7 +301,26 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
         {/* ── Navigation ───────────────────────────────────────── */}
         <nav className="flex-1 overflow-y-auto py-2 px-2">
-          {isAdmin ? (
+          {isPortero ? (
+            /* ── Portero nav (ingreso/salida only) ── */
+            <div className="pt-1 space-y-0.5">
+              {PORTERO_NAV.map(({ href, icon: Icon, label }) => {
+                const active = isActive(href)
+                return (
+                  <Link key={href} href={href}
+                    className={`nav-item ${active ? 'active' : ''} ${collapsed ? 'justify-center' : ''}`}
+                    title={collapsed ? label : undefined}>
+                    <Icon size={16} strokeWidth={2} className="flex-shrink-0" />
+                    {!collapsed && <span className="truncate">{label}</span>}
+                    {active && !collapsed && (
+                      <div className="ml-auto w-1.5 h-1.5 rounded-full flex-shrink-0"
+                        style={{ background: 'var(--sidebar-active-text)' }} />
+                    )}
+                  </Link>
+                )
+              })}
+            </div>
+          ) : isAdmin ? (
             <div className="space-y-0.5">
               {ADMIN_NAV.map((entry, ei) => {
 
@@ -326,6 +356,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                       )}
                       {entry.items.map((item) => {
                         if ('superadminOnly' in item && item.superadminOnly && !isSuperAdmin) return null
+                        if ('adminOnly' in item && (item as any).adminOnly && !isAdmin) return null
                         const Icon = item.icon
                         if (item.disabled) {
                           return (
@@ -402,6 +433,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                             borderLeft: '1px solid var(--sidebar-border)',
                           }}>
                           {entry.items.map((item) => {
+                            if ('adminOnly' in item && (item as any).adminOnly && !isAdmin) return null
                             const ChildIcon = item.icon
                             if (item.disabled) {
                               return (

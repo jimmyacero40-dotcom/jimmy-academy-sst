@@ -10,7 +10,8 @@ export async function GET() {
 
   let query = supabaseAdmin
     .from('users')
-    .select('id, email, name, cedula, role, area, cargo, area_id, active, company_id, created_at')
+    .select('id, email, name, cedula, role, area, cargo, area_id, active, company_id, created_at, retired_at')
+    .is('retired_at', null)  // exclude retired workers from main list
     .order('created_at', { ascending: false })
   if (companyId) query = query.eq('company_id', companyId)
 
