@@ -5,8 +5,12 @@ import { finJornada, MOTIVO_FIN_JORNADA } from '@/lib/jornada'
 /**
  * Cierra los ingresos que quedaron abiertos al terminar el día, para que el panel
  * de personas actualmente dentro arranque limpio cada jornada.
- * Lo invoca Vercel Cron a las 23:59 de Colombia (04:59 UTC); el secreto evita que
- * se dispare desde fuera, porque a media jornada sacaría gente que sigue adentro.
+ * Lo invoca Vercel Cron a las 00:00 de Colombia (05:00 UTC) y sella la salida a las
+ * 23:59:59 del día que se cerró. Corre después del corte, y no antes, porque Vercel
+ * puede disparar el cron en cualquier momento dentro de la hora programada: si se
+ * ejecutara a las 23:xx cerraría la jornada antes de tiempo.
+ * El secreto evita que se dispare desde fuera, porque a media jornada sacaría gente
+ * que sigue adentro.
  */
 export async function GET(req: NextRequest) {
   const secret = process.env.CRON_SECRET
