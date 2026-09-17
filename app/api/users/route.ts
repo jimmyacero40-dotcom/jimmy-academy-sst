@@ -1,15 +1,19 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase-admin'
 const supabase = supabaseAdmin
-import { isAdminOrSuper } from '@/lib/get-company'
+import { isAdminOrSuper, isOperatorOrAdmin } from '@/lib/get-company'
 import bcrypt from 'bcryptjs'
 
+// El portero necesita el listado de trabajadores para registrar ingresos, pero
+// solo ese: nunca las cuentas de plataforma. Crear, editar y borrar siguen
+// siendo exclusivos de administración.
 export async function GET(req: NextRequest) {
-  const { authorized, companyId } = await isAdminOrSuper()
+  const { authorized, companyId, isAdmin } = await isOperatorOrAdmin()
   if (!authorized) return NextResponse.json({ error: 'No autorizado' }, { status: 403 })
 
   const { searchParams } = new URL(req.url)
-  const roleFilter = searchParams.get('role') // 'all' = no filter, otherwise defaults to 'worker'
+  // 'all' = no filter, otherwise defaults to 'worker'
+  const roleFilter = isAdmin ? searchParams.get('role') : 'worker'
 
   let query = supabaseAdmin
     .from('users')

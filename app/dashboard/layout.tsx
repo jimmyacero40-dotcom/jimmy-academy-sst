@@ -12,7 +12,7 @@ import {
   CalendarDays, GraduationCap, TrendingUp,
   Home, Activity, FileCheck2,
   HardHat, FileText, ArrowLeftRight, AlertTriangle, MessageSquare,
-  Bell, Shield, Leaf, LogIn, DoorOpen, UserX
+  Bell, Shield, Leaf, LogIn, DoorOpen, UserX, MapPin
 } from 'lucide-react'
 import { CommandPalette } from '@/components/CommandPalette'
 import { useTheme, THEMES, type ThemeId } from '@/components/ThemeProvider'
@@ -153,8 +153,9 @@ const ADMIN_NAV: NavEntry[] = [
 
 // ── Portero navigation ────────────────────────────────────────────
 const PORTERO_NAV = [
-  { href: '/dashboard/control-operativo/porteria', icon: LogIn,    label: 'Portería · Ingreso' },
+  { href: '/dashboard/control-operativo/porteria', icon: MapPin,   label: 'Portería' },
   { href: '/dashboard/control-operativo/salida',   icon: DoorOpen, label: 'Registro de Salida' },
+  { href: '/dashboard/control-operativo',          icon: LogIn,    label: 'Resumen de Ingresos' },
 ]
 
 // ── Worker navigation ─────────────────────────────────────────────
