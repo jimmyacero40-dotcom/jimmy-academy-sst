@@ -21,6 +21,9 @@ interface AppUser {
   area_id: string
   area_name: string
   role: string
+  cargo: string
+  sede: string
+  fechaIngreso: string
   cedula: string
   status: UserStatus
   createdAt: string
@@ -30,6 +33,15 @@ interface AppUser {
 
 interface Area  { id: string; name: string; color?: string }
 interface Group { id: string; name: string; color?: string }
+
+/**
+ * fecha_ingreso es un DATE (YYYY-MM-DD), no un instante. Pasarlo por new Date()
+ * lo interpreta como medianoche UTC y en Colombia se mostraría el día anterior.
+ */
+function fmtFechaIngreso(fecha: string) {
+  const [y, m, d] = fecha.slice(0, 10).split('-')
+  return `${d}/${m}/${y}`
+}
 
 const AVATAR_COLORS = ['#06B6D4','#0891B2','#6BA644','#10B981','#F59E0B','#8595AD']
 
@@ -56,7 +68,7 @@ function generateEmail(name: string): string {
   return `${parts[0]}.${parts[parts.length - 1]}@jimmyacademy.com`
 }
 
-function parseExcel(buffer: ArrayBuffer): Omit<AppUser, 'id' | 'createdAt' | 'email' | 'area_id' | 'area_name' | 'groups'>[] {
+function parseExcel(buffer: ArrayBuffer): Omit<AppUser, 'id' | 'createdAt' | 'email' | 'area_id' | 'area_name' | 'groups' | 'cargo' | 'sede' | 'fechaIngreso'>[] {
   const wb = XLSX.read(buffer, { type: 'array' })
   const ws = wb.Sheets[wb.SheetNames[0]]
   const rows = XLSX.utils.sheet_to_json<Record<string, unknown>>(ws, { defval: '' })
@@ -240,7 +252,7 @@ export default function UsersPage() {
   const [search, setSearch]           = useState('')
   const [filterStatus, setFilterStatus] = useState('')
   const [filterArea, setFilterArea]   = useState('')
-  const [sortField, setSortField] = useState<'name' | 'cedula' | 'status' | 'area_name' | null>('name')
+  const [sortField, setSortField] = useState<'name' | 'cedula' | 'status' | 'area_name' | 'cargo' | 'sede' | 'fechaIngreso' | null>('name')
   const [sortDir, setSortDir]     = useState<'asc' | 'desc'>('asc')
   const [filterGroup, setFilterGroup] = useState('')
   const [filterRole, setFilterRole]   = useState('')
@@ -275,6 +287,9 @@ export default function UsersPage() {
         id: u.id, name: u.name, email: u.email,
         empresa: u.area || '', area_id: u.area_id || '', area_name: u.area || '',
         role: u.role === 'admin' ? 'Administrador' : (u.area || 'Trabajador'),
+        cargo: u.cargo || '',
+        sede: u.sede || '',
+        fechaIngreso: u.fecha_ingreso || '',
         cedula: u.cedula || '',
         status: u.active ? 'activo' as UserStatus : 'inactivo' as UserStatus,
         createdAt: new Date(u.created_at).toLocaleDateString('es-CO'),
@@ -312,6 +327,10 @@ export default function UsersPage() {
     if (sortField === 'cedula')    { va = a.cedula;    vb = b.cedula }
     if (sortField === 'status')    { va = a.status;    vb = b.status }
     if (sortField === 'area_name') { va = a.area_name; vb = b.area_name }
+    if (sortField === 'cargo')     { va = a.cargo;     vb = b.cargo }
+    if (sortField === 'sede')      { va = a.sede;      vb = b.sede }
+    // fechaIngreso viene como YYYY-MM-DD, así que el orden alfabético ya es cronológico.
+    if (sortField === 'fechaIngreso') { va = a.fechaIngreso; vb = b.fechaIngreso }
     const cmp = va.localeCompare(vb, 'es', { sensitivity: 'base' })
     return sortDir === 'asc' ? cmp : -cmp
   })
@@ -567,13 +586,16 @@ export default function UsersPage() {
             <table className="w-full" style={{ borderCollapse: 'collapse' }}>
               <colgroup>
                 <col style={{ width: 36 }} />   {/* Checkbox */}
-                <col style={{ width: '28%' }} />{/* Trabajador — bloque principal */}
-                <col style={{ width: 110 }} />  {/* Cédula — cerca del nombre */}
-                <col style={{ width: 130 }} />  {/* Área */}
-                <col style={{ width: 180 }} />  {/* Grupos */}
-                <col style={{ width: 95 }} />   {/* Estado */}
+                <col style={{ width: '17%' }} />{/* Trabajador */}
+                <col style={{ width: '8%' }} /> {/* Cédula */}
+                <col style={{ width: '12%' }} />{/* Cargo */}
+                <col style={{ width: '10%' }} />{/* Área */}
+                <col style={{ width: '10%' }} />{/* Sede */}
+                <col style={{ width: '12%' }} />{/* Grupos */}
+                <col style={{ width: '8%' }} /> {/* Fecha de ingreso */}
+                <col style={{ width: '7%' }} /> {/* Estado */}
                 <col />                          {/* Correo — flexible */}
-                <col style={{ width: 90 }} />   {/* Acciones */}
+                <col style={{ width: 80 }} />   {/* Acciones */}
               </colgroup>
 
               {/* ── Table header with embedded filters ───────────────── */}
@@ -599,6 +621,12 @@ export default function UsersPage() {
                     <div className="mt-1.5 h-6" />
                   </TH>
 
+                  {/* Cargo */}
+                  <TH>
+                    <ColLabel field="cargo">Cargo</ColLabel>
+                    <div className="mt-1.5 h-6" />
+                  </TH>
+
                   {/* Área */}
                   <TH>
                     <ColLabel field="area_name">Área</ColLabel>
@@ -609,6 +637,12 @@ export default function UsersPage() {
                     />
                   </TH>
 
+                  {/* Sede */}
+                  <TH>
+                    <ColLabel field="sede">Sede</ColLabel>
+                    <div className="mt-1.5 h-6" />
+                  </TH>
+
                   {/* Grupos */}
                   <TH>
                     <ColLabel>Grupos</ColLabel>
@@ -617,6 +651,12 @@ export default function UsersPage() {
                       placeholder="Todos"
                       options={groups.map(g => ({ value: g.id, label: g.name }))}
                     />
+                  </TH>
+
+                  {/* Fecha de ingreso */}
+                  <TH>
+                    <ColLabel field="fechaIngreso">Fecha de ingreso</ColLabel>
+                    <div className="mt-1.5 h-6" />
                   </TH>
 
                   {/* Estado */}
@@ -667,13 +707,8 @@ export default function UsersPage() {
                             ? <img src={u.photo_url} alt={u.name} className="w-8 h-8 rounded-full object-cover flex-shrink-0" />
                             : <div className="w-8 h-8 rounded-full flex items-center justify-center text-white text-[11px] font-bold flex-shrink-0" style={{ background: colorForUser(u.id) }}>{getInitials(u.name)}</div>
                           }
-                          <div className="min-w-0">
-                            <div className="text-sm font-semibold truncate" style={{ color: 'var(--text)' }}>
-                              {u.name}
-                            </div>
-                            <div className="text-[11px] truncate" style={{ color: 'var(--text-faint)' }}>
-                              {u.role || 'Trabajador'}
-                            </div>
+                          <div className="text-sm font-semibold truncate" style={{ color: 'var(--text)' }} title={u.name}>
+                            {u.name}
                           </div>
                         </div>
                       </td>
@@ -682,6 +717,13 @@ export default function UsersPage() {
                       <td className="px-4 py-3">
                         <span className="font-mono text-[12px] font-semibold" style={{ color: 'var(--text-dim)' }}>
                           {u.cedula || '—'}
+                        </span>
+                      </td>
+
+                      {/* Cargo */}
+                      <td className="px-4 py-3">
+                        <span className="text-[12px] truncate block" style={{ color: u.cargo ? 'var(--text-dim)' : 'var(--text-faint)' }} title={u.cargo || undefined}>
+                          {u.cargo || '—'}
                         </span>
                       </td>
 
@@ -706,6 +748,13 @@ export default function UsersPage() {
                         </div>
                       </td>
 
+                      {/* Sede — centro de trabajo del perfil */}
+                      <td className="px-4 py-3">
+                        <span className="text-[12px] truncate block" style={{ color: u.sede ? 'var(--text-dim)' : 'var(--text-faint)' }} title={u.sede || undefined}>
+                          {u.sede || '—'}
+                        </span>
+                      </td>
+
                       {/* Grupos */}
                       <td className="px-4 py-3" style={{ overflow: 'visible', position: 'relative' }}>
                         <GroupsCell
@@ -713,6 +762,13 @@ export default function UsersPage() {
                           cellSaving={cellSaving} groupPopover={groupPopover}
                           setGroupPopover={setGroupPopover} autoSaveGroups={autoSaveGroups}
                         />
+                      </td>
+
+                      {/* Fecha de ingreso */}
+                      <td className="px-4 py-3">
+                        <span className="text-[12px] tabular-nums" style={{ color: u.fechaIngreso ? 'var(--text-dim)' : 'var(--text-faint)' }}>
+                          {u.fechaIngreso ? fmtFechaIngreso(u.fechaIngreso) : '—'}
+                        </span>
                       </td>
 
                       {/* Estado */}

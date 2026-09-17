@@ -48,9 +48,22 @@ export async function GET(req: NextRequest) {
     if (p.photo_url) photoByUser[p.user_id] = p.photo_url
   }
 
+  // La sede (centro de trabajo) y la fecha de ingreso viven en worker_profiles.
+  const { data: workerProfiles } = await supabaseAdmin
+    .from('worker_profiles')
+    .select('user_id, centro_trabajo, fecha_ingreso')
+    .in('user_id', userIds.length ? userIds : ['_'])
+
+  const perfilByUser: Record<string, { centro_trabajo: string | null; fecha_ingreso: string | null }> = {}
+  for (const p of workerProfiles ?? []) {
+    perfilByUser[p.user_id] = { centro_trabajo: p.centro_trabajo, fecha_ingreso: p.fecha_ingreso }
+  }
+
   const result = (data ?? []).map((u: any) => ({
     ...u,
     photo_url: photoByUser[u.id] || null,
+    sede: perfilByUser[u.id]?.centro_trabajo || null,
+    fecha_ingreso: perfilByUser[u.id]?.fecha_ingreso || null,
     user_groups: (groupsByUser[u.id] ?? []).map(g => ({ groups: g })),
   }))
 
