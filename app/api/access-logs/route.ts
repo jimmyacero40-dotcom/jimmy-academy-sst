@@ -1,7 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase-admin'
 import { isAdminOrSuper, isOperatorOrAdmin } from '@/lib/get-company'
-import { inicioJornada, finJornada, horaColombia, MOTIVO_OTRA_PORTERIA, MOTIVO_FIN_JORNADA } from '@/lib/jornada'
+import {
+  inicioJornada, inicioJornadaDeFecha, siguienteJornada, finJornada, horaColombia,
+  MOTIVO_OTRA_PORTERIA, MOTIVO_FIN_JORNADA,
+} from '@/lib/jornada'
 
 export async function GET(req: NextRequest) {
   const { authorized, companyId } = await isOperatorOrAdmin()
@@ -15,22 +18,23 @@ export async function GET(req: NextRequest) {
   const areaId      = searchParams.get('area_id')
   const gateId      = searchParams.get('gatehouse_id')
 
-  let from: string, to: string
-  const now = new Date()
+  // El día operativo corre de 00:00 a 23:59:59 de Colombia, no de medianoche UTC:
+  // con el corte UTC, un ingreso de las 8 p.m. caía en el día siguiente.
+  let desde: Date, hasta: Date
   if (period === 'day') {
-    from = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate(), 0, 0, 0)).toISOString()
-    to   = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() + 1, 0, 0, 0)).toISOString()
+    desde = inicioJornada()
+    hasta = siguienteJornada(desde)
   } else if (period === 'week') {
-    const utcDay = new Date(now).getUTCDay()
-    const diffToMon = (utcDay === 0 ? -6 : 1 - utcDay)
-    const monday = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() + diffToMon))
-    const sunday = new Date(Date.UTC(monday.getUTCFullYear(), monday.getUTCMonth(), monday.getUTCDate() + 7))
-    from = monday.toISOString(); to = sunday.toISOString()
+    const hoy = inicioJornada()
+    const diaSemana = new Date(hoy.getTime() - 5 * 60 * 60 * 1000).getUTCDay()
+    desde = new Date(hoy.getTime() + (diaSemana === 0 ? -6 : 1 - diaSemana) * 24 * 60 * 60 * 1000)
+    hasta = new Date(desde.getTime() + 7 * 24 * 60 * 60 * 1000)
   } else {
-    from = dateFrom ? new Date(dateFrom).toISOString() : new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate(), 0, 0, 0)).toISOString()
-    const dateToParsed = dateTo ? new Date(dateTo) : new Date()
-    to   = dateTo ? new Date(Date.UTC(dateToParsed.getUTCFullYear(), dateToParsed.getUTCMonth(), dateToParsed.getUTCDate() + 1)).toISOString() : new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() + 1)).toISOString()
+    desde = dateFrom ? inicioJornadaDeFecha(dateFrom) : inicioJornada()
+    hasta = siguienteJornada(dateTo ? inicioJornadaDeFecha(dateTo) : inicioJornada())
   }
+  const from = desde.toISOString()
+  const to   = hasta.toISOString()
 
   let query = supabaseAdmin
     .from('access_logs')

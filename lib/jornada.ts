@@ -17,6 +17,17 @@ export function finJornada(ref: Date = new Date()): Date {
   return new Date(inicioJornada(ref).getTime() + MS_DIA - 1000)
 }
 
+/** Instante UTC de las 00:00 en Colombia para una fecha 'YYYY-MM-DD' del calendario local. */
+export function inicioJornadaDeFecha(fecha: string): Date {
+  const [y, m, d] = fecha.split('-').map(Number)
+  return new Date(Date.UTC(y, m - 1, d, COT_OFFSET_HORAS, 0, 0))
+}
+
+/** Instante UTC del corte siguiente: sirve como límite superior exclusivo. */
+export function siguienteJornada(ref: Date): Date {
+  return new Date(ref.getTime() + MS_DIA)
+}
+
 export function horaColombia(iso: string | Date): string {
   return new Date(iso).toLocaleTimeString('es-CO', {
     hour: '2-digit', minute: '2-digit', timeZone: 'America/Bogota',
