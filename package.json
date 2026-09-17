@@ -17,6 +17,7 @@
     "clsx": "^2.1.1",
     "framer-motion": "^11.3.0",
     "jspdf": "^4.2.1",
+    "jspdf-autotable": "^5.0.8",
     "jszip": "^3.10.1",
     "lucide-react": "^0.383.0",
     "mammoth": "^1.12.0",
