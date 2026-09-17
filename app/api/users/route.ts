@@ -1,15 +1,16 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase-admin'
 const supabase = supabaseAdmin
-import { isAdminOrSuper, isOperatorOrAdmin } from '@/lib/get-company'
+import { requierePermiso } from '@/lib/get-company'
 import bcrypt from 'bcryptjs'
 
-// El portero necesita el listado de trabajadores para registrar ingresos, pero
-// solo ese: nunca las cuentas de plataforma. Crear, editar y borrar siguen
-// siendo exclusivos de administración.
+// Quien registra ingresos o salidas necesita el listado de trabajadores aunque no
+// tenga acceso al módulo de personal, así que cualquiera de esos tres permisos
+// habilita la consulta. Lo que nunca ve un no-administrador son las cuentas de
+// plataforma, por más que pida role=all.
 export async function GET(req: NextRequest) {
-  const { authorized, companyId, isAdmin } = await isOperatorOrAdmin()
-  if (!authorized) return NextResponse.json({ error: 'No autorizado' }, { status: 403 })
+  const { authorized, companyId, isAdmin } = await requierePermiso('personal.ver', 'accesos.ingreso', 'accesos.salida')
+  if (!authorized) return NextResponse.json({ error: 'No tiene permiso para consultar trabajadores' }, { status: 403 })
 
   const { searchParams } = new URL(req.url)
   // 'all' = no filter, otherwise defaults to 'worker'
@@ -75,12 +76,18 @@ export async function GET(req: NextRequest) {
 }
 
 export async function POST(req: NextRequest) {
-  const { authorized, companyId } = await isAdminOrSuper()
-  if (!authorized) return NextResponse.json({ error: 'No autorizado' }, { status: 403 })
-  if (!companyId) return NextResponse.json({ error: 'Selecciona una empresa primero' }, { status: 400 })
-
   const body = await req.json()
   const { email, password, name, cedula, role, area, permissions } = body
+
+  // Crear un trabajador y crear una cuenta de acceso son capacidades distintas.
+  const esCuentaDePlataforma = role && role !== 'worker'
+  const { authorized, companyId } = await requierePermiso(esCuentaDePlataforma ? 'config.usuarios' : 'personal.crear')
+  if (!authorized) {
+    return NextResponse.json({
+      error: esCuentaDePlataforma ? 'No tiene permiso para crear cuentas de acceso' : 'No tiene permiso para crear trabajadores',
+    }, { status: 403 })
+  }
+  if (!companyId) return NextResponse.json({ error: 'Selecciona una empresa primero' }, { status: 400 })
 
   if (!email || !password || !name) {
     return NextResponse.json({ error: 'Email, contraseña y nombre son requeridos' }, { status: 400 })
@@ -114,12 +121,20 @@ export async function POST(req: NextRequest) {
 }
 
 export async function PUT(req: NextRequest) {
-  const { authorized, companyId } = await isAdminOrSuper()
-  if (!authorized) return NextResponse.json({ error: 'No autorizado' }, { status: 403 })
-
   const body = await req.json()
   const { id, ...updates } = body
   if (!id) return NextResponse.json({ error: 'ID requerido' }, { status: 400 })
+
+  // Cambiar el rol o los permisos de alguien es administrar cuentas, no editar
+  // un trabajador: si no se separara, quien puede editar personal podría
+  // ascenderse a sí mismo.
+  const tocaCuentas = updates.role !== undefined || updates.permissions !== undefined || updates.password !== undefined
+  const { authorized, companyId } = await requierePermiso(tocaCuentas ? 'config.usuarios' : 'personal.editar')
+  if (!authorized) {
+    return NextResponse.json({
+      error: tocaCuentas ? 'No tiene permiso para modificar cuentas de acceso' : 'No tiene permiso para editar trabajadores',
+    }, { status: 403 })
+  }
 
   if (updates.password) {
     updates.password = await bcrypt.hash(updates.password, 10)
@@ -134,8 +149,8 @@ export async function PUT(req: NextRequest) {
 }
 
 export async function DELETE(req: NextRequest) {
-  const { authorized, companyId } = await isAdminOrSuper()
-  if (!authorized) return NextResponse.json({ error: 'No autorizado' }, { status: 403 })
+  const { authorized, companyId } = await requierePermiso('personal.retirar')
+  if (!authorized) return NextResponse.json({ error: 'No tiene permiso para retirar trabajadores' }, { status: 403 })
 
   const { id, ids } = await req.json()
   const deleteIds: string[] = ids || (id ? [id] : [])

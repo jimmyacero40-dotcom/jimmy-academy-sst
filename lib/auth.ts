@@ -31,6 +31,7 @@ export const authOptions: NextAuthOptions = {
           email: user.email,
           name: user.name,
           role: user.role,
+          permissions: user.permissions,
           cedula: user.cedula,
           area: user.area,
           companyId: user.company_id,
@@ -42,6 +43,7 @@ export const authOptions: NextAuthOptions = {
     async jwt({ token, user }) {
       if (user) {
         token.role = (user as any).role
+        token.permissions = (user as any).permissions ?? null
         token.cedula = (user as any).cedula
         token.area = (user as any).area
         token.userId = (user as any).id
@@ -52,6 +54,7 @@ export const authOptions: NextAuthOptions = {
     async session({ session, token }) {
       if (session.user) {
         (session.user as any).role = token.role;
+        (session.user as any).permissions = token.permissions ?? null;
         (session.user as any).cedula = token.cedula;
         (session.user as any).area = token.area;
         (session.user as any).id = token.userId;

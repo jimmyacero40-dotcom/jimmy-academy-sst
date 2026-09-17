@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { supabaseAdmin as supabase } from '@/lib/supabase-admin'
 import { getCurrentUser, getActiveCompanyId } from '@/lib/get-company'
+import { tienePermiso } from '@/lib/permisos'
 
 function calcCompletion(d: Record<string, any>): number {
   const checks = [
@@ -78,8 +79,8 @@ export async function PUT(req: NextRequest) {
   // cualquier otro rol solo puede escribir sobre el suyo.
   let targetUserId = user.id
   if (body.user_id && body.user_id !== user.id) {
-    if (user.role !== 'superadmin') {
-      return NextResponse.json({ error: 'Solo el superadmin puede editar el perfil de otro trabajador' }, { status: 403 })
+    if (!tienePermiso(user.role, user.permissions, 'personal.editar')) {
+      return NextResponse.json({ error: 'No tiene permiso para editar el perfil de otro trabajador' }, { status: 403 })
     }
     const { data: target } = await supabase
       .from('users').select('id, company_id').eq('id', body.user_id).maybeSingle()

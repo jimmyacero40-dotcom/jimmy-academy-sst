@@ -1,10 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase-admin'
-import { isAdminOrSuper, isOperatorOrAdmin } from '@/lib/get-company'
+import { requierePermiso } from '@/lib/get-company'
 
 // GET — list gatehouses (admin: all; portero: only assigned)
 export async function GET() {
-  const { authorized, user, companyId, isAdmin } = await isOperatorOrAdmin()
+  const { authorized, user, companyId, isAdmin } = await requierePermiso('accesos.ver', 'accesos.ingreso', 'accesos.salida', 'accesos.sedes')
   if (!authorized) return NextResponse.json({ error: 'No autorizado' }, { status: 403 })
 
   if (isAdmin) {
@@ -37,7 +37,7 @@ export async function GET() {
 
 // POST — create gatehouse (admin only)
 export async function POST(req: NextRequest) {
-  const { authorized, companyId } = await isAdminOrSuper()
+  const { authorized, companyId } = await requierePermiso('accesos.sedes')
   if (!authorized) return NextResponse.json({ error: 'No autorizado' }, { status: 403 })
 
   const body = await req.json()

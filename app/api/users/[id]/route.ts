@@ -1,9 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { supabaseAdmin as supabase } from '@/lib/supabase-admin'
-import { isAdminOrSuper } from '@/lib/get-company'
+import { requierePermiso } from '@/lib/get-company'
 
 export async function GET(_req: NextRequest, { params }: { params: { id: string } }) {
-  const { authorized, companyId } = await isAdminOrSuper()
+  const { authorized, companyId } = await requierePermiso('personal.ver')
   if (!authorized) return NextResponse.json({ error: 'No autorizado' }, { status: 403 })
 
   const userId = params.id

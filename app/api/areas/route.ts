@@ -1,11 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { supabaseAdmin as supabase } from '@/lib/supabase-admin'
-import { isAdminOrSuper, isOperatorOrAdmin } from '@/lib/get-company'
+import { isAdminOrSuper, requierePermiso } from '@/lib/get-company'
 
 // El portero necesita leer las áreas para registrar ingresos; crearlas o
 // editarlas sigue siendo exclusivo de administración.
 export async function GET() {
-  const { authorized, companyId } = await isOperatorOrAdmin()
+  const { authorized, companyId } = await requierePermiso('personal.ver', 'accesos.ingreso', 'accesos.salida')
   if (!authorized) return NextResponse.json({ error: 'No autorizado' }, { status: 403 })
 
   let query = supabase

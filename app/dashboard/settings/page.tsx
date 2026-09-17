@@ -50,7 +50,7 @@ function PermisosGrid({ seleccionados, bloqueado, onToggle }: {
   seleccionados: string[]; bloqueado?: boolean; onToggle: (id: string) => void
 }) {
   return (
-    <div className="grid sm:grid-cols-2 gap-3">
+    <div className="grid sm:grid-cols-2 xl:grid-cols-4 gap-3">
       {CATALOGO_PERMISOS.map(({ grupo, permisos }) => (
         <div key={grupo} className="rounded-xl p-3" style={{ background: 'var(--bg-card)', border: '1px solid var(--border)' }}>
           <div className="text-[11px] font-bold uppercase tracking-wide mb-2" style={{ color: 'var(--text-label)' }}>{grupo}</div>
@@ -158,6 +158,7 @@ export default function SettingsPage() {
   const [permEditando, setPermEditando] = useState<string | null>(null)
   const [permBorrador, setPermBorrador] = useState<string[]>([])
   const [permGuardando, setPermGuardando] = useState(false)
+  const [datosBorrador, setDatosBorrador] = useState({ name: '', email: '', cedula: '', role: '', active: true, password: '' })
 
   /** Al cambiar el rol se propone su plantilla; el usuario puede ajustarla. */
   function cambiarRol(role: string) {
@@ -168,20 +169,35 @@ export default function SettingsPage() {
     return lista.includes(id) ? lista.filter(p => p !== id) : [...lista, id]
   }
 
-  function abrirPermisos(u: PlatformUser) {
+  function abrirEdicion(u: PlatformUser) {
     if (permEditando === u.id) { setPermEditando(null); return }
     setPermEditando(u.id)
     setPermBorrador(permisosEfectivos(u.role, u.permissions))
+    setDatosBorrador({ name: u.name, email: u.email, cedula: u.cedula || '', role: u.role, active: u.active, password: '' })
   }
 
-  async function guardarPermisos(userId: string) {
-    setPermGuardando(true)
-    await fetch('/api/users', {
+  async function guardarUsuario(userId: string) {
+    setPermGuardando(true); setPuError(null)
+    const cambios: Record<string, any> = {
+      id: userId,
+      name: datosBorrador.name,
+      email: datosBorrador.email,
+      cedula: datosBorrador.cedula,
+      role: datosBorrador.role,
+      active: datosBorrador.active,
+      permissions: permBorrador,
+    }
+    // La contraseña solo se envía si se escribió una nueva; el API la cifra.
+    if (datosBorrador.password.trim()) cambios.password = datosBorrador.password.trim()
+
+    const res = await fetch('/api/users', {
       method: 'PUT', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ id: userId, permissions: permBorrador }),
+      body: JSON.stringify(cambios),
     })
+    if (!res.ok) setPuError((await res.json().catch(() => ({}))).error || 'No fue posible guardar')
+    else setPermEditando(null)
     await loadPlatformUsers()
-    setPermGuardando(false); setPermEditando(null)
+    setPermGuardando(false)
   }
   const [puSaving, setPuSaving] = useState(false)
   const [puError, setPuError] = useState<string | null>(null)
@@ -334,18 +350,18 @@ export default function SettingsPage() {
   }
 
   return (
-    <div className="p-4 sm:p-6 max-w-5xl mx-auto">
+    <div className="p-4 sm:p-6 w-full">
 
       <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} className="mb-6">
         <h1 className="text-2xl font-black text-[var(--text)] mb-1">Configuración</h1>
         <p className="text-[var(--text-dim)] text-sm">{isWorker ? 'Ajustes de tu cuenta' : 'Ajustes del sistema SG-SST'}</p>
       </motion.div>
 
-      <div className="grid lg:grid-cols-4 gap-5">
+      <div className="grid lg:grid-cols-[250px_minmax(0,1fr)] gap-5 items-start">
 
         {/* Sidebar nav */}
         <motion.div initial={{ opacity: 0, x: -16 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: 0.05 }}
-          className="lg:col-span-1">
+          >
           <div className="bg-[var(--bg-surface)] border border-[var(--border)] rounded-2xl p-2 space-y-0.5">
             {SECTIONS.map(({ id, label, icon: Icon }) => (
               <button key={id} onClick={() => { setActive(id); setSaveError(null); setPwdError(null); setPuError(null) }}
@@ -360,7 +376,7 @@ export default function SettingsPage() {
 
         {/* Content */}
         <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }}
-          className="lg:col-span-3 space-y-4">
+          className="space-y-4 min-w-0">
 
           {/* ── PERFIL ─────────────────────────────────────────────────── */}
           {effectiveActive === 'perfil' && (
@@ -677,8 +693,8 @@ export default function SettingsPage() {
                     bloqueado={puForm.role === 'superadmin'}
                     onToggle={id => setPuForm(p => ({ ...p, permissions: alternarPermiso(p.permissions, id) }))}
                   />
-                  <p className="text-[11px] mt-2 px-3 py-2 rounded-lg" style={{ background: 'rgba(245,158,11,0.08)', border: '1px solid rgba(245,158,11,0.25)', color: '#F59E0B' }}>
-                    Estos permisos se guardan pero todavía no restringen el acceso: falta aplicarlos en el servidor.
+                  <p className="text-[11px] mt-2 px-3 py-2 rounded-lg" style={{ background: 'rgba(16,185,129,0.08)', border: '1px solid rgba(16,185,129,0.25)', color: '#10B981' }}>
+                    Los permisos se verifican en el servidor: quien no los tenga recibe un rechazo aunque abra la dirección directamente.
                   </p>
                 </div>
                 {puError && (
@@ -735,42 +751,94 @@ export default function SettingsPage() {
                             }}>
                             {u.role}
                           </span>
-                          <button onClick={() => abrirPermisos(u)}
+                          {!u.active && (
+                            <span className="text-[11px] font-bold px-2 py-0.5 rounded-full flex-shrink-0"
+                              style={{ background: 'rgba(239,68,68,0.12)', color: '#EF4444' }}>inactivo</span>
+                          )}
+                          <button onClick={() => abrirEdicion(u)}
                             className="text-[11px] font-semibold px-2.5 py-1 rounded-lg flex-shrink-0"
                             style={{ border: '1px solid var(--border)', color: 'var(--text-dim)', background: 'var(--bg-surface)' }}>
-                            {permEditando === u.id ? 'Cerrar' : 'Permisos'}
+                            {permEditando === u.id ? 'Cerrar' : 'Editar'}
                           </button>
                         </div>
 
                         {permEditando === u.id && (
-                          <div className="px-3 pb-3 pt-1 border-t" style={{ borderColor: 'var(--border)' }}>
-                            {u.role === 'superadmin' ? (
-                              <p className="text-xs py-3" style={{ color: 'var(--text-faint)' }}>
+                          <div className="px-3 pb-4 pt-3 border-t space-y-4" style={{ borderColor: 'var(--border)' }}>
+                            {/* Datos de la cuenta */}
+                            <div className="grid sm:grid-cols-2 xl:grid-cols-4 gap-3">
+                              {([
+                                ['name',     'Nombre completo'],
+                                ['email',    'Correo electrónico'],
+                                ['cedula',   'Cédula'],
+                                ['password', 'Nueva contraseña (opcional)'],
+                              ] as const).map(([campo, etiqueta]) => (
+                                <div key={campo}>
+                                  <label className="text-[var(--text-dim)] text-[11px] font-semibold mb-1 block">{etiqueta}</label>
+                                  <input
+                                    type={campo === 'password' ? 'password' : 'text'}
+                                    value={(datosBorrador as any)[campo]}
+                                    placeholder={campo === 'password' ? 'Dejar vacío para no cambiarla' : undefined}
+                                    onChange={e => setDatosBorrador(p => ({ ...p, [campo]: e.target.value }))}
+                                    className="w-full bg-[var(--bg-surface)] border border-[var(--border)] rounded-lg px-3 py-2 text-sm text-[var(--text)] focus:outline-none focus:border-amber-500/40"
+                                  />
+                                </div>
+                              ))}
+                              <div>
+                                <label className="text-[var(--text-dim)] text-[11px] font-semibold mb-1 block">Rol</label>
+                                <select value={datosBorrador.role}
+                                  onChange={e => { const r = e.target.value; setDatosBorrador(p => ({ ...p, role: r })); setPermBorrador(PERMISOS_POR_ROL[r] ?? []) }}
+                                  className="w-full bg-[var(--bg-surface)] border border-[var(--border)] rounded-lg px-3 py-2 text-sm text-[var(--text)] focus:outline-none focus:border-amber-500/40">
+                                  <option value="portero">Portero</option>
+                                  <option value="admin">Administrador</option>
+                                  <option value="superadmin">Superadministrador</option>
+                                  <option value="worker">Trabajador</option>
+                                </select>
+                              </div>
+                              <div>
+                                <label className="text-[var(--text-dim)] text-[11px] font-semibold mb-1 block">Estado</label>
+                                <select value={datosBorrador.active ? 'si' : 'no'}
+                                  onChange={e => setDatosBorrador(p => ({ ...p, active: e.target.value === 'si' }))}
+                                  className="w-full bg-[var(--bg-surface)] border border-[var(--border)] rounded-lg px-3 py-2 text-sm text-[var(--text)] focus:outline-none focus:border-amber-500/40">
+                                  <option value="si">Activo</option>
+                                  <option value="no">Inactivo — no puede iniciar sesión</option>
+                                </select>
+                              </div>
+                            </div>
+
+                            {/* Permisos */}
+                            {datosBorrador.role === 'superadmin' ? (
+                              <p className="text-xs px-3 py-2 rounded-lg" style={{ background: 'var(--bg-surface)', color: 'var(--text-faint)' }}>
                                 El superadministrador tiene todos los permisos y no se le pueden restringir.
                               </p>
                             ) : (
-                              <>
-                                <div className="my-3">
-                                  <PermisosGrid
-                                    seleccionados={permBorrador}
-                                    onToggle={id => setPermBorrador(prev => alternarPermiso(prev, id))}
-                                  />
-                                </div>
-                                <div className="flex items-center gap-2">
-                                  <button onClick={() => guardarPermisos(u.id)} disabled={permGuardando}
-                                    className="flex items-center gap-1.5 text-xs font-bold px-3 py-1.5 rounded-lg disabled:opacity-60"
-                                    style={{ background: 'var(--primary)', color: '#fff' }}>
-                                    {permGuardando ? <Loader2 size={12} className="animate-spin" /> : <Check size={12} />}
-                                    Guardar permisos
-                                  </button>
-                                  <button onClick={() => setPermBorrador(PERMISOS_POR_ROL[u.role] ?? [])}
-                                    className="text-xs px-3 py-1.5 rounded-lg"
-                                    style={{ border: '1px solid var(--border)', color: 'var(--text-dim)' }}>
+                              <div>
+                                <div className="flex items-baseline justify-between mb-2">
+                                  <span className="text-[var(--text-dim)] text-[11px] font-semibold">Permisos</span>
+                                  <button onClick={() => setPermBorrador(PERMISOS_POR_ROL[datosBorrador.role] ?? [])}
+                                    className="text-[11px]" style={{ color: 'var(--primary)' }}>
                                     Restaurar plantilla del rol
                                   </button>
                                 </div>
-                              </>
+                                <PermisosGrid
+                                  seleccionados={permBorrador}
+                                  onToggle={id => setPermBorrador(prev => alternarPermiso(prev, id))}
+                                />
+                              </div>
                             )}
+
+                            <div className="flex items-center gap-2">
+                              <button onClick={() => guardarUsuario(u.id)} disabled={permGuardando}
+                                className="flex items-center gap-1.5 text-xs font-bold px-3 py-1.5 rounded-lg disabled:opacity-60"
+                                style={{ background: 'var(--primary)', color: '#fff' }}>
+                                {permGuardando ? <Loader2 size={12} className="animate-spin" /> : <Check size={12} />}
+                                Guardar cambios
+                              </button>
+                              <button onClick={() => setPermEditando(null)}
+                                className="text-xs px-3 py-1.5 rounded-lg"
+                                style={{ border: '1px solid var(--border)', color: 'var(--text-dim)' }}>
+                                Cancelar
+                              </button>
+                            </div>
                           </div>
                         )}
                       </div>

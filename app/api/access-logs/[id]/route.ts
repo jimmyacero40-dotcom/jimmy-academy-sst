@@ -1,11 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase-admin'
-import { isOperatorOrAdmin } from '@/lib/get-company'
+import { requierePermiso } from '@/lib/get-company'
 
 // PATCH — registrar salida
 export async function PATCH(req: NextRequest, { params }: { params: { id: string } }) {
-  const { authorized, user, companyId } = await isOperatorOrAdmin()
-  if (!authorized) return NextResponse.json({ error: 'No autorizado' }, { status: 403 })
+  const { authorized, user, companyId } = await requierePermiso('accesos.salida')
+  if (!authorized) return NextResponse.json({ error: 'No tiene permiso para registrar salidas' }, { status: 403 })
 
   const { data: log } = await supabaseAdmin
     .from('access_logs')

@@ -1,9 +1,9 @@
 import { NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase-admin'
-import { isAdminOrSuper } from '@/lib/get-company'
+import { requierePermiso } from '@/lib/get-company'
 
 export async function GET() {
-  const { authorized, companyId } = await isAdminOrSuper()
+  const { authorized, companyId } = await requierePermiso('personal.ver', 'personal.retirar')
   if (!authorized) return NextResponse.json({ error: 'No autorizado' }, { status: 403 })
 
   const { data, error } = await supabaseAdmin

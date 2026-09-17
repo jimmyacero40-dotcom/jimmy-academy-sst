@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import { useSession } from 'next-auth/react'
+import { tienePermiso } from '@/lib/permisos'
 import Link from 'next/link'
 import {
   ArrowLeftRight, Users, LogIn, LogOut, Building2,
@@ -83,8 +84,9 @@ function weekBounds(isoDate: string) {
 export default function ControlOperativoPage() {
   const { data: session } = useSession()
   const rol = (session?.user as any)?.role
-  // Exportar es una herramienta de administración: el portero consulta, no reporta.
-  const esAdmin = rol === 'admin' || rol === 'superadmin'
+  // Se decide por permiso, no por rol: si al portero se le marcó "Exportar
+  // reportes" en Configuración, la casilla debe servir de verdad.
+  const puedeExportar = tienePermiso(rol, (session?.user as any)?.permissions, 'accesos.exportar')
   const today = new Date().toISOString().split('T')[0]
 
   const [logs, setLogs] = useState<AccessLog[]>([])
@@ -455,7 +457,7 @@ export default function ControlOperativoPage() {
       <div className="rounded-xl overflow-hidden" style={{ background: 'var(--bg-card)', border: '1px solid var(--border)' }}>
         <div className="flex items-center justify-between px-4 py-3 gap-3 flex-wrap" style={{ borderBottom: '1px solid var(--border)' }}>
           <span className="text-sm font-bold" style={{ color: 'var(--text-strong)' }}>{filtered.length} registros</span>
-          <div className="flex items-center gap-2" hidden={!esAdmin}>
+          <div className="flex items-center gap-2" hidden={!puedeExportar}>
             <button onClick={exportPDF} disabled={!filtered.length || exporting !== null}
               className="flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg font-semibold disabled:opacity-40 disabled:cursor-not-allowed"
               style={{ border: '1px solid var(--border)', color: 'var(--text-dim)', background: 'var(--bg)' }}>

@@ -1,14 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase-admin'
-import { isAdminOrSuper, isOperatorOrAdmin } from '@/lib/get-company'
+import { requierePermiso } from '@/lib/get-company'
 import {
   inicioJornada, inicioJornadaDeFecha, siguienteJornada, finJornada, horaColombia,
   MOTIVO_OTRA_PORTERIA, MOTIVO_FIN_JORNADA,
 } from '@/lib/jornada'
 
 export async function GET(req: NextRequest) {
-  const { authorized, user, companyId, isAdmin } = await isOperatorOrAdmin()
-  if (!authorized) return NextResponse.json({ error: 'No autorizado' }, { status: 403 })
+  const { authorized, user, companyId, isAdmin } = await requierePermiso('accesos.ver')
+  if (!authorized) return NextResponse.json({ error: 'No tiene permiso para consultar movimientos' }, { status: 403 })
 
   // El portero solo ve el movimiento de las porterías que opera, no el de toda
   // la empresa.
@@ -71,8 +71,8 @@ export async function GET(req: NextRequest) {
 }
 
 export async function POST(req: NextRequest) {
-  const { authorized, user, companyId } = await isOperatorOrAdmin()
-  if (!authorized) return NextResponse.json({ error: 'No autorizado' }, { status: 403 })
+  const { authorized, user, companyId } = await requierePermiso('accesos.ingreso')
+  if (!authorized) return NextResponse.json({ error: 'No tiene permiso para registrar ingresos' }, { status: 403 })
 
   const body = await req.json()
   const { user_id, area_id, gatehouse_id, notes } = body
