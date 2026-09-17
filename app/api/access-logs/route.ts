@@ -17,17 +17,18 @@ export async function GET(req: NextRequest) {
   let from: string, to: string
   const now = new Date()
   if (period === 'day') {
-    from = new Date(now.getFullYear(), now.getMonth(), now.getDate()).toISOString()
-    to   = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1).toISOString()
+    from = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate(), 0, 0, 0)).toISOString()
+    to   = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() + 1, 0, 0, 0)).toISOString()
   } else if (period === 'week') {
-    const day = now.getDay()
-    const diffToMon = (day === 0 ? -6 : 1 - day)
-    const monday = new Date(now); monday.setDate(now.getDate() + diffToMon); monday.setHours(0,0,0,0)
-    const sunday = new Date(monday); sunday.setDate(monday.getDate() + 7)
+    const utcDay = new Date(now).getUTCDay()
+    const diffToMon = (utcDay === 0 ? -6 : 1 - utcDay)
+    const monday = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() + diffToMon))
+    const sunday = new Date(Date.UTC(monday.getUTCFullYear(), monday.getUTCMonth(), monday.getUTCDate() + 7))
     from = monday.toISOString(); to = sunday.toISOString()
   } else {
-    from = dateFrom ? new Date(dateFrom).toISOString() : new Date(now.getFullYear(), now.getMonth(), now.getDate()).toISOString()
-    to   = dateTo ? new Date(new Date(dateTo).setDate(new Date(dateTo).getDate() + 1)).toISOString() : new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1).toISOString()
+    from = dateFrom ? new Date(dateFrom).toISOString() : new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate(), 0, 0, 0)).toISOString()
+    const dateToParsed = dateTo ? new Date(dateTo) : new Date()
+    to   = dateTo ? new Date(Date.UTC(dateToParsed.getUTCFullYear(), dateToParsed.getUTCMonth(), dateToParsed.getUTCDate() + 1)).toISOString() : new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() + 1)).toISOString()
   }
 
   let query = supabaseAdmin

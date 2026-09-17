@@ -10,7 +10,9 @@ export async function GET(req: NextRequest) {
   const areaId    = searchParams.get('area_id')
   const gateId    = searchParams.get('gatehouse_id')
 
-  const todayStart = new Date(); todayStart.setHours(0,0,0,0)
+  // Use UTC today's start to avoid timezone issues
+  const now = new Date()
+  const todayStart = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate(), 0, 0, 0))
 
   let query = supabaseAdmin
     .from('access_logs')
