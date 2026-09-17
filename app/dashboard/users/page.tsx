@@ -69,10 +69,58 @@ function generateEmail(name: string): string {
   return `${parts[0]}.${parts[parts.length - 1]}@jimmyacademy.com`
 }
 
-function parseExcel(buffer: ArrayBuffer): Omit<AppUser, 'id' | 'createdAt' | 'email' | 'area_id' | 'area_name' | 'groups' | 'cargo' | 'sede' | 'fechaIngreso'>[] {
+/** Una fila del Excel, con las mismas columnas que muestra la tabla. */
+interface FilaImportada {
+  name: string; cedula: string; cargo: string; area: string
+  sede: string; fechaIngreso: string; email: string
+}
+
+/**
+ * Las fechas de Excel llegan como número de serie o como texto. Se normaliza a
+ * YYYY-MM-DD sin pasar por new Date() con zona horaria, que correría un día.
+ */
+function normalizarFecha(valor: string): string {
+  const v = valor.trim()
+  if (!v) return ''
+  if (/^\d{4}-\d{2}-\d{2}$/.test(v)) return esFechaReal(v) ? v : ''
+
+  const partes = v.match(/^(\d{1,2})[/-](\d{1,2})[/-](\d{2,4})$/)
+  if (partes) {
+    let [, a, b, y] = partes
+    if (y.length === 2) y = `20${y}`
+    // Excel puede entregar la fecha en formato de EE.UU. (mes primero). Si el
+    // primer número no puede ser un mes pero el segundo sí, están invertidos.
+    let dia = a, mes = b
+    if (Number(b) > 12 && Number(a) <= 12) { dia = b; mes = a }
+    const iso = `${y}-${mes.padStart(2, '0')}-${dia.padStart(2, '0')}`
+    return esFechaReal(iso) ? iso : ''
+  }
+
+  // Número de serie de Excel: días desde el 30/12/1899.
+  const serie = Number(v)
+  if (Number.isFinite(serie) && serie > 0) {
+    const iso = new Date(Date.UTC(1899, 11, 30) + serie * 86400000).toISOString().slice(0, 10)
+    return esFechaReal(iso) ? iso : ''
+  }
+  return ''
+}
+
+/** Descarta cosas como 2026-15-01 o 2026-02-31 antes de mandarlas a la base. */
+function esFechaReal(iso: string): boolean {
+  const [y, m, d] = iso.split('-').map(Number)
+  if (!y || !m || !d || m < 1 || m > 12) return false
+  const fecha = new Date(Date.UTC(y, m - 1, d))
+  return fecha.getUTCFullYear() === y && fecha.getUTCMonth() === m - 1 && fecha.getUTCDate() === d
+}
+
+const COLUMNAS_PLANTILLA = [
+  'NOMBRE DE TRABAJADOR', 'CEDULA', 'CARGO', 'AREA', 'SEDE', 'FECHA DE INGRESO', 'CORREO',
+] as const
+
+function parseExcel(buffer: ArrayBuffer): FilaImportada[] {
   const wb = XLSX.read(buffer, { type: 'array' })
   const ws = wb.Sheets[wb.SheetNames[0]]
-  const rows = XLSX.utils.sheet_to_json<Record<string, unknown>>(ws, { defval: '' })
+  const rows = XLSX.utils.sheet_to_json<Record<string, unknown>>(ws, { defval: '', raw: false })
   return rows.map(row => {
     const col = (...keys: string[]) => {
       for (const k of keys) {
@@ -82,22 +130,26 @@ function parseExcel(buffer: ArrayBuffer): Omit<AppUser, 'id' | 'createdAt' | 'em
       return ''
     }
     return {
-      name: col('nombre de trabajador', 'nombre', 'name', 'nombres'),
-      empresa: col('empresa', 'company', 'razon social'),
-      cedula: col('cedula', 'cc', 'documento', 'identificacion', 'nro documento'),
-      role: col('cargo', 'role', 'rol', 'puesto'),
-      status: 'activo' as UserStatus,
+      name:         col('nombre de trabajador', 'nombre', 'name', 'nombres', 'trabajador'),
+      cedula:       col('cedula', 'cc', 'documento', 'identificacion', 'nro documento'),
+      cargo:        col('cargo', 'puesto'),
+      // "empresa" se acepta por compatibilidad con las plantillas antiguas, donde
+      // esa columna alimentaba el área.
+      area:         col('area', 'área', 'proceso', 'empresa'),
+      sede:         col('sede', 'centro de trabajo', 'centro_trabajo'),
+      fechaIngreso: normalizarFecha(col('fecha de ingreso', 'fecha_ingreso', 'ingreso')),
+      email:        col('correo', 'email', 'correo electronico'),
     }
   }).filter(u => u.name !== '')
 }
 
 function downloadTemplate() {
-  const data = [
-    { EMPRESA: 'AGROVENTURE', 'NOMBRE DE TRABAJADOR': 'JUAN PEREZ GOMEZ', CEDULA: '12345678', CARGO: 'OPERARIO' },
-    { EMPRESA: 'AGROVENTURE', 'NOMBRE DE TRABAJADOR': 'MARIA LOPEZ TORRES', CEDULA: '87654321', CARGO: 'SUPERVISORA SST' },
+  const ejemplos = [
+    ['JUAN PEREZ GOMEZ',   '12345678', 'OPERARIO',        'CAMPO',          'CASA DE TEJA',  '2026-01-15', ''],
+    ['MARIA LOPEZ TORRES', '87654321', 'SUPERVISORA SST', 'ADMINISTRATIVA', 'LA ESMERALDA',  '2026-02-01', 'maria.lopez@empresa.com'],
   ]
-  const ws = XLSX.utils.json_to_sheet(data)
-  ws['!cols'] = [{ wch: 20 }, { wch: 34 }, { wch: 14 }, { wch: 30 }]
+  const ws = XLSX.utils.aoa_to_sheet([[...COLUMNAS_PLANTILLA], ...ejemplos])
+  ws['!cols'] = [{ wch: 34 }, { wch: 14 }, { wch: 24 }, { wch: 20 }, { wch: 20 }, { wch: 18 }, { wch: 30 }]
   const wb2 = XLSX.utils.book_new()
   XLSX.utils.book_append_sheet(wb2, ws, 'Trabajadores')
   XLSX.writeFile(wb2, 'plantilla_trabajadores.xlsx')
@@ -435,12 +487,42 @@ export default function UsersPage() {
       const rows = parseExcel(await file.arrayBuffer())
       if (!rows.length) { setExcelError('No se encontraron trabajadores en el archivo'); return }
       let created = 0
+      let omitidos = 0
       for (const row of rows) {
-        if (!row.name || !row.cedula) continue
-        const res = await fetch('/api/users', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: row.name, email: generateEmail(row.name), password: row.cedula, cedula: row.cedula, role: 'worker', area: row.empresa }) })
-        if (res.ok) created++
+        if (!row.name || !row.cedula) { omitidos++; continue }
+        const res = await fetch('/api/users', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            name: row.name,
+            email: row.email || generateEmail(row.name),
+            password: row.cedula,
+            cedula: row.cedula,
+            role: 'worker',
+            area: row.area,
+            cargo: row.cargo,
+          }),
+        })
+        if (!res.ok) { omitidos++; continue }
+        created++
+
+        // Sede y fecha de ingreso viven en el perfil del trabajador, no en la
+        // cuenta, así que van en una segunda llamada y solo si el Excel las trae.
+        if (row.sede || row.fechaIngreso) {
+          const creado = await res.json().catch(() => null)
+          if (creado?.id) {
+            await fetch('/api/profile', {
+              method: 'PUT', headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                user_id: creado.id,
+                ...(row.sede ? { centro_trabajo: row.sede } : {}),
+                ...(row.fechaIngreso ? { fecha_ingreso: row.fechaIngreso } : {}),
+              }),
+            })
+          }
+        }
       }
-      await loadUsers(); alert(`${created} trabajador(es) importados correctamente`)
+      await loadUsers()
+      alert(`${created} trabajador(es) importados${omitidos ? `. ${omitidos} fila(s) omitidas por faltar nombre o cédula, o por estar repetidas.` : ''}`)
     } catch { setExcelError('Error al leer el archivo Excel') }
     if (fileRef.current) fileRef.current.value = ''
   }

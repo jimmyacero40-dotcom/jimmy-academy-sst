@@ -77,7 +77,7 @@ export async function GET(req: NextRequest) {
 
 export async function POST(req: NextRequest) {
   const body = await req.json()
-  const { email, password, name, cedula, role, area, permissions } = body
+  const { email, password, name, cedula, role, area, cargo, permissions } = body
 
   // Crear un trabajador y crear una cuenta de acceso son capacidades distintas.
   const esCuentaDePlataforma = role && role !== 'worker'
@@ -103,6 +103,7 @@ export async function POST(req: NextRequest) {
       cedula: cedula || '',
       role: role || 'worker',
       area: area || '',
+      cargo: cargo || null,
       active: true,
       company_id: companyId,
       permissions: Array.isArray(permissions) ? permissions : null,
