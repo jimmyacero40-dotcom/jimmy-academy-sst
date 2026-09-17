@@ -4,9 +4,12 @@ const supabase = supabaseAdmin
 import { isAdminOrSuper } from '@/lib/get-company'
 import bcrypt from 'bcryptjs'
 
-export async function GET() {
+export async function GET(req: NextRequest) {
   const { authorized, companyId } = await isAdminOrSuper()
   if (!authorized) return NextResponse.json({ error: 'No autorizado' }, { status: 403 })
+
+  const { searchParams } = new URL(req.url)
+  const roleFilter = searchParams.get('role') // 'all' = no filter, otherwise defaults to 'worker'
 
   let query = supabaseAdmin
     .from('users')
@@ -14,6 +17,8 @@ export async function GET() {
     .is('retired_at', null)  // exclude retired workers from main list
     .order('created_at', { ascending: false })
   if (companyId) query = query.eq('company_id', companyId)
+  // Default: only show trabajadores (role='worker'). Pass ?role=all to include platform users.
+  if (roleFilter !== 'all') query = query.eq('role', 'worker')
 
   const { data, error } = await query
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })

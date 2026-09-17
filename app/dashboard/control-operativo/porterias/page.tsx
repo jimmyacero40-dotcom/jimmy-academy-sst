@@ -54,7 +54,7 @@ export default function PorteriasPage() {
 
   async function load() {
     setLoading(true)
-    const [ghRes, uRes] = await Promise.all([fetch('/api/gatehouses'), fetch('/api/users')])
+    const [ghRes, uRes] = await Promise.all([fetch('/api/gatehouses'), fetch('/api/users?role=all')])
     if (ghRes.ok) setGatehouses(await ghRes.json())
     if (uRes.ok)  setAllUsers(await uRes.json())
     setLoading(false)

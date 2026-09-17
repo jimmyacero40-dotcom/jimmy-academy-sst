@@ -6,16 +6,19 @@ import { motion } from 'framer-motion'
 import {
   Settings, Building2, Bell, Shield, Globe, Palette,
   Save, ChevronRight, Mail, Phone, MapPin,
-  FileText, Lock, Users, Database, CheckCircle, User, Check, AlertCircle, Loader2
+  FileText, Lock, Users, Database, CheckCircle, User, Check, AlertCircle, Loader2,
+  DoorOpen, UserPlus, KeyRound, RefreshCw, Trash2, RotateCcw
 } from 'lucide-react'
 import { useTheme, THEMES, type ThemeId } from '@/components/ThemeProvider'
 
 const ADMIN_SECTIONS = [
-  { id: 'empresa',        label: 'Empresa',      icon: Building2 },
-  { id: 'tema',           label: 'Tema Visual',   icon: Palette   },
-  { id: 'notificaciones', label: 'Notificaciones',icon: Bell      },
-  { id: 'seguridad',      label: 'Seguridad',     icon: Shield    },
-  { id: 'sistema',        label: 'Sistema',        icon: Settings  },
+  { id: 'empresa',        label: 'Empresa',      icon: Building2, superadminOnly: false },
+  { id: 'tema',           label: 'Tema Visual',   icon: Palette,   superadminOnly: false },
+  { id: 'notificaciones', label: 'Notificaciones',icon: Bell,      superadminOnly: false },
+  { id: 'seguridad',      label: 'Seguridad',     icon: Shield,    superadminOnly: false },
+  { id: 'usuarios',       label: 'Usuarios',      icon: Users,     superadminOnly: true  },
+  { id: 'sedes',          label: 'Sedes y Porterías', icon: DoorOpen, superadminOnly: true },
+  { id: 'sistema',        label: 'Sistema',        icon: Settings,  superadminOnly: false },
 ]
 
 // "Preferencias" (sistema) removed — no value for workers
@@ -37,11 +40,18 @@ function Toggle({ defaultOn = false }: { defaultOn?: boolean }) {
   )
 }
 
+interface PlatformUser {
+  id: string; name: string; email: string; role: string; active: boolean; cedula: string
+}
+
 export default function SettingsPage() {
   const { data: session } = useSession()
   const userRole = (session?.user as any)?.role || 'worker'
   const isWorker = userRole === 'worker'
-  const SECTIONS = isWorker ? WORKER_SECTIONS : ADMIN_SECTIONS
+  const isSuperAdmin = userRole === 'superadmin'
+  const SECTIONS = isWorker
+    ? WORKER_SECTIONS
+    : ADMIN_SECTIONS.filter(s => !s.superadminOnly || isSuperAdmin)
 
   const [active, setActive] = useState('')
   const [saved, setSaved] = useState(false)
@@ -106,7 +116,49 @@ export default function SettingsPage() {
   const [pwdError, setPwdError] = useState<string | null>(null)
   const [pwdSuccess, setPwdSuccess] = useState(false)
 
+  // ── Platform users (superadmin only) ─────────────────────────────────
+  const [platformUsers, setPlatformUsers] = useState<PlatformUser[]>([])
+  const [puLoading, setPuLoading] = useState(false)
+  const [puForm, setPuForm] = useState({ name: '', email: '', password: '', role: 'portero', cedula: '' })
+  const [puSaving, setPuSaving] = useState(false)
+  const [puError, setPuError] = useState<string | null>(null)
+  const [puSuccess, setPuSuccess] = useState(false)
+
+  async function loadPlatformUsers() {
+    setPuLoading(true)
+    const res = await fetch('/api/users?role=all')
+    if (res.ok) setPlatformUsers(await res.json())
+    setPuLoading(false)
+  }
+
+  async function createPlatformUser() {
+    setPuError(null)
+    if (!puForm.name || !puForm.email || !puForm.password) {
+      setPuError('Nombre, email y contraseña son obligatorios'); return
+    }
+    setPuSaving(true)
+    const res = await fetch('/api/users', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(puForm),
+    })
+    if (res.ok) {
+      setPuForm({ name: '', email: '', password: '', role: 'portero', cedula: '' })
+      setPuSuccess(true)
+      setTimeout(() => setPuSuccess(false), 2500)
+      await loadPlatformUsers()
+    } else {
+      const b = await res.json().catch(() => ({}))
+      setPuError(b.error ?? 'Error al crear usuario')
+    }
+    setPuSaving(false)
+  }
+
   const effectiveActive = active || (isWorker ? 'perfil' : 'empresa')
+
+  useEffect(() => {
+    if (effectiveActive === 'usuarios' && isSuperAdmin) loadPlatformUsers()
+  }, [effectiveActive])
 
   const handleThemeChange = async (id: ThemeId) => {
     setTheme(id)
@@ -233,7 +285,7 @@ export default function SettingsPage() {
           className="lg:col-span-1">
           <div className="bg-[var(--bg-surface)] border border-[var(--border)] rounded-2xl p-2 space-y-0.5">
             {SECTIONS.map(({ id, label, icon: Icon }) => (
-              <button key={id} onClick={() => { setActive(id); setSaveError(null); setPwdError(null) }}
+              <button key={id} onClick={() => { setActive(id); setSaveError(null); setPwdError(null); setPuError(null) }}
                 className={`w-full flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-sm font-medium transition-all ${effectiveActive === id ? 'bg-amber-500/15 text-amber-300 border border-amber-500/25' : 'text-[var(--text-dim)] hover:bg-[var(--bg-card)] hover:text-[var(--text)]'}`}>
                 <Icon size={16} />
                 <span>{label}</span>
@@ -506,6 +558,126 @@ export default function SettingsPage() {
             </div>
           )}
 
+          {/* ── USUARIOS DEL SISTEMA (superadmin only) ─────────────────────── */}
+          {effectiveActive === 'usuarios' && isSuperAdmin && (
+            <div className="space-y-5">
+              {/* Create user form */}
+              <div className="bg-[var(--bg-surface)] border border-[var(--border)] rounded-2xl p-5">
+                <h2 className="text-[var(--text)] font-bold mb-4 flex items-center gap-2">
+                  <UserPlus size={16} className="text-amber-400" /> Crear Usuario de Plataforma
+                </h2>
+                <p className="text-xs mb-4" style={{ color: 'var(--text-faint)' }}>
+                  Los usuarios de plataforma son cuentas de acceso. Son independientes de los trabajadores de la empresa.
+                </p>
+                <div className="grid sm:grid-cols-2 gap-4 mb-4">
+                  {[
+                    { key: 'name',     label: 'Nombre completo *', placeholder: 'Ej: Juan Portero' },
+                    { key: 'email',    label: 'Correo electrónico *', placeholder: 'correo@empresa.co' },
+                    { key: 'password', label: 'Contraseña *', placeholder: 'Mínimo 8 caracteres' },
+                    { key: 'cedula',   label: 'Cédula (opcional)', placeholder: 'N° documento' },
+                  ].map(({ key, label, placeholder }) => (
+                    <div key={key}>
+                      <label className="text-[var(--text-dim)] text-xs font-semibold mb-1.5 block">{label}</label>
+                      <input
+                        type={key === 'password' ? 'password' : 'text'}
+                        value={(puForm as any)[key]}
+                        onChange={e => setPuForm(p => ({ ...p, [key]: e.target.value }))}
+                        placeholder={placeholder}
+                        className="w-full bg-[var(--bg-card)] border border-[var(--border)] rounded-xl px-4 py-2.5 text-sm text-[var(--text)] focus:outline-none focus:border-amber-500/40 transition-all"
+                      />
+                    </div>
+                  ))}
+                </div>
+                <div className="mb-4">
+                  <label className="text-[var(--text-dim)] text-xs font-semibold mb-1.5 block">Rol *</label>
+                  <select value={puForm.role} onChange={e => setPuForm(p => ({ ...p, role: e.target.value }))}
+                    className="w-full bg-[var(--bg-card)] border border-[var(--border)] rounded-xl px-4 py-2.5 text-sm text-[var(--text)] focus:outline-none focus:border-amber-500/40 transition-all">
+                    <option value="portero">Portero — acceso solo a portería/ingreso/salida</option>
+                    <option value="admin">Administrador — gestión del personal y SSTudio</option>
+                    <option value="superadmin">Superadministrador — control total de la plataforma</option>
+                    <option value="worker">Trabajador — experiencia del trabajador</option>
+                  </select>
+                </div>
+                {puError && (
+                  <div className="flex items-center gap-2 text-sm text-rose-400 bg-rose-400/10 border border-rose-400/20 rounded-xl px-4 py-2.5 mb-3">
+                    <AlertCircle size={14} /> {puError}
+                  </div>
+                )}
+                {puSuccess && (
+                  <div className="flex items-center gap-2 text-sm text-emerald-400 bg-emerald-400/10 border border-emerald-400/20 rounded-xl px-4 py-2.5 mb-3">
+                    <CheckCircle size={14} /> Usuario creado correctamente
+                  </div>
+                )}
+                <button onClick={createPlatformUser} disabled={puSaving}
+                  className="flex items-center justify-center gap-2 w-full py-2.5 rounded-xl text-sm font-bold disabled:opacity-60"
+                  style={{ background: 'var(--primary)', color: '#fff' }}>
+                  {puSaving ? <Loader2 size={14} className="animate-spin" /> : <UserPlus size={14} />}
+                  Crear usuario
+                </button>
+              </div>
+
+              {/* Users list */}
+              <div className="bg-[var(--bg-surface)] border border-[var(--border)] rounded-2xl p-5">
+                <div className="flex items-center justify-between mb-4">
+                  <h2 className="text-[var(--text)] font-bold flex items-center gap-2">
+                    <Users size={16} className="text-amber-400" /> Usuarios activos ({platformUsers.filter(u => u.active).length})
+                  </h2>
+                  <button onClick={loadPlatformUsers} className="text-xs flex items-center gap-1 px-2.5 py-1.5 rounded-lg"
+                    style={{ color: 'var(--text-dim)', border: '1px solid var(--border)', background: 'var(--bg-card)' }}>
+                    <RefreshCw size={12} /> Actualizar
+                  </button>
+                </div>
+                {puLoading ? (
+                  <div className="flex justify-center py-8"><Loader2 size={20} className="animate-spin" style={{ color: 'var(--primary)' }} /></div>
+                ) : (
+                  <div className="space-y-2">
+                    {platformUsers.map(u => (
+                      <div key={u.id} className="flex items-center gap-3 px-3 py-2.5 rounded-xl"
+                        style={{ background: 'var(--bg-card)', border: '1px solid var(--border)' }}>
+                        <div className="w-8 h-8 rounded-full flex items-center justify-center text-white text-xs font-bold flex-shrink-0"
+                          style={{ background: 'var(--primary)' }}>
+                          {u.name.split(' ').slice(0,2).map((w: string) => w[0]).join('')}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <div className="text-sm font-semibold truncate" style={{ color: 'var(--text)' }}>{u.name}</div>
+                          <div className="text-xs truncate" style={{ color: 'var(--text-faint)' }}>{u.email}</div>
+                        </div>
+                        <span className="text-[11px] font-bold px-2 py-0.5 rounded-full flex-shrink-0"
+                          style={{
+                            background: u.role === 'superadmin' ? 'rgba(239,68,68,0.12)' : u.role === 'admin' ? 'rgba(245,158,11,0.12)' : u.role === 'portero' ? 'rgba(6,182,212,0.12)' : 'rgba(16,185,129,0.12)',
+                            color: u.role === 'superadmin' ? '#EF4444' : u.role === 'admin' ? '#F59E0B' : u.role === 'portero' ? '#06B6D4' : '#10B981',
+                          }}>
+                          {u.role}
+                        </span>
+                      </div>
+                    ))}
+                    {platformUsers.length === 0 && (
+                      <p className="text-sm text-center py-4" style={{ color: 'var(--text-faint)' }}>No hay usuarios registrados</p>
+                    )}
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* ── SEDES Y PORTERÍAS (superadmin only) ──────────────────────── */}
+          {effectiveActive === 'sedes' && isSuperAdmin && (
+            <div className="bg-[var(--bg-surface)] border border-[var(--border)] rounded-2xl p-5 space-y-4">
+              <h2 className="text-[var(--text)] font-bold flex items-center gap-2">
+                <DoorOpen size={16} className="text-amber-400" /> Sedes y Porterías
+              </h2>
+              <p className="text-sm" style={{ color: 'var(--text-dim)' }}>
+                Administra los puntos de control de acceso, crea nuevas sedes y asigna porteros a cada una.
+              </p>
+              <a href="/dashboard/control-operativo/porterias"
+                className="flex items-center justify-between w-full px-4 py-3 rounded-xl font-semibold text-sm transition-all"
+                style={{ background: 'var(--primary-dim)', color: 'var(--primary)', border: '1px solid var(--primary-border)' }}>
+                <span className="flex items-center gap-2"><DoorOpen size={15} /> Ir a gestión de Sedes y Porterías</span>
+                <ChevronRight size={15} />
+              </a>
+            </div>
+          )}
+
           {/* ── SISTEMA (admin only) ─────────────────────────────────────── */}
           {effectiveActive === 'sistema' && !isWorker && (
             <>
@@ -563,8 +735,8 @@ export default function SettingsPage() {
             </div>
           )}
 
-          {/* Save button — hidden for tema (auto-saves on click) */}
-          {effectiveActive !== 'tema' && (
+          {/* Save button — hidden for tema (auto-saves) and for admin-only sections */}
+          {effectiveActive !== 'tema' && effectiveActive !== 'usuarios' && effectiveActive !== 'sedes' && (
             <motion.div animate={saved ? { scale: [1, 0.97, 1] } : {}}>
               <button
                 onClick={save}

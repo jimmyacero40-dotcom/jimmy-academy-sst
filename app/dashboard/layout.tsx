@@ -17,6 +17,44 @@ import {
 import { CommandPalette } from '@/components/CommandPalette'
 import { useTheme, THEMES, type ThemeId } from '@/components/ThemeProvider'
 
+// All navigable hrefs — order matters: MORE SPECIFIC paths must come first so
+// the most-specific match wins when finding the active nav item.
+const ALL_NAV_HREFS = [
+  '/dashboard/users/retirados',
+  '/dashboard/users',
+  '/dashboard/areas',
+  '/dashboard/groups',
+  '/dashboard/worker-profiles',
+  '/dashboard/my-signature',
+  '/dashboard/trainings',
+  '/dashboard/plan',
+  '/dashboard/profiles',
+  '/dashboard/enrollments',
+  '/dashboard/attendance-lists',
+  '/dashboard/certificates',
+  '/dashboard/control-operativo/porteria',
+  '/dashboard/control-operativo/salida',
+  '/dashboard/control-operativo/porterias',
+  '/dashboard/control-operativo',
+  '/dashboard/reports',
+  '/dashboard/notifications',
+  '/dashboard/settings',
+  '/dashboard/my-plan',
+  '/dashboard/my-profile',
+  '/dashboard',
+]
+
+function findActiveHref(pathname: string): string | null {
+  for (const href of ALL_NAV_HREFS) {
+    if (href === '/dashboard') {
+      if (pathname === href) return href
+    } else if (pathname === href || pathname.startsWith(href + '/')) {
+      return href
+    }
+  }
+  return null
+}
+
 // ── Nav type definitions ──────────────────────────────────────────
 type NavLeaf = {
   href: string
@@ -221,11 +259,9 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     }
   }, [pathname])
 
-  const isActive = (href: string) => {
-    if (href === '/dashboard') return pathname === '/dashboard'
-    return pathname.startsWith(href)
-  }
-  const moduleHasActive = (id: string) => MODULE_HREFS[id]?.some(h => pathname.startsWith(h)) ?? false
+  const activeHref = findActiveHref(pathname)
+  const isActive = (href: string) => activeHref === href
+  const moduleHasActive = (id: string) => MODULE_HREFS[id]?.some(h => pathname === h || pathname.startsWith(h + '/')) ?? false
 
   const userInitials = session?.user?.name?.split(' ').map(w => w[0]).join('').slice(0, 2) ?? 'AS'
   const otherTheme = theme === 'light' ? 'verde' : 'light'

@@ -1,7 +1,8 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { UserX, Search, RefreshCw, RotateCcw, Calendar, ArrowLeft } from 'lucide-react'
+import { useSession } from 'next-auth/react'
+import { UserX, Search, RefreshCw, RotateCcw, Calendar, ArrowLeft, Trash2, AlertTriangle } from 'lucide-react'
 import Link from 'next/link'
 
 interface RetiredUser {
@@ -32,12 +33,17 @@ function fmtDate(iso: string) {
 }
 
 export default function RetiradosPage() {
+  const { data: session } = useSession()
+  const isSuperAdmin = (session?.user as any)?.role === 'superadmin'
+
   const [workers, setWorkers] = useState<RetiredUser[]>([])
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
   const [reactivating, setReactivating] = useState<string | null>(null)
+  const [deletingPermanent, setDeletingPermanent] = useState(false)
   const [toast, setToast] = useState<{ msg: string; type: 'ok' | 'err' } | null>(null)
   const [confirm, setConfirm] = useState<RetiredUser | null>(null)
+  const [permanentDeleteConfirm, setPermanentDeleteConfirm] = useState<RetiredUser | null>(null)
 
   function showToast(msg: string, type: 'ok' | 'err') {
     setToast({ msg, type })
@@ -68,6 +74,19 @@ export default function RetiradosPage() {
     }
     setReactivating(null)
     setConfirm(null)
+  }
+
+  async function deletePermanent(worker: RetiredUser) {
+    setDeletingPermanent(true)
+    const res = await fetch(`/api/users/${worker.id}/delete-permanent`, { method: 'DELETE' })
+    if (res.ok) {
+      showToast(`${worker.name} eliminado permanentemente`, 'ok')
+      setWorkers(prev => prev.filter(w => w.id !== worker.id))
+    } else {
+      showToast((await res.json()).error || 'Error al eliminar', 'err')
+    }
+    setDeletingPermanent(false)
+    setPermanentDeleteConfirm(null)
   }
 
   const filtered = workers.filter(w => {
@@ -107,6 +126,48 @@ export default function RetiradosPage() {
                 style={{ background: '#10B981', color: '#fff' }}>
                 {reactivating === confirm.id ? <RefreshCw size={14} className="animate-spin" /> : <RotateCcw size={14} />}
                 Reactivar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Permanent delete confirmation modal */}
+      {permanentDeleteConfirm && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ background: 'rgba(0,0,0,0.6)' }}>
+          <div className="w-full max-w-md rounded-2xl shadow-2xl p-6 space-y-4"
+            style={{ background: 'var(--bg-card)', border: '2px solid #EF4444' }}>
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0"
+                style={{ background: 'rgba(239,68,68,0.15)' }}>
+                <AlertTriangle size={20} color="#EF4444" />
+              </div>
+              <h3 className="text-base font-bold" style={{ color: '#EF4444' }}>⚠️ Retirar Definitivamente</h3>
+            </div>
+            <p className="text-sm" style={{ color: 'var(--text-dim)' }}>
+              Vas a eliminar permanentemente a{' '}
+              <strong style={{ color: 'var(--text)' }}>{permanentDeleteConfirm.name}</strong>.
+              Esta acción es <strong>irreversible</strong>.
+            </p>
+            <ul className="text-xs space-y-1 pl-4" style={{ color: 'var(--text-dim)', listStyle: 'disc' }}>
+              <li>El registro del trabajador será eliminado del sistema</li>
+              <li>Sus movimientos históricos de acceso se conservan (anonimizados)</li>
+              <li>No podrá ser recuperado</li>
+            </ul>
+            <p className="text-xs font-bold" style={{ color: '#EF4444' }}>
+              Esta acción solo puede ejecutarla un superadministrador.
+            </p>
+            <div className="flex gap-2 pt-2">
+              <button onClick={() => setPermanentDeleteConfirm(null)}
+                className="flex-1 px-4 py-2 rounded-lg text-sm font-semibold"
+                style={{ border: '1px solid var(--border)', color: 'var(--text-dim)', background: 'var(--bg)' }}>
+                Cancelar
+              </button>
+              <button onClick={() => deletePermanent(permanentDeleteConfirm)} disabled={deletingPermanent}
+                className="flex-1 flex items-center justify-center gap-2 px-4 py-2 rounded-lg text-sm font-bold disabled:opacity-60"
+                style={{ background: '#EF4444', color: '#fff' }}>
+                {deletingPermanent ? <RefreshCw size={14} className="animate-spin" /> : <Trash2 size={14} />}
+                Eliminar definitivamente
               </button>
             </div>
           </div>
@@ -231,12 +292,22 @@ export default function RetiradosPage() {
                       </span>
                     </td>
                     <td className="px-4 py-3">
-                      <button
-                        onClick={() => setConfirm(w)}
-                        className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all"
-                        style={{ background: 'rgba(16,185,129,0.1)', color: '#10B981', border: '1px solid rgba(16,185,129,0.25)' }}>
-                        <RotateCcw size={12} /> Reactivar
-                      </button>
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <button
+                          onClick={() => setConfirm(w)}
+                          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all"
+                          style={{ background: 'rgba(16,185,129,0.1)', color: '#10B981', border: '1px solid rgba(16,185,129,0.25)' }}>
+                          <RotateCcw size={12} /> Reactivar
+                        </button>
+                        {isSuperAdmin && (
+                          <button
+                            onClick={() => setPermanentDeleteConfirm(w)}
+                            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all"
+                            style={{ background: 'rgba(239,68,68,0.08)', color: '#EF4444', border: '1px solid rgba(239,68,68,0.25)' }}>
+                            <Trash2 size={12} /> Retirar definitivamente
+                          </button>
+                        )}
+                      </div>
                     </td>
                   </tr>
                 ))}
