@@ -321,6 +321,8 @@ export default function UsersPage() {
   const [retireConfirm, setRetireConfirm] = useState<AppUser | null>(null)
   const [retiring, setRetiring]           = useState(false)
   const [excelError, setExcelError]       = useState('')
+  const [importando, setImportando]       = useState<{ hechas: number; total: number } | null>(null)
+  const [importResumen, setImportResumen] = useState<{ creadas: number; actualizadas?: number; total: number; fallas: { fila: number; nombre: string; motivo: string }[]; accion?: 'importados' | 'retirados' } | null>(null)
   const [saving, setSaving]               = useState(false)
   const [loadingGroups, setLoadingGroups] = useState(false)
   const [isDirty, setIsDirty]             = useState(false)
@@ -457,8 +459,14 @@ export default function UsersPage() {
   const toggleSelectAll = () => { if (selected.size === sorted.length) setSelected(new Set()); else setSelected(new Set(sorted.map(u => u.id))) }
 
   const handleBulkDelete = async () => {
-    if (!selected.size || !confirm(`¿Eliminar ${selected.size} usuario(s) permanentemente?`)) return
-    for (const id of selected) await fetch('/api/users', { method: 'DELETE', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id }) })
+    if (!selected.size || !confirm(`¿Retirar ${selected.size} trabajador(es)? Pasarán a Retirados y conservarán su historial. Se pueden reactivar.`)) return
+    // Una sola petición para todos: evita dejar la operación a medias.
+    setImportando({ hechas: 0, total: selected.size })
+    const res = await fetch('/api/users', { method: 'DELETE', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ids: [...selected] }) })
+    const r = await res.json().catch(() => ({}))
+    setImportando(null)
+    if (!res.ok) setExcelError(r.error || 'No fue posible retirar a los trabajadores seleccionados')
+    else setImportResumen({ creadas: r.retirados ?? 0, total: selected.size, fallas: [], accion: 'retirados' })
     await loadUsers(); setSelected(new Set())
   }
 
@@ -482,14 +490,67 @@ export default function UsersPage() {
 
   const handleExcel = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]; if (!file) return
-    setExcelError('')
+    setExcelError(''); setImportResumen(null)
+
+    let rows: FilaImportada[]
     try {
-      const rows = parseExcel(await file.arrayBuffer())
-      if (!rows.length) { setExcelError('No se encontraron trabajadores en el archivo'); return }
-      let created = 0
-      let omitidos = 0
-      for (const row of rows) {
-        if (!row.name || !row.cedula) { omitidos++; continue }
+      rows = parseExcel(await file.arrayBuffer())
+    } catch {
+      setExcelError('No se pudo leer el archivo. ¿Es un Excel válido (.xlsx o .xls)?')
+      if (fileRef.current) fileRef.current.value = ''
+      return
+    }
+
+    if (!rows.length) {
+      setExcelError('El archivo no tiene filas con nombre. Revisa que la primera fila sean los títulos de las columnas y descarga la plantilla si tienes dudas.')
+      if (fileRef.current) fileRef.current.value = ''
+      return
+    }
+
+    setImportando({ hechas: 0, total: rows.length })
+    let creadas = 0
+    let actualizadas = 0
+    const fallas: { fila: number; nombre: string; motivo: string }[] = []
+    // La cédula identifica a la persona: si ya existe, el Excel completa sus datos
+    // en lugar de chocar contra su correo e intentar crearla de nuevo.
+    const porCedula = new Map(users.map(u => [u.cedula.trim(), u]))
+
+    for (const [i, row] of rows.entries()) {
+      // +2 porque la fila 1 del Excel son los títulos.
+      const numeroFila = i + 2
+      try {
+        if (!row.name || !row.cedula) {
+          fallas.push({ fila: numeroFila, nombre: row.name || '(sin nombre)', motivo: 'Falta nombre o cédula' })
+          continue
+        }
+
+        const existente = porCedula.get(row.cedula.trim())
+        if (existente) {
+          const cambios: Record<string, any> = { id: existente.id }
+          if (row.cargo) cambios.cargo = row.cargo
+          if (row.area)  cambios.area = row.area
+          const upd = await fetch('/api/users', {
+            method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(cambios),
+          })
+          if (!upd.ok) {
+            const b = await upd.json().catch(() => ({}))
+            fallas.push({ fila: numeroFila, nombre: row.name, motivo: b.error || 'No se pudo actualizar' })
+            continue
+          }
+          if (row.sede || row.fechaIngreso) {
+            await fetch('/api/profile', {
+              method: 'PUT', headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                user_id: existente.id,
+                ...(row.sede ? { centro_trabajo: row.sede } : {}),
+                ...(row.fechaIngreso ? { fecha_ingreso: row.fechaIngreso } : {}),
+              }),
+            })
+          }
+          actualizadas++
+          continue
+        }
+
         const res = await fetch('/api/users', {
           method: 'POST', headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -502,28 +563,39 @@ export default function UsersPage() {
             cargo: row.cargo,
           }),
         })
-        if (!res.ok) { omitidos++; continue }
-        created++
+
+        const creado = await res.json().catch(() => null)
+        if (!res.ok) {
+          fallas.push({ fila: numeroFila, nombre: row.name, motivo: creado?.error || `Error ${res.status}` })
+          continue
+        }
+        creadas++
 
         // Sede y fecha de ingreso viven en el perfil del trabajador, no en la
         // cuenta, así que van en una segunda llamada y solo si el Excel las trae.
-        if (row.sede || row.fechaIngreso) {
-          const creado = await res.json().catch(() => null)
-          if (creado?.id) {
-            await fetch('/api/profile', {
-              method: 'PUT', headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({
-                user_id: creado.id,
-                ...(row.sede ? { centro_trabajo: row.sede } : {}),
-                ...(row.fechaIngreso ? { fecha_ingreso: row.fechaIngreso } : {}),
-              }),
-            })
+        if ((row.sede || row.fechaIngreso) && creado?.id) {
+          const perfil = await fetch('/api/profile', {
+            method: 'PUT', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              user_id: creado.id,
+              ...(row.sede ? { centro_trabajo: row.sede } : {}),
+              ...(row.fechaIngreso ? { fecha_ingreso: row.fechaIngreso } : {}),
+            }),
+          })
+          if (!perfil.ok) {
+            fallas.push({ fila: numeroFila, nombre: row.name, motivo: 'Se creó, pero no se pudo guardar la sede o la fecha de ingreso' })
           }
         }
+      } catch (err: any) {
+        fallas.push({ fila: numeroFila, nombre: row.name || '(sin nombre)', motivo: err?.message || 'Error de conexión' })
+      } finally {
+        setImportando({ hechas: i + 1, total: rows.length })
       }
-      await loadUsers()
-      alert(`${created} trabajador(es) importados${omitidos ? `. ${omitidos} fila(s) omitidas por faltar nombre o cédula, o por estar repetidas.` : ''}`)
-    } catch { setExcelError('Error al leer el archivo Excel') }
+    }
+
+    await loadUsers()
+    setImportando(null)
+    setImportResumen({ creadas, actualizadas, total: rows.length, fallas, accion: 'importados' })
     if (fileRef.current) fileRef.current.value = ''
   }
 
@@ -627,9 +699,12 @@ export default function UsersPage() {
           <button onClick={downloadTemplate} className="terra-btn-outline" style={{ padding: '8px 14px', fontSize: 12 }}>
             <Download size={13} /> Plantilla
           </button>
-          <label className="terra-btn-outline cursor-pointer" style={{ padding: '8px 14px', fontSize: 12, display: 'flex', alignItems: 'center', gap: 6 }}>
-            <FileSpreadsheet size={13} /> Importar Excel
-            <input ref={fileRef} type="file" accept=".xlsx,.xls" onChange={handleExcel} className="hidden" />
+          <label className={`terra-btn-outline ${importando ? 'pointer-events-none opacity-60' : 'cursor-pointer'}`}
+            style={{ padding: '8px 14px', fontSize: 12, display: 'flex', alignItems: 'center', gap: 6 }}>
+            {importando
+              ? <><Loader2 size={13} className="animate-spin" /> Importando {importando.hechas} de {importando.total}…</>
+              : <><FileSpreadsheet size={13} /> Importar Excel</>}
+            <input ref={fileRef} type="file" accept=".xlsx,.xls" onChange={handleExcel} className="hidden" disabled={!!importando} />
           </label>
           <button onClick={openNew} className="terra-btn" style={{ padding: '8px 16px', fontSize: 13 }}>
             <UserPlus size={14} /> Nuevo
@@ -645,6 +720,47 @@ export default function UsersPage() {
         </div>
       )}
 
+      {importando && (
+        <div className="mb-4 p-3 rounded-xl" style={{ background: 'var(--bg-card)', border: '1px solid var(--border)' }}>
+          <div className="flex items-center gap-2 text-sm mb-2" style={{ color: 'var(--text)' }}>
+            <Loader2 size={14} className="animate-spin" style={{ color: 'var(--primary)' }} />
+            Procesando… {importando.hechas} de {importando.total}
+          </div>
+          <div className="h-1.5 rounded-full overflow-hidden" style={{ background: 'var(--border)' }}>
+            <div className="h-full transition-all"
+              style={{ width: `${Math.round((importando.hechas / importando.total) * 100)}%`, background: 'var(--primary)' }} />
+          </div>
+        </div>
+      )}
+
+      {importResumen && (
+        <div className="mb-4 p-3 rounded-xl text-sm"
+          style={{
+            background: importResumen.fallas.length ? 'rgba(245,158,11,0.08)' : 'rgba(16,185,129,0.08)',
+            border: `1px solid ${importResumen.fallas.length ? 'rgba(245,158,11,0.3)' : 'rgba(16,185,129,0.3)'}`,
+          }}>
+          <div className="flex items-center gap-2 font-semibold"
+            style={{ color: importResumen.fallas.length ? '#F59E0B' : '#10B981' }}>
+            {importResumen.fallas.length ? <AlertCircle size={14} /> : <CheckCircle size={14} />}
+            {importResumen.accion === 'retirados'
+              ? `${importResumen.creadas} trabajador(es) enviados a Retirados`
+              : `${importResumen.creadas} creados${importResumen.actualizadas ? `, ${importResumen.actualizadas} actualizados` : ''} de ${importResumen.total} filas`}
+            <button onClick={() => setImportResumen(null)} className="ml-auto"><X size={13} /></button>
+          </div>
+          {importResumen.fallas.length > 0 && (
+            <div className="mt-2 space-y-1 max-h-48 overflow-y-auto">
+              {importResumen.fallas.map((f, i) => (
+                <div key={i} className="text-xs flex gap-2" style={{ color: 'var(--text-dim)' }}>
+                  <span className="font-mono flex-shrink-0" style={{ color: 'var(--text-faint)' }}>Fila {f.fila}</span>
+                  <span className="font-semibold flex-shrink-0">{f.nombre}</span>
+                  <span>— {f.motivo}</span>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
       {/* Bulk actions */}
       <AnimatePresence>
         {selected.size > 0 && (
@@ -657,7 +773,7 @@ export default function UsersPage() {
             <button onClick={handleBulkDelete}
               className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold ml-auto"
               style={{ background: 'var(--red-dim)', color: '#FCA5A5', border: '1px solid rgba(239,68,68,0.2)' }}>
-              <Trash2 size={12} /> Eliminar seleccionados
+              <Trash2 size={12} /> Retirar seleccionados
             </button>
             <button onClick={() => setSelected(new Set())} style={{ color: 'var(--text-dim)' }}><X size={15} /></button>
           </motion.div>
@@ -960,7 +1076,7 @@ export default function UsersPage() {
                             <UserX size={14} />
                           </button>
                           <button onClick={() => setDeleteConfirm(u.id)}
-                            title="Eliminar"
+                            title="Retirar"
                             className="w-7 h-7 rounded-lg flex items-center justify-center transition-colors"
                             style={{ color: 'var(--text-faint)' }}
                             onMouseEnter={e => { e.currentTarget.style.background = 'rgba(239,68,68,0.1)'; e.currentTarget.style.color = '#FCA5A5' }}
@@ -1197,15 +1313,15 @@ export default function UsersPage() {
                 style={{ background: 'var(--red-dim)', border: '1px solid rgba(239,68,68,0.25)' }}>
                 <Trash2 size={22} style={{ color: '#FCA5A5' }} />
               </div>
-              <h3 className="font-bold text-lg mb-2" style={{ color: 'var(--text)' }}>¿Eliminar trabajador?</h3>
+              <h3 className="font-bold text-lg mb-2" style={{ color: 'var(--text)' }}>¿Retirar trabajador?</h3>
               <p className="text-sm mb-6" style={{ color: 'var(--text-dim)' }}>
-                Se eliminará <span className="font-semibold" style={{ color: 'var(--text)' }}>{users.find(u => u.id === deleteConfirm)?.name}</span>. Esta acción no se puede deshacer.
+                Se retirará a <span className="font-semibold" style={{ color: 'var(--text)' }}>{users.find(u => u.id === deleteConfirm)?.name}</span>. Pasa a Retirados con todo su historial y se puede reactivar cuando quieras.
               </p>
               <div className="flex gap-3">
                 <button onClick={() => setDeleteConfirm(null)} className="terra-btn-outline flex-1 py-2.5 justify-center">Cancelar</button>
                 <button onClick={() => handleDelete(deleteConfirm!)}
                   className="flex-1 py-2.5 rounded-xl font-bold text-sm text-white"
-                  style={{ background: 'var(--red)' }}>Eliminar</button>
+                  style={{ background: 'var(--red)' }}>Retirar</button>
               </div>
             </motion.div>
           </div>

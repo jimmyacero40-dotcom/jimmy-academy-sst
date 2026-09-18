@@ -154,13 +154,22 @@ export async function DELETE(req: NextRequest) {
   if (!authorized) return NextResponse.json({ error: 'No tiene permiso para retirar trabajadores' }, { status: 403 })
 
   const { id, ids } = await req.json()
-  const deleteIds: string[] = ids || (id ? [id] : [])
-  if (!deleteIds.length) return NextResponse.json({ error: 'ID requerido' }, { status: 400 })
+  const retirarIds: string[] = ids || (id ? [id] : [])
+  if (!retirarIds.length) return NextResponse.json({ error: 'ID requerido' }, { status: 400 })
 
-  let query = supabase.from('users').delete().in('id', deleteIds)
+  // Quitar a alguien de la lista es RETIRARLO (baja lógica), nunca borrarlo: el
+  // historial de ingresos, formación y certificados debe conservarse y la persona
+  // pasa a Retirados, desde donde se puede reactivar. El borrado físico existe solo
+  // en /api/users/[id]/delete-permanent y es exclusivo del superadmin.
+  let query = supabase
+    .from('users')
+    .update({ active: false, retired_at: new Date().toISOString() })
+    .in('id', retirarIds)
+    .eq('role', 'worker')
+    .is('retired_at', null)
   if (companyId) query = query.eq('company_id', companyId)
 
-  const { error } = await query
+  const { data, error } = await query.select('id')
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
-  return NextResponse.json({ success: true })
+  return NextResponse.json({ success: true, retirados: data?.length ?? 0 })
 }
