@@ -145,14 +145,14 @@ export default function RetiradosPage() {
               <h3 className="text-base font-bold" style={{ color: '#EF4444' }}>⚠️ Retirar Definitivamente</h3>
             </div>
             <p className="text-sm" style={{ color: 'var(--text-dim)' }}>
-              Vas a eliminar permanentemente a{' '}
+              Vas a borrar los datos personales de{' '}
               <strong style={{ color: 'var(--text)' }}>{permanentDeleteConfirm.name}</strong>.
               Esta acción es <strong>irreversible</strong>.
             </p>
             <ul className="text-xs space-y-1 pl-4" style={{ color: 'var(--text-dim)', listStyle: 'disc' }}>
-              <li>El registro del trabajador será eliminado del sistema</li>
-              <li>Sus movimientos históricos de acceso se conservan (anonimizados)</li>
-              <li>No podrá ser recuperado</li>
+              <li>Se eliminan nombre, correo, cédula, perfil y foto; no podrá volver a ingresar ni reactivarse</li>
+              <li>Desaparece de este repositorio</li>
+              <li>Certificados, firmas, consentimientos y movimientos de portería se conservan como registro anónimo, porque son evidencia del SG-SST</li>
             </ul>
             <p className="text-xs font-bold" style={{ color: '#EF4444' }}>
               Esta acción solo puede ejecutarla un superadministrador.

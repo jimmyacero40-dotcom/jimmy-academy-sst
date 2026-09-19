@@ -12,12 +12,15 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
 
   const { data: user } = await supabaseAdmin
     .from('users')
-    .select('id, company_id, role')
+    .select('id, company_id, role, purged_at')
     .eq('id', params.id)
     .single()
 
   if (!user || user.company_id !== companyId) {
     return NextResponse.json({ error: 'Trabajador no encontrado' }, { status: 404 })
+  }
+  if (user.purged_at) {
+    return NextResponse.json({ error: 'Este trabajador fue retirado definitivamente y sus datos se eliminaron' }, { status: 409 })
   }
 
   if (action === 'retire') {

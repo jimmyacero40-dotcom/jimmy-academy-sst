@@ -11,6 +11,7 @@ export async function GET() {
     .select('id, name, email, cedula, role, area, cargo, area_id, active, company_id, created_at, retired_at')
     .eq('company_id', companyId)
     .not('retired_at', 'is', null)
+    .is('purged_at', null)
     .order('retired_at', { ascending: false })
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
