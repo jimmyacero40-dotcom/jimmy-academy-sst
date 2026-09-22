@@ -7,10 +7,11 @@ import {
   Settings, Building2, Bell, Shield, Globe, Palette,
   Save, ChevronRight, Mail, Phone, MapPin,
   FileText, Lock, Users, Database, CheckCircle, User, Check, AlertCircle, Loader2,
-  DoorOpen, UserPlus, KeyRound, RefreshCw, Trash2, RotateCcw
+  DoorOpen, UserPlus, KeyRound, RefreshCw, Trash2, RotateCcw, Search
 } from 'lucide-react'
 import { useTheme, THEMES, type ThemeId } from '@/components/ThemeProvider'
 import { CATALOGO_PERMISOS, PERMISOS_POR_ROL, permisosEfectivos } from '@/lib/permisos'
+import SedesPorterias from '@/components/SedesPorterias'
 
 const ADMIN_SECTIONS = [
   { id: 'empresa',        label: 'Empresa',      icon: Building2, superadminOnly: false },
@@ -86,6 +87,13 @@ export default function SettingsPage() {
     : ADMIN_SECTIONS.filter(s => !s.superadminOnly || isSuperAdmin)
 
   const [active, setActive] = useState('')
+
+  // Permite enlazar una sección concreta, p. ej. /dashboard/settings?seccion=sedes
+  useEffect(() => {
+    const pedida = new URLSearchParams(window.location.search).get('seccion')
+    if (pedida && SECTIONS.some(s => s.id === pedida)) setActive(pedida)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [userRole])
   const [saved, setSaved] = useState(false)
   const [saving, setSaving] = useState(false)
   const [saveError, setSaveError] = useState<string | null>(null)
@@ -159,6 +167,25 @@ export default function SettingsPage() {
   const [permBorrador, setPermBorrador] = useState<string[]>([])
   const [permGuardando, setPermGuardando] = useState(false)
   const [datosBorrador, setDatosBorrador] = useState({ name: '', email: '', cedula: '', role: '', active: true, password: '' })
+
+  // Filtros de la lista de usuarios
+  const [uBusqueda, setUBusqueda] = useState('')
+  const [uRol, setURol] = useState('')
+  const [uEstado, setUEstado] = useState('')
+  const [uOrden, setUOrden] = useState<'nombre' | 'rol' | 'permisos'>('nombre')
+
+  const usuariosFiltrados = platformUsers.filter(u => {
+    if (uRol && u.role !== uRol) return false
+    if (uEstado && String(u.active) !== uEstado) return false
+    if (!uBusqueda) return true
+    const q = uBusqueda.trim().toLowerCase()
+    return u.name.toLowerCase().includes(q) || (u.email || '').toLowerCase().includes(q) || (u.cedula || '').includes(q)
+  }).sort((a, b) => {
+    if (uOrden === 'rol') return a.role.localeCompare(b.role) || a.name.localeCompare(b.name, 'es')
+    if (uOrden === 'permisos') return permisosEfectivos(b.role, b.permissions).length - permisosEfectivos(a.role, a.permissions).length
+    return a.name.localeCompare(b.name, 'es')
+  })
+  const uHayFiltros = !!(uBusqueda || uRol || uEstado || uOrden !== 'nombre')
 
   /** Al cambiar el rol se propone su plantilla; el usuario puede ajustarla. */
   function cambiarRol(role: string) {
@@ -719,18 +746,52 @@ export default function SettingsPage() {
               <div className="bg-[var(--bg-surface)] border border-[var(--border)] rounded-2xl p-5">
                 <div className="flex items-center justify-between mb-4">
                   <h2 className="text-[var(--text)] font-bold flex items-center gap-2">
-                    <Users size={16} className="text-amber-400" /> Usuarios activos ({platformUsers.filter(u => u.active).length})
+                    <Users size={16} className="text-amber-400" />
+                    Usuarios ({usuariosFiltrados.length}{usuariosFiltrados.length !== platformUsers.length ? ` de ${platformUsers.length}` : ''})
                   </h2>
                   <button onClick={loadPlatformUsers} className="text-xs flex items-center gap-1 px-2.5 py-1.5 rounded-lg"
                     style={{ color: 'var(--text-dim)', border: '1px solid var(--border)', background: 'var(--bg-card)' }}>
                     <RefreshCw size={12} /> Actualizar
                   </button>
                 </div>
+                {/* Filtros de la lista */}
+                <div className="flex flex-wrap gap-2 mb-4">
+                  <div className="relative flex-1 min-w-[200px]">
+                    <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2" style={{ color: 'var(--text-faint)' }} />
+                    <input value={uBusqueda} onChange={e => setUBusqueda(e.target.value)}
+                      placeholder="Buscar por nombre, documento o correo…"
+                      className="w-full bg-[var(--bg-card)] border border-[var(--border)] rounded-lg pl-9 pr-3 py-2 text-sm text-[var(--text)] focus:outline-none focus:border-amber-500/40" />
+                  </div>
+                  <select value={uRol} onChange={e => setURol(e.target.value)} aria-label="Rol"
+                    className="bg-[var(--bg-card)] border border-[var(--border)] rounded-lg px-3 py-2 text-sm text-[var(--text)] focus:outline-none">
+                    <option value="">Todos los roles</option>
+                    {[...new Set(platformUsers.map(u => u.role))].sort().map(r => <option key={r} value={r}>{r}</option>)}
+                  </select>
+                  <select value={uEstado} onChange={e => setUEstado(e.target.value)} aria-label="Estado"
+                    className="bg-[var(--bg-card)] border border-[var(--border)] rounded-lg px-3 py-2 text-sm text-[var(--text)] focus:outline-none">
+                    <option value="">Activos e inactivos</option>
+                    <option value="true">Solo activos</option>
+                    <option value="false">Solo inactivos</option>
+                  </select>
+                  <select value={uOrden} onChange={e => setUOrden(e.target.value as any)} aria-label="Orden"
+                    className="bg-[var(--bg-card)] border border-[var(--border)] rounded-lg px-3 py-2 text-sm text-[var(--text)] focus:outline-none">
+                    <option value="nombre">Nombre (A-Z)</option>
+                    <option value="rol">Rol</option>
+                    <option value="permisos">Más permisos primero</option>
+                  </select>
+                  {uHayFiltros && (
+                    <button onClick={() => { setUBusqueda(''); setURol(''); setUEstado(''); setUOrden('nombre') }}
+                      className="px-3 py-2 rounded-lg text-xs" style={{ border: '1px solid var(--border)', color: 'var(--text-dim)' }}>
+                      Limpiar
+                    </button>
+                  )}
+                </div>
+
                 {puLoading ? (
                   <div className="flex justify-center py-8"><Loader2 size={20} className="animate-spin" style={{ color: 'var(--primary)' }} /></div>
                 ) : (
                   <div className="space-y-2">
-                    {platformUsers.map(u => (
+                    {usuariosFiltrados.map(u => (
                       <div key={u.id} className="rounded-xl" style={{ background: 'var(--bg-card)', border: '1px solid var(--border)' }}>
                         <div className="flex items-center gap-3 px-3 py-2.5">
                           <div className="w-8 h-8 rounded-full flex items-center justify-center text-white text-xs font-bold flex-shrink-0"
@@ -843,7 +904,7 @@ export default function SettingsPage() {
                         )}
                       </div>
                     ))}
-                    {platformUsers.length === 0 && (
+                    {usuariosFiltrados.length === 0 && (
                       <p className="text-sm text-center py-4" style={{ color: 'var(--text-faint)' }}>No hay usuarios registrados</p>
                     )}
                   </div>
@@ -854,20 +915,7 @@ export default function SettingsPage() {
 
           {/* ── SEDES Y PORTERÍAS (superadmin only) ──────────────────────── */}
           {effectiveActive === 'sedes' && isSuperAdmin && (
-            <div className="bg-[var(--bg-surface)] border border-[var(--border)] rounded-2xl p-5 space-y-4">
-              <h2 className="text-[var(--text)] font-bold flex items-center gap-2">
-                <DoorOpen size={16} className="text-amber-400" /> Sedes y Porterías
-              </h2>
-              <p className="text-sm" style={{ color: 'var(--text-dim)' }}>
-                Administra los puntos de control de acceso, crea nuevas sedes y asigna porteros a cada una.
-              </p>
-              <a href="/dashboard/control-operativo/porterias"
-                className="flex items-center justify-between w-full px-4 py-3 rounded-xl font-semibold text-sm transition-all"
-                style={{ background: 'var(--primary-dim)', color: 'var(--primary)', border: '1px solid var(--primary-border)' }}>
-                <span className="flex items-center gap-2"><DoorOpen size={15} /> Ir a gestión de Sedes y Porterías</span>
-                <ChevronRight size={15} />
-              </a>
-            </div>
+            <SedesPorterias />
           )}
 
           {/* ── SISTEMA (admin only) ─────────────────────────────────────── */}

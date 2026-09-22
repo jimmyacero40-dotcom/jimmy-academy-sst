@@ -4,7 +4,7 @@ import { useState } from 'react'
 import { signIn } from 'next-auth/react'
 import { useRouter } from 'next/navigation'
 import {
-  Eye, EyeOff, ArrowRight, Lock, Mail, CheckCircle,
+  Eye, EyeOff, ArrowRight, Lock, User, CheckCircle,
   Users, GraduationCap, DoorOpen, Award,
 } from 'lucide-react'
 import Link from 'next/link'
@@ -69,8 +69,8 @@ export default function LoginPage() {
 
   const validate = () => {
     const e: Record<string, string> = {}
-    if (!form.email) e.email = 'El correo es requerido'
-    else if (!/\S+@\S+\.\S+/.test(form.email)) e.email = 'Correo inválido'
+    // El trabajador entra con su documento; administradores y porteros, con correo.
+    if (!form.email) e.email = 'Ingresa tu documento o correo'
     if (!form.password) e.password = 'La contraseña es requerida'
     return e
   }
@@ -89,7 +89,7 @@ export default function LoginPage() {
     })
     setLoading(false)
     if (result?.error) {
-      setAuthError('Correo o contraseña incorrectos')
+      setAuthError('Documento/correo o contraseña incorrectos')
     } else {
       document.cookie = 'x-active-company=; path=/; max-age=0'
       router.push('/dashboard')
@@ -198,17 +198,17 @@ export default function LoginPage() {
                 <form onSubmit={handleSubmit} noValidate className="space-y-5">
                   <div>
                     <label className="block text-[12px] font-medium mb-2" style={{ color: C.textDim }}>
-                      Correo electrónico
+                      Documento o correo
                     </label>
                     <div className="relative">
-                      <Mail size={14} className="absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none"
+                      <User size={14} className="absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none"
                         style={{ color: C.textFaint }} />
                       <input
-                        type="email"
+                        type="text"
                         value={form.email}
                         onChange={e => { setForm({ ...form, email: e.target.value }); setAuthError('') }}
-                        placeholder="tu@empresa.com"
-                        autoComplete="email"
+                        placeholder="N.° de documento o correo"
+                        autoComplete="username"
                         className="placeholder:text-[#4E5F76] focus:border-[#8CCB1E]"
                         style={{ ...inputStyle(!!errors.email), padding: '12px 14px 12px 36px' }}
                       />

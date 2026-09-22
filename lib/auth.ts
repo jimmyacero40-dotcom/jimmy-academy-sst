@@ -8,20 +8,25 @@ export const authOptions: NextAuthOptions = {
     CredentialsProvider({
       name: 'credentials',
       credentials: {
-        email: { label: 'Email', type: 'email' },
+        // Se conserva el nombre 'email' por compatibilidad, pero acepta el
+        // documento de identidad: para los trabajadores esa es la llave de acceso.
+        email: { label: 'Documento o correo', type: 'text' },
         password: { label: 'Password', type: 'password' },
       },
       async authorize(credentials) {
         if (!credentials?.email || !credentials?.password) return null
+        const identificador = credentials.email.trim()
 
-        const { data: user, error } = await supabase
-          .from('users')
-          .select('*')
-          .eq('email', credentials.email)
-          .eq('active', true)
-          .single()
-
-        if (error || !user) return null
+        // Primero por documento; si no, por correo (administradores y porteros).
+        const porCedula = await supabase
+          .from('users').select('*').eq('cedula', identificador).eq('active', true).maybeSingle()
+        let user = porCedula.data
+        if (!user) {
+          const porCorreo = await supabase
+            .from('users').select('*').ilike('email', identificador).eq('active', true).maybeSingle()
+          user = porCorreo.data
+        }
+        if (!user) return null
 
         const valid = await bcrypt.compare(credentials.password, user.password)
         if (!valid) return null
