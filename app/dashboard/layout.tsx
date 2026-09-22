@@ -281,7 +281,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       <CommandPalette open={searchOpen} onClose={() => setSearchOpen(false)} />
 
       {mobileOpen && (
-        <div className="fixed inset-0 bg-black/60 z-40 md:hidden"
+        <div className="fixed inset-0 bg-black/60 z-40 lg:hidden"
           onClick={() => setMobileOpen(false)} />
       )}
 
@@ -289,9 +289,9 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       <aside className={`
         sidebar-shell flex flex-col z-50 flex-shrink-0
         transition-all duration-300 ease-in-out
-        fixed inset-y-0 left-0 md:relative md:translate-x-0
-        ${mobileOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'}
-        ${collapsed ? 'md:w-16' : 'w-64'}
+        fixed inset-y-0 left-0 lg:relative lg:translate-x-0
+        ${mobileOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'}
+        ${collapsed ? 'lg:w-16' : 'w-64'}
       `} style={{ background: 'var(--sidebar-bg)', borderRight: '1px solid var(--sidebar-border)' }}>
 
         {/* ── Logo ─────────────────────────────────────────────── */}
@@ -331,7 +331,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           {/* Mobile close */}
           <button
             onClick={() => setMobileOpen(false)}
-            className="md:hidden absolute right-3 top-1/2 -translate-y-1/2"
+            className="lg:hidden absolute right-3 top-1/2 -translate-y-1/2"
             style={{ color: 'var(--sidebar-dim)' }}>
             <X size={18} />
           </button>
@@ -592,7 +592,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
             {isAdmin && (
               <button
                 onClick={() => setCollapsed(!collapsed)}
-                className="hidden md:flex w-8 h-8 rounded-lg items-center justify-center transition-all flex-shrink-0"
+                className="hidden lg:flex w-8 h-8 rounded-lg items-center justify-center transition-all flex-shrink-0"
                 style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid var(--sidebar-border)', color: 'var(--sidebar-dim)' }}>
                 {collapsed ? <ChevronRight size={13} /> : <ChevronLeft size={13} />}
               </button>
@@ -610,7 +610,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
           <div className="flex items-center gap-3">
             <button onClick={() => setMobileOpen(true)}
-              className="md:hidden w-9 h-9 rounded-lg flex items-center justify-center"
+              className="lg:hidden w-9 h-9 rounded-lg flex items-center justify-center"
               style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', color: 'var(--text-dim)' }}>
               <Menu size={18} />
             </button>
@@ -656,7 +656,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           </div>
         </header>
 
-        <main className="flex-1 overflow-y-auto">
+        <main className="flex-1 min-w-0 overflow-y-auto overflow-x-hidden">
           {children}
         </main>
       </div>

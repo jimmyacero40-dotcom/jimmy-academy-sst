@@ -309,6 +309,7 @@ export default function UsersPage() {
   const [sortDir, setSortDir]     = useState<'asc' | 'desc'>('asc')
   const [filterGroup, setFilterGroup] = useState('')
   const [filterRole, setFilterRole]   = useState('')
+  const [filterSede, setFilterSede]   = useState('')
 
   const [selected, setSelected] = useState<Set<string>>(new Set())
 
@@ -369,6 +370,7 @@ export default function UsersPage() {
     if (filterArea && u.area_id !== filterArea) return false
     if (filterGroup && !u.groups.some(g => g.id === filterGroup)) return false
     if (filterRole && u.role.toLowerCase() !== filterRole.toLowerCase()) return false
+    if (filterSede && (filterSede === '__sin__' ? !!u.sede : u.sede !== filterSede)) return false
     return true
   })
 
@@ -395,7 +397,7 @@ export default function UsersPage() {
   const uniqueRoles = [...new Set(users.map(u => u.role).filter(Boolean))]
   const activeCount   = users.filter(u => u.status === 'activo').length
   const inactiveCount = users.filter(u => u.status === 'inactivo').length
-  const hasFilters    = !!(search || filterStatus || filterArea || filterGroup || filterRole)
+  const hasFilters    = !!(search || filterStatus || filterArea || filterGroup || filterRole || filterSede)
 
   // ── CRUD ─────────────────────────────────────────────────────────────────
   const closeModal = () => { setShowModal(false); setIsDirty(false); setConfirmClose(false) }
@@ -690,7 +692,7 @@ export default function UsersPage() {
 
         <div className="flex items-center gap-2">
           {hasFilters && (
-            <button onClick={() => { setSearch(''); setFilterStatus(''); setFilterArea(''); setFilterGroup(''); setFilterRole(''); setSortField('name'); setSortDir('asc') }}
+            <button onClick={() => { setSearch(''); setFilterStatus(''); setFilterArea(''); setFilterGroup(''); setFilterRole(''); setFilterSede(''); setSortField('name'); setSortDir('asc') }}
               className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs transition-all"
               style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', color: 'var(--text-dim)' }}>
               <X size={11} /> Limpiar filtros
@@ -855,7 +857,15 @@ export default function UsersPage() {
                   {/* Sede */}
                   <TH>
                     <ColLabel field="sede">Sede</ColLabel>
-                    <div className="mt-1.5 h-6" />
+                    {/* Opciones tomadas de los datos reales, no de una lista fija. */}
+                    <FilterSelect
+                      value={filterSede} onChange={setFilterSede}
+                      placeholder="Todas"
+                      options={[
+                        ...[...new Set(users.map(u => u.sede).filter(Boolean))].sort((a, b) => a.localeCompare(b, 'es')).map(s => ({ value: s, label: s })),
+                        { value: '__sin__', label: 'Sin sede' },
+                      ]}
+                    />
                   </TH>
 
                   {/* Grupos */}

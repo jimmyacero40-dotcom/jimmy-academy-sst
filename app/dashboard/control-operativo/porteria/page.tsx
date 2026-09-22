@@ -1,6 +1,7 @@
 'use client'
 
-import { useState, useEffect, useRef, Suspense } from 'react'
+import { useState, useRef, useMemo, Suspense } from 'react'
+import { useConsulta } from '@/lib/useConsulta'
 import { useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import {
@@ -95,52 +96,43 @@ function SedeSelectorView({ gatehouses, loading }: { gatehouses: Gatehouse[]; lo
 }
 
 // ── Portería operativa (con sede seleccionada) ──────────────────────
-function PorteriaOperativaView({ gateId, gateName }: { gateId: string; gateName: string }) {
-  const [workers, setWorkers]     = useState<Worker[]>([])
-  const [areas, setAreas]         = useState<Area[]>([])
-  const [insideIds, setInsideIds] = useState<Set<string>>(new Set())
-  const [loading, setLoading]     = useState(true)
+function PorteriaOperativaView({ gateId, gateName, puedeCambiarSede }: { gateId: string; gateName: string; puedeCambiarSede: boolean }) {
   const [search, setSearch]       = useState('')
   const [filterArea, setFilterArea]     = useState('')
   const [filterStatus, setFilterStatus] = useState<'' | 'active' | 'blocked'>('')
+  const [orden, setOrden]               = useState<'nombre' | 'cedula' | 'area'>('nombre')
   const [registering, setRegistering]   = useState<string | null>(null)
   const [toast, setToast] = useState<{ msg: string; type: 'ok' | 'err' } | null>(null)
   const [confirm, setConfirm] = useState<{ name: string; cedula: string; time: string } | null>(null)
   const [cedula, setCedula] = useState('')
   const cedulaRef = useRef<HTMLInputElement>(null)
 
+  // Cada consulta va atada a esta sede. Además el componente se monta con
+  // key={gateId}, así que al cambiar de sede no sobrevive ningún dato anterior.
+  const trabajadoresQ = useConsulta<any[]>('/api/users', [])
+  const areasQ        = useConsulta<Area[]>('/api/areas', [])
+  const dentroQ       = useConsulta<any[]>(`/api/access-logs/inside?gatehouse_id=${gateId}`, [])
+  const loading = trabajadoresQ.cargando || areasQ.cargando || dentroQ.cargando
+
+  const areas: Area[] = useMemo(() => (Array.isArray(areasQ.datos) ? areasQ.datos : []), [areasQ.datos])
+  const workers: Worker[] = useMemo(() => {
+    const aMap: Record<string, Area> = {}
+    for (const a of areas) aMap[a.id] = a
+    return (Array.isArray(trabajadoresQ.datos) ? trabajadoresQ.datos : []).map((w: any) => ({
+      ...w,
+      area_name: w.area_id ? aMap[w.area_id]?.name : null,
+      area_color: w.area_id ? aMap[w.area_id]?.color : null,
+    }))
+  }, [trabajadoresQ.datos, areas])
+  const insideIds = useMemo(
+    () => new Set((Array.isArray(dentroQ.datos) ? dentroQ.datos : []).map((l: any) => l.user?.id)),
+    [dentroQ.datos])
+  const loadInsideIds = dentroQ.recargar
+
   function showToast(msg: string, type: 'ok' | 'err') {
     setToast({ msg, type })
     setTimeout(() => setToast(null), 3500)
   }
-
-  async function loadInsideIds() {
-    const res = await fetch(`/api/access-logs/inside?gatehouse_id=${gateId}`)
-    if (res.ok) {
-      const data = await res.json()
-      setInsideIds(new Set(data.map((l: any) => l.user.id)))
-    }
-  }
-
-  useEffect(() => {
-    async function init() {
-      setLoading(true)
-      const [wRes, aRes] = await Promise.all([fetch('/api/users'), fetch('/api/areas')])
-      const wData: any[] = wRes.ok ? await wRes.json() : []
-      const aData: Area[] = aRes.ok ? await aRes.json() : []
-      const aMap: Record<string, Area> = {}
-      for (const a of aData) aMap[a.id] = a
-      setAreas(aData)
-      setWorkers(wData.map((w: any) => ({
-        ...w,
-        area_name: w.area_id ? aMap[w.area_id]?.name : null,
-        area_color: w.area_id ? aMap[w.area_id]?.color : null,
-      })))
-      await loadInsideIds()
-      setLoading(false)
-    }
-    init()
-  }, [gateId])
 
   function getStatus(w: Worker): WorkerStatus {
     if (!w.active) return 'blocked'
@@ -180,7 +172,11 @@ function PorteriaOperativaView({ gateId, gateName }: { gateId: string; gateName:
     if (filterStatus && getStatus(w) !== filterStatus) return false
     if (!search) return true
     const q = search.toLowerCase()
-    return w.name.toLowerCase().includes(q) || w.cedula.includes(q)
+    return w.name.toLowerCase().includes(q) || (w.cedula || '').includes(q)
+  }).sort((a, b) => {
+    if (orden === 'cedula') return (a.cedula || '').localeCompare(b.cedula || '')
+    if (orden === 'area') return (a.area_name || '~').localeCompare(b.area_name || '~', 'es') || a.name.localeCompare(b.name, 'es')
+    return a.name.localeCompare(b.name, 'es')
   })
 
   const canEnterCount = workers.filter(w => getStatus(w) === 'active').length
@@ -188,11 +184,11 @@ function PorteriaOperativaView({ gateId, gateName }: { gateId: string; gateName:
   const blockedCount  = workers.filter(w => getStatus(w) === 'blocked').length
 
   return (
-    <div className="p-6 w-full space-y-5">
+    <div className="p-4 sm:p-6 w-full space-y-4 sm:space-y-5">
       {/* Error toast */}
       {toast && (
-        <div className="fixed top-4 right-4 z-50 px-4 py-3 rounded-xl text-sm font-semibold shadow-lg"
-          style={{ background: '#EF4444', color: '#fff', maxWidth: 360 }}>
+        <div className="fixed top-4 left-4 right-4 sm:left-auto z-50 px-4 py-3 rounded-xl text-sm font-semibold shadow-lg"
+          style={{ background: '#EF4444', color: '#fff', maxWidth: 380 }}>
           {toast.msg}
         </div>
       )}
@@ -224,13 +220,16 @@ function PorteriaOperativaView({ gateId, gateName }: { gateId: string; gateName:
 
       {/* Header */}
       <div className="flex items-center gap-3 flex-wrap">
-        <Link href="/dashboard/control-operativo/porteria"
-          className="flex items-center gap-1.5 text-sm font-semibold px-3 py-1.5 rounded-lg"
-          style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', color: 'var(--text-dim)' }}>
-          <ArrowLeft size={14} /> Sedes
-        </Link>
+        {/* Con una sola sede el botón llevaría al mismo lugar. */}
+        {puedeCambiarSede && (
+          <Link href="/dashboard/control-operativo/porteria"
+            className="flex items-center gap-1.5 text-sm font-semibold px-3 py-1.5 rounded-lg"
+            style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', color: 'var(--text-dim)' }}>
+            <ArrowLeft size={14} /> Sedes
+          </Link>
+        )}
         <div className="flex-1">
-          <h1 className="text-2xl font-bold" style={{ color: 'var(--text-strong)' }}>
+          <h1 className="text-xl sm:text-2xl font-bold" style={{ color: 'var(--text-strong)' }}>
             Portería · <span style={{ color: 'var(--primary)' }}>{gateName}</span>
           </h1>
           <p className="text-sm" style={{ color: 'var(--text-dim)' }}>Verifica por cédula o selecciona de la lista</p>
@@ -251,7 +250,7 @@ function PorteriaOperativaView({ gateId, gateName }: { gateId: string; gateName:
         ].map(({ label, value, color }) => (
           <div key={label} className="rounded-xl p-4 text-center"
             style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', boxShadow: 'var(--shadow-card)' }}>
-            <div className="text-3xl font-bold mb-1" style={{ color }}>{value}</div>
+            <div className="text-2xl sm:text-3xl font-bold mb-1" style={{ color }}>{loading ? '—' : value}</div>
             <div className="text-xs font-semibold" style={{ color: 'var(--text-label)' }}>{label}</div>
           </div>
         ))}
@@ -262,15 +261,15 @@ function PorteriaOperativaView({ gateId, gateName }: { gateId: string; gateName:
         <label className="block text-sm font-bold mb-2" style={{ color: 'var(--text-strong)' }}>
           Verificar ingreso por cédula
         </label>
-        <div className="flex gap-2">
-          <input ref={cedulaRef} type="text" value={cedula}
+        <div className="flex flex-col sm:flex-row gap-2">
+          <input ref={cedulaRef} type="text" inputMode="numeric" value={cedula}
             onChange={e => setCedula(e.target.value)}
             onKeyDown={e => e.key === 'Enter' && verifyCedula()}
             placeholder="Escribe o escanea la cédula y presiona Enter…"
-            className="flex-1 px-4 py-2.5 rounded-lg text-sm outline-none font-mono"
+            className="flex-1 min-w-0 px-4 py-3 rounded-lg text-base outline-none font-mono"
             style={{ background: 'var(--bg)', border: '1px solid var(--border)', color: 'var(--text)' }} />
-          <button onClick={verifyCedula}
-            className="flex items-center gap-2 px-5 py-2.5 rounded-lg text-sm font-bold"
+          <button onClick={verifyCedula} disabled={loading}
+            className="flex items-center justify-center gap-2 px-5 py-3 rounded-lg text-sm font-bold disabled:opacity-50"
             style={{ background: 'var(--primary)', color: '#fff' }}>
             <LogIn size={15} /> Verificar
           </button>
@@ -278,8 +277,8 @@ function PorteriaOperativaView({ gateId, gateName }: { gateId: string; gateName:
       </div>
 
       {/* Filtros */}
-      <div className="flex flex-wrap gap-3 items-center">
-        <div className="relative flex-1 min-w-48">
+      <div className="flex flex-wrap gap-2 sm:gap-3 items-center">
+        <div className="relative w-full sm:w-auto sm:flex-1 sm:min-w-48">
           <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2" style={{ color: 'var(--text-faint)' }} />
           <input type="text" value={search} onChange={e => setSearch(e.target.value)}
             placeholder="Buscar trabajador…"
@@ -298,6 +297,13 @@ function PorteriaOperativaView({ gateId, gateName }: { gateId: string; gateName:
           <option value="">Todos los estados</option>
           <option value="active">Activo</option>
           <option value="blocked">Bloqueado</option>
+        </select>
+        <select value={orden} onChange={e => setOrden(e.target.value as any)}
+          className="px-3 py-2 rounded-lg text-sm outline-none" aria-label="Orden"
+          style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', color: 'var(--text)' }}>
+          <option value="nombre">Nombre (A-Z)</option>
+          <option value="cedula">Cédula</option>
+          <option value="area">Área</option>
         </select>
       </div>
 
@@ -318,7 +324,39 @@ function PorteriaOperativaView({ gateId, gateName }: { gateId: string; gateName:
             <p className="text-sm" style={{ color: 'var(--text-faint)' }}>Sin resultados</p>
           </div>
         ) : (
-          <div className="overflow-x-auto">
+          <>
+          {/* Celular: tarjetas compactas, el botón nunca queda fuera de la pantalla */}
+          <ul className="md:hidden divide-y" style={{ borderColor: 'var(--border)' }}>
+            {filtered.map(w => {
+              const st = getStatus(w)
+              const adentro = insideIds.has(w.id)
+              return (
+                <li key={w.id} className="flex items-center gap-3 px-4 py-3">
+                  <div className="flex-1 min-w-0">
+                    <div className="text-sm font-bold truncate" style={{ color: 'var(--text)' }}>{w.name}</div>
+                    <div className="text-xs font-mono" style={{ color: 'var(--text-dim)' }}>C.C. {w.cedula || '—'}</div>
+                    <div className="flex items-center gap-2 mt-1 text-xs flex-wrap" style={{ color: 'var(--text-dim)' }}>
+                      <span>{w.area_name || 'Sin área'}</span>
+                      {st === 'blocked'
+                        ? <span className="font-semibold" style={{ color: '#EF4444' }}>· Bloqueado</span>
+                        : adentro
+                          ? <span className="font-semibold" style={{ color: 'var(--primary)' }}>· Dentro</span>
+                          : <span className="font-semibold" style={{ color: '#10B981' }}>· Activo</span>}
+                    </div>
+                  </div>
+                  {st === 'active' && (
+                    <button onClick={() => registerEntry(w)} disabled={registering === w.id}
+                      className="inline-flex items-center gap-1.5 px-4 py-2.5 rounded-lg text-sm font-bold disabled:opacity-60 flex-shrink-0"
+                      style={{ background: 'var(--primary)', color: '#fff' }}>
+                      {registering === w.id ? <RefreshCw size={13} className="animate-spin" /> : <LogIn size={13} />}
+                      Ingresar
+                    </button>
+                  )}
+                </li>
+              )
+            })}
+          </ul>
+          <div className="hidden md:block overflow-x-auto">
             <table className="terra-table w-full">
               <colgroup>
                 <col style={{ width: '30%' }} /><col style={{ width: 120 }} />
@@ -382,6 +420,7 @@ function PorteriaOperativaView({ gateId, gateName }: { gateId: string; gateName:
               </tbody>
             </table>
           </div>
+          </>
         )}
       </div>
     </div>
@@ -393,28 +432,25 @@ function PorteriaPageInner() {
   const searchParams = useSearchParams()
   const sedeId = searchParams.get('sede')
 
-  const [gatehouses, setGatehouses] = useState<Gatehouse[]>([])
-  const [loading, setLoading]       = useState(true)
+  const porteriasQ = useConsulta<Gatehouse[]>('/api/gatehouses', [])
+  const loading = porteriasQ.cargando
+  const gatehouses = (Array.isArray(porteriasQ.datos) ? porteriasQ.datos : []).filter(g => g.is_active)
 
-  useEffect(() => {
-    fetch('/api/gatehouses')
-      .then(r => r.ok ? r.json() : [])
-      .then((data: Gatehouse[]) => {
-        setGatehouses(data.filter(g => g.is_active))
-        setLoading(false)
-      })
-  }, [])
-
+  // key={gateId}: al cambiar de sede la vista se monta desde cero y no arrastra
+  // contadores ni listas de la sede anterior mientras llegan los nuevos.
   if (sedeId) {
+    if (loading) {
+      return <div className="p-6"><RefreshCw size={20} className="animate-spin" style={{ color: 'var(--primary)' }} /></div>
+    }
     const gate = gatehouses.find(g => g.id === sedeId)
-    const name = gate?.name ?? 'Sede'
-    return <PorteriaOperativaView gateId={sedeId} gateName={name} />
+    // Una sede que no está entre las permitidas no se abre aunque venga en la URL.
+    if (!gate) return <SedeSelectorView gatehouses={gatehouses} loading={false} />
+    return <PorteriaOperativaView key={gate.id} gateId={gate.id} gateName={gate.name} puedeCambiarSede={gatehouses.length > 1} />
   }
 
-  // Con una sola sede no hay nada que elegir: el portero entra directo. El
-  // selector solo tiene sentido cuando de verdad hay varias.
+  // Con una sola sede no hay nada que elegir: el portero entra directo.
   if (!loading && gatehouses.length === 1) {
-    return <PorteriaOperativaView gateId={gatehouses[0].id} gateName={gatehouses[0].name} />
+    return <PorteriaOperativaView key={gatehouses[0].id} gateId={gatehouses[0].id} gateName={gatehouses[0].name} puedeCambiarSede={false} />
   }
 
   return <SedeSelectorView gatehouses={gatehouses} loading={loading} />

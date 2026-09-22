@@ -75,6 +75,26 @@ export async function GET(req: NextRequest) {
   return NextResponse.json(result)
 }
 
+/**
+ * El área vive en dos campos: `area` (texto que se muestra) y `area_id` (el que
+ * usan los filtros y los registros de portería). Se guardaba solo el texto y
+ * ningún filtro por área encontraba a nadie. Aquí se completa el que falte.
+ */
+async function sincronizarArea(cambios: Record<string, any>, companyId: string | null) {
+  if (cambios.area !== undefined && cambios.area_id === undefined) {
+    const nombre = String(cambios.area || '').trim()
+    if (!nombre) { cambios.area_id = null; return }
+    let q = supabase.from('areas').select('id, name').ilike('name', nombre)
+    if (companyId) q = q.eq('company_id', companyId)
+    const { data } = await q.limit(1)
+    cambios.area_id = data?.[0]?.id ?? null
+  } else if (cambios.area_id !== undefined && cambios.area === undefined) {
+    if (!cambios.area_id) { cambios.area = ''; return }
+    const { data } = await supabase.from('areas').select('name').eq('id', cambios.area_id).maybeSingle()
+    cambios.area = data?.name ?? ''
+  }
+}
+
 export async function POST(req: NextRequest) {
   const body = await req.json()
   const { email, password, name, cedula, role, area, cargo, permissions } = body
@@ -94,6 +114,8 @@ export async function POST(req: NextRequest) {
   }
 
   const hash = await bcrypt.hash(password, 10)
+  const areaCampos: Record<string, any> = { area: area || '' }
+  await sincronizarArea(areaCampos, companyId)
   const { data, error } = await supabase
     .from('users')
     .insert({
@@ -102,7 +124,8 @@ export async function POST(req: NextRequest) {
       name,
       cedula: cedula || '',
       role: role || 'worker',
-      area: area || '',
+      area: areaCampos.area,
+      area_id: areaCampos.area_id,
       cargo: cargo || null,
       active: true,
       company_id: companyId,
@@ -140,6 +163,7 @@ export async function PUT(req: NextRequest) {
   if (updates.password) {
     updates.password = await bcrypt.hash(updates.password, 10)
   }
+  await sincronizarArea(updates, companyId)
 
   let query = supabase.from('users').update(updates).eq('id', id)
   if (companyId) query = query.eq('company_id', companyId)

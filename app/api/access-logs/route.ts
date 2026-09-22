@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase-admin'
-import { requierePermiso } from '@/lib/get-company'
+import { requierePermiso, porteriasPermitidas } from '@/lib/get-company'
 import {
   inicioJornada, inicioJornadaDeFecha, siguienteJornada, finJornada, horaColombia,
   MOTIVO_OTRA_PORTERIA, MOTIVO_FIN_JORNADA,
@@ -12,12 +12,7 @@ export async function GET(req: NextRequest) {
 
   // El portero solo ve el movimiento de las porterías que opera, no el de toda
   // la empresa.
-  let porteriasPropias: string[] | null = null
-  if (!isAdmin) {
-    const { data: ops } = await supabaseAdmin
-      .from('gatehouse_operators').select('gatehouse_id').eq('user_id', user.id)
-    porteriasPropias = (ops ?? []).map((o: any) => o.gatehouse_id)
-  }
+  const porteriasPropias = await porteriasPermitidas(user.id, isAdmin)
 
   const { searchParams } = new URL(req.url)
   const period      = searchParams.get('period') || 'day'
@@ -63,7 +58,7 @@ export async function GET(req: NextRequest) {
   if (userId)  query = query.eq('user_id', userId)
   if (areaId)  query = query.eq('area_id', areaId)
   if (gateId)  query = query.eq('gatehouse_id', gateId)
-  if (porteriasPropias) query = query.in('gatehouse_id', porteriasPropias.length ? porteriasPropias : ['_'])
+  if (porteriasPropias) query = query.in('gatehouse_id', porteriasPropias.length ? porteriasPropias : ['00000000-0000-0000-0000-000000000000'])
 
   const { data, error } = await query
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
@@ -71,12 +66,17 @@ export async function GET(req: NextRequest) {
 }
 
 export async function POST(req: NextRequest) {
-  const { authorized, user, companyId } = await requierePermiso('accesos.ingreso')
+  const { authorized, user, companyId, isAdmin } = await requierePermiso('accesos.ingreso')
   if (!authorized) return NextResponse.json({ error: 'No tiene permiso para registrar ingresos' }, { status: 403 })
 
   const body = await req.json()
   const { user_id, area_id, gatehouse_id, notes } = body
   if (!user_id) return NextResponse.json({ error: 'user_id requerido' }, { status: 400 })
+
+  const permitidas = await porteriasPermitidas(user.id, isAdmin)
+  if (permitidas && !permitidas.includes(gatehouse_id)) {
+    return NextResponse.json({ error: 'No puede registrar ingresos en otra portería' }, { status: 403 })
+  }
 
   // Verify worker is active and NOT retired
   const { data: worker } = await supabaseAdmin

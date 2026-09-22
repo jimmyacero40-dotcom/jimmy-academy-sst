@@ -85,6 +85,17 @@ export async function requierePermiso(...permisos: string[]) {
   return { authorized: true, user, companyId, isAdmin } as const
 }
 
+/**
+ * Porterías que un usuario puede ver u operar. `null` significa todas (admin y
+ * superadmin). Un portero queda limitado a las que tiene asignadas en
+ * gatehouse_operators; si no tiene ninguna, la lista es vacía y no ve nada.
+ */
+export async function porteriasPermitidas(userId: string, isAdmin: boolean): Promise<string[] | null> {
+  if (isAdmin) return null
+  const { data } = await supabase.from('gatehouse_operators').select('gatehouse_id').eq('user_id', userId)
+  return (data ?? []).map((o: any) => o.gatehouse_id)
+}
+
 // Portero OR admin — for access to ingreso/salida operations
 export async function isOperatorOrAdmin() {
   const user = await getCurrentUser()

@@ -1,6 +1,7 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useCallback } from 'react'
+import { useConsulta } from '@/lib/useConsulta'
 import { useSession } from 'next-auth/react'
 import { tienePermiso } from '@/lib/permisos'
 import Link from 'next/link'
@@ -89,11 +90,6 @@ export default function ControlOperativoPage() {
   const puedeExportar = tienePermiso(rol, (session?.user as any)?.permissions, 'accesos.exportar')
   const today = new Date().toISOString().split('T')[0]
 
-  const [logs, setLogs] = useState<AccessLog[]>([])
-  const [areas, setAreas] = useState<Area[]>([])
-  const [gatehouses, setGatehouses] = useState<Gatehouse[]>([])
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
   const [exporting, setExporting] = useState<'pdf' | 'excel' | null>(null)
 
   const [period, setPeriod] = useState<Period>('day')
@@ -113,33 +109,27 @@ export default function ControlOperativoPage() {
     return { from: dateFrom || today, to: dateTo || today }
   }, [period, selectedDate, dateFrom, dateTo, today])
 
-  const load = useCallback(async () => {
-    setLoading(true); setError(null)
+  // La url resume todo el contexto de la consulta (fechas y porteria/area). Al
+  // cambiar, la lista se vacia y la peticion anterior se aborta, asi que nunca
+  // se ven movimientos de otra porteria mientras llegan los nuevos.
+  const urlMovimientos = (() => {
     const { from, to } = resolveRange()
-    // Siempre 'range': así la API usa las fechas explícitas y nunca asume "hoy".
+    // Siempre 'range': asi la API usa las fechas explicitas y nunca asume "hoy".
     const params = new URLSearchParams({ period: 'range', from, to })
     if (filterArea) params.set('area_id', filterArea)
     if (filterGate) params.set('gatehouse_id', filterGate)
-    try {
-      const res = await fetch(`/api/access-logs?${params}`)
-      const body = await res.json()
-      if (!res.ok) throw new Error(body?.error || `Error ${res.status}`)
-      setLogs(Array.isArray(body) ? body : [])
-    } catch (e: any) {
-      setError(e.message || 'No fue posible cargar los registros')
-      setLogs([])
-    }
-    setLoading(false)
-  }, [resolveRange, filterArea, filterGate])
+    return `/api/access-logs?${params}`
+  })()
+  const movimientos = useConsulta<AccessLog[]>(urlMovimientos, [])
+  const logs: AccessLog[] = Array.isArray(movimientos.datos) ? movimientos.datos : []
+  const loading = movimientos.cargando
+  const error = movimientos.error
+  const load = movimientos.recargar
 
-  useEffect(() => {
-    fetch('/api/areas').then(r => r.json()).then(d => setAreas(Array.isArray(d) ? d : [])).catch(() => {})
-    fetch('/api/gatehouses').then(r => r.json())
-      .then(d => setGatehouses(Array.isArray(d) ? d.filter((g: Gatehouse) => g.is_active !== false) : []))
-      .catch(() => {})
-  }, [])
-
-  useEffect(() => { load() }, [load])
+  const areasQ = useConsulta<Area[]>('/api/areas', [])
+  const porteriasQ = useConsulta<Gatehouse[]>('/api/gatehouses', [])
+  const areas: Area[] = Array.isArray(areasQ.datos) ? areasQ.datos : []
+  const gatehouses: Gatehouse[] = (Array.isArray(porteriasQ.datos) ? porteriasQ.datos : []).filter(g => g.is_active !== false)
 
   const filtered = logs.filter(l => {
     if (filterEstado === 'inside' && l.exit_time) return false
@@ -407,7 +397,7 @@ export default function ControlOperativoPage() {
               <span className="text-[11px] font-semibold uppercase tracking-wide" style={{ color: 'var(--text-label)' }}>{label}</span>
               <Icon size={14} style={{ color }} />
             </div>
-            <span className="text-2xl font-bold" style={{ color: 'var(--text-strong)' }}>{value}</span>
+            <span className="text-2xl font-bold" style={{ color: 'var(--text-strong)' }}>{loading ? '—' : value}</span>
           </div>
         ))}
       </div>

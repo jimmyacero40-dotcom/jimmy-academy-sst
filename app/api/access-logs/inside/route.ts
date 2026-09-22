@@ -1,15 +1,19 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase-admin'
-import { requierePermiso } from '@/lib/get-company'
+import { requierePermiso, porteriasPermitidas } from '@/lib/get-company'
 import { inicioJornada } from '@/lib/jornada'
 
 export async function GET(req: NextRequest) {
-  const { authorized, companyId } = await requierePermiso('accesos.ver', 'accesos.ingreso', 'accesos.salida')
+  const { authorized, user, companyId, isAdmin } = await requierePermiso('accesos.ver', 'accesos.ingreso', 'accesos.salida')
   if (!authorized) return NextResponse.json({ error: 'No tiene permiso para consultar la portería' }, { status: 403 })
+  const permitidas = await porteriasPermitidas(user.id, isAdmin)
 
   const { searchParams } = new URL(req.url)
   const areaId    = searchParams.get('area_id')
   const gateId    = searchParams.get('gatehouse_id')
+  if (permitidas && gateId && !permitidas.includes(gateId)) {
+    return NextResponse.json({ error: 'No tiene acceso a esa portería' }, { status: 403 })
+  }
 
   // Inicio de la jornada en hora de Colombia: medianoche UTC son las 7 p.m. aquí,
   // y con ese corte los ingresos de la tarde desaparecían del tablero.
@@ -31,6 +35,8 @@ export async function GET(req: NextRequest) {
 
   if (areaId) query = query.eq('area_id', areaId)
   if (gateId) query = query.eq('gatehouse_id', gateId)
+  // Sin portería pedida, el portero igual solo recibe las suyas.
+  if (permitidas) query = query.in('gatehouse_id', permitidas.length ? permitidas : ['00000000-0000-0000-0000-000000000000'])
 
   const { data, error } = await query
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })

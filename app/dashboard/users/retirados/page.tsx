@@ -39,6 +39,7 @@ export default function RetiradosPage() {
   const [workers, setWorkers] = useState<RetiredUser[]>([])
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
+  const [orden, setOrden] = useState<'reciente' | 'antiguo' | 'nombre'>('reciente')
   const [reactivating, setReactivating] = useState<string | null>(null)
   const [deletingPermanent, setDeletingPermanent] = useState(false)
   const [toast, setToast] = useState<{ msg: string; type: 'ok' | 'err' } | null>(null)
@@ -92,7 +93,11 @@ export default function RetiradosPage() {
   const filtered = workers.filter(w => {
     if (!search) return true
     const q = search.toLowerCase()
-    return w.name.toLowerCase().includes(q) || w.cedula.includes(q) || (w.cargo || '').toLowerCase().includes(q)
+    return w.name.toLowerCase().includes(q) || (w.cedula || '').includes(q) || (w.cargo || '').toLowerCase().includes(q)
+  }).sort((a, b) => {
+    if (orden === 'nombre') return a.name.localeCompare(b.name, 'es')
+    const d = new Date(a.retired_at).getTime() - new Date(b.retired_at).getTime()
+    return orden === 'antiguo' ? d : -d
   })
 
   return (
@@ -201,7 +206,14 @@ export default function RetiradosPage() {
           <div className="text-2xl font-bold" style={{ color: 'var(--text-strong)' }}>{workers.length}</div>
           <div className="text-xs font-semibold" style={{ color: 'var(--text-label)' }}>Trabajadores retirados en total</div>
         </div>
-        <div className="ml-auto relative flex-1 max-w-72">
+        <select value={orden} onChange={e => setOrden(e.target.value as any)} aria-label="Orden"
+          className="ml-auto px-3 py-2 rounded-lg text-sm outline-none"
+          style={{ background: 'var(--bg)', border: '1px solid var(--border)', color: 'var(--text)' }}>
+          <option value="reciente">Retiro más reciente</option>
+          <option value="antiguo">Retiro más antiguo</option>
+          <option value="nombre">Nombre (A-Z)</option>
+        </select>
+        <div className="relative flex-1 max-w-72">
           <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2" style={{ color: 'var(--text-faint)' }} />
           <input type="text" value={search} onChange={e => setSearch(e.target.value)}
             placeholder="Buscar por nombre, cédula, cargo…"
