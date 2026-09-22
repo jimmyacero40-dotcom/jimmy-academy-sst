@@ -138,7 +138,13 @@ export default function LoginPage() {
 
         {/* Logo AgroSafe */}
         <div className="relative z-10">
-          <img src="/images/LOGO.png" alt="AgroSafe" className="h-16 w-auto object-contain" />
+          {/* Tarjeta clara: con el tema oscuro el verde de los logos pierde contraste. */}
+          <div className="inline-flex items-center gap-5 rounded-2xl px-5 py-3"
+            style={{ background: '#fff', boxShadow: '0 8px 30px rgba(0,0,0,0.12)' }}>
+            <img src="/images/agrosafe-logo.png" alt="AgroSafe" className="h-20 w-auto object-contain" />
+            <div className="w-px self-stretch" style={{ background: '#E5E7EB' }} />
+            <img src="/images/agroventure-logo.png" alt="AgroVenture Capital" className="h-16 w-auto object-contain" />
+          </div>
         </div>
 
         {/* Hero */}
@@ -198,7 +204,10 @@ export default function LoginPage() {
 
             {/* Mobile logo */}
             <div className="lg:hidden flex items-center justify-center mb-10">
-              <img src="/images/LOGO.png" alt="AgroSafe" className="h-14 w-auto object-contain" />
+              <div className="flex items-center gap-4 rounded-2xl px-4 py-3" style={{ background: '#fff' }}>
+                <img src="/images/agrosafe-logo.png" alt="AgroSafe" className="h-14 w-auto object-contain" />
+                <img src="/images/agroventure-logo.png" alt="AgroVenture Capital" className="h-11 w-auto object-contain" />
+              </div>
             </div>
 
             {/* Header */}

@@ -298,31 +298,27 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           }}>
 
           {collapsed ? (
-            /* Collapsed: icon-size logo */
-            <img
-              src="/images/LOGO.png"
-              alt="AgroSafe"
-              style={{ width: 36, height: 36, objectFit: 'contain' }}
-            />
+            <div className="rounded-lg flex items-center justify-center"
+              style={{ background: '#fff', width: 44, height: 44, padding: 4 }}>
+              <img src="/images/agrosafe-logo.png" alt="AgroSafe"
+                style={{ width: '100%', height: '100%', objectFit: 'contain' }} />
+            </div>
           ) : (
-            /* Expanded: full logo prominent */
             <div className="w-full flex flex-col items-center gap-1.5">
-              {activeCompany?.logo_url ? (
-                /* Company has a custom logo */
-                <img
-                  src={activeCompany.logo_url}
-                  alt={activeCompany.name}
-                  style={{ height: 48, maxWidth: '85%', objectFit: 'contain',
-                    background: 'white', padding: '4px 8px', borderRadius: 8 }}
-                />
-              ) : (
-                /* Default: AgroSafe logo */
-                <img
-                  src="/images/LOGO.png"
-                  alt="AgroSafe"
-                  style={{ height: 52, maxWidth: '85%', objectFit: 'contain' }}
-                />
-              )}
+              {/* Tarjeta clara: el verde oscuro de los logos se pierde sobre la barra azul. */}
+              <div className="w-full rounded-xl flex flex-col items-center gap-2"
+                style={{ background: '#fff', padding: '10px 12px' }}>
+                <img src="/images/agrosafe-logo.png" alt="AgroSafe"
+                  style={{ width: '100%', maxHeight: 64, objectFit: 'contain' }} />
+                {/* Empresas distintas de AgroVenture conservan su propio logo. */}
+                {activeCompany?.logo_url && !/agroventure/i.test(activeCompany.name) ? (
+                  <img src={activeCompany.logo_url} alt={activeCompany.name}
+                    style={{ width: '70%', maxHeight: 44, objectFit: 'contain' }} />
+                ) : (
+                  <img src="/images/agroventure-logo.png" alt="AgroVenture Capital"
+                    style={{ width: '58%', maxHeight: 44, objectFit: 'contain' }} />
+                )}
+              </div>
               <div className="text-[8px] font-bold uppercase tracking-[0.16em]"
                 style={{ color: 'var(--sidebar-faint)' }}>
                 {sessionLoading ? ' ' : isAdmin ? 'Gestión del Personal' : isPortero ? 'Control de Acceso' : 'Portal Trabajador'}
