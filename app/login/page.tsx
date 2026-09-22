@@ -1,31 +1,71 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
 import { signIn } from 'next-auth/react'
 import { useRouter } from 'next/navigation'
-import { motion } from 'framer-motion'
-import { Shield, Eye, EyeOff, ArrowRight, Lock, Mail, Sun, Moon, CheckCircle } from 'lucide-react'
+import {
+  Eye, EyeOff, ArrowRight, Lock, Mail, CheckCircle,
+  Users, GraduationCap, DoorOpen, Award,
+} from 'lucide-react'
 import Link from 'next/link'
+
+// Identidad AgroSafe: el mismo navy del panel, para que el acceso ya se sienta
+// parte de la plataforma y no una página aparte.
+const C = {
+  navy:        '#0B1829',
+  navyDeep:    '#081221',
+  text:        '#E8EEF7',
+  textDim:     '#9AAAC0',
+  textFaint:   '#62748C',
+  line:        'rgba(255,255,255,0.08)',
+  lime:        '#8CCB1E',
+  limeSoft:    'rgba(140,203,30,0.12)',
+  orange:      '#F39A1E',
+  inputBg:     'rgba(255,255,255,0.04)',
+  inputBorder: 'rgba(255,255,255,0.12)',
+  error:       '#FCA5A5',
+}
+
+// Sobre navy el verde oscuro de "AGRO" y del lema se pierde. Un contorno claro de
+// un píxel lo devuelve a la vista sin encerrarlo en una tarjeta.
+const CONTORNO_AGROSAFE: React.CSSProperties = {
+  filter:
+    'drop-shadow(0 0 1px rgba(255,255,255,0.95)) drop-shadow(0 0 1px rgba(255,255,255,0.95)) drop-shadow(0 6px 18px rgba(0,0,0,0.35))',
+}
+// AgroVenture ya contrasta con el navy; el contorno solo le emborronaba las letras.
+const SOMBRA_AGROVENTURE: React.CSSProperties = { filter: 'drop-shadow(0 4px 12px rgba(0,0,0,0.35))' }
+
+const MODULOS = [
+  { icon: Users,         titulo: 'Gestión del personal',       texto: 'Hojas de vida, áreas, grupos y retiros.' },
+  { icon: GraduationCap, titulo: 'SSTudio y formación SST',    texto: 'Capacitaciones, inscripciones y asistencia.' },
+  { icon: DoorOpen,      titulo: 'Control operativo',          texto: 'Ingresos y salidas por portería y sede.' },
+  { icon: Award,         titulo: 'Certificados y trazabilidad', texto: 'Certificados, firmas y reportes.' },
+]
+
+const NORMAS = ['Decreto 1072', 'Res. 0312', 'Datos protegidos']
+
+function Logos({ grande }: { grande?: boolean }) {
+  return (
+    <div className="flex items-center" style={{ gap: grande ? 32 : 18 }}>
+      <img src="/images/agrosafe-logo.png" alt="AgroSafe"
+        className="w-auto object-contain"
+        style={{ height: grande ? 'clamp(104px, 11vh, 132px)' : 64, ...CONTORNO_AGROSAFE }} />
+      <div className="self-stretch w-px" style={{ background: 'rgba(255,255,255,0.14)', margin: '10px 0' }} />
+      {/* AgroVenture es el contexto corporativo: más pequeño que la marca de la plataforma. */}
+      <img src="/images/agroventure-logo.png" alt="AgroVenture Capital"
+        className="w-auto object-contain"
+        style={{ height: grande ? 'clamp(58px, 6vh, 72px)' : 38, ...SOMBRA_AGROVENTURE }} />
+    </div>
+  )
+}
 
 export default function LoginPage() {
   const router = useRouter()
-  const [dark, setDark] = useState(true)
   const [showPass, setShowPass] = useState(false)
   const [loading, setLoading] = useState(false)
   const [form, setForm] = useState({ email: '', password: '' })
   const [errors, setErrors] = useState<Record<string, string>>({})
   const [authError, setAuthError] = useState('')
-
-  // Persist theme preference
-  useEffect(() => {
-    const saved = localStorage.getItem('sst-theme')
-    if (saved) setDark(saved === 'dark')
-  }, [])
-  const toggleTheme = () => {
-    const next = !dark
-    setDark(next)
-    localStorage.setItem('sst-theme', next ? 'dark' : 'light')
-  }
 
   const validate = () => {
     const e: Record<string, string> = {}
@@ -57,308 +97,204 @@ export default function LoginPage() {
     }
   }
 
-  // ── AgroSafe Theme tokens ─────────────────────────────────────
-  const t = dark ? {
-    pageBg:       '#071009',
-    leftBg:       '#0C1A0E',
-    rightBg:      '#0F1F12',
-    rightBorder:  '#1A3020',
-    orbColor:     'rgba(45,138,45,0.10)',
-    logoName:     '#EDF7ED',
-    logoSub:      '#4D7A55',
-    eyebrow:      '#7EC800',
-    h1:           '#EDF7ED',
-    h1Accent:     '#7EC800',
-    desc:         '#6B9475',
-    pillText:     '#4D7A55',
-    formTitle:    '#EDF7ED',
-    formSub:      '#4D7A55',
-    label:        '#6B9475',
-    inputBg:      '#071009',
-    inputBorder:  '#1A3020',
-    inputText:    '#EDF7ED',
-    inputPh:      '#2D4A35',
-    iconColor:    '#2D4A35',
-    badgeBg:      'rgba(126,200,0,0.08)',
-    badgeColor:   '#7EC800',
-    badgeBorder:  'rgba(126,200,0,0.2)',
-    noteColor:    '#2D4A35',
-    toggleBg:     '#1A3020',
-    toggleIcon:   '#6B9475',
-    errorBg:      'rgba(239,68,68,0.08)',
-    errorBorder:  'rgba(239,68,68,0.25)',
-    errorText:    '#fca5a5',
-  } : {
-    pageBg:       '#F2F7EE',
-    leftBg:       '#EBF3E4',
-    rightBg:      '#FFFFFF',
-    rightBorder:  '#D4E8C8',
-    orbColor:     'rgba(26,92,26,0.08)',
-    logoName:     '#0D2410',
-    logoSub:      '#5B8A5B',
-    eyebrow:      '#1A5C1A',
-    h1:           '#0D2410',
-    h1Accent:     '#1A5C1A',
-    desc:         '#4D6E50',
-    pillText:     '#5B8A5B',
-    formTitle:    '#0D2410',
-    formSub:      '#5B8A5B',
-    label:        '#4D6E50',
-    inputBg:      '#F8FAF6',
-    inputBorder:  '#C8DEC0',
-    inputText:    '#0D2410',
-    inputPh:      '#A8C4A0',
-    iconColor:    '#A8C4A0',
-    badgeBg:      'rgba(26,92,26,0.07)',
-    badgeColor:   '#1A5C1A',
-    badgeBorder:  'rgba(26,92,26,0.2)',
-    noteColor:    '#A8C4A0',
-    toggleBg:     '#D4E8C8',
-    toggleIcon:   '#5B8A5B',
-    errorBg:      'rgba(239,68,68,0.06)',
-    errorBorder:  'rgba(239,68,68,0.2)',
-    errorText:    '#dc2626',
-  }
-
-  const BADGES = ['Decreto 1072', 'Res. 0312', 'Datos seguros']
-  const PILLS  = ['Gestión del Personal', 'SSTudio Formación', 'Certificados']
+  const inputStyle = (conError: boolean): React.CSSProperties => ({
+    width: '100%',
+    borderRadius: 10,
+    border: `1px solid ${conError ? 'rgba(239,68,68,0.55)' : C.inputBorder}`,
+    background: C.inputBg,
+    color: C.text,
+    fontSize: 14,
+    outline: 'none',
+    transition: 'border-color 0.2s, background 0.2s',
+  })
 
   return (
-    <div className="min-h-screen flex" style={{ background: t.pageBg, transition: 'background 0.3s' }}>
+    <div className="min-h-screen relative overflow-hidden" style={{ background: C.navy }}>
+      {/* Atmósfera: luces tenues con los colores del logo, sin cortar la pantalla en dos. */}
+      <div className="absolute pointer-events-none" aria-hidden
+        style={{ top: '-20%', left: '-10%', width: '60vw', height: '60vw', borderRadius: '50%',
+          background: 'radial-gradient(circle, rgba(140,203,30,0.10), transparent 60%)' }} />
+      <div className="absolute pointer-events-none" aria-hidden
+        style={{ bottom: '-25%', right: '-10%', width: '55vw', height: '55vw', borderRadius: '50%',
+          background: 'radial-gradient(circle, rgba(243,154,30,0.07), transparent 60%)' }} />
 
-      {/* ── LEFT PANEL ────────────────────────────────────────── */}
-      <div className="hidden lg:flex lg:flex-1 flex-col justify-between p-12 relative overflow-hidden"
-        style={{ background: t.leftBg, transition: 'background 0.3s' }}>
+      <div className="relative z-10 min-h-screen flex items-center">
+        <div className="w-full mx-auto px-6 sm:px-10 lg:px-16 py-10 lg:py-14"
+          style={{ maxWidth: 1320 }}>
+          <div className="grid lg:grid-cols-[minmax(0,1fr)_440px] gap-12 xl:gap-24 items-center">
 
-        {/* Fondo decorativo */}
-        <div className="absolute top-[-100px] right-[-100px] w-[400px] h-[400px] rounded-full pointer-events-none"
-          style={{ background: t.orbColor, filter: 'blur(60px)' }} />
-        <div className="absolute bottom-[-60px] left-[-60px] w-[250px] h-[250px] rounded-full pointer-events-none"
-          style={{ background: dark ? 'rgba(126,200,0,0.05)' : 'rgba(26,92,26,0.06)', filter: 'blur(50px)' }} />
+            {/* ── IDENTIDAD + PROPUESTA DE VALOR ───────────────────── */}
+            <div className="hidden lg:block">
+              <Logos grande />
 
-        {/* Logo AgroSafe */}
-        <div className="relative z-10">
-          {/* Tarjeta clara: con el tema oscuro el verde de los logos pierde contraste. */}
-          <div className="inline-flex items-center gap-5 rounded-2xl px-5 py-3"
-            style={{ background: '#fff', boxShadow: '0 8px 30px rgba(0,0,0,0.12)' }}>
-            <img src="/images/agrosafe-logo.png" alt="AgroSafe" className="h-20 w-auto object-contain" />
-            <div className="w-px self-stretch" style={{ background: '#E5E7EB' }} />
-            <img src="/images/agroventure-logo.png" alt="AgroVenture Capital" className="h-16 w-auto object-contain" />
-          </div>
-        </div>
+              <p className="mt-14 text-[12px] font-bold uppercase tracking-[0.16em]" style={{ color: C.lime }}>
+                Plataforma Integral de Gestión del Personal
+              </p>
+              <h1 className="mt-4 font-semibold leading-[1.15]"
+                style={{ color: C.text, fontSize: 'clamp(30px, 2.6vw, 48px)', maxWidth: 700, textWrap: 'balance' as any }}>
+                Gestiona tu personal, su formación y su seguridad desde un solo lugar.
+              </h1>
+              <p className="mt-5 text-[15px] leading-[1.7]" style={{ color: C.textDim, maxWidth: 580 }}>
+                AgroSafe reúne la administración del personal, la formación en Seguridad y Salud en el
+                Trabajo y el control de acceso a las sedes, con la trazabilidad que exige el SG-SST.
+              </p>
 
-        {/* Hero */}
-        <motion.div className="relative z-10"
-          initial={{ opacity: 0, y: 24 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.6, delay: 0.1 }}>
-          <p className="text-[11px] uppercase tracking-[0.12em] mb-5 font-bold" style={{ color: t.eyebrow }}>
-            Plataforma Integral de Gestión del Personal
-          </p>
-          <h1 className="text-[36px] font-medium leading-[1.15] mb-5" style={{ color: t.h1 }}>
-            Protege.<br />
-            <span style={{ color: t.h1Accent }}>Gestiona.</span><br />
-            Certifica.
-          </h1>
-          <p className="text-[13px] leading-[1.8] mb-8 max-w-[300px]" style={{ color: t.desc }}>
-            La cultura que nos protege. Gestión del personal, formación SST y cumplimiento normativo
-            desde un solo lugar.
-          </p>
-          <div className="flex flex-col gap-3">
-            {PILLS.map(p => (
-              <div key={p} className="flex items-center gap-2.5" style={{ color: t.pillText, fontSize: 12 }}>
-                <div className="w-2 h-2 rounded-full flex-shrink-0"
-                  style={{ background: 'linear-gradient(135deg,#2D8A2D,#7EC800)' }} />
-                <span className="font-medium">{p}</span>
-              </div>
-            ))}
-          </div>
-        </motion.div>
-
-        {/* Tagline */}
-        <div className="relative z-10">
-          <p className="text-[10px] uppercase tracking-widest font-bold" style={{ color: t.pillText }}>
-            La cultura que nos protege
-          </p>
-        </div>
-      </div>
-
-      {/* ── RIGHT PANEL ───────────────────────────────────────── */}
-      <div className="flex-1 lg:w-[420px] lg:flex-none flex flex-col relative"
-        style={{ background: t.rightBg, borderLeft: `1px solid ${t.rightBorder}`, transition: 'background 0.3s, border-color 0.3s' }}>
-
-        {/* Theme toggle */}
-        <div className="flex justify-end p-5">
-          <button
-            onClick={toggleTheme}
-            className="w-9 h-9 rounded-lg flex items-center justify-center transition-colors"
-            style={{ background: t.toggleBg, color: t.toggleIcon }}
-            aria-label={dark ? 'Cambiar a modo claro' : 'Cambiar a modo oscuro'}
-          >
-            {dark ? <Sun size={16} /> : <Moon size={16} />}
-          </button>
-        </div>
-
-        {/* Center content */}
-        <div className="flex-1 flex items-center justify-center px-10 pb-8">
-          <motion.div className="w-full max-w-[340px]"
-            initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4 }}>
-
-            {/* Mobile logo */}
-            <div className="lg:hidden flex items-center justify-center mb-10">
-              <div className="flex items-center gap-4 rounded-2xl px-4 py-3" style={{ background: '#fff' }}>
-                <img src="/images/agrosafe-logo.png" alt="AgroSafe" className="h-14 w-auto object-contain" />
-                <img src="/images/agroventure-logo.png" alt="AgroVenture Capital" className="h-11 w-auto object-contain" />
+              <div className="mt-10 grid grid-cols-2 gap-x-8 gap-y-6" style={{ maxWidth: 620 }}>
+                {MODULOS.map(({ icon: Icon, titulo, texto }) => (
+                  <div key={titulo} className="flex items-start gap-3">
+                    <div className="w-9 h-9 rounded-lg flex items-center justify-center flex-shrink-0"
+                      style={{ background: C.limeSoft, color: C.lime }}>
+                      <Icon size={17} />
+                    </div>
+                    <div>
+                      <div className="text-[14px] font-semibold" style={{ color: C.text }}>{titulo}</div>
+                      <div className="text-[12.5px] mt-0.5 leading-snug" style={{ color: C.textFaint }}>{texto}</div>
+                    </div>
+                  </div>
+                ))}
               </div>
             </div>
 
-            {/* Header */}
-            <div className="mb-8">
-              <div className="text-[11px] uppercase tracking-[0.12em] mb-3 font-bold"
-                style={{ color: dark ? '#7EC800' : '#1A5C1A' }}>
-                Acceso seguro
+            {/* ── FORMULARIO ───────────────────────────────────────── */}
+            <div className="w-full mx-auto" style={{ maxWidth: 440 }}>
+
+              {/* En móvil la identidad va encima del formulario. */}
+              <div className="lg:hidden flex flex-col items-center text-center mb-8">
+                <Logos />
+                <p className="mt-5 text-[11px] font-bold uppercase tracking-[0.14em]" style={{ color: C.lime }}>
+                  Plataforma Integral de Gestión del Personal
+                </p>
+                <p className="mt-2 text-[13px] leading-relaxed" style={{ color: C.textDim }}>
+                  Personal, formación SST y control de acceso en un solo lugar.
+                </p>
               </div>
-              <h2 className="text-[24px] font-medium mb-2" style={{ color: t.formTitle }}>Bienvenido</h2>
-              <p className="text-[13px] leading-relaxed" style={{ color: t.formSub }}>
-                Ingresa tus credenciales para acceder a la plataforma AgroSafe.
+
+              <div className="rounded-2xl p-7 sm:p-9"
+                style={{
+                  background: 'rgba(255,255,255,0.035)',
+                  border: `1px solid ${C.line}`,
+                  boxShadow: '0 24px 60px rgba(0,0,0,0.35)',
+                  backdropFilter: 'blur(6px)',
+                }}>
+                <div className="mb-7">
+                  <div className="text-[11px] uppercase tracking-[0.14em] mb-2 font-bold" style={{ color: C.lime }}>
+                    Acceso seguro
+                  </div>
+                  <h2 className="text-[24px] font-semibold mb-1.5" style={{ color: C.text }}>Bienvenido</h2>
+                  <p className="text-[13px] leading-relaxed" style={{ color: C.textDim }}>
+                    Ingresa tus credenciales para acceder a la plataforma.
+                  </p>
+                </div>
+
+                {authError && (
+                  <div role="alert"
+                    className="flex items-center gap-2 rounded-lg px-3 py-3 mb-5 text-sm"
+                    style={{ background: 'rgba(239,68,68,0.10)', border: '1px solid rgba(239,68,68,0.3)', color: C.error }}>
+                    <Lock size={13} className="flex-shrink-0" />
+                    {authError}
+                  </div>
+                )}
+
+                <form onSubmit={handleSubmit} noValidate className="space-y-5">
+                  <div>
+                    <label className="block text-[12px] font-medium mb-2" style={{ color: C.textDim }}>
+                      Correo electrónico
+                    </label>
+                    <div className="relative">
+                      <Mail size={14} className="absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none"
+                        style={{ color: C.textFaint }} />
+                      <input
+                        type="email"
+                        value={form.email}
+                        onChange={e => { setForm({ ...form, email: e.target.value }); setAuthError('') }}
+                        placeholder="tu@empresa.com"
+                        autoComplete="email"
+                        className="placeholder:text-[#4E5F76] focus:border-[#8CCB1E]"
+                        style={{ ...inputStyle(!!errors.email), padding: '12px 14px 12px 36px' }}
+                      />
+                    </div>
+                    {errors.email && <p className="text-xs mt-1.5 pl-1" style={{ color: C.error }}>{errors.email}</p>}
+                  </div>
+
+                  <div>
+                    <label className="block text-[12px] font-medium mb-2" style={{ color: C.textDim }}>
+                      Contraseña
+                    </label>
+                    <div className="relative">
+                      <Lock size={14} className="absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none"
+                        style={{ color: C.textFaint }} />
+                      <input
+                        type={showPass ? 'text' : 'password'}
+                        value={form.password}
+                        onChange={e => { setForm({ ...form, password: e.target.value }); setAuthError('') }}
+                        placeholder="••••••••"
+                        autoComplete="current-password"
+                        className="placeholder:text-[#4E5F76] focus:border-[#8CCB1E]"
+                        style={{ ...inputStyle(!!errors.password), padding: '12px 42px 12px 36px' }}
+                      />
+                      <button type="button" onClick={() => setShowPass(!showPass)}
+                        aria-label={showPass ? 'Ocultar contraseña' : 'Mostrar contraseña'}
+                        className="absolute right-3.5 top-1/2 -translate-y-1/2 transition-colors"
+                        style={{ color: C.textFaint }}>
+                        {showPass ? <EyeOff size={15} /> : <Eye size={15} />}
+                      </button>
+                    </div>
+                    {errors.password && <p className="text-xs mt-1.5 pl-1" style={{ color: C.error }}>{errors.password}</p>}
+                  </div>
+
+                  <div className="flex justify-end -mt-2">
+                    <Link href="/forgot-password" className="text-[12px] hover:underline underline-offset-2"
+                      style={{ color: C.lime }}>
+                      ¿Olvidaste tu contraseña?
+                    </Link>
+                  </div>
+
+                  <button
+                    type="submit"
+                    disabled={loading}
+                    className="w-full flex items-center justify-center gap-2 rounded-xl text-sm font-semibold transition-all hover:brightness-110"
+                    style={{
+                      background: 'linear-gradient(135deg,#2D8A2D,#8CCB1E)',
+                      color: '#fff',
+                      border: 'none',
+                      padding: '13px 20px',
+                      cursor: loading ? 'not-allowed' : 'pointer',
+                      opacity: loading ? 0.8 : 1,
+                      marginTop: 4,
+                    }}
+                  >
+                    {loading ? (
+                      <>
+                        <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                        Verificando...
+                      </>
+                    ) : (
+                      <>Ingresar al sistema <ArrowRight size={15} /></>
+                    )}
+                  </button>
+                </form>
+
+                <p className="text-[12px] text-center mt-6" style={{ color: C.textFaint }}>
+                  ¿No tienes cuenta?{' '}
+                  <Link href="/register" className="font-semibold underline-offset-2 hover:underline" style={{ color: C.lime }}>
+                    Registrarse
+                  </Link>
+                </p>
+              </div>
+
+              {/* Información secundaria */}
+              <div className="flex items-center justify-center gap-2 flex-wrap mt-5">
+                {NORMAS.map(n => (
+                  <span key={n} className="flex items-center gap-1.5 text-[11px]" style={{ color: C.textFaint }}>
+                    <CheckCircle size={11} style={{ color: C.lime }} /> {n}
+                  </span>
+                ))}
+              </div>
+              <p className="text-center mt-3 text-[10px] uppercase tracking-[0.2em] font-semibold" style={{ color: C.textFaint }}>
+                La cultura que nos <span style={{ color: C.orange }}>protege</span>
               </p>
             </div>
-
-            {/* Auth error */}
-            {authError && (
-              <motion.div initial={{ opacity: 0, y: -6 }} animate={{ opacity: 1, y: 0 }}
-                className="flex items-center gap-2 rounded-lg px-3 py-3 mb-6 text-sm"
-                style={{ background: t.errorBg, border: `1px solid ${t.errorBorder}`, color: t.errorText }}>
-                <Lock size={13} className="flex-shrink-0" />
-                {authError}
-              </motion.div>
-            )}
-
-            <form onSubmit={handleSubmit} noValidate className="space-y-5">
-
-              {/* Email */}
-              <div>
-                <label className="block text-[12px] font-medium mb-2" style={{ color: t.label }}>
-                  Correo electrónico
-                </label>
-                <div className="relative">
-                  <Mail size={14} className="absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none"
-                    style={{ color: t.iconColor }} />
-                  <input
-                    type="email"
-                    value={form.email}
-                    onChange={e => { setForm({ ...form, email: e.target.value }); setAuthError('') }}
-                    placeholder="tu@empresa.com"
-                    autoComplete="email"
-                    style={{
-                      width: '100%',
-                      padding: '11px 14px 11px 36px',
-                      borderRadius: 10,
-                      border: `1px solid ${errors.email ? 'rgba(239,68,68,0.5)' : t.inputBorder}`,
-                      background: t.inputBg,
-                      color: t.inputText,
-                      fontSize: 14,
-                      outline: 'none',
-                      transition: 'border-color 0.2s',
-                    }}
-                  />
-                </div>
-                {errors.email && <p className="text-xs mt-1.5 pl-1" style={{ color: t.errorText }}>{errors.email}</p>}
-              </div>
-
-              {/* Password */}
-              <div>
-                <label className="block text-[12px] font-medium mb-2" style={{ color: t.label }}>
-                  Contraseña
-                </label>
-                <div className="relative">
-                  <Lock size={14} className="absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none"
-                    style={{ color: t.iconColor }} />
-                  <input
-                    type={showPass ? 'text' : 'password'}
-                    value={form.password}
-                    onChange={e => { setForm({ ...form, password: e.target.value }); setAuthError('') }}
-                    placeholder="••••••••"
-                    autoComplete="current-password"
-                    style={{
-                      width: '100%',
-                      padding: '11px 42px 11px 36px',
-                      borderRadius: 10,
-                      border: `1px solid ${errors.password ? 'rgba(239,68,68,0.5)' : t.inputBorder}`,
-                      background: t.inputBg,
-                      color: t.inputText,
-                      fontSize: 14,
-                      outline: 'none',
-                      transition: 'border-color 0.2s',
-                    }}
-                  />
-                  <button type="button" onClick={() => setShowPass(!showPass)}
-                    className="absolute right-3.5 top-1/2 -translate-y-1/2 transition-colors"
-                    style={{ color: t.iconColor }}>
-                    {showPass ? <EyeOff size={15} /> : <Eye size={15} />}
-                  </button>
-                </div>
-                {errors.password && <p className="text-xs mt-1.5 pl-1" style={{ color: t.errorText }}>{errors.password}</p>}
-              </div>
-
-              {/* Forgot password */}
-              <div className="flex justify-end -mt-2">
-                <Link href="/forgot-password" className="text-[12px] transition-colors"
-                  style={{ color: dark ? '#7EC800' : '#1A5C1A' }}>
-                  ¿Olvidaste tu contraseña?
-                </Link>
-              </div>
-
-              {/* Submit */}
-              <button
-                type="submit"
-                disabled={loading}
-                className="w-full flex items-center justify-center gap-2 rounded-xl text-sm font-semibold transition-all"
-                style={{
-                  background: 'linear-gradient(135deg,#2D8A2D,#7EC800)',
-                  color: '#fff',
-                  border: 'none',
-                  padding: '13px 20px',
-                  cursor: loading ? 'not-allowed' : 'pointer',
-                  opacity: loading ? 0.8 : 1,
-                  marginTop: 8,
-                }}
-              >
-                {loading ? (
-                  <>
-                    <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                    Verificando...
-                  </>
-                ) : (
-                  <>Ingresar al sistema <ArrowRight size={15} /></>
-                )}
-              </button>
-            </form>
-
-            {/* Divider */}
-            <div className="flex items-center gap-3 my-6">
-              <div className="flex-1 h-px" style={{ background: t.inputBorder }} />
-              <span className="text-[11px]" style={{ color: t.noteColor }}>cumplimiento normativo</span>
-              <div className="flex-1 h-px" style={{ background: t.inputBorder }} />
-            </div>
-
-            {/* Compliance badges */}
-            <div className="flex gap-2 flex-wrap">
-              {BADGES.map(b => (
-                <div key={b} className="flex items-center gap-1.5 text-[11px] px-3 py-1.5 rounded-lg"
-                  style={{ background: t.badgeBg, color: t.badgeColor, border: `1px solid ${t.badgeBorder}` }}>
-                  <CheckCircle size={11} />
-                  {b}
-                </div>
-              ))}
-            </div>
-
-            <p className="text-[11px] text-center mt-6 leading-relaxed" style={{ color: t.noteColor }}>
-              ¿No tienes cuenta?{' '}
-              <Link href="/register" className="font-semibold underline-offset-2 hover:underline"
-                style={{ color: dark ? '#7EC800' : '#1A5C1A' }}>
-                Registrarse
-              </Link>
-            </p>
-          </motion.div>
+          </div>
         </div>
       </div>
     </div>

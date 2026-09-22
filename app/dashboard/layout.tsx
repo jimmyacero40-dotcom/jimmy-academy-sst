@@ -151,6 +151,11 @@ const ADMIN_NAV: NavEntry[] = [
   },
 ]
 
+// Sobre la barra oscura el verde de "AGRO" se pierde; un contorno claro de un píxel
+// lo devuelve a la vista sin encerrarlo en una tarjeta. AgroVenture no lo necesita
+// y con él sus letras se emborronan.
+const CONTORNO_AGROSAFE = 'drop-shadow(0 0 1px rgba(255,255,255,0.95)) drop-shadow(0 0 1px rgba(255,255,255,0.95))'
+
 // ── Portero navigation ────────────────────────────────────────────
 const PORTERO_NAV = [
   { href: '/dashboard/control-operativo/porteria', icon: MapPin,   label: 'Portería' },
@@ -286,7 +291,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         transition-all duration-300 ease-in-out
         fixed inset-y-0 left-0 md:relative md:translate-x-0
         ${mobileOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'}
-        ${collapsed ? 'md:w-16' : isAdmin ? 'w-60' : 'w-56'}
+        ${collapsed ? 'md:w-16' : 'w-64'}
       `} style={{ background: 'var(--sidebar-bg)', borderRight: '1px solid var(--sidebar-border)' }}>
 
         {/* ── Logo ─────────────────────────────────────────────── */}
@@ -298,25 +303,22 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           }}>
 
           {collapsed ? (
-            <div className="rounded-lg flex items-center justify-center"
-              style={{ background: '#fff', width: 44, height: 44, padding: 4 }}>
-              <img src="/images/agrosafe-logo.png" alt="AgroSafe"
-                style={{ width: '100%', height: '100%', objectFit: 'contain' }} />
-            </div>
+            <img src="/images/agrosafe-logo.png" alt="AgroSafe"
+              style={{ width: 44, height: 44, objectFit: 'contain', filter: CONTORNO_AGROSAFE }} />
           ) : (
-            <div className="w-full flex flex-col items-center gap-1.5">
-              {/* Tarjeta clara: el verde oscuro de los logos se pierde sobre la barra azul. */}
-              <div className="w-full rounded-xl flex flex-col items-center gap-2"
-                style={{ background: '#fff', padding: '10px 12px' }}>
+            <div className="w-full flex flex-col items-center gap-2">
+              {/* Ambos logos en una misma fila, integrados al fondo de la barra. */}
+              <div className="w-full flex items-center justify-center gap-3.5">
                 <img src="/images/agrosafe-logo.png" alt="AgroSafe"
-                  style={{ width: '100%', maxHeight: 64, objectFit: 'contain' }} />
+                  style={{ height: 58, width: 'auto', maxWidth: '60%', objectFit: 'contain', filter: CONTORNO_AGROSAFE }} />
+                <div className="self-stretch w-px" style={{ margin: '6px 0', background: 'var(--sidebar-border)' }} />
                 {/* Empresas distintas de AgroVenture conservan su propio logo. */}
                 {activeCompany?.logo_url && !/agroventure/i.test(activeCompany.name) ? (
                   <img src={activeCompany.logo_url} alt={activeCompany.name}
-                    style={{ width: '70%', maxHeight: 44, objectFit: 'contain' }} />
+                    style={{ height: 42, width: 'auto', maxWidth: '30%', objectFit: 'contain' }} />
                 ) : (
                   <img src="/images/agroventure-logo.png" alt="AgroVenture Capital"
-                    style={{ width: '58%', maxHeight: 44, objectFit: 'contain' }} />
+                    style={{ height: 42, width: 'auto', maxWidth: '30%', objectFit: 'contain' }} />
                 )}
               </div>
               <div className="text-[8px] font-bold uppercase tracking-[0.16em]"
