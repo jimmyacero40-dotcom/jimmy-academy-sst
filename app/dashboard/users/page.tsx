@@ -56,7 +56,7 @@ function colorForUser(id: string) {
 
 const EMPTY_FORM = {
   name: '', email: '', password: '', empresa: '', area_id: '', role: '', cedula: '',
-  status: 'activo' as UserStatus, emailManual: false, selectedGroups: [] as string[],
+  status: 'activo' as UserStatus, emailManual: false, passwordManual: false, selectedGroups: [] as string[],
 }
 
 function generateEmail(name: string): string {
@@ -72,7 +72,7 @@ function generateEmail(name: string): string {
 /** Una fila del Excel, con las mismas columnas que muestra la tabla. */
 interface FilaImportada {
   name: string; cedula: string; cargo: string; area: string
-  sede: string; fechaIngreso: string; email: string
+  sede: string; fechaIngreso: string; email: string; clave: string
 }
 
 /**
@@ -114,7 +114,7 @@ function esFechaReal(iso: string): boolean {
 }
 
 const COLUMNAS_PLANTILLA = [
-  'NOMBRE DE TRABAJADOR', 'CEDULA', 'CARGO', 'AREA', 'SEDE', 'FECHA DE INGRESO', 'CORREO',
+  'NOMBRE DE TRABAJADOR', 'CEDULA', 'CARGO', 'AREA', 'SEDE', 'FECHA DE INGRESO', 'CORREO', 'CONTRASEÑA',
 ] as const
 
 function parseExcel(buffer: ArrayBuffer): FilaImportada[] {
@@ -139,17 +139,19 @@ function parseExcel(buffer: ArrayBuffer): FilaImportada[] {
       sede:         col('sede', 'centro de trabajo', 'centro_trabajo'),
       fechaIngreso: normalizarFecha(col('fecha de ingreso', 'fecha_ingreso', 'ingreso')),
       email:        col('correo', 'email', 'correo electronico'),
+      // Si la columna viene vacía se usa la cédula como clave inicial.
+      clave:        col('contraseña', 'contrasena', 'clave', 'password'),
     }
   }).filter(u => u.name !== '')
 }
 
 function downloadTemplate() {
   const ejemplos = [
-    ['JUAN PEREZ GOMEZ',   '12345678', 'OPERARIO',        'CAMPO',          'CASA DE TEJA',  '2026-01-15', ''],
-    ['MARIA LOPEZ TORRES', '87654321', 'SUPERVISORA SST', 'ADMINISTRATIVA', 'LA ESMERALDA',  '2026-02-01', 'maria.lopez@empresa.com'],
+    ['JUAN PEREZ GOMEZ',   '12345678', 'OPERARIO',        'CAMPO',          'CASA DE TEJA',  '2026-01-15', '', ''],
+    ['MARIA LOPEZ TORRES', '87654321', 'SUPERVISORA SST', 'ADMINISTRATIVA', 'LA ESMERALDA',  '2026-02-01', 'maria.lopez@empresa.com', 'Clave2026'],
   ]
   const ws = XLSX.utils.aoa_to_sheet([[...COLUMNAS_PLANTILLA], ...ejemplos])
-  ws['!cols'] = [{ wch: 34 }, { wch: 14 }, { wch: 24 }, { wch: 20 }, { wch: 20 }, { wch: 18 }, { wch: 30 }]
+  ws['!cols'] = [{ wch: 34 }, { wch: 14 }, { wch: 24 }, { wch: 20 }, { wch: 20 }, { wch: 18 }, { wch: 30 }, { wch: 16 }]
   const wb2 = XLSX.utils.book_new()
   XLSX.utils.book_append_sheet(wb2, ws, 'Trabajadores')
   XLSX.writeFile(wb2, 'plantilla_trabajadores.xlsx')
@@ -407,7 +409,7 @@ export default function UsersPage() {
 
   const openEdit = async (u: AppUser) => {
     setEditUser(u)
-    setForm({ name: u.name, email: u.email || '', password: '', empresa: u.empresa, area_id: u.area_id || '', role: u.role, cedula: u.cedula, status: u.status, emailManual: true, selectedGroups: [] })
+    setForm({ name: u.name, email: u.email || '', password: '', empresa: u.empresa, area_id: u.area_id || '', role: u.role, cedula: u.cedula, status: u.status, emailManual: true, passwordManual: true, selectedGroups: [] })
     setFormErrors({}); setIsDirty(false); setConfirmClose(false); setShowModal(true)
     setLoadingGroups(true)
     try {
@@ -423,6 +425,9 @@ export default function UsersPage() {
     if (!form.cedula.trim()) e.cedula = 'Cédula requerida'
     if (!form.email.trim()) e.email = 'Correo requerido'
     else if (!/\S+@\S+\.\S+/.test(form.email)) e.email = 'Correo inválido'
+    // La contraseña la asigna quien administra; al crear no puede quedar vacía.
+    if (!editUser && !form.password.trim()) e.password = 'Asigna una contraseña'
+    else if (form.password.trim() && form.password.trim().length < 4) e.password = 'Mínimo 4 caracteres'
     return e
   }
 
@@ -439,7 +444,7 @@ export default function UsersPage() {
         if (!res.ok) { const d = await res.json(); setFormErrors({ name: d.error || 'Error al guardar' }); setSaving(false); return }
         await fetch(`/api/users/${editUser.id}/groups`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ group_ids: form.selectedGroups }) })
       } else {
-        const res = await fetch('/api/users', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: form.name, email: form.email, password: form.cedula, cedula: form.cedula, role: 'worker', area: areaText }) })
+        const res = await fetch('/api/users', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: form.name, email: form.email, password: form.password.trim(), cedula: form.cedula, role: 'worker', area: areaText }) })
         if (!res.ok) { const d = await res.json(); setFormErrors({ email: d.error || 'Error al crear' }); setSaving(false); return }
         const created = await res.json()
         if (form.selectedGroups.length && created.id) {
@@ -558,7 +563,7 @@ export default function UsersPage() {
           body: JSON.stringify({
             name: row.name,
             email: row.email || generateEmail(row.name),
-            password: row.cedula,
+            password: row.clave || row.cedula,
             cedula: row.cedula,
             role: 'worker',
             area: row.area,
@@ -1221,7 +1226,7 @@ export default function UsersPage() {
               <div className="p-6 space-y-4 overflow-y-auto" style={{ maxHeight: 'calc(90vh - 140px)' }} onChange={() => setIsDirty(true)}>
                 {([
                   { key: 'name',   label: 'Nombre completo *',                      placeholder: 'JUAN CARLOS PEREZ GOMEZ',   mono: false, type: 'text'  },
-                  { key: 'cedula', label: 'Cédula * (será la contraseña inicial)',  placeholder: '1052392965',                 mono: true,  type: 'text'  },
+                  { key: 'cedula', label: 'Cédula * (con esta ingresa a la plataforma)', placeholder: '1052392965',           mono: true,  type: 'text'  },
                   { key: 'email',  label: 'Correo electrónico *',                   placeholder: 'juan.perez@jimmyacademy.com', mono: false, type: 'email' },
                   { key: 'role',   label: 'Cargo',                                  placeholder: 'SUPERVISOR DE MONTAJE',      mono: false, type: 'text'  },
                 ] as const).map(({ key, label, placeholder, mono, type }) => (
@@ -1231,7 +1236,7 @@ export default function UsersPage() {
                       onChange={e => {
                         const val = key === 'cedula' ? e.target.value.replace(/\D/g, '') : e.target.value
                         if (key === 'name') { const upper = val.toUpperCase(); setForm(f => ({ ...f, name: upper, ...(!f.emailManual ? { email: generateEmail(upper) } : {}) })) }
-                        else if (key === 'cedula') { setForm(f => ({ ...f, cedula: val, password: val })) }
+                        else if (key === 'cedula') { setForm(f => ({ ...f, cedula: val, ...(f.passwordManual ? {} : { password: val }) })) }
                         else if (key === 'role') { setForm(f => ({ ...f, role: val.toUpperCase() })) }
                         else if (key === 'email') { setForm(f => ({ ...f, email: e.target.value, emailManual: true })) }
                         else { setForm(f => ({ ...f, [key]: val })) }
@@ -1243,6 +1248,23 @@ export default function UsersPage() {
                     {(formErrors as any)[key] && <p className="text-xs mt-1" style={{ color: '#FCA5A5' }}>{(formErrors as any)[key]}</p>}
                   </div>
                 ))}
+
+                {/* La contraseña la asigna quien administra; se propone la cédula. */}
+                <div>
+                  <label className="text-xs font-semibold mb-1.5 block" style={{ color: 'var(--text-dim)' }}>
+                    {editUser ? 'Nueva contraseña (dejar vacío para no cambiarla)' : 'Contraseña * (tú la asignas)'}
+                  </label>
+                  <input type="text" value={form.password}
+                    onChange={e => setForm(f => ({ ...f, password: e.target.value, passwordManual: true }))}
+                    placeholder={editUser ? 'Sin cambios' : 'Puedes usar la cédula o escribir otra'}
+                    className="terra-input font-mono"
+                    style={formErrors.password ? { borderColor: 'rgba(239,68,68,0.5)' } : {}} />
+                  {formErrors.password
+                    ? <p className="text-xs mt-1" style={{ color: '#FCA5A5' }}>{formErrors.password}</p>
+                    : <p className="text-[11px] mt-1" style={{ color: 'var(--text-faint)' }}>
+                        El trabajador entra con su cédula como usuario y con esta contraseña.
+                      </p>}
+                </div>
 
                 <div>
                   <label className="text-xs font-semibold mb-1.5 flex items-center gap-1.5" style={{ color: 'var(--text-dim)' }}>

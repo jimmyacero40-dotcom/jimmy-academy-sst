@@ -165,16 +165,6 @@ export async function PUT(req: NextRequest) {
   }
   await sincronizarArea(updates, companyId)
 
-  // Para un trabajador, el documento es a la vez usuario y contraseña: si cambia
-  // la cédula y no se escribió una contraseña nueva, la clave lo acompaña.
-  if (updates.cedula !== undefined && !updates.password) {
-    const { data: actual } = await supabase.from('users').select('role').eq('id', id).maybeSingle()
-    const nuevaCedula = String(updates.cedula || '').trim()
-    if (actual?.role === 'worker' && nuevaCedula) {
-      updates.password = await bcrypt.hash(nuevaCedula, 10)
-    }
-  }
-
   let query = supabase.from('users').update(updates).eq('id', id)
   if (companyId) query = query.eq('company_id', companyId)
 
