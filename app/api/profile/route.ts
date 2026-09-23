@@ -14,7 +14,7 @@ function calcCompletion(d: Record<string, any>): number {
     !!(d.estatura_cm && d.talla_camisa && d.talla_zapato),
     !!d.municipio_vivienda,
     d.realiza_actividad_fisica !== null && d.realiza_actividad_fisica !== undefined,
-    !!(d.enfermedades_diagnosticadas?.length || d.hospitalizado !== null),
+    !!(d.enfermedades_diagnosticadas?.length) || d.hospitalizado !== null,
     !!(d.antecedentes_familiares?.length),
     d.accidentes_trabajo !== null && d.accidentes_trabajo !== undefined,
     d.trabajo_genera_estres !== null && d.trabajo_genera_estres !== undefined,

@@ -152,8 +152,14 @@ function CheckGroup({ label, options, value, onChange, tip, otherValue, onOtherC
   label: string; options: string[]; value: string[]; onChange: (v: string[]) => void
   tip?: string; otherValue?: string; onOtherChange?: (v: string) => void; otherLabel?: string
 }) {
-  const toggle = (opt: string) =>
-    onChange(value.includes(opt) ? value.filter(x => x !== opt) : [...value, opt])
+  // "NINGUNA" es excluyente: responder que no aplica también es una respuesta, y
+  // así la sección queda completa en vez de parecer sin contestar.
+  const esNinguna = (o: string) => /^NINGUN[AO]$/.test(o.trim())
+  const toggle = (opt: string) => {
+    if (value.includes(opt)) return onChange(value.filter(x => x !== opt))
+    if (esNinguna(opt)) return onChange([opt])
+    onChange([...value.filter(x => !esNinguna(x)), opt])
+  }
   // detect if any selected option is an "OTRA/OTRO/OTRAS" variant
   const showOther = onOtherChange && value.some(v => /^OTRA[S]?$|^OTRO[S]?$/.test(v.trim()))
   return (
@@ -212,6 +218,19 @@ const TABS = [
 ]
 
 // which sections map to each tab (for per-tab progress dot)
+const NOMBRE_TAB: Record<string, string> = {
+  personal: 'Personal', familia: 'Familia', laboral: 'Laboral', tallas: 'Tallas / EPP',
+  estilos: 'Estilos de vida', salud: 'Salud', cierre: 'Cierre',
+}
+
+/** Apartado donde se contesta cada sección, para poder llevar al trabajador allí. */
+function tabDeSeccion(nombre: string): string {
+  for (const [tab, secciones] of Object.entries(TAB_SECTIONS)) {
+    if (secciones.includes(nombre)) return tab
+  }
+  return 'personal'
+}
+
 const TAB_SECTIONS: Record<string, string[]> = {
   personal: ['Foto', 'Datos personales'],
   familia:  ['Contacto emergencia', 'Vivienda', 'Desplazamiento'],
@@ -340,6 +359,7 @@ export default function MyProfilePage() {
   const sections = calcSections(data)
   const pct      = calcPct(data)
   const doneCount = Object.values(sections).filter(Boolean).length
+  const pendientes = Object.entries(sections).filter(([, ok]) => !ok).map(([n]) => n)
 
   if (loading) return (
     <div className="flex flex-col items-center justify-center h-full py-32 gap-3">
@@ -439,15 +459,38 @@ export default function MyProfilePage() {
         {/* Section status chips */}
         <div className="flex flex-wrap gap-1.5 mt-4 pt-3" style={{ borderTop: '1px solid var(--border)' }}>
           {Object.entries(sections).map(([name, done]) => (
-            <span key={name}
-              className="text-[10px] px-2 py-1 rounded-full flex items-center gap-1 font-semibold"
+            <button key={name} type="button" onClick={() => switchTab(tabDeSeccion(name))}
+              title={done ? 'Completo — toca para revisarlo' : 'Falta por completar — toca para ir'}
+              className="text-[10px] px-2 py-1 rounded-full flex items-center gap-1 font-semibold transition-all"
               style={done
                 ? { background: 'rgba(16,185,129,0.1)', color: '#34D399', border: '1px solid rgba(16,185,129,0.25)' }
-                : { background: 'var(--bg-card)', color: 'var(--text-faint)', border: '1px solid var(--border)' }}>
+                : { background: 'rgba(245,158,11,0.12)', color: '#F59E0B', border: '1px solid rgba(245,158,11,0.35)' }}>
               {done ? <CheckCircle size={9} /> : <Clock size={9} />} {name}
-            </span>
+            </button>
           ))}
         </div>
+
+        {/* Qué falta para llegar al 100 % */}
+        {pendientes.length > 0 && (
+          <div className="mt-3 rounded-xl px-3 py-2.5"
+            style={{ background: 'rgba(245,158,11,0.08)', border: '1px solid rgba(245,158,11,0.3)' }}>
+            <p className="text-[11px] font-bold mb-1.5" style={{ color: '#F59E0B' }}>
+              Te falta{pendientes.length === 1 ? '' : 'n'} {pendientes.length} secci{pendientes.length === 1 ? 'ón' : 'ones'} para llegar al 100 %
+            </p>
+            <div className="flex flex-wrap gap-1.5">
+              {pendientes.map(name => (
+                <button key={name} type="button" onClick={() => switchTab(tabDeSeccion(name))}
+                  className="text-[11px] px-2.5 py-1 rounded-lg font-semibold"
+                  style={{ background: 'var(--bg-card)', border: '1px solid rgba(245,158,11,0.35)', color: 'var(--text)' }}>
+                  {name} <span style={{ color: '#F59E0B' }}>→ {NOMBRE_TAB[tabDeSeccion(name)] ?? ''}</span>
+                </button>
+              ))}
+            </div>
+            <p className="text-[10px] mt-2" style={{ color: 'var(--text-faint)' }}>
+              Si algo no te aplica, responde <strong>NINGUNA</strong>: esa también cuenta como respuesta.
+            </p>
+          </div>
+        )}
       </div>
 
       {/* ── Tab bar ── */}
@@ -936,7 +979,7 @@ export default function MyProfilePage() {
               <SectionCard title="Antecedentes médicos personales" icon={Heart} accent="#EF4444">
                 <div className="grid grid-cols-2 gap-4">
                   <CheckGroup label="¿LE HAN DIAGNOSTICADO ALGUNA DE ESTAS ENFERMEDADES? (SELECCIONA TODAS LAS QUE APLIQUEN)"
-                    options={['HIPERTENSIÓN','DIABETES','ENF. CARDIOVASCULARES','ENF. RESPIRATORIAS','ENF. OSTEOMUSCULARES (COLUMNA, ARTICULACIONES)','ENF. NEUROLÓGICAS','PROBLEMAS VISUALES','PROBLEMAS AUDITIVOS','ENF. MENTALES / PSIQUIÁTRICAS','OTRA']}
+                    options={['NINGUNA','HIPERTENSIÓN','DIABETES','ENF. CARDIOVASCULARES','ENF. RESPIRATORIAS','ENF. OSTEOMUSCULARES (COLUMNA, ARTICULACIONES)','ENF. NEUROLÓGICAS','PROBLEMAS VISUALES','PROBLEMAS AUDITIVOS','ENF. MENTALES / PSIQUIÁTRICAS','OTRA']}
                     value={data.enfermedades_diagnosticadas ?? []}
                     onChange={v => setArr('enfermedades_diagnosticadas', v)}
                     otherValue={data.enfermedades_otra ?? ''}
@@ -985,7 +1028,7 @@ export default function MyProfilePage() {
 
               <SectionCard title="Antecedentes familiares" icon={Heart} accent="#EF4444">
                 <CheckGroup label="¿ALGÚN FAMILIAR DIRECTO (PADRES, HERMANOS, HIJOS) HA TENIDO ALGUNA DE ESTAS ENFERMEDADES?"
-                  options={['DIABETES','HIPERTENSIÓN','CÁNCER','ENF. CARDIOVASCULARES','ENF. MENTALES','ARTRITIS / REUMATISMO','OTRA']}
+                  options={['NINGUNA','DIABETES','HIPERTENSIÓN','CÁNCER','ENF. CARDIOVASCULARES','ENF. MENTALES','ARTRITIS / REUMATISMO','OTRA']}
                   value={data.antecedentes_familiares ?? []}
                   onChange={v => setArr('antecedentes_familiares', v)}
                   tip="Selecciona todas las que apliquen"

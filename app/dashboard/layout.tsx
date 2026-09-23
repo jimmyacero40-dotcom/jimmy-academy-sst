@@ -269,7 +269,8 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   const isActive = (href: string) => activeHref === href
   const moduleHasActive = (id: string) => MODULE_HREFS[id]?.some(h => pathname === h || pathname.startsWith(h + '/')) ?? false
 
-  const userInitials = session?.user?.name?.split(' ').map(w => w[0]).join('').slice(0, 2) ?? 'AS'
+  const nombreMostrado = workerDisplayName ?? session?.user?.name ?? ''
+  const userInitials = nombreMostrado.split(' ').map(w => w[0]).join('').slice(0, 2) || 'AS'
   const otherTheme = theme === 'light' ? 'verde' : 'light'
   const otherThemeMeta = THEMES.find(t => t.id === otherTheme)!
 
@@ -568,7 +569,8 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
               </div>
               <div className="min-w-0 flex-1">
                 <div className="text-xs font-semibold truncate" style={{ color: 'var(--sidebar-text)' }}>
-                  {session?.user?.name ?? 'Usuario'}
+                  {/* Los trabajadores se guardan como APELLIDOS NOMBRES; se saluda por el nombre. */}
+                  {workerDisplayName ?? session?.user?.name ?? 'Usuario'}
                 </div>
                 <div className="text-[10px] truncate" style={{ color: 'var(--sidebar-dim)' }}>
                   {session?.user?.email ?? ''}
