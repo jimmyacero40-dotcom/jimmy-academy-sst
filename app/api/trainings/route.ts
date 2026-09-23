@@ -33,13 +33,17 @@ export async function POST(req: NextRequest) {
 
   if (!title?.trim()) return NextResponse.json({ error: 'Título requerido' }, { status: 400 })
 
+  // Los títulos van en mayúscula para que se vean parejos en la biblioteca, en
+  // las listas de asistencia y en los certificados.
+  const tituloNormalizado = title.trim().toUpperCase()
+
   const { data: training, error } = await supabase
     .from('trainings')
     .insert({
-      title: title.trim(),
+      title: tituloNormalizado,
       category: category || 'Obligatorio',
       duration: duration || '8h',
-      description: description || `Capacitación: ${title}`,
+      description: description || `Capacitación: ${tituloNormalizado}`,
       status: status || 'activo',
       due: due || new Date(Date.now() + 90 * 86400000).toISOString().split('T')[0],
       slides_count: slides_count || 0,
@@ -65,6 +69,7 @@ export async function PUT(req: NextRequest) {
 
   const { id, ...updates } = await req.json()
   if (!id) return NextResponse.json({ error: 'ID requerido' }, { status: 400 })
+  if (typeof updates.title === 'string') updates.title = updates.title.trim().toUpperCase()
 
   let query = supabase.from('trainings').update(updates).eq('id', id)
   if (companyId) query = query.eq('company_id', companyId)
