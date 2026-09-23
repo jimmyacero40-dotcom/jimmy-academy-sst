@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import { useSession } from 'next-auth/react'
 import { motion, AnimatePresence } from 'framer-motion'
 import * as XLSX from 'xlsx'
+import { generarClave } from '@/lib/claves'
 import {
   Users, Search, MoreVertical, CheckCircle,
   Building2, X, Edit2, Trash2, Download, ChevronDown,
@@ -17,7 +18,10 @@ type UserStatus = 'activo' | 'inactivo'
 interface AppUser {
   id: string
   name: string
+  /** Lo que se escribe para entrar: documento o correo. */
   email: string
+  /** Correo de contacto, dato aparte del usuario. */
+  correo: string
   empresa: string
   area_id: string
   area_name: string
@@ -55,7 +59,7 @@ function colorForUser(id: string) {
 }
 
 const EMPTY_FORM = {
-  name: '', email: '', password: '', empresa: '', area_id: '', role: '', cedula: '',
+  name: '', email: '', correo: '', password: '', empresa: '', area_id: '', role: '', cedula: '',
   status: 'activo' as UserStatus, emailManual: false, passwordManual: false, selectedGroups: [] as string[],
 }
 
@@ -344,7 +348,7 @@ export default function UsersPage() {
       if (!res.ok) return
       const data = await res.json()
       setUsers(data.map((u: any) => ({
-        id: u.id, name: u.name, email: u.email,
+        id: u.id, name: u.name, email: u.email, correo: u.correo || '',
         empresa: u.area || '', area_id: u.area_id || '', area_name: u.area || '',
         role: u.role === 'admin' ? 'Administrador' : (u.area || 'Trabajador'),
         cargo: u.cargo || '',
@@ -409,7 +413,7 @@ export default function UsersPage() {
 
   const openEdit = async (u: AppUser) => {
     setEditUser(u)
-    setForm({ name: u.name, email: u.email || '', password: '', empresa: u.empresa, area_id: u.area_id || '', role: u.role, cedula: u.cedula, status: u.status, emailManual: true, passwordManual: true, selectedGroups: [] })
+    setForm({ name: u.name, email: u.email || '', correo: u.correo || '', password: '', empresa: u.empresa, area_id: u.area_id || '', role: u.role, cedula: u.cedula, status: u.status, emailManual: true, passwordManual: true, selectedGroups: [] })
     setFormErrors({}); setIsDirty(false); setConfirmClose(false); setShowModal(true)
     setLoadingGroups(true)
     try {
@@ -424,7 +428,7 @@ export default function UsersPage() {
     if (!form.name.trim()) e.name = 'Nombre requerido'
     if (!form.cedula.trim()) e.cedula = 'Cédula requerida'
     if (!form.email.trim()) e.email = 'Correo requerido'
-    else if (!/\S+@\S+\.\S+/.test(form.email)) e.email = 'Correo inválido'
+    if (form.correo.trim() && !/\S+@\S+\.\S+/.test(form.correo)) e.correo = 'Correo inválido'
     // La contraseña la asigna quien administra; al crear no puede quedar vacía.
     if (!editUser && !form.password.trim()) e.password = 'Asigna una contraseña'
     else if (form.password.trim() && form.password.trim().length < 4) e.password = 'Mínimo 4 caracteres'
@@ -438,13 +442,13 @@ export default function UsersPage() {
     try {
       const areaText = areas.find(a => a.id === form.area_id)?.name || form.empresa
       if (editUser) {
-        const body: any = { id: editUser.id, name: form.name, email: form.email, cedula: form.cedula, area: areaText, active: form.status === 'activo' }
+        const body: any = { id: editUser.id, name: form.name, email: form.email, correo: form.correo.trim() || null, cedula: form.cedula, area: areaText, active: form.status === 'activo' }
         if (form.password.trim()) body.password = form.password
         const res = await fetch('/api/users', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
         if (!res.ok) { const d = await res.json(); setFormErrors({ name: d.error || 'Error al guardar' }); setSaving(false); return }
         await fetch(`/api/users/${editUser.id}/groups`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ group_ids: form.selectedGroups }) })
       } else {
-        const res = await fetch('/api/users', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: form.name, email: form.email, password: form.password.trim(), cedula: form.cedula, role: 'worker', area: areaText }) })
+        const res = await fetch('/api/users', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: form.name, email: form.email, correo: form.correo.trim() || null, password: form.password.trim(), cedula: form.cedula, role: 'worker', area: areaText }) })
         if (!res.ok) { const d = await res.json(); setFormErrors({ email: d.error || 'Error al crear' }); setSaving(false); return }
         const created = await res.json()
         if (form.selectedGroups.length && created.id) {
@@ -562,7 +566,9 @@ export default function UsersPage() {
           method: 'POST', headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             name: row.name,
-            email: row.email || generateEmail(row.name),
+            // El usuario es el documento; el correo del Excel queda como contacto.
+            email: row.cedula,
+            correo: row.email || null,
             password: row.clave || row.cedula,
             cedula: row.cedula,
             role: 'worker',
@@ -1051,7 +1057,7 @@ export default function UsersPage() {
                       {/* Correo */}
                       <td className="px-4 py-3">
                         <span className="text-[12px] truncate block" style={{ color: 'var(--text-faint)', maxWidth: 220 }}>
-                          {u.email || '—'}
+                          {u.correo || '—'}
                         </span>
                       </td>
 
@@ -1226,8 +1232,9 @@ export default function UsersPage() {
               <div className="p-6 space-y-4 overflow-y-auto" style={{ maxHeight: 'calc(90vh - 140px)' }} onChange={() => setIsDirty(true)}>
                 {([
                   { key: 'name',   label: 'Nombre completo *',                      placeholder: 'JUAN CARLOS PEREZ GOMEZ',   mono: false, type: 'text'  },
-                  { key: 'cedula', label: 'Cédula * (con esta ingresa a la plataforma)', placeholder: '1052392965',           mono: true,  type: 'text'  },
-                  { key: 'email',  label: 'Correo electrónico *',                   placeholder: 'juan.perez@jimmyacademy.com', mono: false, type: 'email' },
+                  { key: 'cedula', label: 'Cédula *',                                  placeholder: '1052392965',           mono: true,  type: 'text'  },
+                  { key: 'email',  label: 'Usuario * (con esto entra a la plataforma)', placeholder: '1052392965', mono: true,  type: 'text'  },
+                  { key: 'correo', label: 'Correo electrónico (dato de contacto)',   placeholder: 'juan.perez@empresa.com',      mono: false, type: 'email' },
                   { key: 'role',   label: 'Cargo',                                  placeholder: 'SUPERVISOR DE MONTAJE',      mono: false, type: 'text'  },
                 ] as const).map(({ key, label, placeholder, mono, type }) => (
                   <div key={key}>
@@ -1235,8 +1242,8 @@ export default function UsersPage() {
                     <input type={type} value={(form as any)[key]}
                       onChange={e => {
                         const val = key === 'cedula' ? e.target.value.replace(/\D/g, '') : e.target.value
-                        if (key === 'name') { const upper = val.toUpperCase(); setForm(f => ({ ...f, name: upper, ...(!f.emailManual ? { email: generateEmail(upper) } : {}) })) }
-                        else if (key === 'cedula') { setForm(f => ({ ...f, cedula: val, ...(f.passwordManual ? {} : { password: val }) })) }
+                        if (key === 'name') { setForm(f => ({ ...f, name: val.toUpperCase() })) }
+                        else if (key === 'cedula') { setForm(f => ({ ...f, cedula: val, ...(f.passwordManual ? {} : { password: val }), ...(f.emailManual ? {} : { email: val }) })) }
                         else if (key === 'role') { setForm(f => ({ ...f, role: val.toUpperCase() })) }
                         else if (key === 'email') { setForm(f => ({ ...f, email: e.target.value, emailManual: true })) }
                         else { setForm(f => ({ ...f, [key]: val })) }
@@ -1254,11 +1261,17 @@ export default function UsersPage() {
                   <label className="text-xs font-semibold mb-1.5 block" style={{ color: 'var(--text-dim)' }}>
                     {editUser ? 'Nueva contraseña (dejar vacío para no cambiarla)' : 'Contraseña * (tú la asignas)'}
                   </label>
-                  <input type="text" value={form.password}
-                    onChange={e => setForm(f => ({ ...f, password: e.target.value, passwordManual: true }))}
-                    placeholder={editUser ? 'Sin cambios' : 'Puedes usar la cédula o escribir otra'}
-                    className="terra-input font-mono"
-                    style={formErrors.password ? { borderColor: 'rgba(239,68,68,0.5)' } : {}} />
+                  <div className="flex gap-2">
+                    <input type="text" value={form.password}
+                      onChange={e => setForm(f => ({ ...f, password: e.target.value, passwordManual: true }))}
+                      placeholder={editUser ? 'Sin cambios' : 'Puedes usar la cédula o escribir otra'}
+                      className="terra-input font-mono"
+                      style={formErrors.password ? { borderColor: 'rgba(239,68,68,0.5)' } : {}} />
+                    <button type="button" onClick={() => setForm(f => ({ ...f, password: generarClave(), passwordManual: true }))}
+                      className="terra-btn-outline whitespace-nowrap" style={{ padding: '0 14px', fontSize: 12 }}>
+                      Generar
+                    </button>
+                  </div>
                   {formErrors.password
                     ? <p className="text-xs mt-1" style={{ color: '#FCA5A5' }}>{formErrors.password}</p>
                     : <p className="text-[11px] mt-1" style={{ color: 'var(--text-faint)' }}>

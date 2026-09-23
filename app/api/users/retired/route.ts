@@ -8,7 +8,7 @@ export async function GET() {
 
   const { data, error } = await supabaseAdmin
     .from('users')
-    .select('id, name, email, cedula, role, area, cargo, area_id, active, company_id, created_at, retired_at')
+    .select('id, name, email, correo, cedula, role, area, cargo, area_id, active, company_id, created_at, retired_at')
     .eq('company_id', companyId)
     .not('retired_at', 'is', null)
     .is('purged_at', null)

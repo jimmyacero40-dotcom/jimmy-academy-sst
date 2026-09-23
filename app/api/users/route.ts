@@ -18,7 +18,7 @@ export async function GET(req: NextRequest) {
 
   let query = supabaseAdmin
     .from('users')
-    .select('id, email, name, cedula, role, area, cargo, area_id, active, company_id, created_at, retired_at, permissions')
+    .select('id, email, correo, name, cedula, role, area, cargo, area_id, active, company_id, created_at, retired_at, permissions')
     .is('retired_at', null)  // exclude retired workers from main list
     .order('created_at', { ascending: false })
   if (companyId) query = query.eq('company_id', companyId)
@@ -97,7 +97,7 @@ async function sincronizarArea(cambios: Record<string, any>, companyId: string |
 
 export async function POST(req: NextRequest) {
   const body = await req.json()
-  const { email, password, name, cedula, role, area, cargo, permissions } = body
+  const { email, correo, password, name, cedula, role, area, cargo, permissions } = body
 
   // Crear un trabajador y crear una cuenta de acceso son capacidades distintas.
   const esCuentaDePlataforma = role && role !== 'worker'
@@ -120,6 +120,7 @@ export async function POST(req: NextRequest) {
     .from('users')
     .insert({
       email,
+      correo: correo || null,
       password: hash,
       name,
       cedula: cedula || '',
@@ -131,7 +132,7 @@ export async function POST(req: NextRequest) {
       company_id: companyId,
       permissions: Array.isArray(permissions) ? permissions : null,
     })
-    .select('id, email, name, cedula, role, area, cargo, area_id, active, company_id, created_at, permissions')
+    .select('id, email, correo, name, cedula, role, area, cargo, area_id, active, company_id, created_at, permissions')
     .single()
 
   if (error) {
@@ -168,7 +169,7 @@ export async function PUT(req: NextRequest) {
   let query = supabase.from('users').update(updates).eq('id', id)
   if (companyId) query = query.eq('company_id', companyId)
 
-  const { data, error } = await query.select('id, email, name, cedula, role, area, area_id, active, company_id, created_at').single()
+  const { data, error } = await query.select('id, email, correo, name, cedula, role, area, area_id, active, company_id, created_at').single()
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
   return NextResponse.json(data)
 }

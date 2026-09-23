@@ -27,7 +27,7 @@ interface Summary {
 }
 
 interface WorkerRow {
-  id: string; name: string; email: string; cedula: string; area: string
+  id: string; name: string; email: string; correo?: string | null; cedula: string; area: string
   role: string; status: string; total: number; completed: number
   compliance: number; avgScore: number | null
 }
@@ -189,7 +189,7 @@ export default function ReportsPage() {
     try {
       if (tab === 'workers') {
         await exportXlsx(workers.map(w => ({
-          Nombre: w.name, Cédula: w.cedula, Email: w.email, Área: w.area,
+          Nombre: w.name, Cédula: w.cedula, Usuario: w.email, Correo: w.correo || '', Área: w.area,
           Rol: w.role, Estado: w.status, Matriculas: w.total,
           Completados: w.completed, 'Cumplimiento %': w.compliance,
           'Promedio score': w.avgScore ?? '',

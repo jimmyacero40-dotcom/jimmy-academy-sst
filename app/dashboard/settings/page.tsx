@@ -12,6 +12,7 @@ import {
 import { useTheme, THEMES, type ThemeId } from '@/components/ThemeProvider'
 import { CATALOGO_PERMISOS, PERMISOS_POR_ROL, permisosEfectivos } from '@/lib/permisos'
 import SedesPorterias from '@/components/SedesPorterias'
+import { generarClave } from '@/lib/claves'
 
 const ADMIN_SECTIONS = [
   { id: 'empresa',        label: 'Empresa',      icon: Building2, superadminOnly: false },
@@ -43,7 +44,7 @@ function Toggle({ defaultOn = false }: { defaultOn?: boolean }) {
 }
 
 interface PlatformUser {
-  id: string; name: string; email: string; role: string; active: boolean; cedula: string
+  id: string; name: string; email: string; correo?: string | null; role: string; active: boolean; cedula: string
   permissions?: string[] | null
 }
 
@@ -160,13 +161,14 @@ export default function SettingsPage() {
   const [platformUsers, setPlatformUsers] = useState<PlatformUser[]>([])
   const [puLoading, setPuLoading] = useState(false)
   const [puForm, setPuForm] = useState({
-    name: '', email: '', password: '', role: 'portero', cedula: '',
+    name: '', email: '', correo: '', password: '', role: 'portero', cedula: '',
     permissions: PERMISOS_POR_ROL['portero'],
   })
   const [permEditando, setPermEditando] = useState<string | null>(null)
   const [permBorrador, setPermBorrador] = useState<string[]>([])
   const [permGuardando, setPermGuardando] = useState(false)
-  const [datosBorrador, setDatosBorrador] = useState({ name: '', email: '', cedula: '', role: '', active: true, password: '' })
+  const [claveAsignada, setClaveAsignada] = useState<{ nombre: string; usuario: string; clave: string } | null>(null)
+  const [datosBorrador, setDatosBorrador] = useState({ name: '', email: '', correo: '', cedula: '', role: '', active: true, password: '' })
 
   // Filtros de la lista de usuarios
   const [uBusqueda, setUBusqueda] = useState('')
@@ -200,7 +202,7 @@ export default function SettingsPage() {
     if (permEditando === u.id) { setPermEditando(null); return }
     setPermEditando(u.id)
     setPermBorrador(permisosEfectivos(u.role, u.permissions))
-    setDatosBorrador({ name: u.name, email: u.email, cedula: u.cedula || '', role: u.role, active: u.active, password: '' })
+    setDatosBorrador({ name: u.name, email: u.email, correo: u.correo || '', cedula: u.cedula || '', role: u.role, active: u.active, password: '' })
   }
 
   async function guardarUsuario(userId: string) {
@@ -209,6 +211,7 @@ export default function SettingsPage() {
       id: userId,
       name: datosBorrador.name,
       email: datosBorrador.email,
+      correo: datosBorrador.correo.trim() || null,
       cedula: datosBorrador.cedula,
       role: datosBorrador.role,
       active: datosBorrador.active,
@@ -222,7 +225,11 @@ export default function SettingsPage() {
       body: JSON.stringify(cambios),
     })
     if (!res.ok) setPuError((await res.json().catch(() => ({}))).error || 'No fue posible guardar')
-    else setPermEditando(null)
+    else {
+      // Se muestra aquí porque, una vez cifrada, no se puede volver a consultar.
+      if (cambios.password) setClaveAsignada({ nombre: datosBorrador.name, usuario: datosBorrador.email, clave: cambios.password })
+      setPermEditando(null)
+    }
     await loadPlatformUsers()
     setPermGuardando(false)
   }
@@ -249,7 +256,7 @@ export default function SettingsPage() {
       body: JSON.stringify(puForm),
     })
     if (res.ok) {
-      setPuForm({ name: '', email: '', password: '', role: 'portero', cedula: '', permissions: PERMISOS_POR_ROL['portero'] })
+      setPuForm({ name: '', email: '', correo: '', password: '', role: 'portero', cedula: '', permissions: PERMISOS_POR_ROL['portero'] })
       setPuSuccess(true)
       setTimeout(() => setPuSuccess(false), 2500)
       await loadPlatformUsers()
@@ -678,7 +685,8 @@ export default function SettingsPage() {
                 <div className="grid sm:grid-cols-2 gap-4 mb-4">
                   {[
                     { key: 'name',     label: 'Nombre completo *', placeholder: 'Ej: Juan Portero' },
-                    { key: 'email',    label: 'Correo electrónico *', placeholder: 'correo@empresa.co' },
+                    { key: 'email',    label: 'Usuario * (documento o correo)', placeholder: '1052392965' },
+                    { key: 'correo',   label: 'Correo electrónico (contacto)', placeholder: 'correo@empresa.co' },
                     { key: 'password', label: 'Contraseña *', placeholder: 'Mínimo 8 caracteres' },
                     { key: 'cedula',   label: 'Cédula (opcional)', placeholder: 'N° documento' },
                   ].map(({ key, label, placeholder }) => (
@@ -754,6 +762,30 @@ export default function SettingsPage() {
                     <RefreshCw size={12} /> Actualizar
                   </button>
                 </div>
+                {claveAsignada && (
+                  <div className="mb-4 p-3 rounded-xl" style={{ background: 'rgba(16,185,129,0.08)', border: '1px solid rgba(16,185,129,0.35)' }}>
+                    <div className="flex items-start gap-2">
+                      <KeyRound size={15} style={{ color: '#10B981' }} className="mt-0.5 flex-shrink-0" />
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-bold" style={{ color: '#10B981' }}>Contraseña asignada a {claveAsignada.nombre}</p>
+                        <p className="text-xs mt-1" style={{ color: 'var(--text-dim)' }}>
+                          Usuario: <span className="font-mono font-bold" style={{ color: 'var(--text)' }}>{claveAsignada.usuario}</span>
+                          {'  ·  '}Contraseña: <span className="font-mono font-bold text-base" style={{ color: 'var(--text)' }}>{claveAsignada.clave}</span>
+                        </p>
+                        <p className="text-[11px] mt-1" style={{ color: 'var(--text-faint)' }}>
+                          Cópiala ahora: queda cifrada y el sistema no puede volver a mostrarla.
+                        </p>
+                      </div>
+                      <button onClick={() => navigator.clipboard?.writeText(claveAsignada.clave)}
+                        className="text-[11px] font-bold px-2.5 py-1.5 rounded-lg flex-shrink-0"
+                        style={{ background: '#10B981', color: '#fff' }}>Copiar</button>
+                      <button onClick={() => setClaveAsignada(null)} className="flex-shrink-0" style={{ color: 'var(--text-faint)' }}>
+                        <Trash2 size={13} />
+                      </button>
+                    </div>
+                  </div>
+                )}
+
                 {/* Filtros de la lista */}
                 <div className="flex flex-wrap gap-2 mb-4">
                   <div className="relative flex-1 min-w-[200px]">
@@ -829,19 +861,29 @@ export default function SettingsPage() {
                             <div className="grid sm:grid-cols-2 xl:grid-cols-4 gap-3">
                               {([
                                 ['name',     'Nombre completo'],
-                                ['email',    'Correo electrónico'],
+                                ['email',    'Usuario (documento o correo)'],
+                                ['correo',   'Correo electrónico (contacto)'],
                                 ['cedula',   'Cédula'],
                                 ['password', 'Nueva contraseña (opcional)'],
                               ] as const).map(([campo, etiqueta]) => (
                                 <div key={campo}>
                                   <label className="text-[var(--text-dim)] text-[11px] font-semibold mb-1 block">{etiqueta}</label>
-                                  <input
-                                    type={campo === 'password' ? 'password' : 'text'}
-                                    value={(datosBorrador as any)[campo]}
-                                    placeholder={campo === 'password' ? 'Dejar vacío para no cambiarla' : undefined}
-                                    onChange={e => setDatosBorrador(p => ({ ...p, [campo]: e.target.value }))}
-                                    className="w-full bg-[var(--bg-surface)] border border-[var(--border)] rounded-lg px-3 py-2 text-sm text-[var(--text)] focus:outline-none focus:border-amber-500/40"
-                                  />
+                                  <div className="flex gap-1.5">
+                                    <input
+                                      type="text"
+                                      value={(datosBorrador as any)[campo]}
+                                      placeholder={campo === 'password' ? 'Dejar vacío para no cambiarla' : undefined}
+                                      onChange={e => setDatosBorrador(p => ({ ...p, [campo]: e.target.value }))}
+                                      className={`w-full bg-[var(--bg-surface)] border border-[var(--border)] rounded-lg px-3 py-2 text-sm text-[var(--text)] focus:outline-none focus:border-amber-500/40 ${campo === 'password' ? 'font-mono' : ''}`}
+                                    />
+                                    {campo === 'password' && (
+                                      <button type="button" onClick={() => setDatosBorrador(p => ({ ...p, password: generarClave() }))}
+                                        className="px-2.5 rounded-lg text-[11px] font-bold whitespace-nowrap"
+                                        style={{ border: '1px solid var(--border)', color: 'var(--primary)', background: 'var(--bg-card)' }}>
+                                        Generar
+                                      </button>
+                                    )}
+                                  </div>
                                 </div>
                               ))}
                               <div>
