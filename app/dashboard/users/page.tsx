@@ -5,7 +5,6 @@ import { useRouter } from 'next/navigation'
 import { useSession } from 'next-auth/react'
 import { motion, AnimatePresence } from 'framer-motion'
 import * as XLSX from 'xlsx'
-import { generarClave } from '@/lib/claves'
 import {
   Users, Search, MoreVertical, CheckCircle,
   Building2, X, Edit2, Trash2, Download, ChevronDown,
@@ -1261,17 +1260,11 @@ export default function UsersPage() {
                   <label className="text-xs font-semibold mb-1.5 block" style={{ color: 'var(--text-dim)' }}>
                     {editUser ? 'Nueva contraseña (dejar vacío para no cambiarla)' : 'Contraseña * (tú la asignas)'}
                   </label>
-                  <div className="flex gap-2">
-                    <input type="text" value={form.password}
-                      onChange={e => setForm(f => ({ ...f, password: e.target.value, passwordManual: true }))}
-                      placeholder={editUser ? 'Sin cambios' : 'Puedes usar la cédula o escribir otra'}
-                      className="terra-input font-mono"
-                      style={formErrors.password ? { borderColor: 'rgba(239,68,68,0.5)' } : {}} />
-                    <button type="button" onClick={() => setForm(f => ({ ...f, password: generarClave(), passwordManual: true }))}
-                      className="terra-btn-outline whitespace-nowrap" style={{ padding: '0 14px', fontSize: 12 }}>
-                      Generar
-                    </button>
-                  </div>
+                  <input type="text" value={form.password}
+                    onChange={e => setForm(f => ({ ...f, password: e.target.value, passwordManual: true }))}
+                    placeholder={editUser ? 'Sin cambios' : 'Puedes usar la cédula o escribir otra'}
+                    className="terra-input font-mono"
+                    style={formErrors.password ? { borderColor: 'rgba(239,68,68,0.5)' } : {}} />
                   {formErrors.password
                     ? <p className="text-xs mt-1" style={{ color: '#FCA5A5' }}>{formErrors.password}</p>
                     : <p className="text-[11px] mt-1" style={{ color: 'var(--text-faint)' }}>
