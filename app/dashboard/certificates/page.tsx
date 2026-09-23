@@ -1,6 +1,8 @@
 ﻿'use client'
 
 import { useState, useEffect } from 'react'
+import { useSession } from 'next-auth/react'
+import { tienePermiso } from '@/lib/permisos'
 import { motion } from 'framer-motion'
 import Link from 'next/link'
 import {
@@ -27,6 +29,13 @@ function computeStatus(cert: Cert): Cert {
 }
 
 export default function CertificatesPage() {
+  const { data: session } = useSession()
+  // Emitir lleva a la biblioteca de cursos: solo lo ve quien gestiona formación.
+  const puedeEmitir = tienePermiso(
+    (session?.user as any)?.role,
+    (session?.user as any)?.permissions,
+    'formacion.gestionar',
+  )
   const [certs, setCerts] = useState<Cert[]>([])
   const [search, setSearch] = useState('')
   const [filter, setFilter] = useState('todos')
@@ -125,10 +134,12 @@ export default function CertificatesPage() {
             <h1 className="text-2xl font-black text-[var(--text)] mb-1">Certificados</h1>
             <p className="text-[var(--text-dim)] text-sm">{certs.length} certificados emitidos</p>
           </div>
-          <Link href="/dashboard/trainings"
-            className="flex items-center gap-2 bg-[var(--amber)] hover:bg-amber-500 text-[var(--text)] px-4 py-2.5 rounded-xl font-semibold text-sm transition-all self-start sm:self-auto">
-            <Plus size={16} /> Emitir Certificado
-          </Link>
+          {puedeEmitir && (
+            <Link href="/dashboard/trainings"
+              className="flex items-center gap-2 bg-[var(--amber)] hover:bg-amber-500 text-[var(--text)] px-4 py-2.5 rounded-xl font-semibold text-sm transition-all self-start sm:self-auto">
+              <Plus size={16} /> Emitir Certificado
+            </Link>
+          )}
         </div>
       </motion.div>
 
