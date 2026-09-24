@@ -66,6 +66,10 @@ const ALLOWED_COLS = new Set([
   'dificultades_economicas','equilibrio_trabajo_vida',
   'licencia_conduccion','categoria_licencia','certificaciones','otras_certificaciones',
   'autoriza_datos','declara_veracidad','firma_electronica','fecha_consentimiento',
+  // Seguridad social, condición de discapacidad y contactos adicionales
+  'grupo_sanguineo','eps','arl','fondo_pension','caja_compensacion',
+  'tiene_discapacidad','discapacidad_detalle','poblacion_vulnerable',
+  'telefono_alterno','contacto_emergencia2','parentesco_contacto2','tel_contacto2',
 ])
 
 export async function PUT(req: NextRequest) {

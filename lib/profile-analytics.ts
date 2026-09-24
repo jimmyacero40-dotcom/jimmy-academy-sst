@@ -36,6 +36,23 @@ export interface WP {
   licencia_conduccion?: boolean; categoria_licencia?: string
   certificaciones?: string[]; otras_certificaciones?: string
   autoriza_datos?: boolean; declara_veracidad?: boolean
+  firma_electronica?: string; fecha_consentimiento?: string
+  // Identificación y contacto
+  photo_url?: string; doc_type?: string
+  ciudad_nacimiento?: string; depto_nacimiento?: string
+  direccion?: string; barrio?: string; telefono?: string; telefono_alterno?: string
+  email_personal?: string; grupo_sanguineo?: string
+  contacto_emergencia?: string; parentesco_contacto?: string; tel_contacto?: string
+  contacto_emergencia2?: string; parentesco_contacto2?: string; tel_contacto2?: string
+  // Seguridad social y condición
+  eps?: string; arl?: string; fondo_pension?: string; caja_compensacion?: string
+  tiene_discapacidad?: boolean; discapacidad_detalle?: string; poblacion_vulnerable?: string
+  // Formación
+  estudios_tecnicos?: string; estudios_tecnologicos?: string; estudios_universitarios?: string
+  especializacion?: string; otros_estudios?: string; cursos_certificados?: string
+  // Laboral / tallas / salud (sin los textos libres de salud)
+  jefe_inmediato?: string; obs_tallas?: string; distancia_aprox?: string
+  enfermedades_otra?: string; antecedentes_familiares_otra?: string
   users?: { name?: string; cedula?: string; email?: string; area?: string }
 }
 

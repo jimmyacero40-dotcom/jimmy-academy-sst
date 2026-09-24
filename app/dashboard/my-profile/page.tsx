@@ -20,6 +20,10 @@ interface ProfileData {
   con_quien_vive?: string; num_personas_hogar?: number; num_hijos?: number
   dependientes_economicos?: number; cabeza_hogar?: Nullable<boolean>
   contacto_emergencia?: string; parentesco_contacto?: string; tel_contacto?: string
+  contacto_emergencia2?: string; parentesco_contacto2?: string; tel_contacto2?: string
+  telefono_alterno?: string; grupo_sanguineo?: string
+  eps?: string; arl?: string; fondo_pension?: string; caja_compensacion?: string
+  tiene_discapacidad?: boolean; discapacidad_detalle?: string; poblacion_vulnerable?: string
   tipo_vivienda?: string; tenencia_vivienda?: string; estrato?: number
   servicios_publicos?: string[]; acceso_internet?: Nullable<boolean>
   nivel_educativo?: string; profesion?: string; estudios_tecnicos?: string
@@ -596,11 +600,38 @@ export default function MyProfilePage() {
                     onChange={e => set('telefono', e.target.value)} placeholder="300 123 4567"
                     type="tel" inputMode="numeric" maxLength={15} />
                 </Field>
-                <Field label="CORREO ELECTRÓNICO PERSONAL" span2>
+                <Field label="TELÉFONO ALTERNO" tip="Otro número donde ubicarte">
+                  <input className={inp} value={data.telefono_alterno ?? ''}
+                    onChange={e => set('telefono_alterno', e.target.value)} placeholder="300 123 4567"
+                    type="tel" inputMode="numeric" maxLength={15} />
+                </Field>
+                <Field label="CORREO ELECTRÓNICO PERSONAL">
                   <input type="email" className={inp} value={data.email_personal ?? ''}
                     onChange={e => set('email_personal', e.target.value.toLowerCase())} placeholder="correo@ejemplo.com"
                     autoComplete="email" />
                 </Field>
+                <Field label="GRUPO SANGUÍNEO Y RH" tip="Dato clave ante una emergencia">
+                  <select value={data.grupo_sanguineo ?? ''} onChange={e => set('grupo_sanguineo', e.target.value)} className={inp}>
+                    <option value="">— Seleccionar —</option>
+                    {['O+','O-','A+','A-','B+','B-','AB+','AB-','NO LO SÉ'].map(o => <option key={o}>{o}</option>)}
+                  </select>
+                </Field>
+                <Field label="¿PERTENECE A ALGÚN GRUPO ÉTNICO O POBLACIÓN VULNERABLE?">
+                  <select value={data.poblacion_vulnerable ?? ''} onChange={e => set('poblacion_vulnerable', e.target.value)} className={inp}>
+                    <option value="">— Seleccionar —</option>
+                    {['NINGUNA','INDÍGENA','AFRODESCENDIENTE','RAIZAL O PALENQUERO','ROM / GITANO','VÍCTIMA DEL CONFLICTO','MADRE O PADRE CABEZA DE HOGAR','MIGRANTE','OTRA'].map(o => <option key={o}>{o}</option>)}
+                  </select>
+                </Field>
+                <div className="col-span-2">
+                  <BoolField label="¿TIENE ALGUNA CONDICIÓN DE DISCAPACIDAD RECONOCIDA?" value={data.tiene_discapacidad ?? null}
+                    onChange={v => set('tiene_discapacidad', v)} tip="Física, sensorial, cognitiva o psicosocial" />
+                </div>
+                {data.tiene_discapacidad && (
+                  <Field label="¿CUÁL CONDICIÓN?" span2>
+                    <input className={inp} value={data.discapacidad_detalle ?? ''}
+                      onChange={e => set('discapacidad_detalle', UP(e.target.value))} placeholder="DESCRIBE LA CONDICIÓN" spellCheck={false} />
+                  </Field>
+                )}
               </div>
               <TabNav onNext={() => switchTab('familia')} nextLabel="Siguiente: Familia" />
             </SectionCard>
@@ -651,6 +682,23 @@ export default function MyProfilePage() {
                   <Field label="TELÉFONO DE EMERGENCIA *" tip="Debe ser diferente al tuyo">
                     <input className={inp} value={data.tel_contacto ?? ''}
                       onChange={e => set('tel_contacto', e.target.value)} placeholder="300 123 4567"
+                      type="tel" inputMode="numeric" maxLength={15} />
+                  </Field>
+
+                  {/* Segundo contacto: por si el primero no responde. */}
+                  <Field label="SEGUNDO CONTACTO (OPCIONAL)">
+                    <input className={inp} value={data.contacto_emergencia2 ?? ''}
+                      onChange={e => set('contacto_emergencia2', UP(e.target.value))} placeholder="NOMBRE COMPLETO" spellCheck={false} />
+                  </Field>
+                  <Field label="PARENTESCO DEL SEGUNDO CONTACTO">
+                    <select value={data.parentesco_contacto2 ?? ''} onChange={e => set('parentesco_contacto2', e.target.value)} className={inp}>
+                      <option value="">— Seleccionar —</option>
+                      {['CÓNYUGE / PAREJA','MADRE','PADRE','HIJO/A','HERMANO/A','OTRO FAMILIAR','AMIGO/A'].map(o => <option key={o}>{o}</option>)}
+                    </select>
+                  </Field>
+                  <Field label="TELÉFONO DEL SEGUNDO CONTACTO">
+                    <input className={inp} value={data.tel_contacto2 ?? ''}
+                      onChange={e => set('tel_contacto2', e.target.value)} placeholder="300 123 4567"
                       type="tel" inputMode="numeric" maxLength={15} />
                   </Field>
                 </div>
@@ -807,6 +855,24 @@ export default function MyProfilePage() {
                   </Field>
                   <BoolField label="¿HACE HORAS EXTRAS CON FRECUENCIA?" value={data.realiza_horas_extras ?? null} onChange={v => set('realiza_horas_extras', v)} />
                   <BoolField label="¿TRABAJA FINES DE SEMANA?" value={data.trabaja_fines_semana ?? null} onChange={v => set('trabaja_fines_semana', v)} />
+
+                  <p className="col-span-2 text-[11px] font-bold uppercase tracking-wider pt-2" style={{ color: 'var(--text-faint)' }}>🏥 Afiliaciones a seguridad social</p>
+                  <Field label="EPS (SALUD)">
+                    <input className={inp} value={data.eps ?? ''}
+                      onChange={e => set('eps', UP(e.target.value))} placeholder="EJ: SURA" spellCheck={false} />
+                  </Field>
+                  <Field label="ARL (RIESGOS LABORALES)">
+                    <input className={inp} value={data.arl ?? ''}
+                      onChange={e => set('arl', UP(e.target.value))} placeholder="EJ: POSITIVA" spellCheck={false} />
+                  </Field>
+                  <Field label="FONDO DE PENSIONES">
+                    <input className={inp} value={data.fondo_pension ?? ''}
+                      onChange={e => set('fondo_pension', UP(e.target.value))} placeholder="EJ: PORVENIR" spellCheck={false} />
+                  </Field>
+                  <Field label="CAJA DE COMPENSACIÓN">
+                    <input className={inp} value={data.caja_compensacion ?? ''}
+                      onChange={e => set('caja_compensacion', UP(e.target.value))} placeholder="EJ: COMFENALCO" spellCheck={false} />
+                  </Field>
                 </div>
               </SectionCard>
               <TabNav onPrev={() => switchTab('familia')} onNext={() => switchTab('tallas')} nextLabel="Siguiente: Tallas / EPP" />
