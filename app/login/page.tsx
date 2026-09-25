@@ -26,14 +26,9 @@ const C = {
   error:       '#FCA5A5',
 }
 
-// Sobre navy el verde oscuro de "AGRO" y del lema se pierde. Un contorno claro de
-// un píxel lo devuelve a la vista sin encerrarlo en una tarjeta.
-const CONTORNO_AGROSAFE: React.CSSProperties = {
-  filter:
-    'drop-shadow(0 0 1px rgba(255,255,255,0.95)) drop-shadow(0 0 1px rgba(255,255,255,0.95)) drop-shadow(0 6px 18px rgba(0,0,0,0.35))',
-}
-// AgroVenture ya contrasta con el navy; el contorno solo le emborronaba las letras.
-const SOMBRA_AGROVENTURE: React.CSSProperties = { filter: 'drop-shadow(0 4px 12px rgba(0,0,0,0.35))' }
+// La marca en blanco ya contrasta sola contra el navy: basta una sombra suave
+// que la despegue del fondo, sin contornos ni tarjetas.
+const SOMBRA_MARCA: React.CSSProperties = { filter: 'drop-shadow(0 8px 24px rgba(0,0,0,0.45))' }
 
 const MODULOS = [
   { icon: Users,         titulo: 'Gestión del personal',       texto: 'Hojas de vida, áreas, grupos y retiros.' },
@@ -44,18 +39,12 @@ const MODULOS = [
 
 const NORMAS = ['Decreto 1072', 'Res. 0312', 'Datos protegidos']
 
+/** El bloque de marca ya trae el lema y el respaldo de AgroVenture en una sola pieza. */
 function Logos({ grande }: { grande?: boolean }) {
   return (
-    <div className="flex items-center" style={{ gap: grande ? 32 : 18 }}>
-      <img src="/images/agrosafe-logo.png" alt="AgroSafe"
-        className="w-auto object-contain"
-        style={{ height: grande ? 'clamp(104px, 11vh, 132px)' : 64, ...CONTORNO_AGROSAFE }} />
-      <div className="self-stretch w-px" style={{ background: 'rgba(255,255,255,0.14)', margin: '10px 0' }} />
-      {/* AgroVenture es el contexto corporativo: más pequeño que la marca de la plataforma. */}
-      <img src="/images/agroventure-logo.png" alt="AgroVenture Capital"
-        className="w-auto object-contain"
-        style={{ height: grande ? 'clamp(58px, 6vh, 72px)' : 38, ...SOMBRA_AGROVENTURE }} />
-    </div>
+    <img src="/images/agrosafe-completo.png" alt="AgroSafe — Sistema de Gestión de Seguridad y Salud en el Trabajo, by AgroVenture Capital"
+      className="h-auto object-contain"
+      style={{ width: grande ? 'clamp(340px, 30vw, 460px)' : 'min(300px, 78vw)', ...SOMBRA_MARCA }} />
   )
 }
 

@@ -149,11 +149,6 @@ const ADMIN_NAV: NavEntry[] = [
   },
 ]
 
-// Sobre la barra oscura el verde de "AGRO" se pierde; un contorno claro de un píxel
-// lo devuelve a la vista sin encerrarlo en una tarjeta. AgroVenture no lo necesita
-// y con él sus letras se emborronan.
-const CONTORNO_AGROSAFE = 'drop-shadow(0 0 1px rgba(255,255,255,0.95)) drop-shadow(0 0 1px rgba(255,255,255,0.95))'
-
 // ── Portero navigation ────────────────────────────────────────────
 const PORTERO_NAV = [
   { href: '/dashboard/control-operativo/porteria', icon: MapPin,   label: 'Portería' },
@@ -200,6 +195,8 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
   const [activeCompany, setActiveCompany] = useState<{ name: string; logo_url?: string } | null>(null)
   const [workerDisplayName, setWorkerDisplayName] = useState<string | null>(null)
+  // AgroVenture ya viene dentro del bloque de marca; otra empresa sí lleva el suyo.
+  const otraEmpresa = !!activeCompany?.logo_url && !/agroventure/i.test(activeCompany.name)
   const [collapsed, setCollapsed] = useState(false)
   const [mobileOpen, setMobileOpen] = useState(false)
   const [searchOpen, setSearchOpen] = useState(false)
@@ -297,28 +294,28 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           style={{
             borderBottom: '1px solid var(--sidebar-border)',
             padding: collapsed ? '10px 8px' : '14px 16px',
-            minHeight: collapsed ? 56 : 80,
+            minHeight: collapsed ? 56 : 104,
           }}>
 
           {collapsed ? (
-            <img src="/images/agrosafe-logo.png" alt="AgroSafe"
-              style={{ width: 44, height: 44, objectFit: 'contain', filter: CONTORNO_AGROSAFE }} />
+            /* Plegada solo cabe el símbolo; el nombre volvería un borrón. */
+            <img src="/images/agrosafe-icono.png" alt="AgroSafe"
+              style={{ height: 34, width: 'auto', objectFit: 'contain' }} />
           ) : (
             <div className="w-full flex flex-col items-center gap-2">
-              {/* Ambos logos en una misma fila, integrados al fondo de la barra. */}
-              <div className="w-full flex items-center justify-center gap-3.5">
-                <img src="/images/agrosafe-logo.png" alt="AgroSafe"
-                  style={{ height: 58, width: 'auto', maxWidth: '60%', objectFit: 'contain', filter: CONTORNO_AGROSAFE }} />
-                <div className="self-stretch w-px" style={{ margin: '6px 0', background: 'var(--sidebar-border)' }} />
-                {/* Empresas distintas de AgroVenture conservan su propio logo. */}
-                {activeCompany?.logo_url && !/agroventure/i.test(activeCompany.name) ? (
-                  <img src={activeCompany.logo_url} alt={activeCompany.name}
-                    style={{ height: 42, width: 'auto', maxWidth: '30%', objectFit: 'contain' }} />
-                ) : (
-                  <img src="/images/agroventure-logo.png" alt="AgroVenture Capital"
-                    style={{ height: 42, width: 'auto', maxWidth: '30%', objectFit: 'contain' }} />
-                )}
-              </div>
+              {otraEmpresa ? (
+                /* Empresas distintas de AgroVenture conservan su propio logo al lado. */
+                <div className="w-full flex items-center justify-center gap-3">
+                  <img src="/images/agrosafe-marca.png" alt="AgroSafe"
+                    style={{ width: 118, height: 'auto', maxWidth: '58%', objectFit: 'contain' }} />
+                  <div className="self-stretch w-px" style={{ margin: '4px 0', background: 'var(--sidebar-border)' }} />
+                  <img src={activeCompany!.logo_url} alt={activeCompany!.name}
+                    style={{ height: 34, width: 'auto', maxWidth: '32%', objectFit: 'contain' }} />
+                </div>
+              ) : (
+                <img src="/images/agrosafe-completo.png" alt="AgroSafe by AgroVenture Capital"
+                  style={{ width: 182, maxWidth: '92%', height: 'auto', objectFit: 'contain' }} />
+              )}
               <div className="text-[8px] font-bold uppercase tracking-[0.16em]"
                 style={{ color: 'var(--sidebar-faint)' }}>
                 {sessionLoading ? ' ' : isAdmin ? 'Gestión del Personal' : isPortero ? 'Control de Acceso' : 'Portal Trabajador'}
