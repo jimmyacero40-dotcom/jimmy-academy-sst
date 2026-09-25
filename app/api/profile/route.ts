@@ -2,27 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { supabaseAdmin as supabase } from '@/lib/supabase-admin'
 import { getCurrentUser, getActiveCompanyId } from '@/lib/get-company'
 import { tienePermiso } from '@/lib/permisos'
-
-function calcCompletion(d: Record<string, any>): number {
-  const checks = [
-    !!d.photo_url,
-    !!(d.nombres && d.apellidos && d.fecha_nacimiento && d.sexo),
-    !!(d.contacto_emergencia && d.tel_contacto),
-    !!d.tipo_vivienda,
-    !!d.nivel_educativo,
-    !!(d.fecha_ingreso || d.tipo_contrato),
-    !!(d.estatura_cm && d.talla_camisa && d.talla_zapato),
-    !!d.municipio_vivienda,
-    d.realiza_actividad_fisica !== null && d.realiza_actividad_fisica !== undefined,
-    !!(d.enfermedades_diagnosticadas?.length) || d.hospitalizado !== null,
-    !!(d.antecedentes_familiares?.length),
-    d.accidentes_trabajo !== null && d.accidentes_trabajo !== undefined,
-    d.trabajo_genera_estres !== null && d.trabajo_genera_estres !== undefined,
-    !!(d.certificaciones?.length || d.licencia_conduccion !== null),
-    !!(d.autoriza_datos && d.declara_veracidad),
-  ]
-  return Math.round((checks.filter(Boolean).length / checks.length) * 100)
-}
+import { calcPct } from '@/lib/perfil-completitud'
 
 export async function GET() {
   const user = await getCurrentUser()
@@ -109,7 +89,7 @@ export async function PUT(req: NextRequest) {
     ...sanitized,
     user_id: targetUserId,
     company_id: companyId,
-    completion_pct: calcCompletion({ ...(actual ?? {}), ...sanitized }),
+    completion_pct: calcPct({ ...(actual ?? {}), ...sanitized }),
     updated_at: new Date().toISOString(),
   }
 

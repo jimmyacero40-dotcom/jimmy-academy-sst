@@ -7,6 +7,7 @@ import {
   Heart, Briefcase, GraduationCap, Activity, Shield, Award,
   FileText, Home, Car, ChevronRight, Info, AlertCircle
 } from 'lucide-react'
+import { calcSections, calcPct, TOTAL_SECCIONES } from '@/lib/perfil-completitud'
 
 // ─── Types ────────────────────────────────────────────────────────────
 type Nullable<T> = T | null | undefined
@@ -67,31 +68,6 @@ interface ProfileData {
 }
 
 const LS_KEY = 'sst_profile_draft'
-
-// ─── Completion calc ─────────────────────────────────────────────────
-function calcSections(d: ProfileData) {
-  return {
-    'Foto':               !!d.photo_url,
-    'Datos personales':   !!(d.nombres && d.apellidos && d.fecha_nacimiento && d.sexo),
-    'Contacto emergencia':!!(d.contacto_emergencia && d.tel_contacto),
-    'Vivienda':           !!d.tipo_vivienda,
-    'Educación':          !!d.nivel_educativo,
-    'Información laboral':!!(d.fecha_ingreso || d.tipo_contrato),
-    'Tallas / EPP':       !!(d.estatura_cm && d.talla_camisa && d.talla_zapato),
-    'Desplazamiento':     !!d.municipio_vivienda,
-    'Hábitos':            d.realiza_actividad_fisica != null,
-    'Antecedentes médicos': d.hospitalizado != null,
-    'Ant. familiares':    !!(d.antecedentes_familiares?.length),
-    'Salud ocupacional':  d.accidentes_trabajo != null,
-    'Riesgo psicosocial': d.trabajo_genera_estres != null,
-    'Competencias':       d.licencia_conduccion != null,
-    'Consentimientos':    !!(d.autoriza_datos && d.declara_veracidad),
-  }
-}
-function calcPct(d: ProfileData) {
-  const s = calcSections(d)
-  return Math.round((Object.values(s).filter(Boolean).length / 15) * 100)
-}
 
 // ─── Client-side image compression ───────────────────────────────────
 async function compressImage(file: File): Promise<Blob> {
@@ -418,7 +394,7 @@ export default function MyProfilePage() {
             <div className="mt-3 mb-2">
               <div className="flex justify-between items-center mb-1.5">
                 <span className="text-xs font-semibold" style={{ color: 'var(--text-dim)' }}>
-                  Perfil completado — {doneCount} de 15 secciones
+                  Perfil completado — {doneCount} de {TOTAL_SECCIONES} secciones
                 </span>
                 <span className="text-sm font-bold" style={{ color: pct >= 80 ? '#10B981' : pct >= 50 ? '#F59E0B' : '#EF4444' }}>{pct}%</span>
               </div>
@@ -1149,7 +1125,7 @@ export default function MyProfilePage() {
                     </Field>
                   )}
                   <CheckGroup label="¿CUÁL DE ESTAS CERTIFICACIONES TIENE VIGENTES? (SELECCIONA TODAS LAS QUE APLICAN)"
-                    options={['TRABAJO EN ALTURAS','BRIGADISTA DE EMERGENCIAS','PRIMEROS AUXILIOS','OPERACIÓN DE MONTACARGAS','ESPACIOS CONFINADOS','MANEJO DE QUÍMICOS PELIGROSOS','SOLDADURA','CARGUE Y DESCARGUE','MANEJO SEGURO DE MAQUINARIA']}
+                    options={['NINGUNA','TRABAJO EN ALTURAS','BRIGADISTA DE EMERGENCIAS','PRIMEROS AUXILIOS','OPERACIÓN DE MONTACARGAS','ESPACIOS CONFINADOS','MANEJO DE QUÍMICOS PELIGROSOS','SOLDADURA','CARGUE Y DESCARGUE','MANEJO SEGURO DE MAQUINARIA']}
                     value={data.certificaciones ?? []}
                     onChange={v => setArr('certificaciones', v)} />
                   <Field label="OTRAS CERTIFICACIONES NO LISTADAS" span2>
