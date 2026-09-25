@@ -30,7 +30,7 @@ const ALLOWED_COLS = new Set([
   'estudios_universitarios','especializacion','otros_estudios','cursos_certificados','actualmente_estudia',
   'cargo_confirmado','area_confirmada','centro_trabajo','jefe_inmediato','fecha_ingreso',
   'tipo_contrato','jornada_laboral','horario_habitual','realiza_horas_extras','trabaja_fines_semana',
-  'estatura_cm','peso_kg','talla_camisa','talla_camiseta','talla_pantalon','talla_overol',
+  'estatura_cm','peso_kg','talla_camisa','talla_pantalon','talla_overol',
   'talla_chaqueta','talla_impermeable','talla_zapato','talla_botas','talla_guantes','obs_tallas',
   'municipio_vivienda','medio_transporte','tiempo_desplazamiento','distancia_aprox',
   'conduce_vehiculo','tipo_vehiculo',

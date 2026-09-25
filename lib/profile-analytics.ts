@@ -18,7 +18,7 @@ export interface WP {
   medio_transporte?: string; tiempo_desplazamiento?: string
   conduce_vehiculo?: boolean; tipo_vehiculo?: string
   estatura_cm?: number; peso_kg?: number
-  talla_camisa?: string; talla_camiseta?: string; talla_pantalon?: string
+  talla_camisa?: string; talla_pantalon?: string
   talla_overol?: string; talla_chaqueta?: string; talla_impermeable?: string
   talla_zapato?: string; talla_botas?: string; talla_guantes?: string
   realiza_actividad_fisica?: boolean; dias_actividad_fisica?: number; tipo_actividad_fisica?: string
@@ -100,7 +100,7 @@ export interface Analytics {
   avgEstatura: number | null
   avgPeso: number | null
   avgImc: number | null
-  tallaCamisa: FreqRow[]; tallaCamiseta: FreqRow[]; tallaPantalon: FreqRow[]
+  tallaCamisa: FreqRow[]; tallaPantalon: FreqRow[]
   tallaOverol: FreqRow[]; tallaChaqueta: FreqRow[]; tallaImpermeable: FreqRow[]
   tallaZapato: FreqRow[]; tallaBotas: FreqRow[]; tallaGuantes: FreqRow[]
   // ── estilos de vida ──
@@ -240,7 +240,6 @@ export function computeAnalytics(profiles: WP[]): Analytics {
     avgPeso: avgNum(profiles, w => w.peso_kg),
     avgImc,
     tallaCamisa: freq(profiles.map(w => w.talla_camisa)),
-    tallaCamiseta: freq(profiles.map(w => w.talla_camiseta)),
     tallaPantalon: freq(profiles.map(w => w.talla_pantalon)),
     tallaOverol: freq(profiles.map(w => w.talla_overol)),
     tallaChaqueta: freq(profiles.map(w => w.talla_chaqueta)),

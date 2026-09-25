@@ -470,8 +470,7 @@ export default function UserDetailPage() {
                   fields: [
                     ['Estatura', workerProfile.estatura_cm != null ? `${workerProfile.estatura_cm} cm` : null],
                     ['Peso', workerProfile.peso_kg != null ? `${workerProfile.peso_kg} kg` : null],
-                    ['Talla camisa', workerProfile.talla_camisa],
-                    ['Talla camiseta', workerProfile.talla_camiseta],
+                    ['Talla camisa / camiseta', workerProfile.talla_camisa],
                     ['Talla pantalón', workerProfile.talla_pantalon],
                     ['Talla overol', workerProfile.talla_overol],
                     ['Talla chaqueta', workerProfile.talla_chaqueta],

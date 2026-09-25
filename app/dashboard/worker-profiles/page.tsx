@@ -488,7 +488,6 @@ export default function WorkerProfilesPage() {
               <div className="grid lg:grid-cols-2 xl:grid-cols-3 gap-4">
                 {[
                   { title: 'Camisa', data: a.tallaCamisa },
-                  { title: 'Camiseta', data: a.tallaCamiseta },
                   { title: 'Pantalón', data: a.tallaPantalon },
                   { title: 'Overol', data: a.tallaOverol },
                   { title: 'Chaqueta', data: a.tallaChaqueta },
@@ -661,7 +660,7 @@ export default function WorkerProfilesPage() {
                         ['Jornada', selected.jornada_laboral],
                         ['Educación', selected.nivel_educativo],
                         ['Transporte', selected.medio_transporte],
-                        ['Talla camisa', selected.talla_camisa],
+                        ['Talla camisa / camiseta', selected.talla_camisa],
                         ['Talla zapato', selected.talla_zapato],
                         ['IMC', imc(selected.estatura_cm, selected.peso_kg) ? `${imc(selected.estatura_cm, selected.peso_kg)}` : undefined],
                       ].map(([k, v]) => v ? (

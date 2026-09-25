@@ -56,7 +56,7 @@ export const SECCIONES: Record<string, (d: Ficha) => boolean> = {
   ]),
 
   'Tallas / EPP': d => todos(d, [
-    'estatura_cm', 'peso_kg', 'talla_camisa', 'talla_camiseta', 'talla_pantalon',
+    'estatura_cm', 'peso_kg', 'talla_camisa', 'talla_pantalon',
     'talla_zapato', 'talla_botas', 'talla_guantes',
   ]),
 

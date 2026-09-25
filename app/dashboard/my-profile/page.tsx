@@ -36,7 +36,7 @@ interface ProfileData {
   jornada_laboral?: string; horario_habitual?: string
   realiza_horas_extras?: Nullable<boolean>; trabaja_fines_semana?: Nullable<boolean>
   estatura_cm?: number; peso_kg?: number
-  talla_camisa?: string; talla_camiseta?: string; talla_pantalon?: string
+  talla_camisa?: string; talla_pantalon?: string
   talla_overol?: string; talla_chaqueta?: string; talla_impermeable?: string
   talla_zapato?: string; talla_botas?: string; talla_guantes?: string; obs_tallas?: string
   municipio_vivienda?: string; medio_transporte?: string
