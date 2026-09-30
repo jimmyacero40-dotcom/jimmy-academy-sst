@@ -40,6 +40,8 @@ const ALL_NAV_HREFS = [
   '/dashboard/settings',
   '/dashboard/my-plan',
   '/dashboard/my-profile',
+  '/dashboard/gestion-sst/participacion',
+  '/dashboard/tu-cuentas/peligros',
   '/dashboard/tu-cuentas',
   '/dashboard/reportal',
   '/dashboard',
@@ -118,6 +120,7 @@ const ADMIN_NAV: NavEntry[] = [
     icon: Shield,
     label: 'Gestión SST',
     items: [
+      { href: '/dashboard/gestion-sst/participacion', icon: MessageSquare, label: 'Participación de trabajadores' },
       { href: null, icon: HardHat,       label: 'EPP',            disabled: true },
       { href: null, icon: FileText,      label: 'Documentos',     disabled: true },
       { href: null, icon: AlertTriangle, label: 'Emergencias',    disabled: true },
@@ -177,7 +180,7 @@ const MODULE_HREFS: Record<string, string[]> = {
     '/dashboard/trainings', '/dashboard/plan', '/dashboard/profiles',
     '/dashboard/enrollments', '/dashboard/attendance-lists', '/dashboard/certificates',
   ],
-  'gestion-sst': [],
+  'gestion-sst': ['/dashboard/gestion-sst'],
   'control-operativo': [
     '/dashboard/control-operativo',
     '/dashboard/control-operativo/porteria',

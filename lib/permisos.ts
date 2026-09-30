@@ -38,6 +38,13 @@ export const CATALOGO_PERMISOS: GrupoPermisos[] = [
     ],
   },
   {
+    grupo: 'Gestión SST',
+    permisos: [
+      { id: 'sst.participacion.ver',      label: 'Consultar participaciones', descripcion: 'Ver quién participó en la identificación de peligros y sus respuestas' },
+      { id: 'sst.participacion.exportar', label: 'Exportar participaciones',  descripcion: 'Descargar formularios en PDF y los resultados en Excel' },
+    ],
+  },
+  {
     grupo: 'Configuración',
     permisos: [
       { id: 'config.usuarios', label: 'Administrar usuarios', descripcion: 'Crear cuentas de acceso y asignar permisos' },

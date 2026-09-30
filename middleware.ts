@@ -40,6 +40,12 @@ export default withAuth(
       if (!isAdmin) return NextResponse.redirect(new URL('/dashboard', req.url))
     }
 
+    // Gestión SST es un módulo administrativo: el trabajador participa desde
+    // Tú Cuentas, no entra a la consola donde se ven las respuestas de todos.
+    if (path.startsWith('/dashboard/gestion-sst')) {
+      if (!isAdmin) return NextResponse.redirect(new URL('/dashboard', req.url))
+    }
+
     // Admin-only routes: retired workers
     if (path.startsWith('/dashboard/users/retirados')) {
       if (!isAdmin) return NextResponse.redirect(new URL('/dashboard', req.url))
