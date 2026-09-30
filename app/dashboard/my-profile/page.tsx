@@ -1172,11 +1172,16 @@ export default function MyProfilePage() {
                     <motion.div initial={{ opacity: 0, scale: 0.97 }} animate={{ opacity: 1, scale: 1 }}
                       className="p-5 rounded-xl text-center"
                       style={{ background: 'rgba(16,185,129,0.08)', border: '1px solid rgba(16,185,129,0.25)' }}>
-                      <CheckCircle size={30} className="mx-auto mb-2" style={{ color: '#34D399' }} />
-                      <p className="font-bold" style={{ color: '#34D399' }}>¡TODO LISTO!</p>
+                      <PenTool size={30} className="mx-auto mb-2" style={{ color: '#34D399' }} />
+                      <p className="font-bold" style={{ color: '#34D399' }}>FALTA UN ÚLTIMO PASO: TU FIRMA</p>
                       <p className="text-xs mt-1" style={{ color: 'rgba(52,211,153,0.75)' }}>
-                        Haz clic en <strong>GUARDAR</strong> para enviar tu perfil al área de SST.
+                        Pasa a la pestaña <strong>Mi Firma</strong> y firma para enviar tu perfil al área de SST.
                       </p>
+                      <button onClick={() => switchTab('firma')}
+                        className="mt-3 text-xs font-bold px-4 py-2.5 rounded-xl"
+                        style={{ background: '#10B981', color: '#fff' }}>
+                        Ir a Mi Firma →
+                      </button>
                     </motion.div>
                   )}
                 </div>
@@ -1199,17 +1204,30 @@ export default function MyProfilePage() {
         </motion.div>
       </AnimatePresence>
 
-      {/* ── Floating save ── */}
-      {/* La firma se guarda con su propio botón; aquí solo estorbaría. */}
-      <div className="fixed bottom-5 right-5 z-40" style={{ display: tab === 'firma' ? 'none' : undefined }}>
-        <button onClick={() => save(false)} disabled={saving}
-          className="terra-btn shadow-xl gap-2 font-bold"
-          style={{ padding: '13px 22px', fontSize: 14,
-            background: saveMsg === 'saved' ? '#10B981' : saveMsg === 'local' ? '#F59E0B' : undefined,
-            boxShadow: '0 8px 24px rgba(0,0,0,0.3)' }}>
-          {saving ? <Loader2 size={16} className="animate-spin" /> : saveMsg === 'saved' ? <CheckCircle size={16} /> : <Save size={16} />}
-          {saving ? 'GUARDANDO...' : saveMsg === 'saved' ? '¡GUARDADO!' : saveMsg === 'local' ? '¡GUARDADO LOCALMENTE!' : 'GUARDAR PERFIL'}
-        </button>
+      {/* ── Botón flotante ── */}
+      {/* En la penúltima pestaña un botón de guardar hacía creer que ya se había
+          terminado y la gente se saltaba la firma: allí el botón lleva a firmar,
+          y el cierre del formulario queda en la última pestaña. */}
+      <div className="fixed bottom-5 right-5 z-40">
+        {tab === 'cierre' ? (
+          <button onClick={() => switchTab('firma')} disabled={saving}
+            className="terra-btn shadow-xl gap-2 font-bold"
+            style={{ padding: '13px 22px', fontSize: 14, background: '#F59E0B', boxShadow: '0 8px 24px rgba(0,0,0,0.3)' }}>
+            <PenTool size={16} /> SIGUIENTE: FIRMAR
+          </button>
+        ) : (
+          <button onClick={() => save(false)} disabled={saving}
+            className="terra-btn shadow-xl gap-2 font-bold"
+            style={{ padding: '13px 22px', fontSize: 14,
+              background: saveMsg === 'saved' ? '#10B981' : saveMsg === 'local' ? '#F59E0B' : undefined,
+              boxShadow: '0 8px 24px rgba(0,0,0,0.3)' }}>
+            {saving ? <Loader2 size={16} className="animate-spin" /> : saveMsg === 'saved' ? <CheckCircle size={16} /> : <Save size={16} />}
+            {saving ? 'GUARDANDO...'
+              : saveMsg === 'saved' ? '¡GUARDADO!'
+              : saveMsg === 'local' ? '¡GUARDADO LOCALMENTE!'
+              : tab === 'firma' ? 'GUARDAR Y TERMINAR' : 'GUARDAR PERFIL'}
+          </button>
+        )}
       </div>
     </div>
   )
