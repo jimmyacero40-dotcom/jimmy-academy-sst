@@ -5,9 +5,11 @@ import { motion, AnimatePresence } from 'framer-motion'
 import {
   User, Camera, CheckCircle, Clock, Loader2, Save,
   Heart, Briefcase, GraduationCap, Activity, Shield, Award,
-  FileText, Home, Car, ChevronRight, Info, AlertCircle
+  FileText, Home, Car, ChevronRight, Info, AlertCircle, PenTool
 } from 'lucide-react'
 import { calcSections, calcPct, TOTAL_SECCIONES } from '@/lib/perfil-completitud'
+// La firma ya existe como pantalla propia; aquí se reutiliza tal cual.
+import MySignaturePage from '../my-signature/page'
 
 // ─── Types ────────────────────────────────────────────────────────────
 type Nullable<T> = T | null | undefined
@@ -195,12 +197,13 @@ const TABS = [
   { id: 'estilos',  label: 'Estilos de vida', icon: Activity,      color: '#F59E0B' },
   { id: 'salud',    label: 'Salud',           icon: Heart,         color: '#EF4444' },
   { id: 'cierre',   label: 'Cierre',          icon: Award,         color: '#EC4899' },
+  { id: 'firma',    label: 'Mi Firma',        icon: PenTool,       color: '#F59E0B' },
 ]
 
 // which sections map to each tab (for per-tab progress dot)
 const NOMBRE_TAB: Record<string, string> = {
   personal: 'Personal', familia: 'Familia', laboral: 'Laboral', tallas: 'Tallas / EPP',
-  estilos: 'Estilos de vida', salud: 'Salud', cierre: 'Cierre',
+  estilos: 'Estilos de vida', salud: 'Salud', cierre: 'Cierre', firma: 'Mi Firma',
 }
 
 /** Apartado donde se contesta cada sección, para poder llevar al trabajador allí. */
@@ -474,11 +477,14 @@ export default function MyProfilePage() {
       </div>
 
       {/* ── Tab bar ── */}
-      <div className="flex gap-1.5 mb-4 overflow-x-auto pb-1" style={{ scrollbarWidth: 'none' }}>
+      {/* Se envuelven en varias filas: con ocho pestañas el desplazamiento
+          horizontal dejaba la última fuera de la vista. */}
+      <div className="flex flex-wrap gap-1.5 mb-4 pb-1">
         {TABS.map(t => {
           const Icon = t.icon
           const tabSecs = TAB_SECTIONS[t.id] ?? []
-          const done = tabSecs.every(s => sections[s as keyof typeof sections])
+          // Una pestaña sin secciones (la firma) no lleva marca de completa.
+          const done = tabSecs.length > 0 && tabSecs.every(s => sections[s as keyof typeof sections])
           const partial = !done && tabSecs.some(s => sections[s as keyof typeof sections])
           return (
             <button key={t.id} onClick={() => switchTab(t.id)}
@@ -1176,14 +1182,26 @@ export default function MyProfilePage() {
                 </div>
               </SectionCard>
 
-              <TabNav onPrev={() => switchTab('salud')} />
+              <TabNav onPrev={() => switchTab('salud')} onNext={() => switchTab('firma')} nextLabel="Siguiente: Mi Firma" />
+            </div>
+          )}
+
+          {/* ════ FIRMA ════ */}
+          {tab === 'firma' && (
+            <div className="-mx-4">
+              {/* Se monta la pantalla de firma tal cual, sin duplicar su lógica. */}
+              <MySignaturePage />
+              <div className="px-4">
+                <TabNav onPrev={() => switchTab('cierre')} />
+              </div>
             </div>
           )}
         </motion.div>
       </AnimatePresence>
 
       {/* ── Floating save ── */}
-      <div className="fixed bottom-5 right-5 z-40">
+      {/* La firma se guarda con su propio botón; aquí solo estorbaría. */}
+      <div className="fixed bottom-5 right-5 z-40" style={{ display: tab === 'firma' ? 'none' : undefined }}>
         <button onClick={() => save(false)} disabled={saving}
           className="terra-btn shadow-xl gap-2 font-bold"
           style={{ padding: '13px 22px', fontSize: 14,

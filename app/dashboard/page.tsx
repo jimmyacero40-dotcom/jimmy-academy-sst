@@ -55,14 +55,18 @@ function ProgressBar({ pct, color }: { pct: number; color: string }) {
 
 export default function DashboardPage() {
   const router = useRouter()
-  const { data: session } = useSession()
-  const userRole = (session?.user as any)?.role || 'worker'
+  const { data: session, status } = useSession()
+  // Sin valor por defecto: mientras la sesión carga, el rol todavía no se sabe.
+  const userRole = (session?.user as any)?.role as string | undefined
 
   const [kpis, setKpis] = useState<KPIs | null>(null)
   const [loading, setLoading] = useState(true)
 
   const load = useCallback(async () => {
-    if (userRole === 'worker') { router.replace('/dashboard/my-plan'); return }
+    // Antes el rol caía en 'worker' mientras cargaba la sesión y sacaba de aquí
+    // al administrador antes de saber quién era.
+    if (status === 'loading') return
+    if (userRole === 'worker') { router.replace('/dashboard/my-profile'); return }
 
     const now = new Date()
     const thisMonth = now.getMonth()   // 0-indexed
@@ -150,7 +154,7 @@ export default function DashboardPage() {
       })
     } catch { /* leave null, show empty */ }
     setLoading(false)
-  }, [userRole, router])
+  }, [userRole, status, router])
 
   useEffect(() => { load() }, [load])
 

@@ -53,13 +53,20 @@ export default withAuth(
     const permite = (rutas: string[]) =>
       rutas.some(r => path === r || (r !== '/dashboard' && path.startsWith(r + '/')))
 
+    // Los cuatro módulos del trabajador, más las pantallas que viven dentro de
+    // ellos: la firma dentro de Mi Perfil y los certificados dentro de SSTudio.
     const RUTAS_TRABAJADOR = [
-      '/dashboard', '/dashboard/my-plan', '/dashboard/my-profile',
+      '/dashboard', '/dashboard/my-profile', '/dashboard/my-plan',
+      '/dashboard/tu-cuentas', '/dashboard/reportal',
       '/dashboard/my-signature', '/dashboard/certificates',
       '/dashboard/settings', '/dashboard/configuracion',
     ]
     if (role === 'worker' && !permite(RUTAS_TRABAJADOR)) {
-      return NextResponse.redirect(new URL('/dashboard/my-plan', req.url))
+      return NextResponse.redirect(new URL('/dashboard/my-profile', req.url))
+    }
+    // Sin "Inicio" en el menú, el tablero general no es su sitio: entra a su perfil.
+    if (role === 'worker' && path === '/dashboard') {
+      return NextResponse.redirect(new URL('/dashboard/my-profile', req.url))
     }
 
     // El portero se mueve en control operativo y en su configuración.

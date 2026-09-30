@@ -40,6 +40,8 @@ const ALL_NAV_HREFS = [
   '/dashboard/settings',
   '/dashboard/my-plan',
   '/dashboard/my-profile',
+  '/dashboard/tu-cuentas',
+  '/dashboard/reportal',
   '/dashboard',
 ]
 
@@ -157,12 +159,13 @@ const PORTERO_NAV = [
 ]
 
 // ── Worker navigation ─────────────────────────────────────────────
+// Cuatro módulos y nada más. La firma vive dentro de Mi Perfil y los
+// certificados dentro de SSTudio, así que ya no necesitan botón propio.
 const WORKER_NAV = [
-  { href: '/dashboard/my-plan',      icon: Home,      label: 'Inicio' },
-  { href: '/dashboard/certificates', icon: Award,     label: 'Mis Certificados' },
-  { href: '/dashboard/my-profile',   icon: Briefcase, label: 'Mi Perfil' },
-  { href: '/dashboard/my-signature', icon: PenTool,   label: 'Mi Firma' },
-  { href: '/dashboard/settings',     icon: Settings,  label: 'Configuración' },
+  { href: '/dashboard/my-profile', icon: Briefcase,      label: 'Mi Perfil' },
+  { href: '/dashboard/my-plan',    icon: GraduationCap,  label: 'SSTudio' },
+  { href: '/dashboard/tu-cuentas', icon: MessageSquare,  label: 'Tú Cuentas' },
+  { href: '/dashboard/reportal',   icon: FileText,       label: 'RePortal' },
 ]
 
 // Hrefs per module — used to auto-expand on load
