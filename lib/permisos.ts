@@ -42,6 +42,7 @@ export const CATALOGO_PERMISOS: GrupoPermisos[] = [
     permisos: [
       { id: 'sst.participacion.ver',      label: 'Consultar participaciones', descripcion: 'Ver quién participó en la identificación de peligros y sus respuestas' },
       { id: 'sst.participacion.exportar', label: 'Exportar participaciones',  descripcion: 'Descargar formularios en PDF y los resultados en Excel' },
+      { id: 'sst.participacion.eliminar', label: 'Eliminar participaciones',  descripcion: 'Borrar respuestas ya registradas. Sirve para limpiar pruebas y no tiene vuelta atrás' },
     ],
   },
   {
@@ -56,9 +57,12 @@ export const CATALOGO_PERMISOS: GrupoPermisos[] = [
 export const TODOS_LOS_PERMISOS = CATALOGO_PERMISOS.flatMap(g => g.permisos.map(p => p.id))
 
 /** Plantilla inicial que se propone al elegir un rol. Es editable. */
+/** Capacidades que no se heredan por ser admin: el superadmin las concede a mano. */
+const SOLO_SUPERADMIN = ['config.empresa', 'sst.participacion.eliminar']
+
 export const PERMISOS_POR_ROL: Record<string, string[]> = {
   superadmin: TODOS_LOS_PERMISOS,
-  admin: TODOS_LOS_PERMISOS.filter(p => p !== 'config.empresa'),
+  admin: TODOS_LOS_PERMISOS.filter(p => !SOLO_SUPERADMIN.includes(p)),
   portero: ['accesos.ver', 'accesos.ingreso', 'accesos.salida'],
   worker: [],
 }

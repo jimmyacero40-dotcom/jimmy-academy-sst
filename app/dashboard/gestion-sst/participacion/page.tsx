@@ -1,11 +1,13 @@
 'use client'
 
 import { useState, useEffect, useMemo } from 'react'
+import { useSession } from 'next-auth/react'
 import { motion } from 'framer-motion'
 import {
   ShieldAlert, Loader2, Search, Download, FileText, Eye, X,
-  CheckCircle, Clock, BarChart2, Users, Table2,
+  CheckCircle, Clock, BarChart2, Users, Table2, Trash2, AlertTriangle,
 } from 'lucide-react'
+import { tienePermiso } from '@/lib/permisos'
 import { RespuestasPeligros } from '@/components/RespuestasPeligros'
 import { tabular, type Fila, type Conteo } from '@/lib/peligros-tabulacion'
 import { GRUPOS_PELIGROS } from '@/lib/peligros'
@@ -23,6 +25,14 @@ export default function ParticipacionAdminPage() {
   const [vista, setVista] = useState<'resumen' | 'trabajadores' | 'resultados'>('resumen')
   const [detalle, setDetalle] = useState<Fila | null>(null)
   const [empresa, setEmpresa] = useState('Empresa')
+  const [porBorrar, setPorBorrar] = useState<Fila[] | null>(null)
+  const [borrando, setBorrando] = useState(false)
+  // Aparte del error de carga: si falla un borrado no debe tapar toda la pantalla.
+  const [errorBorrado, setErrorBorrado] = useState<string | null>(null)
+
+  const { data: session } = useSession()
+  const usuario = session?.user as { role?: string; permissions?: string[] | null } | undefined
+  const puedeEliminar = !!usuario?.role && tienePermiso(usuario.role, usuario.permissions, 'sst.participacion.eliminar')
 
   const [busqueda, setBusqueda] = useState('')
   const [fArea, setFArea] = useState('')
@@ -48,6 +58,26 @@ export default function ParticipacionAdminPage() {
     fetch('/api/company-info').then(r => r.ok ? r.json() : null)
       .then(d => { if (d?.name) setEmpresa(d.name) }).catch(() => {})
   }, [])
+
+  const eliminar = async (objetivo: Fila[]) => {
+    setBorrando(true); setErrorBorrado(null)
+    try {
+      const res = await fetch('/api/participacion-peligros', {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ periodo, user_ids: objetivo.map(f => f.user_id) }),
+      })
+      const body = await res.json().catch(() => ({}))
+      if (!res.ok) { setErrorBorrado(body.error ?? 'No fue posible eliminar'); return }
+      // Quedan como pendientes, sin recargar toda la consulta.
+      const borrados = new Set(objetivo.map(f => f.user_id))
+      setFilas(fs => fs.map(f => borrados.has(f.user_id)
+        ? { ...f, estado: 'Pendiente' as const, enviado_at: null, participacion: null }
+        : f))
+      setPorBorrar(null)
+      setDetalle(null)
+    } finally { setBorrando(false) }
+  }
 
   const opciones = (campo: keyof Fila) =>
     [...new Set(filas.map(f => (f[campo] as string | null)?.trim()).filter(Boolean) as string[])].sort()
@@ -117,6 +147,13 @@ export default function ParticipacionAdminPage() {
             className="terra-btn-outline flex items-center gap-1.5" style={{ padding: '8px 14px', fontSize: 12 }}>
             <Download size={13} /> Excel
           </button>
+          {puedeEliminar && !!visibles.filter(f => f.participacion).length && (
+            <button onClick={() => setPorBorrar(visibles.filter(f => f.participacion))}
+              className="flex items-center gap-1.5 rounded-lg font-bold"
+              style={{ padding: '8px 14px', fontSize: 12, border: '1px solid rgba(239,68,68,0.35)', color: '#EF4444' }}>
+              <Trash2 size={13} /> Eliminar {visibles.filter(f => f.participacion).length}
+            </button>
+          )}
         </div>
       </div>
 
@@ -251,6 +288,13 @@ export default function ParticipacionAdminPage() {
                             style={{ border: '1px solid var(--border)', color: 'var(--text-dim)' }}>
                             <FileText size={11} /> PDF
                           </button>
+                          {puedeEliminar && (
+                            <button onClick={() => setPorBorrar([f])} title="Eliminar esta participación"
+                              className="text-[11px] font-bold px-2.5 py-1.5 rounded-lg flex items-center gap-1"
+                              style={{ border: '1px solid rgba(239,68,68,0.35)', color: '#EF4444' }}>
+                              <Trash2 size={11} />
+                            </button>
+                          )}
                         </div>
                       ) : (
                         <span className="text-[11px]" style={{ color: 'var(--text-faint)' }}>Sin respuestas</span>
@@ -288,6 +332,63 @@ export default function ParticipacionAdminPage() {
               <Bloque titulo="Cambios en el último año" filas={t.cambios} base={t.participantes} />
             </div>
           </div>
+        </div>
+      )}
+
+      {/* ── Confirmación de borrado ── */}
+      {porBorrar && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4"
+          style={{ background: 'rgba(0,0,0,0.6)' }} onClick={() => !borrando && setPorBorrar(null)}>
+          <motion.div initial={{ opacity: 0, scale: 0.97 }} animate={{ opacity: 1, scale: 1 }}
+            onClick={e => e.stopPropagation()} className="terra-card w-full max-w-md p-5">
+            <div className="flex items-start gap-3 mb-3">
+              <div className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0"
+                style={{ background: 'rgba(239,68,68,0.12)', color: '#EF4444' }}>
+                <AlertTriangle size={19} />
+              </div>
+              <div>
+                <p className="text-base font-black" style={{ color: 'var(--text)' }}>
+                  {porBorrar.length === 1 ? 'Eliminar esta participación' : `Eliminar ${porBorrar.length} participaciones`}
+                </p>
+                <p className="text-xs mt-1 leading-relaxed" style={{ color: 'var(--text-dim)' }}>
+                  Se borran las respuestas del periodo {periodo}. No hay papelera: esto no se puede deshacer.
+                  {porBorrar.length === 1
+                    ? ' El trabajador vuelve a quedar como pendiente y podrá responder de nuevo.'
+                    : ' Esos trabajadores vuelven a quedar como pendientes y podrán responder de nuevo.'}
+                </p>
+              </div>
+            </div>
+
+            <div className="max-h-40 overflow-y-auto rounded-xl p-3 mb-4"
+              style={{ background: 'var(--bg-surface)', border: '1px solid var(--border)' }}>
+              {porBorrar.slice(0, 40).map(f => (
+                <p key={f.user_id} className="text-xs py-0.5" style={{ color: 'var(--text)' }}>
+                  {f.nombre} <span style={{ color: 'var(--text-faint)' }}>· {f.cedula ?? 'sin cédula'}</span>
+                </p>
+              ))}
+              {porBorrar.length > 40 && (
+                <p className="text-xs pt-1" style={{ color: 'var(--text-faint)' }}>y {porBorrar.length - 40} más…</p>
+              )}
+            </div>
+
+            {errorBorrado && (
+              <p className="text-xs font-bold mb-3" style={{ color: '#EF4444' }}>{errorBorrado}</p>
+            )}
+
+            <div className="flex gap-2 justify-end">
+              <button onClick={() => setPorBorrar(null)} disabled={borrando}
+                className="text-xs font-bold px-4 py-2.5 rounded-xl"
+                style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', color: 'var(--text-dim)' }}>
+                Cancelar
+              </button>
+              <button onClick={() => eliminar(porBorrar)} disabled={borrando}
+                className="text-xs font-bold px-4 py-2.5 rounded-xl flex items-center gap-1.5"
+                style={{ background: '#EF4444', color: '#fff' }}>
+                {borrando ? <Loader2 size={13} className="animate-spin" /> : <Trash2 size={13} />}
+                {borrando ? 'Eliminando…' : 'Sí, eliminar'}
+              </button>
+            </div>
+          </motion.div>
         </div>
       )}
 

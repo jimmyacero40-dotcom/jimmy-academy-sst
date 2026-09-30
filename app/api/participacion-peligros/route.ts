@@ -91,6 +91,32 @@ export async function GET(req: NextRequest) {
   return NextResponse.json({ periodo, participacion: data ?? null, trabajador })
 }
 
+/**
+ * Borra participaciones ya registradas. Existe sobre todo para limpiar las
+ * pruebas del arranque; no hay papelera, así que se exige la lista explícita
+ * de trabajadores y el periodo.
+ */
+export async function DELETE(req: NextRequest) {
+  const { authorized, companyId } = await requierePermiso('sst.participacion.eliminar')
+  if (!authorized) return NextResponse.json({ error: 'No autorizado' }, { status: 403 })
+  if (!companyId) return NextResponse.json({ error: 'Sin empresa activa' }, { status: 400 })
+
+  const body = await req.json().catch(() => ({}))
+  const userIds: string[] = Array.isArray(body.user_ids) ? body.user_ids.filter(Boolean) : []
+  const periodo = Number.isInteger(body.periodo) ? body.periodo : new Date().getFullYear()
+  if (!userIds.length) return NextResponse.json({ error: 'No se indicó a quién borrar' }, { status: 400 })
+
+  // Acotado a la empresa activa: nunca toca datos de otra.
+  const { data, error } = await supabase
+    .from('hazard_participations')
+    .delete()
+    .eq('company_id', companyId).eq('periodo', periodo).in('user_id', userIds)
+    .select('id')
+
+  if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+  return NextResponse.json({ eliminadas: data?.length ?? 0 })
+}
+
 /** Guarda la participación del propio trabajador. Nadie responde por otro. */
 export async function POST(req: NextRequest) {
   const user = await getCurrentUser()
