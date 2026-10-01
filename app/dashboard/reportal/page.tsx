@@ -12,6 +12,9 @@ import { ESTADOS, TIPOS_REPORTE, type ReporteHSE, type EstadoReporte } from '@/l
 const COLOR_TIPO = Object.fromEntries(TIPOS_REPORTE.map(t => [t.id, t.color]))
 const ICONO_TIPO = Object.fromEntries(TIPOS_REPORTE.map(t => [t.id, t.icono]))
 
+const fechaCorta = (s?: string | null) =>
+  s ? new Date(s.length === 10 ? s + 'T12:00:00' : s).toLocaleDateString('es-CO') : null
+
 export default function RePortalPage() {
   const [reportes, setReportes] = useState<ReporteHSE[]>([])
   const [cargando, setCargando] = useState(true)
@@ -64,7 +67,7 @@ export default function RePortalPage() {
 
       <div className="space-y-2.5">
         {reportes.map(r => {
-          const estado = ESTADOS[(r.estado ?? 'enviado') as EstadoReporte]
+          const estado = ESTADOS[(r.estado ?? 'nuevo') as EstadoReporte] ?? ESTADOS.nuevo
           const expandido = abierto === r.id
           return (
             <motion.div key={r.id} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} className="terra-card overflow-hidden">
@@ -105,15 +108,37 @@ export default function RePortalPage() {
                     <p className="text-[10px] font-bold uppercase tracking-wider flex items-center gap-1.5" style={{ color: 'var(--text-faint)' }}>
                       <Lock size={10} /> Cómo va su reporte
                     </p>
-                    {r.responsable_nombre || r.observaciones_sst || r.accion_intervencion || r.matriz_mejoras_num ? (
-                      <div className="mt-1.5 space-y-1">
-                        {r.responsable_nombre && <p className="text-xs" style={{ color: 'var(--text-dim)' }}>A cargo de: {r.responsable_nombre}</p>}
-                        {r.observaciones_sst && <p className="text-sm whitespace-pre-wrap" style={{ color: 'var(--text)' }}>{r.observaciones_sst}</p>}
-                        {r.accion_intervencion && <p className="text-sm whitespace-pre-wrap" style={{ color: 'var(--text)' }}>{r.accion_intervencion}</p>}
-                        {r.matriz_mejoras_num && <p className="text-xs" style={{ color: 'var(--text-dim)' }}>Matriz de Mejoras: {r.matriz_mejoras_num}</p>}
+                    {/* Todo lo que registre SST se le muestra al trabajador, no solo una parte. */}
+                    <div className="mt-2 grid grid-cols-2 gap-x-4 gap-y-2">
+                      {([
+                        ['Estado', estado.paraTrabajador],
+                        ['A cargo de', r.responsable_nombre],
+                        ['Quien recibió la solicitud', r.recibe_nombre],
+                        ['N.º en Matriz de Mejoras', r.matriz_mejoras_num],
+                        ['Fecha de asignación', fechaCorta(r.fecha_asignacion)],
+                        ['Fecha de gestión', fechaCorta(r.fecha_gestion)],
+                        ['Fecha de cierre', fechaCorta(r.fecha_cierre)],
+                      ] as [string, string | null | undefined][]).map(([k, v]) => (
+                        <div key={k}>
+                          <p className="text-[10px] font-bold uppercase tracking-wider" style={{ color: 'var(--text-faint)' }}>{k}</p>
+                          <p className="text-xs font-semibold" style={{ color: v ? 'var(--text)' : 'var(--text-faint)' }}>{v || 'Sin registrar'}</p>
+                        </div>
+                      ))}
+                    </div>
+
+                    {([
+                      ['Observaciones de SST', r.observaciones_sst],
+                      ['Acción o intervención realizada', r.accion_intervencion],
+                      ['Observaciones de cierre', r.observaciones_cierre],
+                    ] as [string, string | null | undefined][]).filter(([, v]) => !!v).map(([k, v]) => (
+                      <div key={k} className="mt-2">
+                        <p className="text-[10px] font-bold uppercase tracking-wider" style={{ color: 'var(--text-faint)' }}>{k}</p>
+                        <p className="text-sm whitespace-pre-wrap" style={{ color: 'var(--text)' }}>{v}</p>
                       </div>
-                    ) : (
-                      <p className="text-xs mt-1" style={{ color: 'var(--text-dim)' }}>
+                    ))}
+
+                    {!r.responsable_nombre && !r.recibe_nombre && !r.observaciones_sst && !r.accion_intervencion && !r.matriz_mejoras_num && (
+                      <p className="text-xs mt-2" style={{ color: 'var(--text-dim)' }}>
                         Todavía sin seguimiento registrado. Aquí aparecerá cuando SST atienda el reporte.
                       </p>
                     )}

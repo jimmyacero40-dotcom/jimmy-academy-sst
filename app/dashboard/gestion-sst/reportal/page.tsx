@@ -2,10 +2,13 @@
 
 import { useState, useEffect, useMemo, useCallback } from 'react'
 import { motion } from 'framer-motion'
+import { useSession } from 'next-auth/react'
 import {
   FileText, Loader2, Search, Download, X, Save, History,
-  Inbox, Eye, Wrench, CheckCircle, Layers,
+  Inbox, Eye, Wrench, CheckCircle, Layers, Pencil, Trash2, AlertTriangle,
 } from 'lucide-react'
+import { tienePermiso } from '@/lib/permisos'
+import { ACCIONES_INMEDIATAS } from '@/lib/reportes-hse'
 import { TarjetaHSE } from '@/components/TarjetaHSE'
 import {
   ESTADOS, ESTADOS_GESTION, TIPOS_REPORTE,
@@ -35,6 +38,15 @@ export default function BandejaReportalPage() {
   const [guardando, setGuardando] = useState(false)
   const [guardado, setGuardado] = useState(false)
   const [errorGestion, setErrorGestion] = useState<string | null>(null)
+  const [corrigiendo, setCorrigiendo] = useState(false)
+  const [porBorrar, setPorBorrar] = useState<ReporteHSE | null>(null)
+  const [borrando, setBorrando] = useState(false)
+
+  const { data: session } = useSession()
+  const yo = session?.user as { role?: string; permissions?: string[] | null } | undefined
+  const puede = (p: string) => !!yo?.role && tienePermiso(yo.role, yo.permissions, p)
+  const puedeCorregir = puede('sst.reportes.corregir')
+  const puedeEliminar = puede('sst.reportes.eliminar')
 
   const [busqueda, setBusqueda] = useState('')
   const [fEstado, setFEstado] = useState('')
@@ -63,8 +75,16 @@ export default function BandejaReportalPage() {
   }, [])
 
   const abrir = async (r: ReporteHSE) => {
-    setAbierto(r); setBitacora([]); setGuardado(false); setErrorGestion(null)
+    setAbierto(r); setBitacora([]); setGuardado(false); setErrorGestion(null); setCorrigiendo(false)
     setBorrador({
+      // La tarjeta solo viaja al servidor si se activa la corrección.
+      fecha_reporte: soloFecha(r.fecha_reporte),
+      lugar: r.lugar ?? '',
+      tipos: r.tipos ?? [],
+      descripcion: r.descripcion ?? '',
+      acciones_inmediatas: r.acciones_inmediatas ?? [],
+      otra_accion: r.otra_accion ?? '',
+      sugerencia_mejora: r.sugerencia_mejora ?? '',
       estado: r.estado ?? 'nuevo',
       responsable_id: r.responsable_id ?? '',
       fecha_asignacion: soloFecha(r.fecha_asignacion),
@@ -84,8 +104,12 @@ export default function BandejaReportalPage() {
     if (!abierto) return
     setGuardando(true); setErrorGestion(null); setGuardado(false)
     try {
+      const { fecha_reporte, lugar, tipos, descripcion, acciones_inmediatas, otra_accion, sugerencia_mejora, ...gestion } = borrador
+      const cuerpo = corrigiendo
+        ? borrador
+        : gestion   // sin corregir no se toca nada de lo que escribió el trabajador
       const res = await fetch(`/api/reportes-hse/${abierto.id}`, {
-        method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(borrador),
+        method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(cuerpo),
       })
       const body = await res.json().catch(() => ({}))
       if (!res.ok) { setErrorGestion(body.error ?? 'No fue posible guardar'); return }
@@ -96,6 +120,22 @@ export default function BandejaReportalPage() {
       setGuardado(true)
       setTimeout(() => setGuardado(false), 2500)
     } finally { setGuardando(false) }
+  }
+
+  const eliminar = async (r: ReporteHSE) => {
+    setBorrando(true)
+    try {
+      const res = await fetch(`/api/reportes-hse/${r.id}`, { method: 'DELETE' })
+      const body = await res.json().catch(() => ({}))
+      if (!res.ok) { setErrorGestion(body.error ?? 'No fue posible eliminar'); return }
+      setReportes(rs => rs.filter(x => x.id !== r.id))
+      setPorBorrar(null); setAbierto(null)
+    } finally { setBorrando(false) }
+  }
+
+  const alternar = (campo: 'tipos' | 'acciones_inmediatas', valor: string) => {
+    const actual: string[] = borrador[campo] ?? []
+    setBorrador(b => ({ ...b, [campo]: actual.includes(valor) ? actual.filter(x => x !== valor) : [...actual, valor] }))
   }
 
   const opciones = (campo: keyof ReporteHSE) =>
@@ -266,6 +306,13 @@ export default function BandejaReportalPage() {
                           style={{ border: '1px solid var(--border)', color: 'var(--text-dim)' }}>
                           <Download size={11} /> PDF
                         </button>
+                        {puedeEliminar && (
+                          <button onClick={() => setPorBorrar(r)} title="Eliminar este reporte"
+                            className="text-[11px] font-bold px-2.5 py-1.5 rounded-lg flex items-center gap-1"
+                            style={{ border: '1px solid rgba(239,68,68,0.35)', color: '#EF4444' }}>
+                            <Trash2 size={11} />
+                          </button>
+                        )}
                       </div>
                     </td>
                   </tr>
@@ -281,6 +328,51 @@ export default function BandejaReportalPage() {
         </div>
       </div>
 
+      {/* ── Confirmación de borrado ── */}
+      {porBorrar && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4"
+          style={{ background: 'rgba(0,0,0,0.65)' }} onClick={() => !borrando && setPorBorrar(null)}>
+          <motion.div initial={{ opacity: 0, scale: 0.97 }} animate={{ opacity: 1, scale: 1 }}
+            onClick={e => e.stopPropagation()} className="terra-card w-full max-w-md p-5">
+            <div className="flex items-start gap-3 mb-3">
+              <div className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0"
+                style={{ background: 'rgba(239,68,68,0.12)', color: '#EF4444' }}>
+                <AlertTriangle size={19} />
+              </div>
+              <div>
+                <p className="text-base font-black" style={{ color: 'var(--text)' }}>
+                  Eliminar el reporte {porBorrar.codigo}
+                </p>
+                <p className="text-xs mt-1 leading-relaxed" style={{ color: 'var(--text-dim)' }}>
+                  Se borra la tarjeta de {porBorrar.reporta_nombre} y toda su trazabilidad.
+                  No hay papelera: esto no se puede deshacer. El trabajador dejará de verlo en RePortal.
+                </p>
+              </div>
+            </div>
+
+            <div className="p-3 rounded-xl mb-4" style={{ background: 'var(--bg-surface)', border: '1px solid var(--border)' }}>
+              <p className="text-xs line-clamp-3" style={{ color: 'var(--text)' }}>{porBorrar.descripcion}</p>
+            </div>
+
+            {errorGestion && <p className="text-xs font-bold mb-3" style={{ color: '#EF4444' }}>{errorGestion}</p>}
+
+            <div className="flex gap-2 justify-end">
+              <button onClick={() => setPorBorrar(null)} disabled={borrando}
+                className="text-xs font-bold px-4 py-2.5 rounded-xl"
+                style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', color: 'var(--text-dim)' }}>
+                Cancelar
+              </button>
+              <button onClick={() => eliminar(porBorrar)} disabled={borrando}
+                className="text-xs font-bold px-4 py-2.5 rounded-xl flex items-center gap-1.5"
+                style={{ background: '#EF4444', color: '#fff' }}>
+                {borrando ? <Loader2 size={13} className="animate-spin" /> : <Trash2 size={13} />}
+                {borrando ? 'Eliminando…' : 'Sí, eliminar'}
+              </button>
+            </div>
+          </motion.div>
+        </div>
+      )}
+
       {/* ── Detalle y trámite ── */}
       {abierto && (
         <div className="fixed inset-0 z-50 flex items-start justify-center p-4 overflow-y-auto"
@@ -295,20 +387,115 @@ export default function BandejaReportalPage() {
                   Tarjeta de reporte HSE · {abierto.reporta_nombre}
                 </p>
               </div>
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2 flex-wrap justify-end">
                 <button onClick={() => exportarTarjetaPDF(abierto, empresa)}
                   className="terra-btn-outline flex items-center gap-1.5" style={{ padding: '7px 12px', fontSize: 12 }}>
                   <Download size={12} /> Descargar reporte
                 </button>
+                {puedeCorregir && (
+                  <button onClick={() => setCorrigiendo(v => !v)}
+                    className="flex items-center gap-1.5 rounded-lg font-bold"
+                    style={{ padding: '7px 12px', fontSize: 12,
+                      border: `1px solid ${corrigiendo ? '#F59E0B' : 'var(--border)'}`,
+                      background: corrigiendo ? 'rgba(245,158,11,0.12)' : 'transparent',
+                      color: corrigiendo ? '#F59E0B' : 'var(--text-dim)' }}>
+                    <Pencil size={12} /> {corrigiendo ? 'Dejar de corregir' : 'Corregir tarjeta'}
+                  </button>
+                )}
+                {puedeEliminar && (
+                  <button onClick={() => setPorBorrar(abierto)}
+                    className="flex items-center gap-1.5 rounded-lg font-bold"
+                    style={{ padding: '7px 12px', fontSize: 12, border: '1px solid rgba(239,68,68,0.35)', color: '#EF4444' }}>
+                    <Trash2 size={12} /> Eliminar
+                  </button>
+                )}
                 <button onClick={() => setAbierto(null)} style={{ color: 'var(--text-faint)' }}><X size={18} /></button>
               </div>
             </div>
 
-            {/* Lo que envió el trabajador: solo lectura */}
-            <p className="text-[11px] font-bold uppercase tracking-wider mb-2" style={{ color: 'var(--text-faint)' }}>
-              Lo que reportó el trabajador · no se modifica
+            {/* Lo que envió el trabajador. Normalmente es de solo lectura; quien
+                pueda corregir lo enmienda cuando quedó mal diligenciado. */}
+            <p className="text-[11px] font-bold uppercase tracking-wider mb-2"
+              style={{ color: corrigiendo ? '#F59E0B' : 'var(--text-faint)' }}>
+              {corrigiendo
+                ? 'Corrigiendo la tarjeta · cada cambio queda en la trazabilidad'
+                : 'Lo que reportó el trabajador · no se modifica'}
             </p>
-            <TarjetaHSE r={abierto} />
+
+            {corrigiendo ? (
+              <div className="p-4 rounded-xl space-y-3"
+                style={{ background: 'rgba(245,158,11,0.06)', border: '1px solid rgba(245,158,11,0.35)' }}>
+                <div className="grid sm:grid-cols-2 gap-3">
+                  <div>
+                    <p className="text-xs font-bold mb-1.5" style={{ color: 'var(--text)' }}>Fecha del reporte</p>
+                    <input type="date" className={inp} value={borrador.fecha_reporte ?? ''}
+                      onChange={e => setBorrador(b => ({ ...b, fecha_reporte: e.target.value }))} />
+                  </div>
+                  <div>
+                    <p className="text-xs font-bold mb-1.5" style={{ color: 'var(--text)' }}>Lugar</p>
+                    <input className={inp} value={borrador.lugar ?? ''}
+                      onChange={e => setBorrador(b => ({ ...b, lugar: e.target.value }))} />
+                  </div>
+                </div>
+
+                <div>
+                  <p className="text-xs font-bold mb-1.5" style={{ color: 'var(--text)' }}>1. Tipo de reporte</p>
+                  <div className="flex flex-wrap gap-1.5">
+                    {TIPOS_REPORTE.map(tp => {
+                      const activo = (borrador.tipos ?? []).includes(tp.id)
+                      return (
+                        <button key={tp.id} onClick={() => alternar('tipos', tp.id)}
+                          className="text-[11px] font-semibold px-2.5 py-1.5 rounded-lg"
+                          style={activo
+                            ? { background: `${tp.color}1F`, color: tp.color, border: `1.5px solid ${tp.color}` }
+                            : { background: 'var(--bg-surface)', color: 'var(--text-dim)', border: '1px solid var(--border)' }}>
+                          {activo && '✓ '}{tp.id}
+                        </button>
+                      )
+                    })}
+                  </div>
+                </div>
+
+                <div>
+                  <p className="text-xs font-bold mb-1.5" style={{ color: 'var(--text)' }}>2. ¿Qué sucedió?</p>
+                  <textarea rows={4} className={`${inp} resize-none`} value={borrador.descripcion ?? ''}
+                    onChange={e => setBorrador(b => ({ ...b, descripcion: e.target.value }))} />
+                </div>
+
+                <div>
+                  <p className="text-xs font-bold mb-1.5" style={{ color: 'var(--text)' }}>3. Acción inmediata</p>
+                  <div className="flex flex-wrap gap-1.5 mb-2">
+                    {ACCIONES_INMEDIATAS.map(ac => {
+                      const activo = (borrador.acciones_inmediatas ?? []).includes(ac)
+                      return (
+                        <button key={ac} onClick={() => alternar('acciones_inmediatas', ac)}
+                          className="text-[11px] font-semibold px-2.5 py-1.5 rounded-lg"
+                          style={activo
+                            ? { background: 'rgba(16,185,129,0.12)', color: '#10B981', border: '1.5px solid #10B981' }
+                            : { background: 'var(--bg-surface)', color: 'var(--text-dim)', border: '1px solid var(--border)' }}>
+                          {activo && '✓ '}{ac}
+                        </button>
+                      )
+                    })}
+                  </div>
+                  <textarea rows={2} className={`${inp} resize-none`} placeholder="¿Otra acción o sugerencia?"
+                    value={borrador.otra_accion ?? ''}
+                    onChange={e => setBorrador(b => ({ ...b, otra_accion: e.target.value }))} />
+                </div>
+
+                <div>
+                  <p className="text-xs font-bold mb-1.5" style={{ color: 'var(--text)' }}>4. Sugerencia de mejora o intervención</p>
+                  <textarea rows={3} className={`${inp} resize-none`} value={borrador.sugerencia_mejora ?? ''}
+                    onChange={e => setBorrador(b => ({ ...b, sugerencia_mejora: e.target.value }))} />
+                </div>
+
+                <p className="text-[11px]" style={{ color: '#F59E0B' }}>
+                  Los cambios se guardan con el botón <strong>Guardar gestión</strong>, al final.
+                </p>
+              </div>
+            ) : (
+              <TarjetaHSE r={abierto} />
+            )}
 
             {/* Lo que agrega SST */}
             <div className="mt-6 p-4 rounded-xl" style={{ background: 'rgba(6,182,212,0.06)', border: '1px solid rgba(6,182,212,0.3)' }}>

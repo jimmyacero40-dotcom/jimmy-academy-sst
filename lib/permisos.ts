@@ -45,6 +45,8 @@ export const CATALOGO_PERMISOS: GrupoPermisos[] = [
       { id: 'sst.participacion.eliminar', label: 'Eliminar participaciones',  descripcion: 'Borrar respuestas ya registradas. Sirve para limpiar pruebas y no tiene vuelta atrás' },
       { id: 'sst.reportes.ver',           label: 'Consultar reportes HSE',    descripcion: 'Ver las tarjetas de reporte que envían los trabajadores' },
       { id: 'sst.reportes.gestionar',     label: 'Gestionar reportes HSE',    descripcion: 'Registrar el seguimiento y relacionarlos con la matriz de mejoras' },
+      { id: 'sst.reportes.corregir',      label: 'Corregir reportes HSE',     descripcion: 'Enmendar lo que escribió el trabajador cuando quedó mal diligenciado' },
+      { id: 'sst.reportes.eliminar',      label: 'Eliminar reportes HSE',     descripcion: 'Borrar reportes. Sirve para limpiar pruebas y no tiene vuelta atrás' },
     ],
   },
   {
@@ -60,7 +62,12 @@ export const TODOS_LOS_PERMISOS = CATALOGO_PERMISOS.flatMap(g => g.permisos.map(
 
 /** Plantilla inicial que se propone al elegir un rol. Es editable. */
 /** Capacidades que no se heredan por ser admin: el superadmin las concede a mano. */
-const SOLO_SUPERADMIN = ['config.empresa', 'sst.participacion.eliminar']
+const SOLO_SUPERADMIN = [
+  'config.empresa',
+  'sst.participacion.eliminar',
+  'sst.reportes.corregir',
+  'sst.reportes.eliminar',
+]
 
 export const PERMISOS_POR_ROL: Record<string, string[]> = {
   superadmin: TODOS_LOS_PERMISOS,

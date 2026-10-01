@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { supabaseAdmin as supabase } from '@/lib/supabase-admin'
 import { requierePermiso } from '@/lib/get-company'
+import { tienePermiso } from '@/lib/permisos'
 
 // Lo único que SST puede tocar. Nada de lo que escribió el trabajador aparece
 // aquí: su reporte queda tal como lo envió.
@@ -10,7 +11,17 @@ const CAMPOS_GESTION = [
   'seguimiento', 'recibe_nombre', 'matriz_mejoras_num',
 ] as const
 
+// La tarjeta del trabajador. Solo se puede enmendar con permiso aparte, y
+// cada enmienda queda en la bitácora con el valor anterior.
+const CAMPOS_TARJETA = [
+  'fecha_reporte', 'lugar', 'tipos', 'descripcion',
+  'acciones_inmediatas', 'otra_accion', 'sugerencia_mejora',
+] as const
+
 const ETIQUETAS: Record<string, string> = {
+  fecha_reporte: 'Fecha del reporte', lugar: 'Lugar', tipos: 'Tipo de reporte',
+  descripcion: '¿Qué sucedió?', acciones_inmediatas: 'Acción inmediata',
+  otra_accion: 'Otra acción o sugerencia', sugerencia_mejora: 'Sugerencia de mejora',
   estado: 'Estado', responsable_id: 'Responsable', fecha_asignacion: 'Fecha de asignación',
   observaciones_sst: 'Observaciones de SST', accion_intervencion: 'Acción o intervención',
   fecha_gestion: 'Fecha de gestión', fecha_cierre: 'Fecha de cierre',
@@ -39,16 +50,34 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
   const { authorized, user, companyId } = await requierePermiso('sst.reportes.gestionar')
   if (!authorized || !user) return NextResponse.json({ error: 'No autorizado' }, { status: 403 })
 
+  // Enmendar la tarjeta del trabajador es una capacidad aparte de gestionarla.
+  const puedeCorregir = tienePermiso(user.role, user.permissions, 'sst.reportes.corregir')
+
   const { data: actual } = await supabase.from('hse_reports')
     .select('*').eq('id', params.id).eq('company_id', companyId).maybeSingle()
   if (!actual) return NextResponse.json({ error: 'Reporte no encontrado' }, { status: 404 })
 
   const body = await req.json().catch(() => ({}))
   const cambios: Record<string, any> = {}
+  let corrigioLaTarjeta = false
+
   for (const campo of CAMPOS_GESTION) {
     if (body[campo] === undefined) continue
     const valor = body[campo] === '' ? null : body[campo]
     if (valor !== actual[campo]) cambios[campo] = valor
+  }
+
+  if (puedeCorregir) {
+    for (const campo of CAMPOS_TARJETA) {
+      if (body[campo] === undefined) continue
+      const valor = Array.isArray(body[campo])
+        ? body[campo]
+        : (body[campo] === '' ? null : body[campo])
+      const igual = Array.isArray(valor)
+        ? JSON.stringify(valor) === JSON.stringify(actual[campo] ?? [])
+        : valor === actual[campo]
+      if (!igual) { cambios[campo] = valor; corrigioLaTarjeta = true }
+    }
   }
   if (!Object.keys(cambios).length) return NextResponse.json({ reporte: actual, sinCambios: true })
 
@@ -84,9 +113,24 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
     report_id: params.id,
     user_id: user.id,
     user_name: user.name,
-    accion: cambios.estado ? `Cambió el estado a ${cambios.estado}` : 'Actualizó la gestión',
+    accion: corrigioLaTarjeta ? 'Corrigió datos de la tarjeta'
+      : cambios.estado ? `Cambió el estado a ${cambios.estado}`
+      : 'Actualizó la gestión',
     detalle: { cambios: detalle },
   })
 
   return NextResponse.json({ reporte: data })
+}
+
+/** Borra un reporte. Sin papelera: se exige un permiso propio. */
+export async function DELETE(_req: NextRequest, { params }: { params: { id: string } }) {
+  const { authorized, user, companyId } = await requierePermiso('sst.reportes.eliminar')
+  if (!authorized || !user) return NextResponse.json({ error: 'No autorizado' }, { status: 403 })
+
+  const { data, error } = await supabase.from('hse_reports')
+    .delete().eq('id', params.id).eq('company_id', companyId).select('codigo')
+
+  if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+  if (!data?.length) return NextResponse.json({ error: 'Reporte no encontrado' }, { status: 404 })
+  return NextResponse.json({ eliminado: data[0].codigo })
 }
