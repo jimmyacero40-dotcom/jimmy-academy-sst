@@ -7,6 +7,7 @@ import {
   ShieldAlert, Loader2, CheckCircle, ChevronLeft, ChevronRight,
   Save, User, AlertCircle, Send,
 } from 'lucide-react'
+import { CampoDictado } from '@/components/CampoDictado'
 import {
   PREGUNTAS, GRUPOS_PELIGROS, CAMPO_MEJORAS, avance, estaCompleta,
   type Participacion, type Pregunta,
@@ -206,9 +207,10 @@ export default function ParticipacionPeligrosPage() {
           </div>
 
           {pregunta.tipo === 'texto' && (
-            <textarea className={`${inp} resize-none`} rows={4}
+            <CampoDictado className={inp} rows={4}
               value={(datos[pregunta.campo] as string) ?? ''}
-              onChange={e => set(pregunta.campo, e.target.value)}
+              onChange={v => set(pregunta.campo, v)}
+              aria-label={pregunta.titulo}
               placeholder={pregunta.placeholder} />
           )}
 
@@ -259,8 +261,10 @@ export default function ParticipacionPeligrosPage() {
                 <p className="text-[11px] font-bold uppercase tracking-wider mb-1.5" style={{ color: 'var(--text-faint)' }}>
                   Otro peligro que no esté en la lista
                 </p>
-                <input className={inp} value={datos.peligros_otro ?? ''}
-                  onChange={e => set('peligros_otro', e.target.value)} placeholder="Opcional" />
+                <CampoDictado className={inp} linea
+                  value={datos.peligros_otro ?? ''}
+                  onChange={v => set('peligros_otro', v)}
+                  aria-label="Otro peligro que no esté en la lista" placeholder="Opcional" />
               </div>
               <p className="text-xs font-bold" style={{ color: 'var(--primary)' }}>
                 {(datos.peligros ?? []).length} peligro{(datos.peligros ?? []).length === 1 ? '' : 's'} marcado{(datos.peligros ?? []).length === 1 ? '' : 's'}
@@ -272,9 +276,10 @@ export default function ParticipacionPeligrosPage() {
           {pregunta.campo === 'controles_suficientes' && (
             <div className="mt-4">
               <p className="text-xs font-bold mb-1.5" style={{ color: 'var(--text)' }}>{CAMPO_MEJORAS.titulo}</p>
-              <textarea className={`${inp} resize-none`} rows={3}
+              <CampoDictado className={inp} rows={3}
                 value={(datos.oportunidades_mejora as string) ?? ''}
-                onChange={e => set('oportunidades_mejora', e.target.value)}
+                onChange={v => set('oportunidades_mejora', v)}
+                aria-label={CAMPO_MEJORAS.titulo}
                 placeholder={CAMPO_MEJORAS.placeholder} />
             </div>
           )}

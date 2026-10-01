@@ -42,6 +42,7 @@ const ALL_NAV_HREFS = [
   '/dashboard/my-profile',
   '/dashboard/gestion-sst/participacion',
   '/dashboard/tu-cuentas/peligros',
+  '/dashboard/reportal/nuevo',
   '/dashboard/tu-cuentas',
   '/dashboard/reportal',
   '/dashboard',
