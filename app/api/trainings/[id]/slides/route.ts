@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase-admin'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
+import { subirDiapositiva } from '@/lib/subir-diapositiva'
 
 type Params = { params: { id: string } }
 
@@ -37,11 +38,22 @@ export async function POST(req: NextRequest, { params }: Params) {
 
   let insertedCount = 0
 
+  // Las imágenes se suben una por una: así un fallo señala cuál falló en vez
+  // de tumbar la carga entera del curso.
+  const urls: (string | null)[] = []
+  for (const s of validSlides) {
+    try {
+      urls.push(await subirDiapositiva(s.image_data, trainingId, s.slide_index))
+    } catch (e: any) {
+      return NextResponse.json({ error: e.message }, { status: 500 })
+    }
+  }
+
   if (validSlides.length > 0) {
-    const rows = validSlides.map((s: any) => ({
+    const rows = validSlides.map((s: any, i: number) => ({
       training_id: trainingId,
       slide_index: s.slide_index,
-      image_data: s.image_data,
+      image_data: urls[i],
       slide_text: s.slide_text || '',
     }))
 
@@ -55,7 +67,7 @@ export async function POST(req: NextRequest, { params }: Params) {
   }
 
   // Update training: slides_count = actual stored count, cover = first slide image
-  const firstImage = validSlides[0]?.image_data || null
+  const firstImage = urls[0] || null
   await supabaseAdmin
     .from('trainings')
     .update({ slides_count: insertedCount, cover_url: firstImage })
