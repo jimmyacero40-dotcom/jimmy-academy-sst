@@ -101,7 +101,8 @@ export async function POST(req: NextRequest) {
     cargo: perfil?.cargo_confirmado || (user as any).cargo || null,
     area: perfil?.area_confirmada || (user as any).area || null,
     centro_trabajo: perfil?.centro_trabajo || null,
-    estado: 'enviado' as const,
+    // Entra a la bandeja de SST como nuevo.
+    estado: 'nuevo' as const,
     enviado_at: new Date().toISOString(),
     updated_at: new Date().toISOString(),
   }

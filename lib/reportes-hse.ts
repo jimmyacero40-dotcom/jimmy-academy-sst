@@ -24,6 +24,14 @@ export interface ReporteHSE {
 
   // Gestión posterior de SST. El trabajador no diligencia nada de esto.
   estado?: EstadoReporte
+  responsable_id?: string | null
+  responsable_nombre?: string | null
+  fecha_asignacion?: string | null
+  observaciones_sst?: string | null
+  accion_intervencion?: string | null
+  fecha_gestion?: string | null
+  fecha_cierre?: string | null
+  observaciones_cierre?: string | null
   seguimiento?: string | null
   recibe_nombre?: string | null
   recibe_firma?: string | null
@@ -34,14 +42,19 @@ export interface ReporteHSE {
   created_at?: string | null
 }
 
-export type EstadoReporte = 'borrador' | 'enviado' | 'en_gestion' | 'cerrado'
+export type EstadoReporte = 'borrador' | 'nuevo' | 'en_revision' | 'en_gestion' | 'cerrado'
 
-export const ESTADOS: Record<EstadoReporte, { label: string; color: string }> = {
-  borrador:   { label: 'Sin enviar',  color: '#94A3B8' },
-  enviado:    { label: 'Recibido',    color: '#3B82F6' },
-  en_gestion: { label: 'En gestión',  color: '#F59E0B' },
-  cerrado:    { label: 'Cerrado',     color: '#10B981' },
+/** La bandeja de SST avanza en este orden: nuevo → revisar → gestionar → cerrar. */
+export const ESTADOS: Record<EstadoReporte, { label: string; color: string; paraTrabajador: string }> = {
+  borrador:    { label: 'Sin enviar',   color: '#94A3B8', paraTrabajador: 'Sin enviar' },
+  nuevo:       { label: 'Nuevo',        color: '#3B82F6', paraTrabajador: 'Recibido' },
+  en_revision: { label: 'En revisión',  color: '#8B5CF6', paraTrabajador: 'En revisión' },
+  en_gestion:  { label: 'En gestión',   color: '#F59E0B', paraTrabajador: 'En gestión' },
+  cerrado:     { label: 'Cerrado',      color: '#10B981', paraTrabajador: 'Cerrado' },
 }
+
+/** Los estados que SST puede asignar; 'borrador' no es uno de ellos. */
+export const ESTADOS_GESTION: EstadoReporte[] = ['nuevo', 'en_revision', 'en_gestion', 'cerrado']
 
 /** Los ocho tipos de la tarjeta, con una explicación en palabras del trabajador. */
 export const TIPOS_REPORTE: { id: string; titulo: string; ayuda: string; icono: string; color: string }[] = [

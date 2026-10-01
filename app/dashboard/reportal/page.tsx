@@ -6,6 +6,7 @@ import Link from 'next/link'
 import {
   FileText, Plus, Loader2, MapPin, Calendar, ChevronDown, Lock,
 } from 'lucide-react'
+import { TarjetaHSE } from '@/components/TarjetaHSE'
 import { ESTADOS, TIPOS_REPORTE, type ReporteHSE, type EstadoReporte } from '@/lib/reportes-hse'
 
 const COLOR_TIPO = Object.fromEntries(TIPOS_REPORTE.map(t => [t.id, t.color]))
@@ -73,7 +74,7 @@ export default function RePortalPage() {
                     <div className="flex items-center gap-2 flex-wrap">
                       <span className="text-xs font-mono font-bold" style={{ color: 'var(--primary)' }}>{r.codigo}</span>
                       <span className="text-[10px] font-bold px-2 py-0.5 rounded-lg"
-                        style={{ background: `${estado.color}1F`, color: estado.color }}>{estado.label}</span>
+                        style={{ background: `${estado.color}1F`, color: estado.color }}>{estado.paraTrabajador}</span>
                     </div>
                     <p className="text-sm mt-1.5 line-clamp-2" style={{ color: 'var(--text)' }}>{r.descripcion}</p>
                     <div className="flex items-center gap-3 mt-1.5 flex-wrap text-[11px]" style={{ color: 'var(--text-faint)' }}>
@@ -96,28 +97,19 @@ export default function RePortalPage() {
               </button>
 
               {expandido && (
-                <div className="px-4 pb-4 space-y-2.5" style={{ borderTop: '1px solid var(--border)', paddingTop: 14 }}>
-                  {([
-                    ['Qué sucedió', r.descripcion],
-                    ['Acción inmediata', [...(r.acciones_inmediatas ?? []), r.otra_accion].filter(Boolean).join(' · ')],
-                    ['Sugerencia de mejora', r.sugerencia_mejora],
-                  ] as [string, string | null | undefined][]).map(([k, v]) => (
-                    <div key={k}>
-                      <p className="text-[10px] font-bold uppercase tracking-wider" style={{ color: 'var(--text-faint)' }}>{k}</p>
-                      <p className="text-sm whitespace-pre-wrap" style={{ color: v ? 'var(--text)' : 'var(--text-faint)' }}>
-                        {v || 'Sin diligenciar'}
-                      </p>
-                    </div>
-                  ))}
+                <div className="px-4 pb-4" style={{ borderTop: '1px solid var(--border)', paddingTop: 14 }}>
+                  {/* La misma tarjeta que ve SST, para que no haya dos versiones. */}
+                  <TarjetaHSE r={r} />
 
-                  <div className="p-3 rounded-xl" style={{ background: 'rgba(148,163,184,0.08)', border: '1px dashed var(--border)' }}>
+                  <div className="mt-3 p-3 rounded-xl" style={{ background: 'rgba(148,163,184,0.08)', border: '1px dashed var(--border)' }}>
                     <p className="text-[10px] font-bold uppercase tracking-wider flex items-center gap-1.5" style={{ color: 'var(--text-faint)' }}>
-                      <Lock size={10} /> Seguimiento de SST
+                      <Lock size={10} /> Cómo va su reporte
                     </p>
-                    {r.seguimiento || r.recibe_nombre || r.matriz_mejoras_num ? (
+                    {r.responsable_nombre || r.observaciones_sst || r.accion_intervencion || r.matriz_mejoras_num ? (
                       <div className="mt-1.5 space-y-1">
-                        {r.seguimiento && <p className="text-sm whitespace-pre-wrap" style={{ color: 'var(--text)' }}>{r.seguimiento}</p>}
-                        {r.recibe_nombre && <p className="text-xs" style={{ color: 'var(--text-dim)' }}>Recibió: {r.recibe_nombre}</p>}
+                        {r.responsable_nombre && <p className="text-xs" style={{ color: 'var(--text-dim)' }}>A cargo de: {r.responsable_nombre}</p>}
+                        {r.observaciones_sst && <p className="text-sm whitespace-pre-wrap" style={{ color: 'var(--text)' }}>{r.observaciones_sst}</p>}
+                        {r.accion_intervencion && <p className="text-sm whitespace-pre-wrap" style={{ color: 'var(--text)' }}>{r.accion_intervencion}</p>}
                         {r.matriz_mejoras_num && <p className="text-xs" style={{ color: 'var(--text-dim)' }}>Matriz de Mejoras: {r.matriz_mejoras_num}</p>}
                       </div>
                     ) : (

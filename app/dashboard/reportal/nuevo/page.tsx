@@ -17,7 +17,8 @@ const inp = 'w-full bg-[var(--bg-surface)] border border-[var(--border)] rounded
 
 const hoy = () => new Date().toISOString().slice(0, 10)
 
-const PASOS = ['Qué pasó', 'Tipo', 'Acción', 'Sugerencia', 'Revisar'] as const
+// El orden es el del formato AVC-FR54: primero el tipo, después qué sucedió.
+const PASOS = ['Datos', 'Tipo', 'Qué sucedió', 'Acción', 'Sugerencia', 'Revisar'] as const
 
 export default function NuevoReportePage() {
   const [r, setR] = useState<ReporteHSE>({ fecha_reporte: hoy(), tipos: [], acciones_inmediatas: [] })
@@ -44,8 +45,9 @@ export default function NuevoReportePage() {
 
   // Solo se exige lo imprescindible, y se exige en el paso donde se pregunta.
   const pasoCompleto = (n: number) => {
-    if (n === 0) return !!r.fecha_reporte && !!r.lugar?.trim() && !!r.descripcion?.trim()
+    if (n === 0) return !!r.fecha_reporte && !!r.lugar?.trim()
     if (n === 1) return (r.tipos ?? []).length > 0
+    if (n === 2) return !!r.descripcion?.trim()
     return true
   }
 
@@ -149,38 +151,26 @@ export default function NuevoReportePage() {
 
           {/* ── 1. Qué sucedió, dónde y cuándo ── */}
           {paso === 0 && (
-            <>
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <p className="text-xs font-bold mb-1.5" style={{ color: 'var(--text)' }}>Fecha del reporte *</p>
-                  <input type="date" className={inp} value={r.fecha_reporte ?? ''} max={hoy()}
-                    onChange={e => set('fecha_reporte', e.target.value)} />
-                </div>
-                <div>
-                  <p className="text-xs font-bold mb-1.5 flex items-center gap-1" style={{ color: 'var(--text)' }}>
-                    <MapPin size={11} /> Lugar *
-                  </p>
-                  <input className={inp} value={r.lugar ?? ''}
-                    onChange={e => set('lugar', e.target.value)} placeholder="Ej: bodega, lote 3, taller" />
-                </div>
-              </div>
-
+            <div className="grid grid-cols-2 gap-3">
               <div>
-                <p className="text-sm font-bold" style={{ color: 'var(--text)' }}>
-                  ¿Qué sucedió? <span style={{ color: '#EF4444' }}>*</span>
-                </p>
-                <p className="text-xs mt-1 mb-2 leading-relaxed" style={{ color: 'var(--text-dim)' }}>
-                  Cuente con sus palabras lo que desea reportar. Si prefiere, puede dictarlo.
-                </p>
-                <CampoDictado className={inp} rows={6}
-                  value={r.descripcion ?? ''} onChange={v => set('descripcion', v)}
-                  aria-label="¿Qué sucedió?"
-                  placeholder="Ej: la escalera del beneficiadero está suelta y se mueve al subir" />
+                <p className="text-xs font-bold mb-1.5" style={{ color: 'var(--text)' }}>Fecha del reporte *</p>
+                <input type="date" className={inp} value={r.fecha_reporte ?? ''} max={hoy()}
+                  onChange={e => set('fecha_reporte', e.target.value)} />
               </div>
-            </>
+              <div>
+                <p className="text-xs font-bold mb-1.5 flex items-center gap-1" style={{ color: 'var(--text)' }}>
+                  <MapPin size={11} /> Lugar *
+                </p>
+                <input className={inp} value={r.lugar ?? ''}
+                  onChange={e => set('lugar', e.target.value)} placeholder="Ej: bodega, lote 3, taller" />
+              </div>
+              <p className="col-span-2 text-xs leading-relaxed" style={{ color: 'var(--text-dim)' }}>
+                Su nombre y su cédula ya están en el reporte; no tiene que escribirlos.
+              </p>
+            </div>
           )}
 
-          {/* ── 2. Tipo de reporte ── */}
+          {/* ── 1. Tipo de reporte ── */}
           {paso === 1 && (
             <>
               <div>
@@ -216,8 +206,24 @@ export default function NuevoReportePage() {
             </>
           )}
 
-          {/* ── 3. Acción inmediata ── */}
+          {/* ── 2. ¿Qué sucedió? ── */}
           {paso === 2 && (
+            <div>
+              <p className="text-sm font-bold" style={{ color: 'var(--text)' }}>
+                ¿Qué sucedió? <span style={{ color: '#EF4444' }}>*</span>
+              </p>
+              <p className="text-xs mt-1 mb-2 leading-relaxed" style={{ color: 'var(--text-dim)' }}>
+                Indique claramente lo que desea reportar. Si prefiere, puede dictarlo.
+              </p>
+              <CampoDictado className={inp} rows={6}
+                value={r.descripcion ?? ''} onChange={v => set('descripcion', v)}
+                aria-label="¿Qué sucedió?"
+                placeholder="Ej: la escalera del beneficiadero está suelta y se mueve al subir" />
+            </div>
+          )}
+
+          {/* ── 3. Acción inmediata ── */}
+          {paso === 3 && (
             <>
               <div>
                 <p className="text-sm font-bold" style={{ color: 'var(--text)' }}>¿Qué se hizo de inmediato?</p>
@@ -251,7 +257,7 @@ export default function NuevoReportePage() {
           )}
 
           {/* ── 4. Sugerencia de mejora ── */}
-          {paso === 3 && (
+          {paso === 4 && (
             <div>
               <p className="text-sm font-bold" style={{ color: 'var(--text)' }}>
                 ¿Qué cree que debería hacerse para mejorar?
@@ -267,18 +273,18 @@ export default function NuevoReportePage() {
             </div>
           )}
 
-          {/* ── 5. Revisar y enviar ── */}
-          {paso === 4 && (
+          {/* ── Revisar y enviar ── */}
+          {paso === 5 && (
             <div className="space-y-3">
               <p className="text-sm font-bold" style={{ color: 'var(--text)' }}>Revise antes de enviar</p>
 
               {([
                 ['Fecha', r.fecha_reporte],
                 ['Lugar', r.lugar],
-                ['Tipo de reporte', (r.tipos ?? []).join(', ')],
-                ['Qué sucedió', r.descripcion],
-                ['Acción inmediata', [...(r.acciones_inmediatas ?? []), r.otra_accion].filter(Boolean).join(' · ')],
-                ['Sugerencia de mejora', r.sugerencia_mejora],
+                ['1. Tipo de reporte', (r.tipos ?? []).join(', ')],
+                ['2. Qué sucedió', r.descripcion],
+                ['3. Acción inmediata', [...(r.acciones_inmediatas ?? []), r.otra_accion].filter(Boolean).join(' · ')],
+                ['4. Sugerencia de mejora o intervención', r.sugerencia_mejora],
               ] as [string, string | null | undefined][]).map(([k, v]) => (
                 <div key={k} className="p-3 rounded-xl" style={{ background: 'var(--bg-surface)', border: '1px solid var(--border)' }}>
                   <p className="text-[10px] font-bold uppercase tracking-wider" style={{ color: 'var(--text-faint)' }}>{k}</p>
@@ -291,7 +297,7 @@ export default function NuevoReportePage() {
               {/* El seguimiento no es del trabajador: se muestra para que sepa qué sigue. */}
               <div className="p-3.5 rounded-xl" style={{ background: 'rgba(148,163,184,0.08)', border: '1px dashed var(--border)' }}>
                 <p className="text-[11px] font-bold uppercase tracking-wider flex items-center gap-1.5" style={{ color: 'var(--text-faint)' }}>
-                  <Lock size={11} /> Lo diligencia Seguridad y Salud en el Trabajo
+                  <Lock size={11} /> 5. Seguimiento — lo diligencia Seguridad y Salud en el Trabajo
                 </p>
                 <p className="text-xs mt-1.5 leading-relaxed" style={{ color: 'var(--text-dim)' }}>
                   Seguimiento, quién recibe la solicitud, su firma y el número en la Matriz de Mejoras.
@@ -312,7 +318,9 @@ export default function NuevoReportePage() {
           {intento && !pasoCompleto(paso) && (
             <p className="text-xs font-bold flex items-center gap-1.5" style={{ color: '#EF4444' }}>
               <AlertCircle size={13} />
-              {paso === 0 ? 'Complete la fecha, el lugar y qué sucedió.' : 'Elija al menos un tipo de reporte.'}
+              {paso === 0 ? 'Complete la fecha y el lugar.'
+                : paso === 1 ? 'Elija al menos un tipo de reporte.'
+                : 'Cuente qué sucedió para poder continuar.'}
             </p>
           )}
           {error && <p className="text-xs font-bold" style={{ color: '#EF4444' }}>{error}</p>}
