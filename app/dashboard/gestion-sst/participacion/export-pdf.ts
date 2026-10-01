@@ -14,6 +14,8 @@ const C = {
 }
 
 const W = 210, H = 297, ML = 18, MR = 18, CW = W - ML - MR
+// Último renglón utilizable: debajo queda la línea del pie y su leyenda.
+const TOPE = H - 18
 
 export async function exportarFormularioPDF(p: Participacion, empresa = 'Organización') {
   const { default: jsPDF } = await import('jspdf')
@@ -42,8 +44,12 @@ export async function exportarFormularioPDF(p: Participacion, empresa = 'Organiz
 
   let y = cabecera()
 
-  /** Salta de página cuando lo que viene no cabe. */
-  const espacio = (alto: number) => { if (y + alto > H - 16) y = cabecera() }
+  /** Abre una hoja nueva de verdad. Sin el addPage el encabezado se volvía a
+   *  pintar sobre la misma hoja y las respuestas quedaban una encima de otra. */
+  function nuevaHoja() { doc.addPage(); y = cabecera() }
+
+  /** Si lo que viene no cabe en lo que queda de hoja, pasa a la siguiente. */
+  const espacio = (alto: number) => { if (y + alto > TOPE) nuevaHoja() }
 
   // ── Identificación ───────────────────────────────────────────────────
   caja(ML, y, CW, 7, C.light); caja(ML, y, 3, 7, C.blue)
@@ -97,13 +103,15 @@ export async function exportarFormularioPDF(p: Participacion, empresa = 'Organiz
           porGrupo.set(g, [...(porGrupo.get(g) ?? []), x])
         }
         for (const [grupo, items] of porGrupo) {
-          espacio(6)
+          // El nombre de la clase no se queda solo al final de la hoja: se
+          // reserva sitio para él y para al menos uno de sus peligros.
+          espacio(11)
           texto(grupo.toUpperCase(), ML + 6, y, 7, C.teal, true); y += 4.2
           for (const it of items) { espacio(5); texto(`•  ${it}`, ML + 10, y, 8.5, C.dark); y += 4.4 }
           y += 1
         }
       }
-      if (p.peligros_otro) { espacio(6); texto('Otro:', ML + 6, y, 8, C.gray, true); y += 4.4; parrafo(p.peligros_otro, 9, C.dark, 10) }
+      if (p.peligros_otro) { espacio(11); texto('Otro:', ML + 6, y, 8, C.gray, true); y += 4.4; parrafo(p.peligros_otro, 9, C.dark, 10) }
     } else if (q.tipo === 'confirmacion') {
       const ok = p.confirma_participacion === true
       texto(ok ? 'Confirmó su participación' : 'No confirmó', ML + 6, y, 9, ok ? C.green : C.red, true)
@@ -113,7 +121,7 @@ export async function exportarFormularioPDF(p: Participacion, empresa = 'Organiz
     }
 
     if (q.campo === 'controles_suficientes') {
-      espacio(10)
+      espacio(14)
       texto(CAMPO_MEJORAS.titulo, ML + 6, y, 8, C.gray, true); y += 4.6
       parrafo(p.oportunidades_mejora || 'Sin respuesta', 9, p.oportunidades_mejora ? C.dark : C.gray, 10)
     }
