@@ -7,6 +7,7 @@ import {
   PenTool, CheckCircle, Upload, RotateCcw, Save,
   Shield, FileText, Calendar, Loader2, AlertCircle, X
 } from 'lucide-react'
+import { comprimirFirma } from '@/lib/comprimir-firma'
 
 export default function MySignaturePage() {
   const { data: session } = useSession()
@@ -132,14 +133,18 @@ export default function MySignaturePage() {
     setHasDrawn(false)
   }
 
-  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
     if (!file) return
-    const reader = new FileReader()
-    reader.onload = ev => {
-      setSignatureData(ev.target!.result as string)
+    // Una foto de una firma llegaba entera a la base: 1536x1024 y 2 MB. Se
+    // recorta y se reduce antes de guardarla.
+    try {
+      setSignatureData(await comprimirFirma(file))
+    } catch {
+      const reader = new FileReader()
+      reader.onload = ev => setSignatureData(ev.target!.result as string)
+      reader.readAsDataURL(file)
     }
-    reader.readAsDataURL(file)
   }
 
   const prepareSignature = () => {
