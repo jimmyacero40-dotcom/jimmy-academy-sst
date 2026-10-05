@@ -3,6 +3,7 @@ import { supabaseAdmin as supabase } from '@/lib/supabase-admin'
 import { getCurrentUser, getActiveCompanyId } from '@/lib/get-company'
 import { tienePermiso } from '@/lib/permisos'
 import { calcPct } from '@/lib/perfil-completitud'
+import { normalizarPerfil } from '@/lib/mayusculas'
 
 export async function GET() {
   const user = await getCurrentUser()
@@ -85,8 +86,10 @@ export async function PUT(req: NextRequest) {
   const { data: actual } = await supabase
     .from('worker_profiles').select('*').eq('user_id', targetUserId).maybeSingle()
 
+  // Lo que escribe el trabajador también se normaliza en el servidor: la
+  // pantalla ya lo muestra en mayúscula, pero el dato guardado es el que vale.
   const payload = {
-    ...sanitized,
+    ...normalizarPerfil(sanitized),
     user_id: targetUserId,
     company_id: companyId,
     completion_pct: calcPct({ ...(actual ?? {}), ...sanitized }),

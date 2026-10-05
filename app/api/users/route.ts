@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase-admin'
 const supabase = supabaseAdmin
+import { normalizarUsuario } from '@/lib/mayusculas'
 import { requierePermiso } from '@/lib/get-company'
 import bcrypt from 'bcryptjs'
 
@@ -18,7 +19,7 @@ export async function GET(req: NextRequest) {
 
   let query = supabaseAdmin
     .from('users')
-    .select('id, email, correo, name, cedula, role, area, cargo, area_id, active, company_id, created_at, retired_at, permissions')
+    .select('id, email, correo, name, cedula, role, area, cargo, area_id, active, company_id, created_at, retired_at, permissions, estado_registro, motivo_rechazo, pre_registro_at')
     .is('retired_at', null)  // exclude retired workers from main list
     .order('created_at', { ascending: false })
   if (companyId) query = query.eq('company_id', companyId)
@@ -116,18 +117,20 @@ export async function POST(req: NextRequest) {
   const hash = await bcrypt.hash(password, 10)
   const areaCampos: Record<string, any> = { area: area || '' }
   await sincronizarArea(areaCampos, companyId)
+  // El nombre, el cargo y el área se guardan en mayúscula sostenida.
+  const enMayuscula = normalizarUsuario({ name, cargo: cargo || null, area: areaCampos.area })
   const { data, error } = await supabase
     .from('users')
     .insert({
       email,
       correo: correo || null,
       password: hash,
-      name,
+      name: enMayuscula.name,
       cedula: cedula || '',
       role: role || 'worker',
-      area: areaCampos.area,
+      area: enMayuscula.area,
       area_id: areaCampos.area_id,
-      cargo: cargo || null,
+      cargo: enMayuscula.cargo,
       active: true,
       company_id: companyId,
       permissions: Array.isArray(permissions) ? permissions : null,
@@ -165,6 +168,7 @@ export async function PUT(req: NextRequest) {
     updates.password = await bcrypt.hash(updates.password, 10)
   }
   await sincronizarArea(updates, companyId)
+  Object.assign(updates, normalizarUsuario(updates))
 
   let query = supabase.from('users').update(updates).eq('id', id)
   if (companyId) query = query.eq('company_id', companyId)

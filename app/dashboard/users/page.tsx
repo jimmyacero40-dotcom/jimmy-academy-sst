@@ -12,7 +12,7 @@ import {
   Layers, UserCheck, Tag, Eye, BookOpen, UserX
 } from 'lucide-react'
 
-type UserStatus = 'activo' | 'inactivo'
+type UserStatus = 'activo' | 'inactivo' | 'pendiente' | 'rechazado'
 
 interface AppUser {
   id: string
@@ -30,6 +30,9 @@ interface AppUser {
   fechaIngreso: string
   cedula: string
   status: UserStatus
+  /** Nulo en quienes no vienen del enlace público de pre-registro. */
+  estadoRegistro: 'pendiente' | 'aprobado' | 'rechazado' | null
+  motivoRechazo: string | null
   createdAt: string
   photo_url?: string | null
   groups: { id: string; name: string; color?: string }[]
@@ -300,6 +303,73 @@ function GroupsCell({ u, groups, cellSaving, groupPopover, setGroupPopover, auto
 }
 
 // ── Main component ───────────────────────────────────────────────────────────
+type CampoOrden = 'name' | 'cedula' | 'status' | 'area_name' | 'cargo' | 'sede' | 'fechaIngreso'
+
+/**
+ * Estas tres vivían dentro de UsersPage. Al declararse en cada render, React
+ * las veía como componentes distintos cada vez y desmontaba el encabezado
+ * entero: por eso el buscador perdía el foco a la primera letra. Declaradas
+ * aquí, su identidad no cambia y el <input> sobrevive al filtrado.
+ */
+function TH({ children, className = '' }: { children: React.ReactNode; className?: string }) {
+  return (
+    <th className={`px-4 py-0 text-left align-top ${className}`}
+      style={{ borderBottom: '1px solid var(--border)' }}>
+      <div className="py-3">{children}</div>
+    </th>
+  )
+}
+
+function SortIcon({ field, sortField, sortDir }: { field: CampoOrden; sortField: CampoOrden | null; sortDir: string }) {
+  const active = sortField === field
+  return (
+    <span className="inline-flex flex-col ml-1 leading-none" style={{ verticalAlign: 'middle' }}>
+      <span style={{ opacity: active && sortDir === 'asc' ? 1 : 0.25, fontSize: 8, lineHeight: '9px', color: active ? 'var(--primary)' : 'var(--text-faint)' }}>▲</span>
+      <span style={{ opacity: active && sortDir === 'desc' ? 1 : 0.25, fontSize: 8, lineHeight: '9px', color: active ? 'var(--primary)' : 'var(--text-faint)' }}>▼</span>
+    </span>
+  )
+}
+
+function EtiquetaColumna({ children, field, sortField, sortDir, onSort }: {
+  children: React.ReactNode; field?: CampoOrden
+  sortField: CampoOrden | null; sortDir: string; onSort: (f: any) => void
+}) {
+  if (!field) {
+    return (
+      <span className="text-[10px] font-semibold uppercase tracking-widest block" style={{ color: 'var(--text-faint)' }}>
+        {children}
+      </span>
+    )
+  }
+  return (
+    <button onClick={() => onSort(field)}
+      className="flex items-center gap-0.5 text-[10px] font-semibold uppercase tracking-widest transition-colors hover:opacity-80"
+      style={{ color: sortField === field ? 'var(--primary)' : 'var(--text-faint)' }}>
+      {children}<SortIcon field={field} sortField={sortField} sortDir={sortDir} />
+    </button>
+  )
+}
+
+const ETIQUETA_ESTADO: Record<string, string> = {
+  activo: 'Activo', inactivo: 'Inactivo',
+  pendiente: 'Pendiente de validación', rechazado: 'Rechazado',
+}
+
+const COLOR_ESTADO: Record<string, string> = {
+  activo: '#10B981', inactivo: '#EF4444', pendiente: '#F59E0B', rechazado: '#94A3B8',
+}
+
+function InsigniaEstado({ estado }: { estado: string }) {
+  const color = COLOR_ESTADO[estado] ?? '#EF4444'
+  return (
+    <span className="inline-flex items-center gap-1.5 text-[11px] font-bold px-2 py-1 rounded-lg whitespace-nowrap"
+      style={{ background: `${color}1F`, color }}>
+      <span className="w-1.5 h-1.5 rounded-full flex-shrink-0" style={{ background: color }} />
+      {ETIQUETA_ESTADO[estado] ?? 'Inactivo'}
+    </span>
+  )
+}
+
 export default function UsersPage() {
   const router = useRouter()
   const [users, setUsers]   = useState<AppUser[]>([])
@@ -309,6 +379,9 @@ export default function UsersPage() {
   // Filters
   const [search, setSearch]           = useState('')
   const [filterStatus, setFilterStatus] = useState('')
+  const [validando, setValidando] = useState<string | null>(null)
+  const [rechazando, setRechazando] = useState<any>(null)
+  const [motivoRechazo, setMotivoRechazo] = useState('')
   const [filterArea, setFilterArea]   = useState('')
   const [sortField, setSortField] = useState<'name' | 'cedula' | 'status' | 'area_name' | 'cargo' | 'sede' | 'fechaIngreso' | null>('name')
   const [sortDir, setSortDir]     = useState<'asc' | 'desc'>('asc')
@@ -354,7 +427,12 @@ export default function UsersPage() {
         sede: u.sede || '',
         fechaIngreso: u.fecha_ingreso || '',
         cedula: u.cedula || '',
-        status: u.active ? 'activo' as UserStatus : 'inactivo' as UserStatus,
+        // Quien viene del enlace público se distingue de un inactivo normal.
+        status: (u.estado_registro === 'pendiente' ? 'pendiente'
+          : u.estado_registro === 'rechazado' ? 'rechazado'
+          : u.active ? 'activo' : 'inactivo') as UserStatus,
+        estadoRegistro: u.estado_registro ?? null,
+        motivoRechazo: u.motivo_rechazo ?? null,
         createdAt: new Date(u.created_at).toLocaleDateString('es-CO'),
         photo_url: u.photo_url || null,
         groups: (u.user_groups ?? []).map((ug: any) => ug.groups).filter(Boolean),
@@ -402,6 +480,20 @@ export default function UsersPage() {
   const uniqueRoles = [...new Set(users.map(u => u.role).filter(Boolean))]
   const activeCount   = users.filter(u => u.status === 'activo').length
   const inactiveCount = users.filter(u => u.status === 'inactivo').length
+  /** Aprobar o rechazar un pre-registro. El servidor es quien decide. */
+  const validar = async (u: any, decision: 'aprobar' | 'rechazar', motivo = '') => {
+    setValidando(u.id)
+    try {
+      const res = await fetch(`/api/users/${u.id}/validar`, {
+        method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ decision, motivo }),
+      })
+      if (!res.ok) { alert((await res.json().catch(() => ({}))).error ?? 'No fue posible validar'); return }
+      setRechazando(null); setMotivoRechazo('')
+      await loadUsers()
+    } finally { setValidando(null) }
+  }
+
   const hasFilters    = !!(search || filterStatus || filterArea || filterGroup || filterRole || filterSede)
 
   // ── CRUD ─────────────────────────────────────────────────────────────────
@@ -639,35 +731,10 @@ export default function UsersPage() {
     await loadUsers(); setCellSaving(null)
   }
 
-  // ── TH helper ────────────────────────────────────────────────────────────
-  const TH = ({ children, className = '' }: { children: React.ReactNode; className?: string }) => (
-    <th className={`px-4 py-0 text-left align-top ${className}`}
-      style={{ borderBottom: '1px solid var(--border)' }}>
-      <div className="py-3">{children}</div>
-    </th>
-  )
-
-  const SortIcon = ({ field }: { field: typeof sortField }) => {
-    const active = sortField === field
-    return (
-      <span className="inline-flex flex-col ml-1 leading-none" style={{ verticalAlign: 'middle' }}>
-        <span style={{ opacity: active && sortDir === 'asc' ? 1 : 0.25, fontSize: 8, lineHeight: '9px', color: active ? 'var(--primary)' : 'var(--text-faint)' }}>▲</span>
-        <span style={{ opacity: active && sortDir === 'desc' ? 1 : 0.25, fontSize: 8, lineHeight: '9px', color: active ? 'var(--primary)' : 'var(--text-faint)' }}>▼</span>
-      </span>
-    )
-  }
-
-  const ColLabel = ({ children, field }: { children: React.ReactNode; field?: typeof sortField }) => (
-    field
-      ? <button onClick={() => handleSort(field)}
-          className="flex items-center gap-0.5 text-[10px] font-semibold uppercase tracking-widest transition-colors hover:opacity-80"
-          style={{ color: sortField === field ? 'var(--primary)' : 'var(--text-faint)' }}>
-          {children}<SortIcon field={field} />
-        </button>
-      : <span className="text-[10px] font-semibold uppercase tracking-widest block" style={{ color: 'var(--text-faint)' }}>
-          {children}
-        </span>
-  )
+  // TH, SortIcon y EtiquetaColumna viven fuera del componente: ver la nota allí.
+  // No se envuelven en un ayudante local porque ese ayudante volvería a cambiar
+  // de identidad en cada render y el buscador perdería el foco otra vez.
+  const ordenar = { sortField, sortDir, onSort: handleSort }
 
   // ── Render ────────────────────────────────────────────────────────────────
   return (
@@ -792,6 +859,39 @@ export default function UsersPage() {
         )}
       </AnimatePresence>
 
+      {/* Rechazar un pre-registro */}
+      {rechazando && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4"
+          style={{ background: 'rgba(0,0,0,0.6)' }} onClick={() => setRechazando(null)}>
+          <div onClick={e => e.stopPropagation()} className="terra-card w-full max-w-md p-5">
+            <p className="text-base font-black" style={{ color: 'var(--text)' }}>
+              Rechazar el registro de {rechazando.name}
+            </p>
+            <p className="text-xs mt-1 leading-relaxed" style={{ color: 'var(--text-dim)' }}>
+              No podrá entrar a la plataforma. El registro no se borra: queda guardado con el
+              motivo para que puedas revisarlo o corregirlo después.
+            </p>
+            <textarea rows={3} value={motivoRechazo} onChange={e => setMotivoRechazo(e.target.value)}
+              placeholder="Motivo (opcional). Ej: la cédula no coincide con el documento."
+              className="w-full mt-3 bg-[var(--bg-surface)] border border-[var(--border)] rounded-xl px-3 py-2.5 text-sm resize-none"
+              style={{ color: 'var(--text)' }} />
+            <div className="flex gap-2 justify-end mt-3">
+              <button onClick={() => { setRechazando(null); setMotivoRechazo('') }}
+                className="text-xs font-bold px-4 py-2.5 rounded-xl"
+                style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', color: 'var(--text-dim)' }}>
+                Cancelar
+              </button>
+              <button onClick={() => validar(rechazando, 'rechazar', motivoRechazo)}
+                disabled={validando === rechazando.id}
+                className="text-xs font-bold px-4 py-2.5 rounded-xl"
+                style={{ background: '#EF4444', color: '#fff' }}>
+                {validando === rechazando.id ? 'Rechazando…' : 'Sí, rechazar'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Empty state */}
       {users.length === 0 ? (
         <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }}
@@ -838,25 +938,25 @@ export default function UsersPage() {
 
                   {/* Trabajador + search */}
                   <TH>
-                    <ColLabel field="name">Trabajador</ColLabel>
+                    <EtiquetaColumna field="name" {...ordenar}>Trabajador</EtiquetaColumna>
                     <FilterInput value={search} onChange={setSearch} placeholder="Buscar..." />
                   </TH>
 
                   {/* Cédula */}
                   <TH>
-                    <ColLabel field="cedula">Cédula</ColLabel>
+                    <EtiquetaColumna field="cedula" {...ordenar}>Cédula</EtiquetaColumna>
                     <div className="mt-1.5 h-6" />
                   </TH>
 
                   {/* Cargo */}
                   <TH>
-                    <ColLabel field="cargo">Cargo</ColLabel>
+                    <EtiquetaColumna field="cargo" {...ordenar}>Cargo</EtiquetaColumna>
                     <div className="mt-1.5 h-6" />
                   </TH>
 
                   {/* Área */}
                   <TH>
-                    <ColLabel field="area_name">Área</ColLabel>
+                    <EtiquetaColumna field="area_name" {...ordenar}>Área</EtiquetaColumna>
                     <FilterSelect
                       value={filterArea} onChange={setFilterArea}
                       placeholder="Todas"
@@ -866,7 +966,7 @@ export default function UsersPage() {
 
                   {/* Sede */}
                   <TH>
-                    <ColLabel field="sede">Sede</ColLabel>
+                    <EtiquetaColumna field="sede" {...ordenar}>Sede</EtiquetaColumna>
                     {/* Opciones tomadas de los datos reales, no de una lista fija. */}
                     <FilterSelect
                       value={filterSede} onChange={setFilterSede}
@@ -880,7 +980,7 @@ export default function UsersPage() {
 
                   {/* Grupos */}
                   <TH>
-                    <ColLabel>Grupos</ColLabel>
+                    <EtiquetaColumna {...ordenar}>Grupos</EtiquetaColumna>
                     <FilterSelect
                       value={filterGroup} onChange={setFilterGroup}
                       placeholder="Todos"
@@ -890,23 +990,28 @@ export default function UsersPage() {
 
                   {/* Fecha de ingreso */}
                   <TH>
-                    <ColLabel field="fechaIngreso">Fecha de ingreso</ColLabel>
+                    <EtiquetaColumna field="fechaIngreso" {...ordenar}>Fecha de ingreso</EtiquetaColumna>
                     <div className="mt-1.5 h-6" />
                   </TH>
 
                   {/* Estado */}
                   <TH>
-                    <ColLabel field="status">Estado</ColLabel>
+                    <EtiquetaColumna field="status" {...ordenar}>Estado</EtiquetaColumna>
                     <FilterSelect
                       value={filterStatus} onChange={setFilterStatus}
                       placeholder="Todos"
-                      options={[{ value: 'activo', label: 'Activo' }, { value: 'inactivo', label: 'Inactivo' }]}
+                      options={[
+                        { value: 'activo', label: 'Activo' },
+                        { value: 'pendiente', label: 'Pendiente de validación' },
+                        { value: 'rechazado', label: 'Rechazado' },
+                        { value: 'inactivo', label: 'Inactivo' },
+                      ]}
                     />
                   </TH>
 
                   {/* Correo */}
                   <TH>
-                    <ColLabel>Correo</ColLabel>
+                    <EtiquetaColumna {...ordenar}>Correo</EtiquetaColumna>
                     <div className="mt-1.5 h-6" />
                   </TH>
 
@@ -1046,11 +1151,7 @@ export default function UsersPage() {
 
                       {/* Estado */}
                       <td className="px-4 py-3">
-                        <span className={u.status === 'activo' ? 'badge-success' : 'badge-danger'}>
-                          <span className="w-1.5 h-1.5 rounded-full flex-shrink-0"
-                            style={{ background: u.status === 'activo' ? '#10B981' : '#EF4444' }} />
-                          {u.status === 'activo' ? 'Activo' : 'Inactivo'}
-                        </span>
+                        <InsigniaEstado estado={u.status} />
                       </td>
 
                       {/* Correo */}
@@ -1062,6 +1163,22 @@ export default function UsersPage() {
 
                       {/* Acciones inline */}
                       <td className="px-4 py-3">
+                        {/* Un pre-registro se revisa antes que nada: sus botones
+                            se ven siempre, no solo al pasar el ratón. */}
+                        {u.estadoRegistro === 'pendiente' && (
+                          <div className="flex items-center justify-end gap-1 mb-1">
+                            <button onClick={() => validar(u, 'aprobar')} disabled={validando === u.id}
+                              className="text-[11px] font-bold px-2 py-1 rounded-lg whitespace-nowrap"
+                              style={{ background: 'rgba(16,185,129,0.14)', color: '#10B981' }}>
+                              Aprobar
+                            </button>
+                            <button onClick={() => setRechazando(u)} disabled={validando === u.id}
+                              className="text-[11px] font-bold px-2 py-1 rounded-lg whitespace-nowrap"
+                              style={{ border: '1px solid rgba(239,68,68,0.35)', color: '#EF4444' }}>
+                              Rechazar
+                            </button>
+                          </div>
+                        )}
                         <div className="flex items-center justify-end gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
                           <button onClick={() => router.push(`/dashboard/users/${u.id}`)}
                             title="Ver hoja de vida"
@@ -1172,7 +1289,7 @@ export default function UsersPage() {
                         ? { background: 'rgba(16,185,129,0.1)', color: '#6EE7B7', border: '1px solid rgba(16,185,129,0.2)' }
                         : { background: 'rgba(239,68,68,0.08)', color: '#FCA5A5', border: '1px solid rgba(239,68,68,0.2)' }}>
                       <span className="w-1.5 h-1.5 rounded-full" style={{ background: u.status === 'activo' ? '#10B981' : '#EF4444' }} />
-                      {u.status === 'activo' ? 'Activo' : 'Inactivo'}
+                      {ETIQUETA_ESTADO[u.status] ?? 'Inactivo'}
                     </span>
                   </div>
                   <div className="flex gap-2 mt-3 flex-wrap">
