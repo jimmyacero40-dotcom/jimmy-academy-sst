@@ -1,7 +1,7 @@
 ﻿'use client'
 
 import { QrPreRegistro } from '@/components/QrPreRegistro'
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import { useSession } from 'next-auth/react'
 import { motion, AnimatePresence } from 'framer-motion'
@@ -10,7 +10,7 @@ import {
   Users, Search, MoreVertical, CheckCircle,
   Building2, X, Edit2, Trash2, Download, ChevronDown,
   UserPlus, FileSpreadsheet, AlertCircle, Loader2,
-  Layers, UserCheck, Tag, Eye, BookOpen, UserX, QrCode, Check,
+  Layers, UserCheck, Tag, Eye, BookOpen, UserX, QrCode, Check, GraduationCap,
 } from 'lucide-react'
 
 type UserStatus = 'activo' | 'inactivo' | 'pendiente' | 'rechazado'
@@ -381,6 +381,9 @@ export default function UsersPage() {
   const [search, setSearch]           = useState('')
   const [filterStatus, setFilterStatus] = useState('')
   const [mostrarQr, setMostrarQr] = useState(false)
+  const [sinInduccion, setSinInduccion] = useState(0)
+  const [asignando, setAsignando] = useState(false)
+  const [avisoInduccion, setAvisoInduccion] = useState<string | null>(null)
   const [validando, setValidando] = useState<string | null>(null)
   const [rechazando, setRechazando] = useState<any>(null)
   const [motivoRechazo, setMotivoRechazo] = useState('')
@@ -497,6 +500,34 @@ export default function UsersPage() {
   }
 
   const pendientes = users.filter(u => u.estadoRegistro === 'pendiente')
+
+  const contarSinInduccion = useCallback(() => {
+    fetch('/api/induccion').then(r => r.ok ? r.json() : null)
+      .then(d => { if (typeof d?.pendientes === 'number') setSinInduccion(d.pendientes) })
+      .catch(() => {})
+  }, [])
+
+  useEffect(() => { contarSinInduccion() }, [contarSinInduccion, users.length])
+
+  /** Asigna la formación de ingreso. Repetirlo no duplica nada. */
+  const asignarInduccion = async (cuerpo: { user_ids?: string[]; todos?: boolean }) => {
+    setAsignando(true); setAvisoInduccion(null)
+    try {
+      const res = await fetch('/api/induccion', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(cuerpo),
+      })
+      const d = await res.json().catch(() => ({}))
+      if (!res.ok) { setAvisoInduccion(d.error ?? 'No fue posible asignar la inducción'); return }
+      setAvisoInduccion(
+        d.asignados === 0
+          ? 'Todos los seleccionados ya tenían la inducción.'
+          : `Inducción asignada a ${d.asignados} trabajador${d.asignados === 1 ? '' : 'es'}` +
+            (d.yaTenian ? ` · ${d.yaTenian} ya la tenía${d.yaTenian === 1 ? '' : 'n'}` : ''))
+      setSelected(new Set())
+      contarSinInduccion()
+      setTimeout(() => setAvisoInduccion(null), 6000)
+    } finally { setAsignando(false) }
+  }
 
   const hasFilters    = !!(search || filterStatus || filterArea || filterGroup || filterRole || filterSede)
 
@@ -858,8 +889,13 @@ export default function UsersPage() {
             <span className="text-sm font-semibold" style={{ color: 'var(--primary)' }}>
               {selected.size} seleccionado{selected.size !== 1 ? 's' : ''}
             </span>
-            <button onClick={handleBulkDelete}
+            <button onClick={() => asignarInduccion({ user_ids: [...selected] })} disabled={asignando}
               className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold ml-auto"
+              style={{ background: 'rgba(16,185,129,0.14)', color: '#10B981', border: '1px solid rgba(16,185,129,0.25)' }}>
+              <GraduationCap size={12} /> {asignando ? 'Asignando…' : 'Asignar inducción'}
+            </button>
+            <button onClick={handleBulkDelete}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold"
               style={{ background: 'var(--red-dim)', color: '#FCA5A5', border: '1px solid rgba(239,68,68,0.2)' }}>
               <Trash2 size={12} /> Retirar seleccionados
             </button>
@@ -891,6 +927,37 @@ export default function UsersPage() {
             Revisarlos
           </button>
         </motion.div>
+      )}
+
+      {/* Quien ya estaba antes de la automatización no la recibió: se asigna de un clic. */}
+      {sinInduccion > 0 && (
+        <motion.div initial={{ opacity: 0, y: -6 }} animate={{ opacity: 1, y: 0 }}
+          className="flex items-center gap-3 mb-4 p-3.5 rounded-xl flex-wrap"
+          style={{ background: 'rgba(16,185,129,0.08)', border: '1px solid rgba(16,185,129,0.3)' }}>
+          <GraduationCap size={17} style={{ color: '#10B981' }} className="flex-shrink-0" />
+          <div className="flex-1 min-w-[240px]">
+            <p className="text-sm font-bold" style={{ color: '#10B981' }}>
+              {sinInduccion === 1
+                ? 'Hay 1 trabajador sin la inducción asignada'
+                : `Hay ${sinInduccion} trabajadores sin la inducción asignada`}
+            </p>
+            <p className="text-xs mt-0.5" style={{ color: 'var(--text-dim)' }}>
+              Los que ingresen desde ahora la reciben solos. Estos entraron antes.
+            </p>
+          </div>
+          <button onClick={() => asignarInduccion({ todos: true })} disabled={asignando}
+            className="text-xs font-bold px-3.5 py-2 rounded-lg whitespace-nowrap"
+            style={{ background: '#10B981', color: '#fff' }}>
+            {asignando ? 'Asignando…' : 'Asignar a todos'}
+          </button>
+        </motion.div>
+      )}
+
+      {avisoInduccion && (
+        <div className="mb-4 p-3 rounded-xl text-sm font-semibold"
+          style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', color: 'var(--text)' }}>
+          {avisoInduccion}
+        </div>
       )}
 
       {mostrarQr && <QrPreRegistro onClose={() => setMostrarQr(false)} />}
