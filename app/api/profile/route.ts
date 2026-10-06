@@ -16,7 +16,15 @@ export async function GET() {
     .maybeSingle()
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
-  return NextResponse.json(data ?? {})
+
+  // Si el trabajador todavía no ha confirmado su cargo o su área, se le
+  // muestran los que tiene registrados: así ve lo que ya hay en vez de un
+  // campo en blanco, y al guardar no manda vacío.
+  const ficha: Record<string, any> = { ...(data ?? {}) }
+  if (!ficha.cargo_confirmado && (user as any).cargo) ficha.cargo_confirmado = (user as any).cargo
+  if (!ficha.area_confirmada && (user as any).area) ficha.area_confirmada = (user as any).area
+
+  return NextResponse.json(ficha)
 }
 
 // Exact columns that exist in the worker_profiles table
@@ -104,12 +112,20 @@ export async function PUT(req: NextRequest) {
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
 
-  // Keep users.cargo in sync — it is the single source of truth consumed by
-  // attendance lists, certificates, and all admin views.
-  if (sanitized.cargo_confirmado !== undefined) {
+  // El cargo que confirma el trabajador se copia a users.cargo, que es lo que
+  // leen las listas de asistencia, los certificados y la pantalla de Personas.
+  //
+  // Solo se copia cuando trae valor. Antes se escribía `cargo_confirmado ||
+  // null`, y como la encuesta envía todo el perfil en cada guardado, un
+  // trabajador que no hubiera diligenciado ese campo mandaba null y borraba el
+  // cargo que el responsable de SST había escrito en Personas. Si hay que
+  // dejarlo en blanco, se hace desde Personas, que es donde se administra.
+  const cargoConfirmado = typeof sanitized.cargo_confirmado === 'string'
+    ? sanitized.cargo_confirmado.trim() : ''
+  if (cargoConfirmado) {
     await supabase
       .from('users')
-      .update({ cargo: sanitized.cargo_confirmado || null })
+      .update({ cargo: cargoConfirmado })
       .eq('id', targetUserId)
   }
 
