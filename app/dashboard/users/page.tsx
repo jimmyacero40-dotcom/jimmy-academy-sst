@@ -10,7 +10,7 @@ import {
   Users, Search, MoreVertical, CheckCircle,
   Building2, X, Edit2, Trash2, Download, ChevronDown,
   UserPlus, FileSpreadsheet, AlertCircle, Loader2,
-  Layers, UserCheck, Tag, Eye, BookOpen, UserX, QrCode,
+  Layers, UserCheck, Tag, Eye, BookOpen, UserX, QrCode, Check,
 } from 'lucide-react'
 
 type UserStatus = 'activo' | 'inactivo' | 'pendiente' | 'rechazado'
@@ -314,9 +314,9 @@ type CampoOrden = 'name' | 'cedula' | 'status' | 'area_name' | 'cargo' | 'sede' 
  */
 function TH({ children, className = '' }: { children: React.ReactNode; className?: string }) {
   return (
-    <th className={`px-4 py-0 text-left align-top ${className}`}
-      style={{ borderBottom: '1px solid var(--border)' }}>
-      <div className="py-3">{children}</div>
+    <th className={`px-3 py-0 text-left align-top ${className}`}
+      style={{ borderBottom: '1px solid var(--border)', overflow: 'hidden' }}>
+      <div className="py-3 min-w-0">{children}</div>
     </th>
   )
 }
@@ -363,10 +363,10 @@ const COLOR_ESTADO: Record<string, string> = {
 function InsigniaEstado({ estado }: { estado: string }) {
   const color = COLOR_ESTADO[estado] ?? '#EF4444'
   return (
-    <span className="inline-flex items-center gap-1.5 text-[11px] font-bold px-2 py-1 rounded-lg whitespace-nowrap"
-      style={{ background: `${color}1F`, color }}>
-      <span className="w-1.5 h-1.5 rounded-full flex-shrink-0" style={{ background: color }} />
-      {ETIQUETA_ESTADO[estado] ?? 'Inactivo'}
+    <span className="inline-flex items-start gap-1.5 text-[11px] font-bold px-2 py-1 rounded-lg leading-tight"
+      style={{ background: `${color}1F`, color }} title={ETIQUETA_ESTADO[estado] ?? 'Inactivo'}>
+      <span className="w-1.5 h-1.5 rounded-full flex-shrink-0 mt-1" style={{ background: color }} />
+      <span className="min-w-0">{ETIQUETA_ESTADO[estado] ?? 'Inactivo'}</span>
     </span>
   )
 }
@@ -946,19 +946,29 @@ export default function UsersPage() {
           <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }}
             className="terra-card hidden md:block"
             style={{ borderRadius: 16, overflow: 'visible' }}>
-            <table className="w-full" style={{ borderCollapse: 'collapse' }}>
+            {/* tableLayout: 'fixed' hace que los anchos de <colgroup> manden de
+                verdad. Con el diseño automático el contenido los ignoraba —los
+                filtros del encabezado, los chips de grupos y los botones de
+                acciones— y la tabla crecía a 1680 px dentro de un contenedor de
+                971: se salía de la tarjeta en lugar de ajustarse. Fijo, el
+                encabezado y las filas comparten exactamente las mismas columnas
+                a cualquier resolución, y lo que no cabe se recorta. */}
+            <table className="w-full" style={{ borderCollapse: 'collapse', tableLayout: 'fixed' }}>
               <colgroup>
-                <col style={{ width: 36 }} />   {/* Checkbox */}
-                <col style={{ width: '17%' }} />{/* Trabajador */}
-                <col style={{ width: '8%' }} /> {/* Cédula */}
-                <col style={{ width: '12%' }} />{/* Cargo */}
-                <col style={{ width: '10%' }} />{/* Área */}
-                <col style={{ width: '10%' }} />{/* Sede */}
-                <col style={{ width: '12%' }} />{/* Grupos */}
-                <col style={{ width: '8%' }} /> {/* Fecha de ingreso */}
-                <col style={{ width: '7%' }} /> {/* Estado */}
-                <col />                          {/* Correo — flexible */}
-                <col style={{ width: 80 }} />   {/* Acciones */}
+                {/* Todo en porcentaje y sumando 100: mezclar píxeles con
+                    porcentajes dejaba a Correo con 15 px, porque el porcentaje
+                    se calcula sobre el ancho total y no sobre lo que sobra. */}
+                <col style={{ width: '4%' }} />  {/* Checkbox */}
+                <col style={{ width: '18%' }} /> {/* Trabajador */}
+                <col style={{ width: '8%' }} />  {/* Cédula */}
+                <col style={{ width: '9%' }} />  {/* Cargo */}
+                <col style={{ width: '8%' }} />  {/* Área */}
+                <col style={{ width: '8%' }} />  {/* Sede */}
+                <col style={{ width: '8%' }} />  {/* Grupos */}
+                <col style={{ width: '9%' }} />  {/* Fecha de ingreso — cabe el selector */}
+                <col style={{ width: '9%' }} />  {/* Estado */}
+                <col style={{ width: '11%' }} /> {/* Correo */}
+                <col style={{ width: '8%' }} />  {/* Acciones */}
               </colgroup>
 
               {/* ── Table header with embedded filters ───────────────── */}
@@ -1204,14 +1214,16 @@ export default function UsersPage() {
                         {u.estadoRegistro === 'pendiente' && (
                           <div className="flex items-center justify-end gap-1 mb-1">
                             <button onClick={() => validar(u, 'aprobar')} disabled={validando === u.id}
-                              className="text-[11px] font-bold px-2 py-1 rounded-lg whitespace-nowrap"
+                              title="Aprobar este registro"
+                              className="w-7 h-7 rounded-lg flex items-center justify-center"
                               style={{ background: 'rgba(16,185,129,0.14)', color: '#10B981' }}>
-                              Aprobar
+                              <Check size={14} />
                             </button>
                             <button onClick={() => setRechazando(u)} disabled={validando === u.id}
-                              className="text-[11px] font-bold px-2 py-1 rounded-lg whitespace-nowrap"
+                              title="Rechazar este registro"
+                              className="w-7 h-7 rounded-lg flex items-center justify-center"
                               style={{ border: '1px solid rgba(239,68,68,0.35)', color: '#EF4444' }}>
-                              Rechazar
+                              <X size={14} />
                             </button>
                           </div>
                         )}

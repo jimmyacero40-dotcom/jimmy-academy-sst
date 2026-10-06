@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import bcrypt from 'bcryptjs'
 import { supabaseAdmin as supabase } from '@/lib/supabase-admin'
 import { normalizarUsuario, normalizarPerfil } from '@/lib/mayusculas'
+import { asignarInduccion } from '@/lib/induccion'
 
 /**
  * Pre-registro público de trabajadores.
@@ -140,5 +141,9 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'No fue posible guardar tus datos' }, { status: 500 })
   }
 
-  return NextResponse.json({ ok: true, cedula }, { status: 201 })
+  // La inducción se asigna sola. Es idempotente, así que repetir el proceso
+  // no crea una segunda.
+  const induccion = await asignarInduccion(usuario.id, companyId)
+
+  return NextResponse.json({ ok: true, cedula, induccion: induccion.motivo }, { status: 201 })
 }

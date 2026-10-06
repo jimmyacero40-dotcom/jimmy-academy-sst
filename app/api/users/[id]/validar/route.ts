@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { supabaseAdmin as supabase } from '@/lib/supabase-admin'
 import { requierePermiso } from '@/lib/get-company'
+import { asignarInduccion } from '@/lib/induccion'
 
 /**
  * Aprobar o rechazar un pre-registro.
@@ -41,5 +42,11 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
   }).eq('id', params.id).select('id, name, cedula, estado_registro, active').single()
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
-  return NextResponse.json({ usuario: data })
+
+  // Se vuelve a intentar al aprobar: cubre los registros anteriores a esta
+  // automatización y cualquier caso en que no se hubiera podido asignar.
+  let induccion
+  if (aprobado && companyId) induccion = (await asignarInduccion(params.id, companyId)).motivo
+
+  return NextResponse.json({ usuario: data, induccion })
 }

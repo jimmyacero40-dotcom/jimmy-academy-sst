@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase-admin'
 const supabase = supabaseAdmin
 import { normalizarUsuario } from '@/lib/mayusculas'
+import { asignarInduccion } from '@/lib/induccion'
 import { requierePermiso } from '@/lib/get-company'
 import bcrypt from 'bcryptjs'
 
@@ -152,10 +153,18 @@ export async function POST(req: NextRequest) {
 
   if (error) {
     if (error.message.includes('duplicate')) {
-      return NextResponse.json({ error: 'Ya existe un usuario con ese correo' }, { status: 409 })
+      return NextResponse.json({
+        error: error.message.includes('cedula')
+          ? 'Ya existe un trabajador con ese documento'
+          : 'Ya existe un usuario con ese correo',
+      }, { status: 409 })
     }
     return NextResponse.json({ error: error.message }, { status: 500 })
   }
+
+  // Todo trabajador nuevo recibe la inducción, se haya creado por el enlace
+  // público, a mano o desde la importación de Excel.
+  if (data.role === 'worker' && companyId) await asignarInduccion(data.id, companyId)
 
   return NextResponse.json(data, { status: 201 })
 }

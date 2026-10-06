@@ -123,11 +123,44 @@ export default function UserDetailPage() {
     ? enrollments
     : enrollments.filter(e => e.status === statusFilter)
 
+  // La inducción se identifica por su categoría, que es como la marca el
+  // sistema al asignarla automáticamente.
+  const induccion = enrollments.find(e =>
+    /induc/i.test(e.trainings?.category ?? '') || /inducc/i.test(e.trainings?.title ?? ''))
+  const ESTADO_INDUCCION: Record<string, { texto: string; color: string }> = {
+    pending:     { texto: 'Inducción pendiente',    color: '#F59E0B' },
+    in_progress: { texto: 'Inducción en progreso',  color: '#3B82F6' },
+    completed:   { texto: 'Inducción completada',   color: '#10B981' },
+    expired:     { texto: 'Inducción vencida',      color: '#EF4444' },
+    overdue:     { texto: 'Inducción vencida',      color: '#EF4444' },
+  }
+  const marca = induccion ? ESTADO_INDUCCION[induccion.status] : null
+
   const initials = getInitials(user.name)
   const hue = user.id.split('').reduce((a, c) => a + c.charCodeAt(0), 0) % 360
 
   return (
     <div className="p-4 sm:p-6 max-w-5xl mx-auto">
+
+      {/* Cómo va su inducción, de un vistazo. */}
+      {marca && (
+        <div className="mb-3 inline-flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-bold"
+          style={{ background: `${marca.color}1A`, color: marca.color, border: `1px solid ${marca.color}44` }}
+          title={induccion!.trainings?.title ?? ''}>
+          <span className="w-1.5 h-1.5 rounded-full" style={{ background: marca.color }} />
+          {marca.texto}
+          {induccion!.completed_at && (
+            <span style={{ opacity: 0.75 }}>
+              · {new Date(induccion!.completed_at).toLocaleDateString('es-CO')}
+            </span>
+          )}
+          {induccion!.status !== 'completed' && induccion!.due_date && (
+            <span style={{ opacity: 0.75 }}>
+              · vence {new Date(induccion!.due_date + 'T12:00:00').toLocaleDateString('es-CO')}
+            </span>
+          )}
+        </div>
+      )}
 
       {/* Back */}
       <button onClick={() => router.back()}
