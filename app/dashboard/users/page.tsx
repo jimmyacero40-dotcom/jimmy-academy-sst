@@ -496,6 +496,8 @@ export default function UsersPage() {
     } finally { setValidando(null) }
   }
 
+  const pendientes = users.filter(u => u.estadoRegistro === 'pendiente')
+
   const hasFilters    = !!(search || filterStatus || filterArea || filterGroup || filterRole || filterSede)
 
   // ── CRUD ─────────────────────────────────────────────────────────────────
@@ -865,6 +867,31 @@ export default function UsersPage() {
           </motion.div>
         )}
       </AnimatePresence>
+
+      {/* Lo primero que hay que atender al entrar: quién está esperando. */}
+      {pendientes.length > 0 && (
+        <motion.div initial={{ opacity: 0, y: -6 }} animate={{ opacity: 1, y: 0 }}
+          className="flex items-center gap-3 mb-4 p-3.5 rounded-xl flex-wrap"
+          style={{ background: 'rgba(245,158,11,0.09)', border: '1px solid rgba(245,158,11,0.35)' }}>
+          <UserCheck size={17} style={{ color: '#F59E0B' }} className="flex-shrink-0" />
+          <div className="flex-1 min-w-[220px]">
+            <p className="text-sm font-bold" style={{ color: '#F59E0B' }}>
+              {pendientes.length === 1
+                ? 'Hay 1 registro esperando tu validación'
+                : `Hay ${pendientes.length} registros esperando tu validación`}
+            </p>
+            <p className="text-xs mt-0.5" style={{ color: 'var(--text-dim)' }}>
+              {pendientes.slice(0, 3).map(u => u.name).join(' · ')}
+              {pendientes.length > 3 && ` y ${pendientes.length - 3} más`}
+            </p>
+          </div>
+          <button onClick={() => { setFilterStatus('pendiente'); setSearch('') }}
+            className="text-xs font-bold px-3.5 py-2 rounded-lg whitespace-nowrap"
+            style={{ background: '#F59E0B', color: '#0B1829' }}>
+            Revisarlos
+          </button>
+        </motion.div>
+      )}
 
       {mostrarQr && <QrPreRegistro onClose={() => setMostrarQr(false)} />}
 

@@ -61,6 +61,15 @@ export default withAuth(
 
     // Los cuatro módulos del trabajador, más las pantallas que viven dentro de
     // ellos: la firma dentro de Mi Perfil y los certificados dentro de SSTudio.
+    // En revisión: puede completar su perfil y nada más. Todavía no es un
+    // trabajador de la empresa, así que no entra a formación ni a reportes.
+    if (token?.estadoRegistro === 'pendiente') {
+      if (!path.startsWith('/dashboard/my-profile')) {
+        return NextResponse.redirect(new URL('/dashboard/my-profile', req.url))
+      }
+      return NextResponse.next()
+    }
+
     const RUTAS_TRABAJADOR = [
       '/dashboard', '/dashboard/my-profile', '/dashboard/my-plan',
       '/dashboard/tu-cuentas', '/dashboard/reportal',

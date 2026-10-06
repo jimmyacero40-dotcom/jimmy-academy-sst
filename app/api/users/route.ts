@@ -10,6 +10,18 @@ import bcrypt from 'bcryptjs'
 // habilita la consulta. Lo que nunca ve un no-administrador son las cuentas de
 // plataforma, por más que pida role=all.
 export async function GET(req: NextRequest) {
+  // Atajo barato para la insignia del menú: solo devuelve cuántos esperan.
+  if (req.nextUrl.searchParams.get('pendientes')) {
+    const { authorized, companyId } = await requierePermiso('personal.ver')
+    if (!authorized) return NextResponse.json({ pendientes: 0 })
+    let q = supabase.from('users')
+      .select('id', { count: 'exact', head: true })
+      .eq('estado_registro', 'pendiente')
+    if (companyId) q = q.eq('company_id', companyId)
+    const { count } = await q
+    return NextResponse.json({ pendientes: count ?? 0 })
+  }
+
   const { authorized, companyId, isAdmin } = await requierePermiso('personal.ver', 'accesos.ingreso', 'accesos.salida')
   if (!authorized) return NextResponse.json({ error: 'No tiene permiso para consultar trabajadores' }, { status: 403 })
 

@@ -204,6 +204,23 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
   const [activeCompany, setActiveCompany] = useState<{ name: string; logo_url?: string } | null>(null)
   const [workerDisplayName, setWorkerDisplayName] = useState<string | null>(null)
+  // Pre-registros esperando validación: se avisa en el menú para que no haya
+  // que entrar a Personas a descubrirlos.
+  const [pendientes, setPendientes] = useState(0)
+  useEffect(() => {
+    if (!isAdmin) return
+    let vivo = true
+    const contar = () => fetch('/api/users?pendientes=1')
+      .then(r => r.ok ? r.json() : null)
+      .then(d => { if (vivo && typeof d?.pendientes === 'number') setPendientes(d.pendientes) })
+      .catch(() => {})
+    contar()
+    // Se refresca cada pocos minutos: un registro nuevo no tiene por qué
+    // esperar a que el administrador recargue la página.
+    const reloj = setInterval(contar, 3 * 60 * 1000)
+    return () => { vivo = false; clearInterval(reloj) }
+  }, [isAdmin])
+
   // AgroVenture ya viene dentro del bloque de marca; otra empresa sí lleva el suyo.
   const otraEmpresa = !!activeCompany?.logo_url && !/agroventure/i.test(activeCompany.name)
   const [collapsed, setCollapsed] = useState(false)
@@ -502,7 +519,15 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                                 style={{ fontSize: 12, paddingTop: 6, paddingBottom: 6 }}>
                                 <ChildIcon size={13} strokeWidth={2} className="flex-shrink-0" />
                                 <span className="truncate">{item.label}</span>
-                                {active && (
+                                {/* Los pre-registros esperando validación se ven desde el menú. */}
+                                {item.href === '/dashboard/users' && pendientes > 0 && (
+                                  <span className="ml-auto text-[10px] font-black px-1.5 py-0.5 rounded-md flex-shrink-0"
+                                    style={{ background: '#F59E0B', color: '#0B1829' }}
+                                    title={`${pendientes} registro(s) esperando validación`}>
+                                    {pendientes}
+                                  </span>
+                                )}
+                                {active && !(item.href === '/dashboard/users' && pendientes > 0) && (
                                   <div className="ml-auto w-1.5 h-1.5 rounded-full flex-shrink-0"
                                     style={{ background: 'var(--sidebar-active-text)' }} />
                                 )}

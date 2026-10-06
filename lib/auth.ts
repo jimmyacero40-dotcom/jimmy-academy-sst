@@ -19,14 +19,20 @@ export const authOptions: NextAuthOptions = {
 
         // Primero por documento; si no, por correo (administradores y porteros).
         const porCedula = await supabase
-          .from('users').select('*').eq('cedula', identificador).eq('active', true).maybeSingle()
+          .from('users').select('*').eq('cedula', identificador).maybeSingle()
         let user = porCedula.data
         if (!user) {
           const porCorreo = await supabase
-            .from('users').select('*').ilike('email', identificador).eq('active', true).maybeSingle()
+            .from('users').select('*').ilike('email', identificador).maybeSingle()
           user = porCorreo.data
         }
         if (!user) return null
+
+        // Quien está en revisión entra para poder seguir completando sus datos,
+        // pero el middleware lo deja únicamente en Mi Perfil. Cualquier otra
+        // cuenta inactiva —retirada o rechazada— no entra.
+        const enRevision = user.estado_registro === 'pendiente'
+        if (!user.active && !enRevision) return null
 
         const valid = await bcrypt.compare(credentials.password, user.password)
         if (!valid) return null
@@ -40,6 +46,7 @@ export const authOptions: NextAuthOptions = {
           cedula: user.cedula,
           area: user.area,
           companyId: user.company_id,
+          estadoRegistro: user.estado_registro ?? null,
         }
       },
     }),
@@ -53,6 +60,7 @@ export const authOptions: NextAuthOptions = {
         token.area = (user as any).area
         token.userId = (user as any).id
         token.companyId = (user as any).companyId
+        token.estadoRegistro = (user as any).estadoRegistro ?? null
       }
       return token
     },
@@ -63,7 +71,8 @@ export const authOptions: NextAuthOptions = {
         (session.user as any).cedula = token.cedula;
         (session.user as any).area = token.area;
         (session.user as any).id = token.userId;
-        (session.user as any).companyId = token.companyId
+        (session.user as any).companyId = token.companyId;
+        (session.user as any).estadoRegistro = token.estadoRegistro ?? null
       }
       return session
     },

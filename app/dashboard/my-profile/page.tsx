@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
+import { useSession } from 'next-auth/react'
 import {
   User, Camera, CheckCircle, Clock, Loader2, Save,
   Heart, Briefcase, GraduationCap, Activity, Shield, Award,
@@ -225,6 +226,7 @@ const TAB_SECTIONS: Record<string, string[]> = {
 }
 
 export default function MyProfilePage() {
+  const { data: session } = useSession()
   const [data, setData]             = useState<ProfileData>({})
   const [loading, setLoading]       = useState(true)
   const [saving, setSaving]         = useState(false)
@@ -339,6 +341,8 @@ export default function MyProfilePage() {
     }
   }
 
+  const enRevision = (session?.user as any)?.estadoRegistro === 'pendiente'
+
   const sections = calcSections(data)
   const pct      = calcPct(data)
   const doneCount = Object.values(sections).filter(Boolean).length
@@ -353,6 +357,22 @@ export default function MyProfilePage() {
 
   return (
     <div className="max-w-3xl mx-auto p-4 pb-24">
+
+      {/* Quien se registró por el enlace público sabe en qué va su solicitud. */}
+      {enRevision && (
+        <div className="mb-4 p-4 rounded-xl flex items-start gap-3"
+          style={{ background: 'rgba(245,158,11,0.09)', border: '1px solid rgba(245,158,11,0.35)' }}>
+          <Clock size={17} style={{ color: '#F59E0B' }} className="mt-0.5 flex-shrink-0" />
+          <div>
+            <p className="text-sm font-bold" style={{ color: '#F59E0B' }}>Tu registro está en revisión</p>
+            <p className="text-xs mt-1 leading-relaxed" style={{ color: 'var(--text-dim)' }}>
+              Mientras tanto puedes ir completando tus datos: todo lo que llenes aquí queda guardado.
+              Cuando el área de Seguridad y Salud en el Trabajo apruebe tu registro, se te habilitan
+              las capacitaciones y los reportes.
+            </p>
+          </div>
+        </div>
+      )}
 
       {/* ── Header card ── */}
       <div className="terra-card p-5 mb-5">
