@@ -3,108 +3,68 @@
 // API. Antes había dos listas parecidas en sitios distintos y cada sección
 // se daba por cumplida con uno o dos campos, así que una ficha a medio
 // llenar podía marcar 100 %.
+//
+// Lo que se exige ya no se escribe aquí: se lee de `lib/ficha-campos`, que
+// es el catálogo de la encuesta. Así el porcentaje, la ficha que ve el
+// responsable de SST y el detalle de lo pendiente salen del mismo sitio y
+// no pueden contradecirse.
 // ──────────────────────────────────────────────────────────────────────
+
+import { FICHA, type CampoFicha } from './ficha-campos'
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 type Ficha = Record<string, any>
 
 /** Una respuesta cuenta si tiene contenido. `false` es una respuesta válida. */
-function lleno(v: any): boolean {
+export function lleno(v: any): boolean {
   if (v === null || v === undefined) return false
   if (typeof v === 'string') return v.trim() !== ''
   if (Array.isArray(v)) return v.length > 0
   return true
 }
 
-const todos = (d: Ficha, campos: string[]) => campos.every(c => lleno(d[c]))
-
-/** Solo se exige el detalle cuando la respuesta previa lo hace necesario. */
-const siAplica = (d: Ficha, condicion: string, detalle: string[]) =>
-  lleno(d[condicion]) && (d[condicion] !== true || todos(d, detalle))
-
 /**
- * Las 15 secciones de la ficha, con los campos que cada una exige.
- * Se dejan fuera a propósito los campos declarados opcionales en la
- * encuesta: profesión, estudios formales, otras certificaciones,
- * observaciones de tallas, teléfono alterno, correo personal, jefe
- * inmediato, distancia aproximada y el segundo contacto de emergencia.
+ * ¿Hay que pedir este campo? Lo opcional nunca; el detalle condicionado
+ * solo cuando se respondió que sí a la pregunta de la que depende.
  */
-export const SECCIONES: Record<string, (d: Ficha) => boolean> = {
-  'Foto': d => lleno(d.photo_url),
-
-  'Datos personales': d =>
-    todos(d, [
-      'nombres', 'apellidos', 'doc_type', 'fecha_nacimiento', 'sexo', 'estado_civil',
-      'grupo_sanguineo', 'nacionalidad', 'ciudad_nacimiento', 'depto_nacimiento',
-      'telefono', 'direccion', 'barrio', 'ciudad_residencia', 'depto_residencia',
-      'poblacion_vulnerable',
-    ]) && siAplica(d, 'tiene_discapacidad', ['discapacidad_detalle']),
-
-  'Contacto emergencia': d => todos(d, ['contacto_emergencia', 'parentesco_contacto', 'tel_contacto']),
-
-  'Vivienda': d => todos(d, [
-    'tipo_vivienda', 'tenencia_vivienda', 'estrato', 'servicios_publicos', 'acceso_internet',
-    'con_quien_vive', 'num_personas_hogar', 'num_hijos', 'dependientes_economicos', 'cabeza_hogar',
-  ]),
-
-  'Educación': d => todos(d, ['nivel_educativo', 'actualmente_estudia']),
-
-  'Información laboral': d => todos(d, [
-    'cargo_confirmado', 'area_confirmada', 'centro_trabajo', 'fecha_ingreso', 'tipo_contrato',
-    'jornada_laboral', 'horario_habitual', 'realiza_horas_extras', 'trabaja_fines_semana',
-    'eps', 'arl', 'fondo_pension', 'caja_compensacion',
-  ]),
-
-  'Tallas / EPP': d => todos(d, [
-    'estatura_cm', 'peso_kg', 'talla_camisa', 'talla_pantalon',
-    'talla_zapato', 'talla_botas', 'talla_guantes',
-  ]),
-
-  'Desplazamiento': d =>
-    todos(d, ['municipio_vivienda', 'medio_transporte', 'tiempo_desplazamiento']) &&
-    siAplica(d, 'conduce_vehiculo', ['tipo_vehiculo']),
-
-  'Hábitos': d =>
-    todos(d, [
-      'horas_sueno', 'descanso_adecuado', 'desayuna_diariamente', 'comidas_al_dia',
-      'consume_frutas', 'consume_verduras', 'consumo_alcohol', 'consume_energizantes',
-      'consume_psicoactivos',
-    ]) &&
-    siAplica(d, 'realiza_actividad_fisica', ['dias_actividad_fisica', 'tipo_actividad_fisica']) &&
-    siAplica(d, 'fuma', ['cigarrillos_dia']),
-
-  'Antecedentes médicos': d => todos(d, [
-    'enfermedades_diagnosticadas', 'hospitalizado', 'cirugias', 'alergias',
-    'medicamentos_permanentes', 'limitacion_fisica',
-  ]),
-
-  'Ant. familiares': d => lleno(d.antecedentes_familiares),
-
-  'Salud ocupacional': d => todos(d, [
-    'accidentes_trabajo', 'enfermedades_laborales', 'restricciones_medicas',
-    'usa_gafas', 'usa_audifonos',
-  ]),
-
-  'Riesgo psicosocial': d => todos(d, [
-    'trabajo_genera_estres', 'apoyo_familiar', 'otro_empleo', 'es_cuidador',
-    'dificultades_economicas', 'equilibrio_trabajo_vida',
-  ]),
-
-  'Competencias': d =>
-    lleno(d.certificaciones) && siAplica(d, 'licencia_conduccion', ['categoria_licencia']),
-
-  'Consentimientos': d => d.autoriza_datos === true && d.declara_veracidad === true,
+function seExige(c: CampoFicha, d: Ficha): boolean {
+  if (c.opcional) return false
+  if (c.soloSi) return d[c.soloSi] === true
+  return true
 }
 
-export const TOTAL_SECCIONES = Object.keys(SECCIONES).length
+/** ¿Está resuelto este campo? El consentimiento solo cuenta si se aceptó. */
+function respondido(c: CampoFicha, d: Ficha): boolean {
+  return c.debeSerCierto ? d[c.campo] === true : lleno(d[c.campo])
+}
+
+/** Los campos que la persona todavía no ha respondido, sección por sección. */
+export function faltantes(d: Ficha): { seccion: string; campos: CampoFicha[] }[] {
+  const ficha = d ?? {}
+  return FICHA
+    .map(s => ({ seccion: s.nombre, campos: s.campos.filter(c => seExige(c, ficha) && !respondido(c, ficha)) }))
+    .filter(s => s.campos.length > 0)
+}
+
+export const TOTAL_SECCIONES = FICHA.length
 
 export function calcSections(d: Ficha): Record<string, boolean> {
+  const ficha = d ?? {}
   const r: Record<string, boolean> = {}
-  for (const [nombre, cumple] of Object.entries(SECCIONES)) r[nombre] = cumple(d ?? {})
+  for (const s of FICHA) r[s.nombre] = s.campos.every(c => !seExige(c, ficha) || respondido(c, ficha))
   return r
 }
 
 export function calcPct(d: Ficha): number {
   const hechas = Object.values(calcSections(d)).filter(Boolean).length
   return Math.round((hechas / TOTAL_SECCIONES) * 100)
+}
+
+/** Un resumen corto para decirle a la persona qué le falta. */
+export function resumenFaltantes(d: Ficha, maxSecciones = 3): string {
+  const f = faltantes(d)
+  if (f.length === 0) return 'Ficha completa'
+  const nombres = f.slice(0, maxSecciones).map(s => s.seccion)
+  const resto = f.length - nombres.length
+  return nombres.join(', ') + (resto > 0 ? ` y ${resto} más` : '')
 }

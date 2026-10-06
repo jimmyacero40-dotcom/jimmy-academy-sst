@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import FichaCompleta from '@/components/FichaCompleta'
 import { useParams, useRouter } from 'next/navigation'
 import { motion } from 'framer-motion'
 import {
@@ -405,135 +406,7 @@ export default function UserDetailPage() {
       {/* Perfil Sociodemográfico tab */}
       {tab === 'perfil' && (
         <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
-          {!workerProfile ? (
-            <div className="py-16 text-center">
-              <User size={28} className="mx-auto mb-3 opacity-30" style={{ color: 'var(--text-faint)' }} />
-              <p style={{ color: 'var(--text-faint)' }}>Este usuario aún no ha completado su perfil sociodemográfico</p>
-            </div>
-          ) : (
-            <div className="space-y-4">
-              {[
-                {
-                  title: 'Información Personal', color: '#60A5FA',
-                  fields: [
-                    ['Fecha de nacimiento', workerProfile.fecha_nacimiento ? fmtDate(workerProfile.fecha_nacimiento) : null],
-                    ['Sexo', workerProfile.sexo],
-                    ['Estado civil', workerProfile.estado_civil],
-                    ['Nivel educativo', workerProfile.nivel_educativo],
-                    ['Profesión', workerProfile.profesion],
-                    ['Estrato socioeconómico', workerProfile.estrato != null ? `Estrato ${workerProfile.estrato}` : null],
-                    ['Ciudad de residencia', workerProfile.ciudad_residencia || workerProfile.municipio_vivienda],
-                    ['Departamento', workerProfile.depto_residencia],
-                    ['Nacionalidad', workerProfile.nacionalidad],
-                  ],
-                },
-                {
-                  title: 'Núcleo Familiar', color: '#A78BFA',
-                  fields: [
-                    ['Número de hijos', workerProfile.num_hijos != null ? String(workerProfile.num_hijos) : null],
-                    ['Personas en el hogar', workerProfile.num_personas_hogar != null ? String(workerProfile.num_personas_hogar) : null],
-                    ['Dependientes económicos', workerProfile.dependientes_economicos != null ? String(workerProfile.dependientes_economicos) : null],
-                    ['Cabeza de hogar', workerProfile.cabeza_hogar != null ? (workerProfile.cabeza_hogar ? 'Sí' : 'No') : null],
-                    ['Con quién vive', workerProfile.con_quien_vive],
-                    ['Tipo de vivienda', workerProfile.tipo_vivienda],
-                    ['Tenencia de vivienda', workerProfile.tenencia_vivienda],
-                    ['Acceso a internet', workerProfile.acceso_internet != null ? (workerProfile.acceso_internet ? 'Sí' : 'No') : null],
-                  ],
-                },
-                {
-                  title: 'Salud', color: '#34D399',
-                  fields: [
-                    ['Enfermedades diagnosticadas', workerProfile.enfermedades_diagnosticadas?.length ? workerProfile.enfermedades_diagnosticadas.join(', ') : null],
-                    ['Antecedentes familiares', workerProfile.antecedentes_familiares?.length ? workerProfile.antecedentes_familiares.join(', ') : null],
-                    ['Hospitalizado anteriormente', workerProfile.hospitalizado != null ? (workerProfile.hospitalizado ? 'Sí' : 'No') : null],
-                    ['Cirugías', workerProfile.cirugias != null ? (workerProfile.cirugias ? 'Sí' : 'No') : null],
-                    ['Alergias', workerProfile.alergias != null ? (workerProfile.alergias ? 'Sí' : 'No') : null],
-                    ['Medicamentos permanentes', workerProfile.medicamentos_permanentes != null ? (workerProfile.medicamentos_permanentes ? 'Sí' : 'No') : null],
-                    ['Limitación física', workerProfile.limitacion_fisica != null ? (workerProfile.limitacion_fisica ? 'Sí' : 'No') : null],
-                    ['Usa gafas formuladas', workerProfile.usa_gafas != null ? (workerProfile.usa_gafas ? 'Sí' : 'No') : null],
-                    ['Usa audífonos', workerProfile.usa_audifonos != null ? (workerProfile.usa_audifonos ? 'Sí' : 'No') : null],
-                    ['Restricciones médicas', workerProfile.restricciones_medicas != null ? (workerProfile.restricciones_medicas ? 'Sí' : 'No') : null],
-                    ['Trabajo genera estrés', workerProfile.trabajo_genera_estres != null ? (workerProfile.trabajo_genera_estres ? 'Sí' : 'No') : null],
-                  ],
-                },
-                {
-                  title: 'Estilos de Vida', color: '#FCD34D',
-                  fields: [
-                    ['Realiza actividad física', workerProfile.realiza_actividad_fisica != null ? (workerProfile.realiza_actividad_fisica ? 'Sí' : 'No') : null],
-                    ['Tipo de actividad física', workerProfile.tipo_actividad_fisica],
-                    ['Días/semana de actividad', workerProfile.dias_actividad_fisica != null ? String(workerProfile.dias_actividad_fisica) : null],
-                    ['Horas de sueño', workerProfile.horas_sueno != null ? `${workerProfile.horas_sueno} horas` : null],
-                    ['Descanso adecuado', workerProfile.descanso_adecuado != null ? (workerProfile.descanso_adecuado ? 'Sí' : 'No') : null],
-                    ['Desayuna diariamente', workerProfile.desayuna_diariamente != null ? (workerProfile.desayuna_diariamente ? 'Sí' : 'No') : null],
-                    ['Comidas al día', workerProfile.comidas_al_dia != null ? String(workerProfile.comidas_al_dia) : null],
-                    ['Consume frutas', workerProfile.consume_frutas != null ? (workerProfile.consume_frutas ? 'Sí' : 'No') : null],
-                    ['Consume verduras', workerProfile.consume_verduras != null ? (workerProfile.consume_verduras ? 'Sí' : 'No') : null],
-                    ['Fuma', workerProfile.fuma != null ? (workerProfile.fuma ? `Sí (${workerProfile.cigarrillos_dia ?? '?'} cig/día)` : 'No') : null],
-                    ['Consumo de alcohol', workerProfile.consumo_alcohol],
-                    ['Consume energizantes', workerProfile.consume_energizantes != null ? (workerProfile.consume_energizantes ? 'Sí' : 'No') : null],
-                    ['Consume psicoactivos', workerProfile.consume_psicoactivos],
-                  ],
-                },
-                {
-                  title: 'Transporte', color: '#F97316',
-                  fields: [
-                    ['Medio de transporte', workerProfile.medio_transporte],
-                    ['Tiempo de desplazamiento', workerProfile.tiempo_desplazamiento],
-                    ['Conduce vehículo propio', workerProfile.conduce_vehiculo != null ? (workerProfile.conduce_vehiculo ? 'Sí' : 'No') : null],
-                    ['Tipo de vehículo', workerProfile.tipo_vehiculo],
-                    ['Licencia de conducción', workerProfile.licencia_conduccion != null ? (workerProfile.licencia_conduccion ? `Sí${workerProfile.categoria_licencia ? ` (Cat. ${workerProfile.categoria_licencia})` : ''}` : 'No') : null],
-                  ],
-                },
-                {
-                  title: 'Datos Laborales', color: '#F9A8D4',
-                  fields: [
-                    ['Cargo', workerProfile.cargo_confirmado],
-                    ['Área / Proceso', workerProfile.area_confirmada],
-                    ['Tipo de contrato', workerProfile.tipo_contrato],
-                    ['Jornada laboral', workerProfile.jornada_laboral],
-                    ['Fecha de ingreso', workerProfile.fecha_ingreso ? fmtDate(workerProfile.fecha_ingreso) : null],
-                    ['Centro de trabajo', workerProfile.centro_trabajo],
-                    ['Realiza horas extras', workerProfile.realiza_horas_extras != null ? (workerProfile.realiza_horas_extras ? 'Sí' : 'No') : null],
-                    ['Trabaja fines de semana', workerProfile.trabaja_fines_semana != null ? (workerProfile.trabaja_fines_semana ? 'Sí' : 'No') : null],
-                    ['Actualmente estudia', workerProfile.actualmente_estudia != null ? (workerProfile.actualmente_estudia ? 'Sí' : 'No') : null],
-                  ],
-                },
-                {
-                  title: 'Dotación', color: '#06B6D4',
-                  fields: [
-                    ['Estatura', workerProfile.estatura_cm != null ? `${workerProfile.estatura_cm} cm` : null],
-                    ['Peso', workerProfile.peso_kg != null ? `${workerProfile.peso_kg} kg` : null],
-                    ['Talla camisa / camiseta', workerProfile.talla_camisa],
-                    ['Talla pantalón', workerProfile.talla_pantalon],
-                    ['Talla overol', workerProfile.talla_overol],
-                    ['Talla chaqueta', workerProfile.talla_chaqueta],
-                    ['Talla zapato', workerProfile.talla_zapato],
-                    ['Talla botas', workerProfile.talla_botas],
-                    ['Talla guantes', workerProfile.talla_guantes],
-                  ],
-                },
-              ].map(({ title, color, fields }) => {
-                const visible = fields.filter(([, v]) => v)
-                if (visible.length === 0) return null
-                return (
-                  <div key={title} className="terra-card p-5">
-                    <h3 className="text-sm font-bold mb-3 flex items-center gap-2" style={{ color }}>
-                      <div className="w-2 h-2 rounded-full" style={{ background: color }} />
-                      {title}
-                    </h3>
-                    <div className="grid sm:grid-cols-2 gap-x-8 gap-y-2">
-                      {visible.map(([label, value]) => (
-                        <div key={label} className="flex items-start justify-between py-1.5 border-b border-white/5 last:border-0">
-                          <span className="text-xs" style={{ color: 'var(--text-faint)' }}>{label}</span>
-                          <span className="text-xs font-semibold text-right ml-4" style={{ color: 'var(--text)' }}>{value}</span>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )
-              })}
-            </div>
-          )}
+          <FichaCompleta ficha={workerProfile} nombre={user?.name} />
         </motion.div>
       )}
 

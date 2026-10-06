@@ -1,6 +1,8 @@
 ﻿'use client'
 
 import { useState, useEffect } from 'react'
+import FichaCompleta from '@/components/FichaCompleta'
+import { calcPct, resumenFaltantes } from '@/lib/perfil-completitud'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useRouter } from 'next/navigation'
 import {
@@ -150,7 +152,13 @@ export default function WorkerProfilesPage() {
   useEffect(() => {
     fetch('/api/worker-profiles')
       .then(r => r.ok ? r.json() : [])
-      .then((d: WP[]) => { setProfiles(d); setLoading(false) })
+      .then((d: WP[]) => {
+        // El avance se recalcula sobre la ficha recibida. La columna guardada
+        // se escribió con la versión de la encuesta vigente ese día, así que
+        // podía discrepar de lo que la pantalla dice que falta.
+        setProfiles(d.map(p => ({ ...p, completion_pct: calcPct(p) })))
+        setLoading(false)
+      })
     fetch('/api/companies').then(r => r.json()).then((d: any[]) => {
       if (d?.[0]?.name) setCompany(d[0].name)
     }).catch(() => {})
@@ -533,11 +541,14 @@ export default function WorkerProfilesPage() {
                 <div className="overflow-x-auto">
                   <table className="w-full text-xs" style={{ tableLayout: 'fixed', minWidth: 1000 }}>
                     <colgroup>
-                      <col style={{ width: '18%' }} /><col style={{ width: '10%' }} />
-                      <col style={{ width: '12%' }} /><col style={{ width: '12%' }} />
-                      <col style={{ width: '8%' }} /><col style={{ width: '8%' }} />
+                      {/* Los anchos suman 100 y el ancho es fijo: así la tabla no se
+                          descuadra cuando un nombre o un cargo es más largo de la cuenta. */}
+                      <col style={{ width: '16%' }} /><col style={{ width: '8%' }} />
                       <col style={{ width: '10%' }} /><col style={{ width: '10%' }} />
-                      <col style={{ width: '7%' }} /><col style={{ width: '5%' }} />
+                      <col style={{ width: '5%' }} /><col style={{ width: '6%' }} />
+                      <col style={{ width: '8%' }} /><col style={{ width: '8%' }} />
+                      <col style={{ width: '9%' }} /><col style={{ width: '16%' }} />
+                      <col style={{ width: '4%' }} />
                     </colgroup>
                     <thead>
                       <tr style={{ background: 'var(--bg-card)', borderBottom: '1px solid var(--border)' }}>
@@ -551,6 +562,7 @@ export default function WorkerProfilesPage() {
                           { label: 'Educación',     col: 'nivel_educativo' },
                           { label: 'Contrato',      col: 'tipo_contrato' },
                           { label: 'Completitud',   col: 'completion_pct' },
+                          { label: 'Qué le falta',  col: '' },
                           { label: 'Ver',           col: '' },
                         ].map(({ label, col }) => (
                           <th key={label} className="text-left px-3 py-2.5 font-semibold select-none"
@@ -563,7 +575,7 @@ export default function WorkerProfilesPage() {
                     </thead>
                     <tbody>
                       {paged.length === 0 && (
-                        <tr><td colSpan={10} className="text-center py-12" style={{ color: 'var(--text-faint)' }}>Sin resultados</td></tr>
+                        <tr><td colSpan={11} className="text-center py-12" style={{ color: 'var(--text-faint)' }}>Sin resultados</td></tr>
                       )}
                       {paged.map((p, i) => {
                         const a2 = ageOf(p.fecha_nacimiento)
@@ -588,6 +600,14 @@ export default function WorkerProfilesPage() {
                                 </div>
                                 <span className="text-[10px] font-bold flex-shrink-0" style={{ color: cc }}>{cp}%</span>
                               </div>
+                            </td>
+                            <td className="px-3 py-2">
+                              {/* Para no tener que abrir ficha por ficha: se ve de un vistazo
+                                  en qué secciones está pendiente cada persona. */}
+                              <span className="truncate block" title={resumenFaltantes(p, 99)}
+                                style={{ color: cp >= 100 ? '#10B981' : 'var(--text-dim)' }}>
+                                {resumenFaltantes(p)}
+                              </span>
                             </td>
                             <td className="px-3 py-2">
                               <div className="flex gap-1">
@@ -645,30 +665,8 @@ export default function WorkerProfilesPage() {
                         <button onClick={() => setSelectedId(null)} className="text-xs px-2 py-1 rounded-lg" style={{ background: 'var(--bg-card)', color: 'var(--text-dim)' }}>Cerrar</button>
                       </div>
                     </div>
-                    <div className="p-4 grid grid-cols-2 lg:grid-cols-4 gap-x-6 gap-y-1 text-xs">
-                      {[
-                        ['Cédula', selected.users?.cedula],
-                        ['Sexo', selected.sexo],
-                        ['Estado civil', selected.estado_civil],
-                        ['Edad', ageOf(selected.fecha_nacimiento) ? `${ageOf(selected.fecha_nacimiento)} años` : undefined],
-                        ['Ciudad', selected.ciudad_residencia],
-                        ['Tipo vivienda', selected.tipo_vivienda],
-                        ['Estrato', selected.estrato ? `Estrato ${selected.estrato}` : undefined],
-                        ['Área', selected.area_confirmada ?? selected.users?.area],
-                        ['Cargo', selected.cargo_confirmado],
-                        ['Contrato', selected.tipo_contrato],
-                        ['Jornada', selected.jornada_laboral],
-                        ['Educación', selected.nivel_educativo],
-                        ['Transporte', selected.medio_transporte],
-                        ['Talla camisa / camiseta', selected.talla_camisa],
-                        ['Talla zapato', selected.talla_zapato],
-                        ['IMC', imc(selected.estatura_cm, selected.peso_kg) ? `${imc(selected.estatura_cm, selected.peso_kg)}` : undefined],
-                      ].map(([k, v]) => v ? (
-                        <div key={k as string}>
-                          <span style={{ color: 'var(--text-faint)' }}>{k}: </span>
-                          <span className="font-semibold" style={{ color: 'var(--text)' }}>{v}</span>
-                        </div>
-                      ) : null)}
+                    <div className="p-4">
+                      <FichaCompleta ficha={selected} nombre={selected.users?.name ?? `${selected.nombres ?? ''} ${selected.apellidos ?? ''}`.trim()} />
                     </div>
                   </motion.div>
                 )}
