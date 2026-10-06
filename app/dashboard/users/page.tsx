@@ -1,5 +1,6 @@
 ﻿'use client'
 
+import { QrPreRegistro } from '@/components/QrPreRegistro'
 import { useState, useEffect, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import { useSession } from 'next-auth/react'
@@ -9,7 +10,7 @@ import {
   Users, Search, MoreVertical, CheckCircle,
   Building2, X, Edit2, Trash2, Download, ChevronDown,
   UserPlus, FileSpreadsheet, AlertCircle, Loader2,
-  Layers, UserCheck, Tag, Eye, BookOpen, UserX
+  Layers, UserCheck, Tag, Eye, BookOpen, UserX, QrCode,
 } from 'lucide-react'
 
 type UserStatus = 'activo' | 'inactivo' | 'pendiente' | 'rechazado'
@@ -379,6 +380,7 @@ export default function UsersPage() {
   // Filters
   const [search, setSearch]           = useState('')
   const [filterStatus, setFilterStatus] = useState('')
+  const [mostrarQr, setMostrarQr] = useState(false)
   const [validando, setValidando] = useState<string | null>(null)
   const [rechazando, setRechazando] = useState<any>(null)
   const [motivoRechazo, setMotivoRechazo] = useState('')
@@ -775,6 +777,11 @@ export default function UsersPage() {
               <X size={11} /> Limpiar filtros
             </button>
           )}
+          <button onClick={() => setMostrarQr(true)} className="terra-btn-outline"
+            style={{ padding: '8px 14px', fontSize: 12 }}
+            title="Enlace y QR para que los trabajadores se registren solos">
+            <QrCode size={13} /> Enlace de registro
+          </button>
           <button onClick={downloadTemplate} className="terra-btn-outline" style={{ padding: '8px 14px', fontSize: 12 }}>
             <Download size={13} /> Plantilla
           </button>
@@ -858,6 +865,8 @@ export default function UsersPage() {
           </motion.div>
         )}
       </AnimatePresence>
+
+      {mostrarQr && <QrPreRegistro onClose={() => setMostrarQr(false)} />}
 
       {/* Rechazar un pre-registro */}
       {rechazando && (
