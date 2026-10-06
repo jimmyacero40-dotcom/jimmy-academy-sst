@@ -76,6 +76,14 @@ export default withAuth(
       '/dashboard/my-signature', '/dashboard/certificates',
       '/dashboard/settings', '/dashboard/configuracion',
     ]
+
+    // El trabajador tiene que poder abrir la capacitación que le asignaron.
+    // Se le deja un curso concreto, /dashboard/trainings/<id>, pero no la
+    // biblioteca ni la creación, que son del administrador. Sin esto, pulsar
+    // "Iniciar" lo devolvía a Mi Perfil.
+    const esUnCurso = /^\/dashboard\/trainings\/(?!create(?:\/|$))[^/]+/.test(path)
+    if (role === 'worker' && esUnCurso) return NextResponse.next()
+
     if (role === 'worker' && !permite(RUTAS_TRABAJADOR)) {
       return NextResponse.redirect(new URL('/dashboard/my-profile', req.url))
     }

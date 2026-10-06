@@ -268,6 +268,8 @@ function generateQuestionsFromContent(texts: string[], title: string): Question[
 
 export default function TrainingDetailPage() {
   const { data: session } = useSession()
+  const rolActual = (session?.user as any)?.role
+  const puedeEditarCurso = rolActual === 'admin' || rolActual === 'superadmin'
   const params = useParams()
   const router = useRouter()
   const courseId = parseInt(params.id as string)
@@ -613,11 +615,15 @@ export default function TrainingDetailPage() {
           </div>
           {phase === 'slides' && (
             <div className="hidden sm:flex items-center gap-2">
+              {/* Editar las preguntas del curso es cosa del administrador:
+                  el trabajador entra aquí a hacer su capacitación. */}
+              {puedeEditarCurso && (
               <button onClick={() => { if (editQuestions.length === 0) setEditQuestions([emptyQ()]); setPhase('edit-questions') }}
                 className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all hover:opacity-80"
                 style={{ background: 'rgba(16,185,129,0.15)', border: '1px solid rgba(16,185,129,0.3)', color: '#6EE7B7' }}>
                 <Edit3 size={12} /> {hasCustomQuestions ? 'Editar Preguntas' : 'Crear Preguntas'}
               </button>
+              )}
               <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold"
                 style={{ background: 'var(--amber)', color: 'var(--text)' }}>
                 <Clock size={12} /> {training?.duration || '8h'}
