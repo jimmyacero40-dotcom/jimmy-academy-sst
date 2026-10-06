@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { supabaseAdmin as supabase } from '@/lib/supabase-admin'
 import { isAdminOrSuper } from '@/lib/get-company'
+import { perfilSugerido, cursosQueEncajan } from '@/lib/perfiles-sugeridos'
 
 export async function GET() {
   const { authorized, companyId } = await isAdminOrSuper()
@@ -41,7 +42,25 @@ export async function POST(req: NextRequest) {
     .single()
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
-  return NextResponse.json({ ...data, training_count: 0 }, { status: 201 })
+
+  // Si es uno de los perfiles sugeridos, nace con los cursos que le
+  // corresponden en vez de quedar vacío, que era lo que pasaba antes.
+  let cursosCargados = 0
+  const sugerido = perfilSugerido(data.name)
+  if (sugerido) {
+    const { data: biblioteca } = await supabase
+      .from('trainings').select('id, title, category')
+      .eq('company_id', companyId).eq('status', 'activo')
+
+    const elegidos = cursosQueEncajan(biblioteca ?? [], sugerido.claves)
+    if (elegidos.length) {
+      const { error: errCursos } = await supabase.from('profile_trainings').insert(
+        elegidos.map((c, i) => ({ profile_id: data.id, training_id: c.id, required: true, sort_order: i })))
+      if (!errCursos) cursosCargados = elegidos.length
+    }
+  }
+
+  return NextResponse.json({ ...data, training_count: cursosCargados }, { status: 201 })
 }
 
 export async function PUT(req: NextRequest) {

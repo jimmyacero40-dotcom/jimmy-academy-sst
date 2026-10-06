@@ -1,5 +1,7 @@
 'use client'
 
+import { PERFILES_SUGERIDOS } from '@/lib/perfiles-sugeridos'
+
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
@@ -31,16 +33,24 @@ interface Assignment extends Training {
   sort_order: number
 }
 
-const SUGGESTED_PROFILES = [
-  { name: 'Brigadista SST',          cargo: 'Brigadista de emergencias',  icon: Flame,  color: '#EF4444' },
-  { name: 'Miembro COPASST',         cargo: 'Comité Paritario SST',        icon: Shield, color: 'var(--primary)' },
-  { name: 'Trabajo en Alturas',      cargo: 'Operario alturas',            icon: HardHat,color: '#F59E0B' },
-  { name: 'Conductor SST',           cargo: 'Conductor / Operador',        icon: Truck,  color: '#8B5CF6' },
-  { name: 'Operario Producción',     cargo: 'Auxiliar de producción',      icon: Wrench, color: '#10B981' },
-  { name: 'Personal Administrativo', cargo: 'Administrativo / Oficina',    icon: Users,  color: '#06B6D4' },
-  { name: 'Primeros Auxilios',       cargo: 'Socorrista certificado',      icon: Heart,  color: '#EC4899' },
-  { name: 'Inducción General',       cargo: 'Nuevo ingreso',               icon: GraduationCap, color: '#A78BFA' },
-]
+// Los nombres y cargos salen de lib/perfiles-sugeridos, que es también donde
+// se dice qué cursos trae cada uno: así el perfil no nace vacío.
+const ICONO_SUGERIDO: Record<string, { icon: any; color: string }> = {
+  'Brigadista SST':          { icon: Flame,         color: '#EF4444' },
+  'Miembro COPASST':         { icon: Shield,        color: 'var(--primary)' },
+  'Trabajo en Alturas':      { icon: HardHat,       color: '#F59E0B' },
+  'Conductor SST':           { icon: Truck,         color: '#8B5CF6' },
+  'Operario Producción':     { icon: Wrench,        color: '#10B981' },
+  'Personal Administrativo': { icon: Users,         color: '#06B6D4' },
+  'Primeros Auxilios':       { icon: Heart,         color: '#EC4899' },
+  'Inducción General':       { icon: GraduationCap, color: '#A78BFA' },
+}
+
+const SUGGESTED_PROFILES = PERFILES_SUGERIDOS.map(p => ({
+  name: p.name, cargo: p.cargo,
+  icon: ICONO_SUGERIDO[p.name]?.icon ?? GraduationCap,
+  color: ICONO_SUGERIDO[p.name]?.color ?? 'var(--primary)',
+}))
 
 const PROFILE_COLORS = ['var(--primary)','#8B5CF6','#EC4899','#F59E0B','#10B981','#06B6D4','#F97316','#EF4444']
 
@@ -267,7 +277,7 @@ export default function ProfilesPage() {
       if (!editItem) {
         // Auto-open editor for new profile
         const created = await res.json().catch(() => null)
-        if (created?.id) openEditor({ ...created, training_count: 0 })
+        if (created?.id) openEditor({ ...created, training_count: created.training_count ?? 0 })
       }
     } else {
       const err = await res.json().catch(() => ({}))
