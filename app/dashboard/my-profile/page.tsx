@@ -70,7 +70,16 @@ interface ProfileData {
   completion_pct?: number; updated_at?: string
 }
 
-const LS_KEY = 'sst_profile_draft'
+/**
+ * El borrador se guardaba bajo una sola clave para todo el navegador, así que
+ * en un equipo compartido el siguiente trabajador abría la ficha del anterior
+ * —con su nombre y su foto— y al guardar se la habría sobrescrito. Ahora cada
+ * quien tiene la suya y además va firmada con su identificador.
+ */
+const LS_BASE = 'sst_profile_draft'
+const claveBorrador = (userId: string) => `${LS_BASE}:${userId}`
+/** Clave antigua y compartida: se borra al entrar para que no quede rastro. */
+const LS_HEREDADA = LS_BASE
 
 // ─── Client-side image compression ───────────────────────────────────
 async function compressImage(file: File): Promise<Blob> {
@@ -227,6 +236,7 @@ const TAB_SECTIONS: Record<string, string[]> = {
 
 export default function MyProfilePage() {
   const { data: session } = useSession()
+  const miId = (session?.user as any)?.id as string | undefined
   const [data, setData]             = useState<ProfileData>({})
   const [loading, setLoading]       = useState(true)
   const [saving, setSaving]         = useState(false)
@@ -238,23 +248,36 @@ export default function MyProfilePage() {
   const photoRef = useRef<HTMLInputElement>(null)
   const autoSaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
 
-  // Load: API first, fall back to localStorage draft
+  // Carga: primero el servidor y, si hay un borrador propio más completo, ese.
   useEffect(() => {
+    if (!miId) return   // sin saber quién es, no se toca ningún borrador
+
+    // Arrastre de la versión anterior: la clave compartida se elimina.
+    try { localStorage.removeItem(LS_HEREDADA) } catch {}
+
+    const miBorrador = (): ProfileData => {
+      try {
+        const d = JSON.parse(localStorage.getItem(claveBorrador(miId)) ?? '{}')
+        // Solo se acepta si es suyo; cualquier otra cosa se descarta.
+        if (d?.__de !== miId) return {}
+        const { __de, ...suyo } = d   // la firma no viaja al servidor
+        return suyo
+      } catch { return {} }
+    }
+
     fetch('/api/profile')
       .then(r => r.ok ? r.json() : {})
       .then((remote: ProfileData) => {
         const remotePct = remote?.completion_pct ?? 0
-        const draft = (() => { try { return JSON.parse(localStorage.getItem(LS_KEY) ?? '{}') } catch { return {} } })()
-        const draftPct = calcPct(draft)
-        // Use whichever is more complete
-        setData(draftPct > remotePct ? { ...remote, ...draft } : remote ?? {})
+        const draft = miBorrador()
+        setData(calcPct(draft) > remotePct ? { ...remote, ...draft } : remote ?? {})
         setLoading(false)
       })
       .catch(() => {
-        try { const d = JSON.parse(localStorage.getItem(LS_KEY) ?? '{}'); setData(d) } catch {}
+        setData(miBorrador())
         setLoading(false)
       })
-  }, [])
+  }, [miId])
 
   const set = useCallback((key: keyof ProfileData, val: any) =>
     setData(prev => ({ ...prev, [key]: val })), [])
@@ -262,20 +285,20 @@ export default function MyProfilePage() {
   const setArr = useCallback((key: keyof ProfileData, val: string[]) =>
     setData(prev => ({ ...prev, [key]: val })), [])
 
-  // Auto-save to localStorage on every change (debounced 800ms)
+  // Respaldo local mientras escribe, para no perder nada si se cae la conexión.
   useEffect(() => {
-    if (loading) return
+    if (loading || !miId) return
     if (autoSaveTimer.current) clearTimeout(autoSaveTimer.current)
     autoSaveTimer.current = setTimeout(() => {
-      localStorage.setItem(LS_KEY, JSON.stringify(data))
+      try { localStorage.setItem(claveBorrador(miId), JSON.stringify({ ...data, __de: miId })) } catch {}
     }, 800)
     return () => { if (autoSaveTimer.current) clearTimeout(autoSaveTimer.current) }
-  }, [data, loading])
+  }, [data, loading, miId])
 
   const save = async (silent = false) => {
     if (!silent) setSaving(true)
-    // Always persist locally first — data is never lost
-    localStorage.setItem(LS_KEY, JSON.stringify(data))
+    // Primero en el equipo: así no se pierde nada si falla el envío.
+    if (miId) { try { localStorage.setItem(claveBorrador(miId), JSON.stringify({ ...data, __de: miId })) } catch {} }
     try {
       const res = await fetch('/api/profile', {
         method: 'PUT',
@@ -283,7 +306,7 @@ export default function MyProfilePage() {
         body: JSON.stringify(data),
       })
       if (res.ok) {
-        localStorage.removeItem(LS_KEY)
+        if (miId) { try { localStorage.removeItem(claveBorrador(miId)) } catch {} }
         setServerErr(null)
         if (!silent) { setSaveMsg('saved'); setTimeout(() => setSaveMsg(null), 2500) }
       } else {
