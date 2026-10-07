@@ -33,6 +33,9 @@ export const CAMPOS_PERFIL = [
   'cirugias_detalle', 'alergias_detalle', 'medicamentos_detalle',
   'limitacion_detalle', 'restricciones_detalle',
   'obs_tallas',
+  // Preguntas de selección múltiple: se guardan como arreglo de texto.
+  'servicios_publicos', 'enfermedades_diagnosticadas',
+  'antecedentes_familiares', 'certificaciones',
 ] as const
 
 /** Nunca se tocan: perderían su significado o dejarían de funcionar. */
@@ -61,15 +64,18 @@ export function normalizar<T extends Record<string, any>>(
   for (const campo of campos) {
     if (CAMPOS_INTOCABLES.has(campo)) continue
     const v = salida[campo]
+    // Solo se toca lo que está en la lista. Antes, además, se recorría el objeto
+    // entero poniendo en mayúscula cualquier arreglo de texto que apareciera.
+    // Eso alcanzaba a `users.permissions`: los permisos quedaban guardados como
+    // 'ACCESOS.VER', no coincidían con los identificadores -que van en
+    // minúscula- y la cuenta se quedaba sin ninguno, aunque en la pantalla se
+    // vieran todos los chulos marcados.
+    if (Array.isArray(v)) {
+      salida[campo] = v.map(x => (typeof x === 'string' ? aMayuscula(x) : x))
+      continue
+    }
     if (typeof v !== 'string' || v.trim() === '') continue
     salida[campo] = aMayuscula(v)
-  }
-  // Los arreglos de texto (peligros, certificaciones, servicios) también.
-  for (const [k, v] of Object.entries(salida)) {
-    if (CAMPOS_INTOCABLES.has(k)) continue
-    if (Array.isArray(v) && v.every(x => typeof x === 'string')) {
-      salida[k] = v.map(x => aMayuscula(x))
-    }
   }
   return salida as T
 }
