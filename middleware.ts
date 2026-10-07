@@ -28,12 +28,36 @@ export default withAuth(
 
     const isAdmin = role === 'admin' || role === 'superadmin'
     const isPortero = role === 'portero'
+    // Cuenta de solo lectura: consulta movimientos y listados, pero no entra a
+    // las pantallas donde se registra o se configura algo.
+    const isConsulta = role === 'consulta'
 
     // El portero no tiene nada que hacer en el tablero general: entra directo a
     // su portería en vez de pasar por una pantalla que no puede usar.
     if (isPortero && path === '/dashboard') {
       return NextResponse.redirect(new URL('/dashboard/control-operativo/porteria', req.url))
     }
+
+    // Su pantalla es la de movimientos, no el tablero general de gestión.
+    if (isConsulta && path === '/dashboard') {
+      return NextResponse.redirect(new URL('/dashboard/control-operativo', req.url))
+    }
+
+    // Las pantallas de registrar y de configurar porterías son de quien opera.
+    if (isConsulta && (
+      path.startsWith('/dashboard/control-operativo/porteria') ||
+      path.startsWith('/dashboard/control-operativo/salida') ||
+      path.startsWith('/dashboard/settings') ||
+      path.startsWith('/dashboard/configuracion')
+    )) {
+      return NextResponse.redirect(new URL('/dashboard/control-operativo', req.url))
+    }
+
+    const RUTAS_CONSULTA = [
+      '/dashboard', '/dashboard/control-operativo',
+      '/dashboard/users', '/dashboard/worker-profiles',
+      '/dashboard/reports', '/dashboard/gestion-sst',
+    ]
 
     // Admin-only routes: portería admin
     if (path.startsWith('/dashboard/control-operativo/porterias')) {
@@ -43,7 +67,7 @@ export default withAuth(
     // Gestión SST es un módulo administrativo: el trabajador participa desde
     // Tú Cuentas, no entra a la consola donde se ven las respuestas de todos.
     if (path.startsWith('/dashboard/gestion-sst')) {
-      if (!isAdmin) return NextResponse.redirect(new URL('/dashboard', req.url))
+      if (!isAdmin && !isConsulta) return NextResponse.redirect(new URL('/dashboard', req.url))
     }
 
     // Admin-only routes: retired workers
@@ -92,6 +116,10 @@ export default withAuth(
       return NextResponse.redirect(new URL('/dashboard/my-profile', req.url))
     }
 
+    if (isConsulta && !permite(RUTAS_CONSULTA)) {
+      return NextResponse.redirect(new URL('/dashboard/control-operativo', req.url))
+    }
+
     // El portero se mueve en control operativo y en su configuración.
     const RUTAS_PORTERO = ['/dashboard', '/dashboard/control-operativo', '/dashboard/settings', '/dashboard/configuracion']
     if (isPortero && !permite(RUTAS_PORTERO)) {
@@ -104,7 +132,7 @@ export default withAuth(
       path.startsWith('/dashboard/control-operativo/salida') ||
       path === '/dashboard/control-operativo'
     ) {
-      if (!isAdmin && !isPortero) return NextResponse.redirect(new URL('/dashboard', req.url))
+      if (!isAdmin && !isPortero && !isConsulta) return NextResponse.redirect(new URL('/dashboard', req.url))
     }
 
     return NextResponse.next()

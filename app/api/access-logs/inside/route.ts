@@ -1,12 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase-admin'
-import { requierePermiso, porteriasPermitidas } from '@/lib/get-company'
+import { requierePermiso, porteriasQuePuedeConsultar } from '@/lib/get-company'
 import { inicioJornada } from '@/lib/jornada'
 
 export async function GET(req: NextRequest) {
   const { authorized, user, companyId, isAdmin } = await requierePermiso('accesos.ver', 'accesos.ingreso', 'accesos.salida')
   if (!authorized) return NextResponse.json({ error: 'No tiene permiso para consultar la portería' }, { status: 403 })
-  const permitidas = await porteriasPermitidas(user.id, isAdmin)
+  const permitidas = await porteriasQuePuedeConsultar(user, isAdmin)
 
   const { searchParams } = new URL(req.url)
   const areaId    = searchParams.get('area_id')

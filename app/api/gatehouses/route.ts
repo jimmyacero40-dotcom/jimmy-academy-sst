@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase-admin'
 import { requierePermiso } from '@/lib/get-company'
+import { tienePermiso } from '@/lib/permisos'
 
 // GET — list gatehouses (admin: all; portero: only assigned)
 export async function GET() {
@@ -16,6 +17,21 @@ export async function GET() {
         gatehouse_operators(user_id, users!gatehouse_operators_user_id_fkey(id, name, email, role))
       `)
       .eq('company_id', companyId)
+      .order('name')
+
+    if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+    return NextResponse.json(data ?? [])
+  }
+
+  // Una cuenta de consulta necesita la lista completa para poder filtrar por
+  // portería, aunque no opere ninguna. Van sin sus operadores: quién atiende
+  // cada portería es dato de administración, no de consulta.
+  if (tienePermiso(user.role, user.permissions, 'accesos.ver.todas')) {
+    const { data, error } = await supabaseAdmin
+      .from('gatehouses')
+      .select('id, name, location, description, is_active')
+      .eq('company_id', companyId)
+      .eq('is_active', true)
       .order('name')
 
     if (error) return NextResponse.json({ error: error.message }, { status: 500 })

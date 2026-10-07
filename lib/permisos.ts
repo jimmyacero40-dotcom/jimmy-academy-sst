@@ -24,6 +24,7 @@ export const CATALOGO_PERMISOS: GrupoPermisos[] = [
     grupo: 'Control operativo',
     permisos: [
       { id: 'accesos.ver',      label: 'Consultar movimientos', descripcion: 'Ver el registro de ingresos y salidas' },
+      { id: 'accesos.ver.todas', label: 'Consultar todas las porterías', descripcion: 'Ver el movimiento de toda la empresa sin tener porterías asignadas. Sin esto, solo se ve el de las porterías que la persona opera' },
       { id: 'accesos.ingreso',  label: 'Registrar ingresos',    descripcion: 'Marcar entradas en portería' },
       { id: 'accesos.salida',   label: 'Registrar salidas',     descripcion: 'Marcar salidas en portería' },
       { id: 'accesos.exportar', label: 'Exportar reportes',     descripcion: 'Descargar los movimientos en PDF y Excel' },
@@ -73,8 +74,40 @@ export const PERMISOS_POR_ROL: Record<string, string[]> = {
   superadmin: TODOS_LOS_PERMISOS,
   admin: TODOS_LOS_PERMISOS.filter(p => !SOLO_SUPERADMIN.includes(p)),
   portero: ['accesos.ver', 'accesos.ingreso', 'accesos.salida'],
+  // Cuenta de solo lectura: consulta el movimiento de todas las porterías sin
+  // tener ninguna asignada y sin poder registrar ingresos ni salidas. Es lo que
+  // antes obligaba a darle rol de portero a quien solo necesitaba mirar, con el
+  // efecto de que al quitarle ingreso y salida dejaba de ver los movimientos.
+  consulta: [
+    'accesos.ver', 'accesos.ver.todas', 'accesos.exportar',
+    'personal.ver', 'formacion.ver',
+    'sst.participacion.ver', 'sst.reportes.ver',
+  ],
   worker: [],
 }
+
+/** Los roles de plataforma, para no repetir nombres y colores en cada pantalla. */
+export const ROLES: { id: string; label: string; descripcion: string; color: string }[] = [
+  { id: 'consulta',   label: 'Consulta',           color: '#8B5CF6', descripcion: 'solo lectura, sin registrar nada' },
+  { id: 'portero',    label: 'Portero',            color: '#06B6D4', descripcion: 'acceso solo a portería/ingreso/salida' },
+  { id: 'admin',      label: 'Administrador',      color: '#F59E0B', descripcion: 'gestión del personal y SSTudio' },
+  { id: 'superadmin', label: 'Superadministrador', color: '#EF4444', descripcion: 'control total de la plataforma' },
+]
+
+export const ROL = (id: string) =>
+  ROLES.find(r => r.id === id) ?? { id, label: 'Trabajador', color: '#10B981', descripcion: '' }
+
+/** Ningún rol de consulta debe poder escribir, por mucho que se marque la casilla. */
+export const SOLO_LECTURA = new Set(['consulta'])
+
+/**
+ * Lo que una cuenta de consulta puede tener. Se filtra aquí y no solo en la
+ * pantalla: si alguien marca por error "Registrar ingresos" en una cuenta de
+ * consulta, o lo manda directo al API, no debe surtir efecto.
+ */
+const PERMISOS_DE_LECTURA = new Set(
+  TODOS_LOS_PERMISOS.filter(p => p.endsWith('.ver') || p.endsWith('.ver.todas') || p.endsWith('.exportar'))
+)
 
 /**
  * El superadmin siempre puede todo, según regla del negocio. Para los demás, si
@@ -82,8 +115,9 @@ export const PERMISOS_POR_ROL: Record<string, string[]> = {
  */
 export function permisosEfectivos(role: string, permissions?: string[] | null): string[] {
   if (role === 'superadmin') return TODOS_LOS_PERMISOS
-  if (permissions && permissions.length) return permissions
-  return PERMISOS_POR_ROL[role] ?? []
+  const propios = permissions && permissions.length ? permissions : (PERMISOS_POR_ROL[role] ?? [])
+  if (SOLO_LECTURA.has(role)) return propios.filter(p => PERMISOS_DE_LECTURA.has(p))
+  return propios
 }
 
 export function tienePermiso(role: string, permissions: string[] | null | undefined, permiso: string): boolean {

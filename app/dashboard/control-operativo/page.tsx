@@ -88,6 +88,10 @@ export default function ControlOperativoPage() {
   // Se decide por permiso, no por rol: si al portero se le marcó "Exportar
   // reportes" en Configuración, la casilla debe servir de verdad.
   const puedeExportar = tienePermiso(rol, (session?.user as any)?.permissions, 'accesos.exportar')
+  // Una cuenta de consulta entra aquí a mirar: no se le ofrecen los botones de
+  // registrar, que la llevarían a una pantalla que no puede usar.
+  const puedeRegistrarIngreso = tienePermiso(rol, (session?.user as any)?.permissions, 'accesos.ingreso')
+  const puedeRegistrarSalida  = tienePermiso(rol, (session?.user as any)?.permissions, 'accesos.salida')
   const today = new Date().toISOString().split('T')[0]
 
   const [exporting, setExporting] = useState<'pdf' | 'excel' | null>(null)
@@ -259,16 +263,20 @@ export default function ControlOperativoPage() {
           <p className="text-sm mt-0.5" style={{ color: 'var(--text-dim)' }}>Personas que ingresaron y salieron de las instalaciones</p>
         </div>
         <div className="flex items-center gap-2">
-          <Link href="/dashboard/control-operativo/porteria"
-            className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold transition-all"
-            style={{ background: 'var(--primary)', color: '#fff' }}>
-            <LogIn size={15} /> Registrar Ingreso
-          </Link>
-          <Link href="/dashboard/control-operativo/salida"
-            className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold transition-all"
-            style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', color: 'var(--text)' }}>
-            <LogOut size={15} /> Registrar Salida
-          </Link>
+          {puedeRegistrarIngreso && (
+            <Link href="/dashboard/control-operativo/porteria"
+              className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold transition-all"
+              style={{ background: 'var(--primary)', color: '#fff' }}>
+              <LogIn size={15} /> Registrar Ingreso
+            </Link>
+          )}
+          {puedeRegistrarSalida && (
+            <Link href="/dashboard/control-operativo/salida"
+              className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold transition-all"
+              style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', color: 'var(--text)' }}>
+              <LogOut size={15} /> Registrar Salida
+            </Link>
+          )}
         </div>
       </div>
 

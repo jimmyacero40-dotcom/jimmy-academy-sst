@@ -85,15 +85,39 @@ export async function requierePermiso(...permisos: string[]) {
   return { authorized: true, user, companyId, isAdmin } as const
 }
 
+/** Porterías asignadas a una persona en gatehouse_operators. */
+async function porteriasAsignadas(userId: string): Promise<string[]> {
+  const { data } = await supabase.from('gatehouse_operators').select('gatehouse_id').eq('user_id', userId)
+  return (data ?? []).map((o: any) => o.gatehouse_id)
+}
+
 /**
- * Porterías que un usuario puede ver u operar. `null` significa todas (admin y
- * superadmin). Un portero queda limitado a las que tiene asignadas en
- * gatehouse_operators; si no tiene ninguna, la lista es vacía y no ve nada.
+ * Porterías en las que puede REGISTRAR ingresos y salidas. `null` significa
+ * todas (admin y superadmin). Un portero queda limitado a las que tiene
+ * asignadas; si no tiene ninguna, la lista es vacía y no opera en ninguna.
  */
 export async function porteriasPermitidas(userId: string, isAdmin: boolean): Promise<string[] | null> {
   if (isAdmin) return null
-  const { data } = await supabase.from('gatehouse_operators').select('gatehouse_id').eq('user_id', userId)
-  return (data ?? []).map((o: any) => o.gatehouse_id)
+  return porteriasAsignadas(userId)
+}
+
+/**
+ * Porterías cuyo movimiento puede CONSULTAR. Se separó de la anterior porque
+ * mirar y operar no son lo mismo: antes el alcance se decidía por el rol, así
+ * que para ver los movimientos de toda la empresa había que ser administrador o
+ * tener porterías asignadas. Quien solo necesitaba consultar terminaba con rol
+ * de portero, y al quitarle ingreso y salida se quedaba sin ver nada.
+ *
+ * Ahora lo decide el permiso `accesos.ver.todas`. Sin él no cambia nada: el
+ * portero sigue viendo únicamente lo de sus porterías.
+ */
+export async function porteriasQuePuedeConsultar(
+  user: { id: string; role: string; permissions?: string[] | null },
+  isAdmin: boolean,
+): Promise<string[] | null> {
+  if (isAdmin) return null
+  if (tienePermiso(user.role, user.permissions, 'accesos.ver.todas')) return null
+  return porteriasAsignadas(user.id)
 }
 
 // Portero OR admin — for access to ingreso/salida operations

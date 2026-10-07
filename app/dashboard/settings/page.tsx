@@ -10,7 +10,7 @@ import {
   DoorOpen, UserPlus, KeyRound, RefreshCw, Trash2, RotateCcw, Search
 } from 'lucide-react'
 import { useTheme, THEMES, type ThemeId } from '@/components/ThemeProvider'
-import { CATALOGO_PERMISOS, PERMISOS_POR_ROL, permisosEfectivos } from '@/lib/permisos'
+import { CATALOGO_PERMISOS, PERMISOS_POR_ROL, permisosEfectivos, ROLES, ROL } from '@/lib/permisos'
 import SedesPorterias from '@/components/SedesPorterias'
 
 const ADMIN_SECTIONS = [
@@ -700,9 +700,9 @@ export default function SettingsPage() {
                   <label className="text-[var(--text-dim)] text-xs font-semibold mb-1.5 block">Rol *</label>
                   <select value={puForm.role} onChange={e => cambiarRol(e.target.value)}
                     className="w-full bg-[var(--bg-card)] border border-[var(--border)] rounded-xl px-4 py-2.5 text-sm text-[var(--text)] focus:outline-none focus:border-amber-500/40 transition-all">
-                    <option value="portero">Portero — acceso solo a portería/ingreso/salida</option>
-                    <option value="admin">Administrador — gestión del personal y SSTudio</option>
-                    <option value="superadmin">Superadministrador — control total de la plataforma</option>
+                    {ROLES.map(r => (
+                      <option key={r.id} value={r.id}>{r.label} — {r.descripcion}</option>
+                    ))}
                     <option value="worker">Trabajador — experiencia del trabajador</option>
                   </select>
                 </div>
@@ -809,10 +809,10 @@ export default function SettingsPage() {
                           </span>
                           <span className="text-[11px] font-bold px-2 py-0.5 rounded-full flex-shrink-0"
                             style={{
-                              background: u.role === 'superadmin' ? 'rgba(239,68,68,0.12)' : u.role === 'admin' ? 'rgba(245,158,11,0.12)' : u.role === 'portero' ? 'rgba(6,182,212,0.12)' : 'rgba(16,185,129,0.12)',
-                              color: u.role === 'superadmin' ? '#EF4444' : u.role === 'admin' ? '#F59E0B' : u.role === 'portero' ? '#06B6D4' : '#10B981',
+                              background: ROL(u.role).color + '1F',
+                              color: ROL(u.role).color,
                             }}>
-                            {u.role}
+                            {ROL(u.role).label}
                           </span>
                           {!u.active && (
                             <span className="text-[11px] font-bold px-2 py-0.5 rounded-full flex-shrink-0"
@@ -852,9 +852,9 @@ export default function SettingsPage() {
                                 <select value={datosBorrador.role}
                                   onChange={e => { const r = e.target.value; setDatosBorrador(p => ({ ...p, role: r })); setPermBorrador(PERMISOS_POR_ROL[r] ?? []) }}
                                   className="w-full bg-[var(--bg-surface)] border border-[var(--border)] rounded-lg px-3 py-2 text-sm text-[var(--text)] focus:outline-none focus:border-amber-500/40">
-                                  <option value="portero">Portero</option>
-                                  <option value="admin">Administrador</option>
-                                  <option value="superadmin">Superadministrador</option>
+                                  {ROLES.map(r => (
+                                    <option key={r.id} value={r.id}>{r.label}</option>
+                                  ))}
                                   <option value="worker">Trabajador</option>
                                 </select>
                               </div>

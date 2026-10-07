@@ -164,6 +164,16 @@ const PORTERO_NAV = [
   { href: '/dashboard/control-operativo/salida',   icon: DoorOpen, label: 'Registro de Salidas' },
 ]
 
+// ── Consulta navigation ───────────────────────────────────────────
+// Cuenta de solo lectura. Ve el movimiento de todas las porterías sin tener
+// ninguna asignada, y no entra a las pantallas donde se registra o se configura.
+const CONSULTA_NAV = [
+  { href: '/dashboard/control-operativo', icon: ArrowLeftRight, label: 'Movimientos' },
+  { href: '/dashboard/users',             icon: Users,          label: 'Personas' },
+  { href: '/dashboard/worker-profiles',   icon: Activity,       label: 'Inf. Sociodemográfica' },
+  { href: '/dashboard/reports',           icon: BarChart2,      label: 'Reportes' },
+]
+
 // ── Worker navigation ─────────────────────────────────────────────
 // Cuatro módulos y nada más. La firma vive dentro de Mi Perfil y los
 // certificados dentro de SSTudio, así que ya no necesitan botón propio.
@@ -201,6 +211,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   const isAdmin = userRole === 'admin' || userRole === 'superadmin'
   const isSuperAdmin = userRole === 'superadmin'
   const isPortero = userRole === 'portero'
+  const isConsulta = userRole === 'consulta'
 
   const [activeCompany, setActiveCompany] = useState<{ name: string; logo_url?: string } | null>(null)
   const [workerDisplayName, setWorkerDisplayName] = useState<string | null>(null)
@@ -344,7 +355,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
               )}
               <div className="text-[8px] font-bold uppercase tracking-[0.16em]"
                 style={{ color: 'var(--sidebar-faint)' }}>
-                {sessionLoading ? ' ' : isAdmin ? 'Gestión del Personal' : isPortero ? 'Control de Acceso' : 'Portal Trabajador'}
+                {sessionLoading ? ' ' : isAdmin ? 'Gestión del Personal' : isPortero ? 'Control de Acceso' : isConsulta ? 'Consulta' : 'Portal Trabajador'}
               </div>
             </div>
           )}
@@ -366,10 +377,10 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                 <div key={i} className="h-8 rounded-lg animate-pulse" style={{ background: 'var(--sidebar-skeleton, rgba(255,255,255,0.06))' }} />
               ))}
             </div>
-          ) : isPortero ? (
-            /* ── Portero nav (ingreso/salida only) ── */
+          ) : isPortero || isConsulta ? (
+            /* ── Portero (ingreso/salida) y Consulta (solo lectura) ── */
             <div className="pt-1 space-y-0.5">
-              {PORTERO_NAV.map(({ href, icon: Icon, label }) => {
+              {(isConsulta ? CONSULTA_NAV : PORTERO_NAV).map(({ href, icon: Icon, label }) => {
                 const active = isActive(href)
                 return (
                   <Link key={href} href={href}

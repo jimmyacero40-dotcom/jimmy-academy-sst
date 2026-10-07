@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase-admin'
-import { requierePermiso, porteriasPermitidas } from '@/lib/get-company'
+import { requierePermiso, porteriasPermitidas, porteriasQuePuedeConsultar } from '@/lib/get-company'
 import {
   inicioJornada, inicioJornadaDeFecha, siguienteJornada, finJornada, horaColombia,
   MOTIVO_OTRA_PORTERIA, MOTIVO_FIN_JORNADA,
@@ -11,8 +11,8 @@ export async function GET(req: NextRequest) {
   if (!authorized) return NextResponse.json({ error: 'No tiene permiso para consultar movimientos' }, { status: 403 })
 
   // El portero solo ve el movimiento de las porterías que opera, no el de toda
-  // la empresa.
-  const porteriasPropias = await porteriasPermitidas(user.id, isAdmin)
+  // la empresa. Una cuenta de consulta sí ve el de todas, sin operar ninguna.
+  const porteriasPropias = await porteriasQuePuedeConsultar(user, isAdmin)
 
   const { searchParams } = new URL(req.url)
   const period      = searchParams.get('period') || 'day'
