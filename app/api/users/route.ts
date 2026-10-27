@@ -70,12 +70,17 @@ export async function GET(req: NextRequest) {
   // La sede (centro de trabajo) y la fecha de ingreso viven en worker_profiles.
   const { data: workerProfiles } = await supabaseAdmin
     .from('worker_profiles')
-    .select('user_id, centro_trabajo, fecha_ingreso')
+    .select('user_id, centro_trabajo, fecha_ingreso, nombres, apellidos')
     .in('user_id', userIds.length ? userIds : ['_'])
 
-  const perfilByUser: Record<string, { centro_trabajo: string | null; fecha_ingreso: string | null }> = {}
+  // nombres y apellidos vienen aparte para poder intercambiarlos sin adivinar
+  // dónde termina el apellido dentro del nombre completo.
+  const perfilByUser: Record<string, { centro_trabajo: string | null; fecha_ingreso: string | null; nombres: string | null; apellidos: string | null }> = {}
   for (const p of workerProfiles ?? []) {
-    perfilByUser[p.user_id] = { centro_trabajo: p.centro_trabajo, fecha_ingreso: p.fecha_ingreso }
+    perfilByUser[p.user_id] = {
+      centro_trabajo: p.centro_trabajo, fecha_ingreso: p.fecha_ingreso,
+      nombres: p.nombres, apellidos: p.apellidos,
+    }
   }
 
   const result = (data ?? []).map((u: any) => ({
@@ -83,6 +88,8 @@ export async function GET(req: NextRequest) {
     photo_url: photoByUser[u.id] || null,
     sede: perfilByUser[u.id]?.centro_trabajo || null,
     fecha_ingreso: perfilByUser[u.id]?.fecha_ingreso || null,
+    nombres: perfilByUser[u.id]?.nombres || null,
+    apellidos: perfilByUser[u.id]?.apellidos || null,
     user_groups: (groupsByUser[u.id] ?? []).map(g => ({ groups: g })),
   }))
 

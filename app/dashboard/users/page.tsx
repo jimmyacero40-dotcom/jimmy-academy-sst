@@ -2,6 +2,7 @@
 
 import { QrPreRegistro } from '@/components/QrPreRegistro'
 import { useState, useEffect, useRef, useCallback } from 'react'
+import CorreccionRapida from '@/components/CorreccionRapida'
 import { useRouter } from 'next/navigation'
 import { useSession } from 'next-auth/react'
 import { motion, AnimatePresence } from 'framer-motion'
@@ -10,7 +11,7 @@ import {
   Users, Search, MoreVertical, CheckCircle,
   Building2, X, Edit2, Trash2, Download, ChevronDown,
   UserPlus, FileSpreadsheet, AlertCircle, Loader2,
-  Layers, UserCheck, Tag, Eye, BookOpen, UserX, QrCode, Check, GraduationCap,
+  Layers, UserCheck, Tag, Eye, BookOpen, UserX, QrCode, Check, GraduationCap, Wand2,
 } from 'lucide-react'
 
 type UserStatus = 'activo' | 'inactivo' | 'pendiente' | 'rechazado'
@@ -27,6 +28,9 @@ interface AppUser {
   area_name: string
   role: string
   cargo: string
+  /** De la ficha, cuando existe: sirven para saber dónde parte el apellido. */
+  nombres: string
+  apellidos: string
   sede: string
   fechaIngreso: string
   cedula: string
@@ -419,7 +423,7 @@ export default function UsersPage() {
   const [retiring, setRetiring]           = useState(false)
   const [excelError, setExcelError]       = useState('')
   const [importando, setImportando]       = useState<{ hechas: number; total: number } | null>(null)
-  const [importResumen, setImportResumen] = useState<{ creadas: number; actualizadas?: number; total: number; fallas: { fila: number; nombre: string; motivo: string }[]; accion?: 'importados' | 'retirados' } | null>(null)
+  const [importResumen, setImportResumen] = useState<{ creadas: number; actualizadas?: number; total: number; fallas: { fila: number; nombre: string; motivo: string }[]; accion?: 'importados' | 'retirados' | 'corregidos' } | null>(null)
   const [saving, setSaving]               = useState(false)
   const [loadingGroups, setLoadingGroups] = useState(false)
   const [isDirty, setIsDirty]             = useState(false)
@@ -430,6 +434,7 @@ export default function UsersPage() {
   const { data: session } = useSession()
   const isSuperadmin = (session?.user as any)?.role === 'superadmin'
   const [groupPopover, setGroupPopover] = useState<string | null>(null)
+  const [corrigiendo, setCorrigiendo] = useState(false)
 
   // ── Data loading ─────────────────────────────────────────────────────────
   const loadUsers = async () => {
@@ -442,6 +447,8 @@ export default function UsersPage() {
         empresa: u.area || '', area_id: u.area_id || '', area_name: u.area || '',
         role: u.role === 'admin' ? 'Administrador' : (u.area || 'Trabajador'),
         cargo: u.cargo || '',
+        nombres: u.nombres || '',
+        apellidos: u.apellidos || '',
         sede: u.sede || '',
         fechaIngreso: u.fecha_ingreso || '',
         cedula: u.cedula || '',
@@ -779,6 +786,47 @@ export default function UsersPage() {
     await loadUsers(); setCellSaving(null)
   }
 
+  /**
+   * Guarda las correcciones rápidas. El nombre y el cargo viven en `users`; los
+   * nombres y apellidos por separado, en la ficha. Se manda solo lo que cambió.
+   */
+  const aplicarCorrecciones = async (
+    cambios: { id: string; name: string; cargo: string | null; nombres: string | null; apellidos: string | null }[],
+  ) => {
+    setImportando({ hechas: 0, total: cambios.length })
+    const fallas: { fila: number; nombre: string; motivo: string }[] = []
+    let hechas = 0
+
+    for (const [i, c] of cambios.entries()) {
+      const antes = users.find(u => u.id === c.id)
+      try {
+        const r = await fetch('/api/users', {
+          method: 'PUT', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ id: c.id, name: c.name, cargo: c.cargo }),
+        })
+        if (!r.ok) throw new Error((await r.json()).error || 'No fue posible guardar')
+
+        // La ficha solo se toca si la persona ya la tenía diligenciada.
+        if (antes?.nombres || antes?.apellidos) {
+          await fetch('/api/profile', {
+            method: 'PUT', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ user_id: c.id, nombres: c.nombres, apellidos: c.apellidos }),
+          })
+        }
+        hechas++
+      } catch (e: any) {
+        fallas.push({ fila: i + 1, nombre: antes?.name ?? c.name, motivo: e.message })
+      }
+      setImportando({ hechas: i + 1, total: cambios.length })
+    }
+
+    await loadUsers()
+    setImportando(null)
+    setCorrigiendo(false)
+    setSelected(new Set())
+    setImportResumen({ creadas: hechas, total: cambios.length, fallas, accion: 'corregidos' })
+  }
+
   const autoSaveGroups = async (userId: string, groupIds: string[]) => {
     setCellSaving(userId)
     await fetch(`/api/users/${userId}/groups`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ group_ids: groupIds }) })
@@ -882,6 +930,8 @@ export default function UsersPage() {
             {importResumen.fallas.length ? <AlertCircle size={14} /> : <CheckCircle size={14} />}
             {importResumen.accion === 'retirados'
               ? `${importResumen.creadas} trabajador(es) enviados a Retirados`
+              : importResumen.accion === 'corregidos'
+              ? `${importResumen.creadas} de ${importResumen.total} corregidos`
               : `${importResumen.creadas} creados${importResumen.actualizadas ? `, ${importResumen.actualizadas} actualizados` : ''} de ${importResumen.total} filas`}
             <button onClick={() => setImportResumen(null)} className="ml-auto"><X size={13} /></button>
           </div>
@@ -899,6 +949,17 @@ export default function UsersPage() {
         </div>
       )}
 
+      {corrigiendo && (
+        <CorreccionRapida
+          personas={sorted.filter(u => selected.has(u.id)).map(u => ({
+            id: u.id, name: u.name, cedula: u.cedula,
+            cargo: u.cargo || null, nombres: u.nombres || null, apellidos: u.apellidos || null,
+          }))}
+          onCerrar={() => setCorrigiendo(false)}
+          onAplicar={aplicarCorrecciones}
+        />
+      )}
+
       {/* Bulk actions */}
       <AnimatePresence>
         {selected.size > 0 && (
@@ -908,8 +969,13 @@ export default function UsersPage() {
             <span className="text-sm font-semibold" style={{ color: 'var(--primary)' }}>
               {selected.size} seleccionado{selected.size !== 1 ? 's' : ''}
             </span>
-            <button onClick={() => asignarInduccion({ user_ids: [...selected] })} disabled={asignando}
+            <button onClick={() => setCorrigiendo(true)}
               className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold ml-auto"
+              style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', color: 'var(--text)' }}>
+              <Wand2 size={12} /> Corrección rápida
+            </button>
+            <button onClick={() => asignarInduccion({ user_ids: [...selected] })} disabled={asignando}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold"
               style={{ background: 'rgba(16,185,129,0.14)', color: '#10B981', border: '1px solid rgba(16,185,129,0.25)' }}>
               <GraduationCap size={12} /> {asignando ? 'Asignando…' : 'Asignar inducción'}
             </button>
