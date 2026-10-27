@@ -3,6 +3,7 @@
 import { QrPreRegistro } from '@/components/QrPreRegistro'
 import { useState, useEffect, useRef, useCallback } from 'react'
 import CorreccionRapida from '@/components/CorreccionRapida'
+import { useAnchosColumnas, ManijaColumna, type ColumnaAncho } from '@/components/anchos-columnas'
 import { useRouter } from 'next/navigation'
 import { useSession } from 'next-auth/react'
 import { motion, AnimatePresence } from 'framer-motion'
@@ -11,7 +12,7 @@ import {
   Users, Search, MoreVertical, CheckCircle,
   Building2, X, Edit2, Trash2, Download, ChevronDown,
   UserPlus, FileSpreadsheet, AlertCircle, Loader2,
-  Layers, UserCheck, Tag, Eye, BookOpen, UserX, QrCode, Check, GraduationCap, Wand2,
+  Layers, UserCheck, Tag, Eye, BookOpen, UserX, QrCode, Check, GraduationCap, Wand2, Columns3,
 } from 'lucide-react'
 
 type UserStatus = 'activo' | 'inactivo' | 'pendiente' | 'rechazado'
@@ -64,6 +65,21 @@ function colorForUser(id: string) {
   const sum = id.split('').reduce((a, c) => a + c.charCodeAt(0), 0)
   return AVATAR_COLORS[sum % AVATAR_COLORS.length]
 }
+
+/** Columnas de la tabla de personas, con el ancho con que nacen. */
+const COLUMNAS_PERSONAS: ColumnaAncho[] = [
+  { id: 'sel',     ancho: 4,  min: 3 },
+  { id: 'nombre',  ancho: 18, min: 8 },
+  { id: 'cedula',  ancho: 8,  min: 5 },
+  { id: 'cargo',   ancho: 9,  min: 5 },
+  { id: 'area',    ancho: 8,  min: 5 },
+  { id: 'sede',    ancho: 8,  min: 5 },
+  { id: 'grupos',  ancho: 8,  min: 5 },
+  { id: 'ingreso', ancho: 9,  min: 7 },
+  { id: 'estado',  ancho: 9,  min: 5 },
+  { id: 'correo',  ancho: 11, min: 5 },
+  { id: 'acciones', ancho: 8, min: 6 },
+]
 
 const EMPTY_FORM = {
   name: '', email: '', correo: '', password: '', empresa: '', area_id: '', cargo: '', cedula: '',
@@ -393,11 +409,16 @@ function CeldaEditable({ valor, onGuardar, deshabilitado, tipo = 'text', classNa
   )
 }
 
-function TH({ children, className = '' }: { children: React.ReactNode; className?: string }) {
+function TH({ children, className = '', manija }: {
+  children: React.ReactNode; className?: string; manija?: React.ReactNode
+}) {
   return (
+    // `position: relative` para que la manija del ancho se pueda pegar al
+    // borde derecho de esta celda y no al de la tabla.
     <th className={`px-3 py-0 text-left align-top ${className}`}
-      style={{ borderBottom: '1px solid var(--border)', overflow: 'hidden' }}>
+      style={{ borderBottom: '1px solid var(--border)', overflow: 'hidden', position: 'relative' }}>
       <div className="py-3 min-w-0">{children}</div>
+      {manija}
     </th>
   )
 }
@@ -505,6 +526,7 @@ export default function UsersPage() {
   const isSuperadmin = (session?.user as any)?.role === 'superadmin'
   const [groupPopover, setGroupPopover] = useState<string | null>(null)
   const [corrigiendo, setCorrigiendo] = useState(false)
+  const columnas = useAnchosColumnas('personas', COLUMNAS_PERSONAS)
 
   // ── Data loading ─────────────────────────────────────────────────────────
   const loadUsers = async () => {
@@ -947,6 +969,14 @@ export default function UsersPage() {
               <X size={11} /> Limpiar filtros
             </button>
           )}
+          {columnas.acomodado && (
+            <button onClick={columnas.restablecer}
+              className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs transition-all"
+              title="Devolver las columnas a su ancho original"
+              style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', color: 'var(--text-dim)' }}>
+              <Columns3 size={11} /> Restablecer columnas
+            </button>
+          )}
           <button onClick={() => setMostrarQr(true)} className="terra-btn-outline"
             style={{ padding: '8px 14px', fontSize: 12 }}
             title="Enlace y QR para que los trabajadores se registren solos">
@@ -1166,6 +1196,7 @@ export default function UsersPage() {
         <>
           {/* ── Desktop table ─────────────────────────────────────────── */}
           <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }}
+            ref={columnas.contenedor}
             className="terra-card hidden md:block"
             style={{ borderRadius: 16, overflow: 'visible' }}>
             {/* tableLayout: 'fixed' hace que los anchos de <colgroup> manden de
@@ -1179,45 +1210,40 @@ export default function UsersPage() {
               <colgroup>
                 {/* Todo en porcentaje y sumando 100: mezclar píxeles con
                     porcentajes dejaba a Correo con 15 px, porque el porcentaje
-                    se calcula sobre el ancho total y no sobre lo que sobra. */}
-                <col style={{ width: '4%' }} />  {/* Checkbox */}
-                <col style={{ width: '18%' }} /> {/* Trabajador */}
-                <col style={{ width: '8%' }} />  {/* Cédula */}
-                <col style={{ width: '9%' }} />  {/* Cargo */}
-                <col style={{ width: '8%' }} />  {/* Área */}
-                <col style={{ width: '8%' }} />  {/* Sede */}
-                <col style={{ width: '8%' }} />  {/* Grupos */}
-                <col style={{ width: '9%' }} />  {/* Fecha de ingreso — cabe el selector */}
-                <col style={{ width: '9%' }} />  {/* Estado */}
-                <col style={{ width: '11%' }} /> {/* Correo */}
-                <col style={{ width: '8%' }} />  {/* Acciones */}
+                    se calcula sobre el ancho total y no sobre lo que sobra.
+                    Los anchos los maneja el acomodador de columnas. */}
+                {columnas.anchos.map((a, i) => (
+                  <col key={COLUMNAS_PERSONAS[i].id} style={{ width: `${a}%` }} />
+                ))}
               </colgroup>
 
               {/* ── Table header with embedded filters ───────────────── */}
               <thead>
                 <tr>
                   {/* Checkbox */}
-                  <th className="px-4 py-3 text-left align-middle" style={{ borderBottom: '1px solid var(--border)' }}>
+                  <th className="px-4 py-3 text-left align-middle"
+                    style={{ borderBottom: '1px solid var(--border)', position: 'relative' }}>
                     <input type="checkbox"
                       checked={selected.size === sorted.length && sorted.length > 0}
                       onChange={toggleSelectAll}
                       className="w-4 h-4 rounded accent-blue-500" />
+                    <ManijaColumna onArrastrar={e => columnas.empezarArrastre(0, e)} onRestablecer={columnas.restablecer} />
                   </th>
 
                   {/* Trabajador + search */}
-                  <TH>
+                  <TH manija={<ManijaColumna onArrastrar={e => columnas.empezarArrastre(1, e)} onRestablecer={columnas.restablecer} />}>
                     <EtiquetaColumna field="name" {...ordenar}>Trabajador</EtiquetaColumna>
                     <FilterInput value={search} onChange={setSearch} placeholder="Buscar..." />
                   </TH>
 
                   {/* Cédula */}
-                  <TH>
+                  <TH manija={<ManijaColumna onArrastrar={e => columnas.empezarArrastre(2, e)} onRestablecer={columnas.restablecer} />}>
                     <EtiquetaColumna field="cedula" {...ordenar}>Cédula</EtiquetaColumna>
                     <FilterInput value={filterCedula} onChange={setFilterCedula} placeholder="Documento" />
                   </TH>
 
                   {/* Cargo */}
-                  <TH>
+                  <TH manija={<ManijaColumna onArrastrar={e => columnas.empezarArrastre(3, e)} onRestablecer={columnas.restablecer} />}>
                     <EtiquetaColumna field="cargo" {...ordenar}>Cargo</EtiquetaColumna>
                     {/* Los cargos salen de los datos, no de una lista fija: así aparecen
                         todos los que existen de verdad, incluidos los mal escritos. */}
@@ -1234,7 +1260,7 @@ export default function UsersPage() {
                   </TH>
 
                   {/* Área */}
-                  <TH>
+                  <TH manija={<ManijaColumna onArrastrar={e => columnas.empezarArrastre(4, e)} onRestablecer={columnas.restablecer} />}>
                     <EtiquetaColumna field="area_name" {...ordenar}>Área</EtiquetaColumna>
                     <FilterSelect
                       value={filterArea} onChange={setFilterArea}
@@ -1244,7 +1270,7 @@ export default function UsersPage() {
                   </TH>
 
                   {/* Sede */}
-                  <TH>
+                  <TH manija={<ManijaColumna onArrastrar={e => columnas.empezarArrastre(5, e)} onRestablecer={columnas.restablecer} />}>
                     <EtiquetaColumna field="sede" {...ordenar}>Sede</EtiquetaColumna>
                     {/* Opciones tomadas de los datos reales, no de una lista fija. */}
                     <FilterSelect
@@ -1258,7 +1284,7 @@ export default function UsersPage() {
                   </TH>
 
                   {/* Grupos */}
-                  <TH>
+                  <TH manija={<ManijaColumna onArrastrar={e => columnas.empezarArrastre(6, e)} onRestablecer={columnas.restablecer} />}>
                     <EtiquetaColumna {...ordenar}>Grupos</EtiquetaColumna>
                     <FilterSelect
                       value={filterGroup} onChange={setFilterGroup}
@@ -1268,7 +1294,7 @@ export default function UsersPage() {
                   </TH>
 
                   {/* Fecha de ingreso */}
-                  <TH>
+                  <TH manija={<ManijaColumna onArrastrar={e => columnas.empezarArrastre(7, e)} onRestablecer={columnas.restablecer} />}>
                     <EtiquetaColumna field="fechaIngreso" {...ordenar}>Fecha de ingreso</EtiquetaColumna>
                     {/* Por mes, que es como se consulta: quién entró en tal mes. Un
                         rango de fechas no cabe en el ancho de la columna. */}
@@ -1285,7 +1311,7 @@ export default function UsersPage() {
                   </TH>
 
                   {/* Estado */}
-                  <TH>
+                  <TH manija={<ManijaColumna onArrastrar={e => columnas.empezarArrastre(8, e)} onRestablecer={columnas.restablecer} />}>
                     <EtiquetaColumna field="status" {...ordenar}>Estado</EtiquetaColumna>
                     <FilterSelect
                       value={filterStatus} onChange={setFilterStatus}
@@ -1300,7 +1326,7 @@ export default function UsersPage() {
                   </TH>
 
                   {/* Correo */}
-                  <TH>
+                  <TH manija={<ManijaColumna onArrastrar={e => columnas.empezarArrastre(9, e)} onRestablecer={columnas.restablecer} />}>
                     <EtiquetaColumna {...ordenar}>Correo</EtiquetaColumna>
                     <FilterInput value={filterCorreo} onChange={setFilterCorreo} placeholder="Correo" />
                   </TH>

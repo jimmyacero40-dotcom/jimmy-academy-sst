@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useCallback } from 'react'
+import { useAnchosColumnas, ManijaColumna, type ColumnaAncho } from '@/components/anchos-columnas'
 import { useConsulta } from '@/lib/useConsulta'
 import { useSession } from 'next-auth/react'
 import { tienePermiso } from '@/lib/permisos'
@@ -82,7 +83,20 @@ function weekBounds(isoDate: string) {
   return { from: monday.toISOString().split('T')[0], to: sunday.toISOString().split('T')[0] }
 }
 
+const COLUMNAS_MOVIMIENTOS: ColumnaAncho[] = [
+  { id: 'fecha',       ancho: 10, min: 7 },
+  { id: 'entrada',     ancho: 9,  min: 6 },
+  { id: 'salida',      ancho: 9,  min: 6 },
+  { id: 'permanencia', ancho: 10, min: 7 },
+  { id: 'trabajador',  ancho: 22, min: 10 },
+  { id: 'cedula',      ancho: 10, min: 6 },
+  { id: 'area',        ancho: 11, min: 6 },
+  { id: 'porteria',    ancho: 10, min: 6 },
+  { id: 'estado',      ancho: 9,  min: 6 },
+]
+
 export default function ControlOperativoPage() {
+  const columnas = useAnchosColumnas('movimientos-porteria', COLUMNAS_MOVIMIENTOS)
   const { data: session } = useSession()
   const rol = (session?.user as any)?.role
   // Se decide por permiso, no por rol: si al portero se le marcó "Exportar
@@ -479,19 +493,25 @@ export default function ControlOperativoPage() {
             <p className="text-sm" style={{ color: 'var(--text-faint)' }}>Sin registros en el periodo seleccionado</p>
           </div>
         ) : (
-          <div className="overflow-x-auto">
-            <table className="terra-table w-full">
+          <div className="overflow-x-auto" ref={columnas.contenedor}>
+            <table className="terra-table w-full" style={{ tableLayout: 'fixed' }}>
+              <colgroup>
+                {columnas.anchos.map((a, i) => (
+                  <col key={COLUMNAS_MOVIMIENTOS[i].id} style={{ width: `${a}%` }} />
+                ))}
+              </colgroup>
               <thead>
                 <tr>
-                  <th className="px-4 py-3 text-left">F. ingreso</th>
-                  <th className="px-4 py-3 text-left">Entrada</th>
-                  <th className="px-4 py-3 text-left">Salida</th>
-                  <th className="px-4 py-3 text-left">Permanencia</th>
-                  <th className="px-4 py-3 text-left">Trabajador</th>
-                  <th className="px-4 py-3 text-left">Cédula</th>
-                  <th className="px-4 py-3 text-left">Área</th>
-                  <th className="px-4 py-3 text-left">Portería</th>
-                  <th className="px-4 py-3 text-left">Estado</th>
+                  {['F. ingreso', 'Entrada', 'Salida', 'Permanencia', 'Trabajador', 'Cédula', 'Área', 'Portería', 'Estado']
+                    .map((titulo, i) => (
+                      <th key={titulo} className="px-4 py-3 text-left"
+                        style={{ position: 'relative', overflow: 'hidden' }}>
+                        {titulo}
+                        {i < COLUMNAS_MOVIMIENTOS.length - 1 && (
+                          <ManijaColumna onArrastrar={e => columnas.empezarArrastre(i, e)} onRestablecer={columnas.restablecer} />
+                        )}
+                      </th>
+                    ))}
                 </tr>
               </thead>
               <tbody>

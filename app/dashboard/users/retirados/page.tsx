@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import { useAnchosColumnas, ManijaColumna, type ColumnaAncho } from '@/components/anchos-columnas'
 import { useSession } from 'next-auth/react'
 import { UserX, Search, RefreshCw, RotateCcw, Calendar, ArrowLeft, Trash2, AlertTriangle } from 'lucide-react'
 import Link from 'next/link'
@@ -32,7 +33,18 @@ function fmtDate(iso: string) {
   return new Date(iso).toLocaleDateString('es-CO', { day: '2-digit', month: 'short', year: 'numeric' })
 }
 
+const COLUMNAS_RETIRADOS: ColumnaAncho[] = [
+  { id: 'trabajador', ancho: 28, min: 12 },
+  { id: 'cedula',     ancho: 13, min: 7 },
+  { id: 'cargo',      ancho: 14, min: 7 },
+  { id: 'grupos',     ancho: 13, min: 7 },
+  { id: 'ingreso',    ancho: 12, min: 8 },
+  { id: 'retiro',     ancho: 10, min: 8 },
+  { id: 'accion',     ancho: 10, min: 8 },
+]
+
 export default function RetiradosPage() {
+  const columnas = useAnchosColumnas('retirados', COLUMNAS_RETIRADOS)
   const { data: session } = useSession()
   const isSuperAdmin = (session?.user as any)?.role === 'superadmin'
 
@@ -236,26 +248,24 @@ export default function RetiradosPage() {
             </p>
           </div>
         ) : (
-          <div className="overflow-x-auto">
-            <table className="terra-table w-full">
+          <div className="overflow-x-auto" ref={columnas.contenedor}>
+            <table className="terra-table w-full" style={{ tableLayout: 'fixed' }}>
               <colgroup>
-                <col style={{ width: '28%' }} />
-                <col style={{ width: 120 }} />
-                <col style={{ width: 130 }} />
-                <col style={{ width: 120 }} />
-                <col style={{ width: 120 }} />
-                <col style={{ width: 110 }} />
-                <col style={{ width: 110 }} />
+                {columnas.anchos.map((a, i) => (
+                  <col key={COLUMNAS_RETIRADOS[i].id} style={{ width: `${a}%` }} />
+                ))}
               </colgroup>
               <thead>
                 <tr>
-                  <th className="px-4 py-3 text-left">Trabajador</th>
-                  <th className="px-4 py-3 text-left">Cédula</th>
-                  <th className="px-4 py-3 text-left">Cargo</th>
-                  <th className="px-4 py-3 text-left">Grupos</th>
-                  <th className="px-4 py-3 text-left">Fecha ingreso</th>
-                  <th className="px-4 py-3 text-left">Fecha retiro</th>
-                  <th className="px-4 py-3 text-left">Acción</th>
+                  {['Trabajador', 'Cédula', 'Cargo', 'Grupos', 'Fecha ingreso', 'Fecha retiro', 'Acción'].map((titulo, i) => (
+                    <th key={titulo} className="px-4 py-3 text-left"
+                      style={{ position: 'relative', overflow: 'hidden' }}>
+                      {titulo}
+                      {i < COLUMNAS_RETIRADOS.length - 1 && (
+                        <ManijaColumna onArrastrar={e => columnas.empezarArrastre(i, e)} onRestablecer={columnas.restablecer} />
+                      )}
+                    </th>
+                  ))}
                 </tr>
               </thead>
               <tbody>

@@ -1,6 +1,7 @@
 ﻿'use client'
 
 import { useState, useEffect } from 'react'
+import { useAnchosColumnas, ManijaColumna, type ColumnaAncho } from '@/components/anchos-columnas'
 import FichaCompleta from '@/components/FichaCompleta'
 import { calcPct, resumenFaltantes } from '@/lib/perfil-completitud'
 import { motion, AnimatePresence } from 'framer-motion'
@@ -133,7 +134,22 @@ const TABS = [
 ]
 
 // ── Main ──────────────────────────────────────────────────────────────
+const COLUMNAS_CONSULTAS: ColumnaAncho[] = [
+  { id: 'trabajador',  ancho: 16, min: 8 },
+  { id: 'cedula',      ancho: 8,  min: 5 },
+  { id: 'area',        ancho: 10, min: 5 },
+  { id: 'cargo',       ancho: 10, min: 5 },
+  { id: 'edad',        ancho: 5,  min: 4 },
+  { id: 'sexo',        ancho: 6,  min: 4 },
+  { id: 'educacion',   ancho: 8,  min: 5 },
+  { id: 'contrato',    ancho: 8,  min: 5 },
+  { id: 'completitud', ancho: 9,  min: 6 },
+  { id: 'falta',       ancho: 16, min: 7 },
+  { id: 'ver',         ancho: 4,  min: 4 },
+]
+
 export default function WorkerProfilesPage() {
+  const columnas = useAnchosColumnas('consultas-sociodemografica', COLUMNAS_CONSULTAS)
   const router = useRouter()
   const [profiles, setProfiles] = useState<WP[]>([])
   const [loading, setLoading]   = useState(true)
@@ -538,17 +554,15 @@ export default function WorkerProfilesPage() {
               </div>
 
               <div className="terra-card overflow-hidden">
-                <div className="overflow-x-auto">
+                <div className="overflow-x-auto" ref={columnas.contenedor}>
                   <table className="w-full text-xs" style={{ tableLayout: 'fixed', minWidth: 1000 }}>
                     <colgroup>
                       {/* Los anchos suman 100 y el ancho es fijo: así la tabla no se
-                          descuadra cuando un nombre o un cargo es más largo de la cuenta. */}
-                      <col style={{ width: '16%' }} /><col style={{ width: '8%' }} />
-                      <col style={{ width: '10%' }} /><col style={{ width: '10%' }} />
-                      <col style={{ width: '5%' }} /><col style={{ width: '6%' }} />
-                      <col style={{ width: '8%' }} /><col style={{ width: '8%' }} />
-                      <col style={{ width: '9%' }} /><col style={{ width: '16%' }} />
-                      <col style={{ width: '4%' }} />
+                          descuadra cuando un nombre o un cargo es más largo de la cuenta.
+                          Se pueden acomodar arrastrando la línea entre dos títulos. */}
+                      {columnas.anchos.map((a, i) => (
+                        <col key={COLUMNAS_CONSULTAS[i].id} style={{ width: `${a}%` }} />
+                      ))}
                     </colgroup>
                     <thead>
                       <tr style={{ background: 'var(--bg-card)', borderBottom: '1px solid var(--border)' }}>
@@ -564,11 +578,14 @@ export default function WorkerProfilesPage() {
                           { label: 'Completitud',   col: 'completion_pct' },
                           { label: 'Qué le falta',  col: '' },
                           { label: 'Ver',           col: '' },
-                        ].map(({ label, col }) => (
+                        ].map(({ label, col }, i) => (
                           <th key={label} className="text-left px-3 py-2.5 font-semibold select-none"
-                            style={{ color: 'var(--text-dim)', cursor: col ? 'pointer' : 'default' }}
+                            style={{ color: 'var(--text-dim)', cursor: col ? 'pointer' : 'default', position: 'relative', overflow: 'hidden' }}
                             onClick={() => col && toggleSort(col)}>
                             <span className="flex items-center gap-1">{label}{col && <SortIcon col={col} />}</span>
+                            {i < COLUMNAS_CONSULTAS.length - 1 && (
+                              <ManijaColumna onArrastrar={e => columnas.empezarArrastre(i, e)} onRestablecer={columnas.restablecer} />
+                            )}
                           </th>
                         ))}
                       </tr>
