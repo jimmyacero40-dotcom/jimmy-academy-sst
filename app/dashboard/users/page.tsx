@@ -66,7 +66,7 @@ function colorForUser(id: string) {
 }
 
 const EMPTY_FORM = {
-  name: '', email: '', correo: '', password: '', empresa: '', area_id: '', role: '', cedula: '',
+  name: '', email: '', correo: '', password: '', empresa: '', area_id: '', cargo: '', cedula: '',
   status: 'activo' as UserStatus, emailManual: false, passwordManual: false, selectedGroups: [] as string[],
 }
 
@@ -323,6 +323,76 @@ type CampoOrden = 'name' | 'cedula' | 'status' | 'area_name' | 'cargo' | 'sede' 
  * entero: por eso el buscador perdía el foco a la primera letra. Declaradas
  * aquí, su identidad no cambia y el <input> sobrevive al filtrado.
  */
+/**
+ * Celda que se edita en la tabla y guarda al salir del campo.
+ *
+ * Antes cada celda era un <input> sin estado, con `defaultValue` y una `key`
+ * que incluía el valor guardado. Dos problemas:
+ *
+ *  - La fecha guardaba en `onChange`, y un <input type="date"> dispara ese
+ *    evento con cada tramo que se escribe. Al teclear el año 2026 se guardaba
+ *    el año 0002 apenas iba por la segunda cifra, la tabla se recargaba, la
+ *    `key` cambiaba, React desmontaba el campo y el cursor se perdía. De ahí
+ *    que tocara escribir dígito por dígito y que quedaran fechas absurdas.
+ *  - Al recargar la lista por cualquier motivo, la `key` cambiaba y se perdía
+ *    lo que se estuviera escribiendo.
+ *
+ * Aquí el valor es estado propio; solo se guarda al salir del campo o con
+ * Enter, y se vuelve a sincronizar con el dato de afuera únicamente cuando el
+ * campo no está en uso.
+ */
+/**
+ * Un año de dos cifras o uno que no existe no se guarda. No debería llegar
+ * ninguno ahora que la fecha se guarda al salir del campo, pero un dedo
+ * equivocado no tiene por qué dejar a alguien ingresando en el año 20.
+ */
+function fechaRazonable(v: string): string | null {
+  if (!v) return null
+  const anio = Number(v.slice(0, 4))
+  if (!Number.isFinite(anio) || anio < 1900 || anio > 2100) return null
+  return v
+}
+
+function CeldaEditable({ valor, onGuardar, deshabilitado, tipo = 'text', className = '', style, placeholder }: {
+  valor: string
+  onGuardar: (v: string) => void
+  deshabilitado?: boolean
+  tipo?: 'text' | 'date'
+  className?: string
+  style?: React.CSSProperties
+  placeholder?: string
+}) {
+  const [texto, setTexto] = useState(valor)
+  const enUso = useRef(false)
+
+  useEffect(() => {
+    if (!enUso.current) setTexto(valor)
+  }, [valor])
+
+  const guardar = () => {
+    const v = tipo === 'date' ? texto : texto.trim()
+    if (v !== valor) onGuardar(v)
+  }
+
+  return (
+    <input
+      type={tipo}
+      value={texto}
+      disabled={deshabilitado}
+      placeholder={placeholder}
+      onFocus={() => { enUso.current = true }}
+      onChange={e => setTexto(e.target.value)}
+      onKeyDown={e => {
+        if (e.key === 'Enter') (e.target as HTMLInputElement).blur()
+        if (e.key === 'Escape') { setTexto(valor); enUso.current = false; (e.target as HTMLInputElement).blur() }
+      }}
+      onBlur={() => { enUso.current = false; guardar() }}
+      className={className}
+      style={style}
+    />
+  )
+}
+
 function TH({ children, className = '' }: { children: React.ReactNode; className?: string }) {
   return (
     <th className={`px-3 py-0 text-left align-top ${className}`}
@@ -565,7 +635,7 @@ export default function UsersPage() {
 
   const openEdit = async (u: AppUser) => {
     setEditUser(u)
-    setForm({ name: u.name, email: u.email || '', correo: u.correo || '', password: '', empresa: u.empresa, area_id: u.area_id || '', role: u.role, cedula: u.cedula, status: u.status, emailManual: true, passwordManual: true, selectedGroups: [] })
+    setForm({ name: u.name, email: u.email || '', correo: u.correo || '', password: '', empresa: u.empresa, area_id: u.area_id || '', cargo: u.cargo || '', cedula: u.cedula, status: u.status, emailManual: true, passwordManual: true, selectedGroups: [] })
     setFormErrors({}); setIsDirty(false); setConfirmClose(false); setShowModal(true)
     setLoadingGroups(true)
     try {
@@ -594,13 +664,13 @@ export default function UsersPage() {
     try {
       const areaText = areas.find(a => a.id === form.area_id)?.name || form.empresa
       if (editUser) {
-        const body: any = { id: editUser.id, name: form.name, email: form.email, correo: form.correo.trim() || null, cedula: form.cedula, area: areaText, active: form.status === 'activo' }
+        const body: any = { id: editUser.id, name: form.name, email: form.email, correo: form.correo.trim() || null, cedula: form.cedula, cargo: form.cargo.trim() || null, area: areaText, active: form.status === 'activo' }
         if (form.password.trim()) body.password = form.password
         const res = await fetch('/api/users', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
         if (!res.ok) { const d = await res.json(); setFormErrors({ name: d.error || 'Error al guardar' }); setSaving(false); return }
         await fetch(`/api/users/${editUser.id}/groups`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ group_ids: form.selectedGroups }) })
       } else {
-        const res = await fetch('/api/users', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: form.name, email: form.email, correo: form.correo.trim() || null, password: form.password.trim(), cedula: form.cedula, role: 'worker', area: areaText }) })
+        const res = await fetch('/api/users', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: form.name, email: form.email, correo: form.correo.trim() || null, password: form.password.trim(), cedula: form.cedula, cargo: form.cargo.trim() || null, role: 'worker', area: areaText }) })
         if (!res.ok) { const d = await res.json(); setFormErrors({ email: d.error || 'Error al crear' }); setSaving(false); return }
         const created = await res.json()
         if (form.selectedGroups.length && created.id) {
@@ -1283,13 +1353,11 @@ export default function UsersPage() {
                       {/* Cargo — editable por superadmin */}
                       <td className="px-4 py-3">
                         {isSuperadmin ? (
-                          <input
-                            key={`cargo-${u.id}-${u.cargo}`}
-                            defaultValue={u.cargo}
-                            disabled={cellSaving === u.id}
+                          <CeldaEditable
+                            valor={u.cargo}
+                            onGuardar={v => autoSaveCargo(u.id, v)}
+                            deshabilitado={cellSaving === u.id}
                             placeholder="—"
-                            onKeyDown={e => { if (e.key === 'Enter') (e.target as HTMLInputElement).blur() }}
-                            onBlur={e => { const v = e.target.value.trim(); if (v !== u.cargo) autoSaveCargo(u.id, v) }}
                             className="w-full text-[12px] rounded-lg px-2 py-1 bg-transparent outline-none border border-transparent transition-colors hover:border-[var(--border)] focus:border-[var(--primary-border)] focus:bg-[var(--bg-card)]"
                             style={{ color: u.cargo ? 'var(--text-dim)' : 'var(--text-faint)' }}
                           />
@@ -1324,13 +1392,11 @@ export default function UsersPage() {
                       {/* Sede — centro de trabajo del perfil, editable por superadmin */}
                       <td className="px-4 py-3">
                         {isSuperadmin ? (
-                          <input
-                            key={`sede-${u.id}-${u.sede}`}
-                            defaultValue={u.sede}
-                            disabled={cellSaving === u.id}
+                          <CeldaEditable
+                            valor={u.sede}
+                            onGuardar={v => autoSavePerfil(u.id, { centro_trabajo: v || null })}
+                            deshabilitado={cellSaving === u.id}
                             placeholder="—"
-                            onKeyDown={e => { if (e.key === 'Enter') (e.target as HTMLInputElement).blur() }}
-                            onBlur={e => { const v = e.target.value.trim(); if (v !== u.sede) autoSavePerfil(u.id, { centro_trabajo: v || null }) }}
                             className="w-full text-[12px] rounded-lg px-2 py-1 bg-transparent outline-none border border-transparent transition-colors hover:border-[var(--border)] focus:border-[var(--primary-border)] focus:bg-[var(--bg-card)]"
                             style={{ color: u.sede ? 'var(--text-dim)' : 'var(--text-faint)' }}
                           />
@@ -1353,12 +1419,11 @@ export default function UsersPage() {
                       {/* Fecha de ingreso — editable por superadmin */}
                       <td className="px-4 py-3">
                         {isSuperadmin ? (
-                          <input
-                            type="date"
-                            key={`fi-${u.id}-${u.fechaIngreso}`}
-                            defaultValue={u.fechaIngreso}
-                            disabled={cellSaving === u.id}
-                            onChange={e => { const v = e.target.value; if (v !== u.fechaIngreso) autoSavePerfil(u.id, { fecha_ingreso: v || null }) }}
+                          <CeldaEditable
+                            tipo="date"
+                            valor={u.fechaIngreso}
+                            onGuardar={v => autoSavePerfil(u.id, { fecha_ingreso: fechaRazonable(v) })}
+                            deshabilitado={cellSaving === u.id}
                             className="w-full text-[12px] tabular-nums rounded-lg px-2 py-1 bg-transparent outline-none border border-transparent transition-colors hover:border-[var(--border)] focus:border-[var(--primary-border)] focus:bg-[var(--bg-card)]"
                             style={{ color: u.fechaIngreso ? 'var(--text-dim)' : 'var(--text-faint)' }}
                           />
@@ -1573,7 +1638,7 @@ export default function UsersPage() {
                   { key: 'cedula', label: 'Cédula *',                                  placeholder: '1052392965',           mono: true,  type: 'text'  },
                   { key: 'email',  label: 'Usuario * (con esto entra a la plataforma)', placeholder: '1052392965', mono: true,  type: 'text'  },
                   { key: 'correo', label: 'Correo electrónico (dato de contacto)',   placeholder: 'juan.perez@empresa.com',      mono: false, type: 'email' },
-                  { key: 'role',   label: 'Cargo',                                  placeholder: 'SUPERVISOR DE MONTAJE',      mono: false, type: 'text'  },
+                  { key: 'cargo',  label: 'Cargo',                                  placeholder: 'SUPERVISOR DE MONTAJE',      mono: false, type: 'text'  },
                 ] as const).map(({ key, label, placeholder, mono, type }) => (
                   <div key={key}>
                     <label className="text-xs font-semibold mb-1.5 block" style={{ color: 'var(--text-dim)' }}>{label}</label>
@@ -1582,7 +1647,7 @@ export default function UsersPage() {
                         const val = key === 'cedula' ? e.target.value.replace(/\D/g, '') : e.target.value
                         if (key === 'name') { setForm(f => ({ ...f, name: val.toUpperCase() })) }
                         else if (key === 'cedula') { setForm(f => ({ ...f, cedula: val, ...(f.passwordManual ? {} : { password: val }), ...(f.emailManual ? {} : { email: val }) })) }
-                        else if (key === 'role') { setForm(f => ({ ...f, role: val.toUpperCase() })) }
+                        else if (key === 'cargo') { setForm(f => ({ ...f, cargo: val.toUpperCase() })) }
                         else if (key === 'email') { setForm(f => ({ ...f, email: e.target.value, emailManual: true })) }
                         else { setForm(f => ({ ...f, [key]: val })) }
                       }}
