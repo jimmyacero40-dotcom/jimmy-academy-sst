@@ -12,7 +12,7 @@ import {
   Users, Search, MoreVertical, CheckCircle,
   Building2, X, Edit2, Trash2, Download, ChevronDown,
   UserPlus, FileSpreadsheet, AlertCircle, Loader2,
-  Layers, UserCheck, Tag, Eye, BookOpen, UserX, QrCode, Check, GraduationCap, Wand2, Columns3,
+  Layers, UserCheck, Tag, Eye, BookOpen, UserX, QrCode, Check, GraduationCap, Wand2, Columns3, Briefcase, CalendarDays,
 } from 'lucide-react'
 
 type UserStatus = 'activo' | 'inactivo' | 'pendiente' | 'rechazado'
@@ -218,6 +218,43 @@ function nombreDelMes(ym: string): string {
   const [a, m] = ym.split('-')
   const nombre = new Date(Number(a), Number(m) - 1, 1).toLocaleDateString('es-CO', { month: 'long' })
   return `${nombre} ${a}`
+}
+
+/**
+ * Un filtro de la barra superior. Antes cada filtro vivía dentro del título de
+ * su columna: el encabezado quedaba cargado, se partía en dos renglones y al
+ * angostar una columna el filtro se volvía inservible. Arriba se leen todos de
+ * una pasada y las columnas quedan para lo suyo, que es ordenar.
+ */
+function FiltroBarra({ value, onChange, options, placeholder, icono: Icono }: {
+  value: string; onChange: (v: string) => void
+  options: { value: string; label: string }[]; placeholder: string
+  icono?: React.ComponentType<{ size?: string | number; style?: React.CSSProperties }>
+}) {
+  const activo = !!value
+  return (
+    <div className="relative">
+      {Icono && (
+        <Icono size={12} style={{
+          position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)',
+          pointerEvents: 'none', color: activo ? 'var(--primary)' : 'var(--text-faint)',
+        }} />
+      )}
+      <select value={value} onChange={e => onChange(e.target.value)}
+        className={`text-xs rounded-lg py-2 pr-7 appearance-none cursor-pointer outline-none transition-all ${Icono ? 'pl-7' : 'pl-3'}`}
+        style={{
+          background: activo ? 'var(--primary-dim)' : 'var(--bg-card)',
+          border: `1px solid ${activo ? 'var(--primary-border)' : 'var(--border)'}`,
+          color: activo ? 'var(--primary)' : 'var(--text-dim)',
+          maxWidth: 190,
+        }}>
+        <option value="">{placeholder}</option>
+        {options.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
+      </select>
+      <ChevronDown size={11} className="absolute right-2 top-1/2 -translate-y-1/2 pointer-events-none"
+        style={{ color: activo ? 'var(--primary)' : 'var(--text-faint)' }} />
+    </div>
+  )
 }
 
 // ── Compact filter select ────────────────────────────────────────────────────
@@ -439,7 +476,7 @@ function EtiquetaColumna({ children, field, sortField, sortDir, onSort }: {
 }) {
   if (!field) {
     return (
-      <span className="text-[10px] font-semibold uppercase tracking-widest block leading-tight min-h-[26px]" style={{ color: 'var(--text-faint)' }}>
+      <span className="text-[10px] font-semibold uppercase tracking-widest block leading-tight" style={{ color: 'var(--text-faint)' }}>
         {children}
       </span>
     )
@@ -497,10 +534,8 @@ export default function UsersPage() {
   const [filterSede, setFilterSede]   = useState('')
   // Toda columna se puede filtrar: antes solo área, sede, grupos y estado
   // tenían filtro, y para buscar por cargo tocaba revisar la lista a ojo.
-  const [filterCedula, setFilterCedula] = useState('')
   const [filterCargo, setFilterCargo]   = useState('')
   const [filterMes, setFilterMes]       = useState('')
-  const [filterCorreo, setFilterCorreo] = useState('')
 
   const [selected, setSelected] = useState<Set<string>>(new Set())
 
@@ -564,19 +599,22 @@ export default function UsersPage() {
   }, [])
 
   const filtered = users.filter(u => {
-    const q = search.toLowerCase()
-    if (q && !u.name.toLowerCase().includes(q) && !u.cedula.includes(q) && !u.role.toLowerCase().includes(q) && !u.empresa.toLowerCase().includes(q)) return false
+    // Un solo buscador para todo lo que es texto: nombre, documento y correo.
+    // Tenerlos como filtros aparte en cada columna obligaba a saber de antemano
+    // en cuál de las tres estaba lo que se buscaba.
+    const q = search.trim().toLowerCase()
+    if (q) {
+      const texto = `${u.name} ${u.cedula} ${u.correo ?? ''} ${u.cargo ?? ''} ${u.empresa ?? ''}`.toLowerCase()
+      if (!texto.includes(q)) return false
+    }
     if (filterStatus && u.status !== filterStatus) return false
     if (filterArea && u.area_id !== filterArea) return false
     if (filterGroup && !u.groups.some(g => g.id === filterGroup)) return false
     if (filterRole && u.role.toLowerCase() !== filterRole.toLowerCase()) return false
     if (filterSede && (filterSede === '__sin__' ? !!u.sede : u.sede !== filterSede)) return false
-    if (filterCedula && !u.cedula.includes(filterCedula.trim())) return false
     if (filterCargo && (filterCargo === '__sin__' ? !!u.cargo : u.cargo !== filterCargo)) return false
     // La fecha viene como YYYY-MM-DD, así que el mes son sus siete primeros caracteres.
     if (filterMes && (filterMes === '__sin__' ? !!u.fechaIngreso : u.fechaIngreso.slice(0, 7) !== filterMes)) return false
-    // Se busca sobre el correo de contacto, que es lo que muestra la columna.
-    if (filterCorreo && !(u.correo ?? '').toLowerCase().includes(filterCorreo.trim().toLowerCase())) return false
     return true
   })
 
@@ -647,7 +685,7 @@ export default function UsersPage() {
     } finally { setAsignando(false) }
   }
 
-  const hasFilters    = !!(search || filterStatus || filterArea || filterGroup || filterRole || filterSede || filterCedula || filterCargo || filterMes || filterCorreo)
+  const hasFilters    = !!(search || filterStatus || filterArea || filterGroup || filterRole || filterSede || filterCargo || filterMes)
 
   // ── CRUD ─────────────────────────────────────────────────────────────────
   const closeModal = () => { setShowModal(false); setIsDirty(false); setConfirmClose(false) }
@@ -963,7 +1001,7 @@ export default function UsersPage() {
 
         <div className="flex items-center gap-2">
           {hasFilters && (
-            <button onClick={() => { setSearch(''); setFilterStatus(''); setFilterArea(''); setFilterGroup(''); setFilterRole(''); setFilterSede(''); setFilterCedula(''); setFilterCargo(''); setFilterMes(''); setFilterCorreo(''); setSortField('name'); setSortDir('asc') }}
+            <button onClick={() => { setSearch(''); setFilterStatus(''); setFilterArea(''); setFilterGroup(''); setFilterRole(''); setFilterSede(''); setFilterCargo(''); setFilterMes(''); setSortField('name'); setSortDir('asc') }}
               className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs transition-all"
               style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', color: 'var(--text-dim)' }}>
               <X size={11} /> Limpiar filtros
@@ -1048,6 +1086,78 @@ export default function UsersPage() {
           )}
         </div>
       )}
+
+      {/* ── Filtros, todos juntos arriba ───────────────────────────────
+          Antes vivían dentro del título de cada columna. Eso cargaba el
+          encabezado, partía los títulos en dos renglones y dejaba el filtro
+          inservible al angostar una columna. Arriba se leen de una pasada y
+          las columnas quedan solo con su ordenador. */}
+      <div className="terra-card mb-4 px-3 py-2.5 flex flex-wrap items-center gap-2">
+        <div className="relative flex-1" style={{ minWidth: 240 }}>
+          <Search size={13} className="absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none"
+            style={{ color: 'var(--text-faint)' }} />
+          <input
+            value={search} onChange={e => setSearch(e.target.value)}
+            placeholder="Buscar por nombre, cédula, cargo o correo…"
+            className="w-full text-xs rounded-lg pl-8 pr-8 py-2 outline-none transition-colors"
+            style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', color: 'var(--text)' }}
+            onFocus={e => e.currentTarget.style.borderColor = 'var(--primary-border)'}
+            onBlur={e => e.currentTarget.style.borderColor = 'var(--border)'}
+          />
+          {search && (
+            <button onClick={() => setSearch('')} className="absolute right-2.5 top-1/2 -translate-y-1/2"
+              style={{ color: 'var(--text-faint)' }}><X size={12} /></button>
+          )}
+        </div>
+
+        <FiltroBarra
+          value={filterCargo} onChange={setFilterCargo} placeholder="Todos los cargos" icono={Briefcase}
+          options={[
+            ...[...new Set(users.map(u => u.cargo).filter(Boolean))]
+              .sort((a, b) => a.localeCompare(b, 'es')).map(c => ({ value: c, label: c })),
+            { value: '__sin__', label: 'Sin cargo' },
+          ]}
+        />
+        <FiltroBarra
+          value={filterArea} onChange={setFilterArea} placeholder="Todas las áreas" icono={Layers}
+          options={areas.map(a => ({ value: a.id, label: a.name }))}
+        />
+        <FiltroBarra
+          value={filterSede} onChange={setFilterSede} placeholder="Todas las sedes" icono={Building2}
+          options={[
+            ...[...new Set(users.map(u => u.sede).filter(Boolean))]
+              .sort((a, b) => a.localeCompare(b, 'es')).map(s => ({ value: s, label: s })),
+            { value: '__sin__', label: 'Sin sede' },
+          ]}
+        />
+        <FiltroBarra
+          value={filterGroup} onChange={setFilterGroup} placeholder="Todos los grupos" icono={Tag}
+          options={groups.map(g => ({ value: g.id, label: g.name }))}
+        />
+        <FiltroBarra
+          value={filterMes} onChange={setFilterMes} placeholder="Cualquier ingreso" icono={CalendarDays}
+          options={[
+            ...[...new Set(users.map(u => u.fechaIngreso).filter(Boolean).map(f => f.slice(0, 7)))]
+              .sort().reverse().map(m => ({ value: m, label: nombreDelMes(m) })),
+            { value: '__sin__', label: 'Sin fecha' },
+          ]}
+        />
+        <FiltroBarra
+          value={filterStatus} onChange={setFilterStatus} placeholder="Todos los estados" icono={UserCheck}
+          options={[
+            { value: 'activo', label: 'Activo' },
+            { value: 'pendiente', label: 'Pendiente de validación' },
+            { value: 'rechazado', label: 'Rechazado' },
+            { value: 'inactivo', label: 'Inactivo' },
+          ]}
+        />
+
+        <span className="text-[11px] ml-auto" style={{ color: 'var(--text-faint)' }}>
+          {sorted.length === users.length
+            ? `${users.length} trabajadores`
+            : `${sorted.length} de ${users.length} trabajadores`}
+        </span>
+      </div>
 
       {corrigiendo && (
         <CorreccionRapida
@@ -1233,102 +1343,46 @@ export default function UsersPage() {
                   {/* Trabajador + search */}
                   <TH manija={<ManijaColumna onArrastrar={e => columnas.empezarArrastre(1, e)} onRestablecer={columnas.restablecer} />}>
                     <EtiquetaColumna field="name" {...ordenar}>Trabajador</EtiquetaColumna>
-                    <FilterInput value={search} onChange={setSearch} placeholder="Buscar..." />
                   </TH>
 
                   {/* Cédula */}
                   <TH manija={<ManijaColumna onArrastrar={e => columnas.empezarArrastre(2, e)} onRestablecer={columnas.restablecer} />}>
                     <EtiquetaColumna field="cedula" {...ordenar}>Cédula</EtiquetaColumna>
-                    <FilterInput value={filterCedula} onChange={setFilterCedula} placeholder="Documento" />
                   </TH>
 
                   {/* Cargo */}
                   <TH manija={<ManijaColumna onArrastrar={e => columnas.empezarArrastre(3, e)} onRestablecer={columnas.restablecer} />}>
                     <EtiquetaColumna field="cargo" {...ordenar}>Cargo</EtiquetaColumna>
-                    {/* Los cargos salen de los datos, no de una lista fija: así aparecen
-                        todos los que existen de verdad, incluidos los mal escritos. */}
-                    <FilterSelect
-                      value={filterCargo} onChange={setFilterCargo}
-                      placeholder="Todos"
-                      options={[
-                        ...[...new Set(users.map(u => u.cargo).filter(Boolean))]
-                          .sort((a, b) => a.localeCompare(b, 'es'))
-                          .map(c => ({ value: c, label: c })),
-                        { value: '__sin__', label: 'Sin cargo' },
-                      ]}
-                    />
                   </TH>
 
                   {/* Área */}
                   <TH manija={<ManijaColumna onArrastrar={e => columnas.empezarArrastre(4, e)} onRestablecer={columnas.restablecer} />}>
                     <EtiquetaColumna field="area_name" {...ordenar}>Área</EtiquetaColumna>
-                    <FilterSelect
-                      value={filterArea} onChange={setFilterArea}
-                      placeholder="Todas"
-                      options={areas.map(a => ({ value: a.id, label: a.name }))}
-                    />
                   </TH>
 
                   {/* Sede */}
                   <TH manija={<ManijaColumna onArrastrar={e => columnas.empezarArrastre(5, e)} onRestablecer={columnas.restablecer} />}>
                     <EtiquetaColumna field="sede" {...ordenar}>Sede</EtiquetaColumna>
-                    {/* Opciones tomadas de los datos reales, no de una lista fija. */}
-                    <FilterSelect
-                      value={filterSede} onChange={setFilterSede}
-                      placeholder="Todas"
-                      options={[
-                        ...[...new Set(users.map(u => u.sede).filter(Boolean))].sort((a, b) => a.localeCompare(b, 'es')).map(s => ({ value: s, label: s })),
-                        { value: '__sin__', label: 'Sin sede' },
-                      ]}
-                    />
                   </TH>
 
                   {/* Grupos */}
                   <TH manija={<ManijaColumna onArrastrar={e => columnas.empezarArrastre(6, e)} onRestablecer={columnas.restablecer} />}>
                     <EtiquetaColumna {...ordenar}>Grupos</EtiquetaColumna>
-                    <FilterSelect
-                      value={filterGroup} onChange={setFilterGroup}
-                      placeholder="Todos"
-                      options={groups.map(g => ({ value: g.id, label: g.name }))}
-                    />
                   </TH>
 
                   {/* Fecha de ingreso */}
                   <TH manija={<ManijaColumna onArrastrar={e => columnas.empezarArrastre(7, e)} onRestablecer={columnas.restablecer} />}>
                     <EtiquetaColumna field="fechaIngreso" {...ordenar}>Fecha de ingreso</EtiquetaColumna>
-                    {/* Por mes, que es como se consulta: quién entró en tal mes. Un
-                        rango de fechas no cabe en el ancho de la columna. */}
-                    <FilterSelect
-                      value={filterMes} onChange={setFilterMes}
-                      placeholder="Todas"
-                      options={[
-                        ...[...new Set(users.map(u => u.fechaIngreso).filter(Boolean).map(f => f.slice(0, 7)))]
-                          .sort().reverse()
-                          .map(m => ({ value: m, label: nombreDelMes(m) })),
-                        { value: '__sin__', label: 'Sin fecha' },
-                      ]}
-                    />
                   </TH>
 
                   {/* Estado */}
                   <TH manija={<ManijaColumna onArrastrar={e => columnas.empezarArrastre(8, e)} onRestablecer={columnas.restablecer} />}>
                     <EtiquetaColumna field="status" {...ordenar}>Estado</EtiquetaColumna>
-                    <FilterSelect
-                      value={filterStatus} onChange={setFilterStatus}
-                      placeholder="Todos"
-                      options={[
-                        { value: 'activo', label: 'Activo' },
-                        { value: 'pendiente', label: 'Pendiente de validación' },
-                        { value: 'rechazado', label: 'Rechazado' },
-                        { value: 'inactivo', label: 'Inactivo' },
-                      ]}
-                    />
                   </TH>
 
                   {/* Correo */}
                   <TH manija={<ManijaColumna onArrastrar={e => columnas.empezarArrastre(9, e)} onRestablecer={columnas.restablecer} />}>
                     <EtiquetaColumna {...ordenar}>Correo</EtiquetaColumna>
-                    <FilterInput value={filterCorreo} onChange={setFilterCorreo} placeholder="Correo" />
                   </TH>
 
                   {/* Acciones */}
