@@ -193,6 +193,13 @@ function FilterInput({ value, onChange, placeholder }: {
   )
 }
 
+/** '2026-10' → 'octubre 2026', para el filtro de fecha de ingreso. */
+function nombreDelMes(ym: string): string {
+  const [a, m] = ym.split('-')
+  const nombre = new Date(Number(a), Number(m) - 1, 1).toLocaleDateString('es-CO', { month: 'long' })
+  return `${nombre} ${a}`
+}
+
 // ── Compact filter select ────────────────────────────────────────────────────
 function FilterSelect({ value, onChange, options, placeholder }: {
   value: string; onChange: (v: string) => void
@@ -337,14 +344,14 @@ function EtiquetaColumna({ children, field, sortField, sortDir, onSort }: {
 }) {
   if (!field) {
     return (
-      <span className="text-[10px] font-semibold uppercase tracking-widest block" style={{ color: 'var(--text-faint)' }}>
+      <span className="text-[10px] font-semibold uppercase tracking-widest block leading-tight min-h-[26px]" style={{ color: 'var(--text-faint)' }}>
         {children}
       </span>
     )
   }
   return (
     <button onClick={() => onSort(field)}
-      className="flex items-center gap-0.5 text-[10px] font-semibold uppercase tracking-widest transition-colors hover:opacity-80"
+      className="flex items-start gap-0.5 text-left text-[10px] font-semibold uppercase tracking-widest leading-tight min-h-[26px] transition-colors hover:opacity-80"
       style={{ color: sortField === field ? 'var(--primary)' : 'var(--text-faint)' }}>
       {children}<SortIcon field={field} sortField={sortField} sortDir={sortDir} />
     </button>
@@ -393,6 +400,12 @@ export default function UsersPage() {
   const [filterGroup, setFilterGroup] = useState('')
   const [filterRole, setFilterRole]   = useState('')
   const [filterSede, setFilterSede]   = useState('')
+  // Toda columna se puede filtrar: antes solo área, sede, grupos y estado
+  // tenían filtro, y para buscar por cargo tocaba revisar la lista a ojo.
+  const [filterCedula, setFilterCedula] = useState('')
+  const [filterCargo, setFilterCargo]   = useState('')
+  const [filterMes, setFilterMes]       = useState('')
+  const [filterCorreo, setFilterCorreo] = useState('')
 
   const [selected, setSelected] = useState<Set<string>>(new Set())
 
@@ -459,6 +472,12 @@ export default function UsersPage() {
     if (filterGroup && !u.groups.some(g => g.id === filterGroup)) return false
     if (filterRole && u.role.toLowerCase() !== filterRole.toLowerCase()) return false
     if (filterSede && (filterSede === '__sin__' ? !!u.sede : u.sede !== filterSede)) return false
+    if (filterCedula && !u.cedula.includes(filterCedula.trim())) return false
+    if (filterCargo && (filterCargo === '__sin__' ? !!u.cargo : u.cargo !== filterCargo)) return false
+    // La fecha viene como YYYY-MM-DD, así que el mes son sus siete primeros caracteres.
+    if (filterMes && (filterMes === '__sin__' ? !!u.fechaIngreso : u.fechaIngreso.slice(0, 7) !== filterMes)) return false
+    // Se busca sobre el correo de contacto, que es lo que muestra la columna.
+    if (filterCorreo && !(u.correo ?? '').toLowerCase().includes(filterCorreo.trim().toLowerCase())) return false
     return true
   })
 
@@ -529,7 +548,7 @@ export default function UsersPage() {
     } finally { setAsignando(false) }
   }
 
-  const hasFilters    = !!(search || filterStatus || filterArea || filterGroup || filterRole || filterSede)
+  const hasFilters    = !!(search || filterStatus || filterArea || filterGroup || filterRole || filterSede || filterCedula || filterCargo || filterMes || filterCorreo)
 
   // ── CRUD ─────────────────────────────────────────────────────────────────
   const closeModal = () => { setShowModal(false); setIsDirty(false); setConfirmClose(false) }
@@ -804,7 +823,7 @@ export default function UsersPage() {
 
         <div className="flex items-center gap-2">
           {hasFilters && (
-            <button onClick={() => { setSearch(''); setFilterStatus(''); setFilterArea(''); setFilterGroup(''); setFilterRole(''); setFilterSede(''); setSortField('name'); setSortDir('asc') }}
+            <button onClick={() => { setSearch(''); setFilterStatus(''); setFilterArea(''); setFilterGroup(''); setFilterRole(''); setFilterSede(''); setFilterCedula(''); setFilterCargo(''); setFilterMes(''); setFilterCorreo(''); setSortField('name'); setSortDir('asc') }}
               className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs transition-all"
               style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', color: 'var(--text-dim)' }}>
               <X size={11} /> Limpiar filtros
@@ -1058,13 +1077,24 @@ export default function UsersPage() {
                   {/* Cédula */}
                   <TH>
                     <EtiquetaColumna field="cedula" {...ordenar}>Cédula</EtiquetaColumna>
-                    <div className="mt-1.5 h-6" />
+                    <FilterInput value={filterCedula} onChange={setFilterCedula} placeholder="Documento" />
                   </TH>
 
                   {/* Cargo */}
                   <TH>
                     <EtiquetaColumna field="cargo" {...ordenar}>Cargo</EtiquetaColumna>
-                    <div className="mt-1.5 h-6" />
+                    {/* Los cargos salen de los datos, no de una lista fija: así aparecen
+                        todos los que existen de verdad, incluidos los mal escritos. */}
+                    <FilterSelect
+                      value={filterCargo} onChange={setFilterCargo}
+                      placeholder="Todos"
+                      options={[
+                        ...[...new Set(users.map(u => u.cargo).filter(Boolean))]
+                          .sort((a, b) => a.localeCompare(b, 'es'))
+                          .map(c => ({ value: c, label: c })),
+                        { value: '__sin__', label: 'Sin cargo' },
+                      ]}
+                    />
                   </TH>
 
                   {/* Área */}
@@ -1104,7 +1134,18 @@ export default function UsersPage() {
                   {/* Fecha de ingreso */}
                   <TH>
                     <EtiquetaColumna field="fechaIngreso" {...ordenar}>Fecha de ingreso</EtiquetaColumna>
-                    <div className="mt-1.5 h-6" />
+                    {/* Por mes, que es como se consulta: quién entró en tal mes. Un
+                        rango de fechas no cabe en el ancho de la columna. */}
+                    <FilterSelect
+                      value={filterMes} onChange={setFilterMes}
+                      placeholder="Todas"
+                      options={[
+                        ...[...new Set(users.map(u => u.fechaIngreso).filter(Boolean).map(f => f.slice(0, 7)))]
+                          .sort().reverse()
+                          .map(m => ({ value: m, label: nombreDelMes(m) })),
+                        { value: '__sin__', label: 'Sin fecha' },
+                      ]}
+                    />
                   </TH>
 
                   {/* Estado */}
@@ -1125,11 +1166,11 @@ export default function UsersPage() {
                   {/* Correo */}
                   <TH>
                     <EtiquetaColumna {...ordenar}>Correo</EtiquetaColumna>
-                    <div className="mt-1.5 h-6" />
+                    <FilterInput value={filterCorreo} onChange={setFilterCorreo} placeholder="Correo" />
                   </TH>
 
                   {/* Acciones */}
-                  <th className="px-4 py-3 text-right align-middle" style={{ borderBottom: '1px solid var(--border)' }}>
+                  <th className="px-4 py-3 text-center align-middle" style={{ borderBottom: '1px solid var(--border)' }}>
                     <span className="text-[10px] font-semibold uppercase tracking-widest" style={{ color: 'var(--text-faint)' }}>Acciones</span>
                   </th>
                 </tr>
@@ -1279,7 +1320,7 @@ export default function UsersPage() {
                         {/* Un pre-registro se revisa antes que nada: sus botones
                             se ven siempre, no solo al pasar el ratón. */}
                         {u.estadoRegistro === 'pendiente' && (
-                          <div className="flex items-center justify-end gap-1 mb-1">
+                          <div className="flex items-center justify-center gap-1 mb-1">
                             <button onClick={() => validar(u, 'aprobar')} disabled={validando === u.id}
                               title="Aprobar este registro"
                               className="w-7 h-7 rounded-lg flex items-center justify-center"
@@ -1294,7 +1335,7 @@ export default function UsersPage() {
                             </button>
                           </div>
                         )}
-                        <div className="flex items-center justify-end gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
+                        <div className="flex items-center justify-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
                           <button onClick={() => router.push(`/dashboard/users/${u.id}`)}
                             title="Ver hoja de vida"
                             className="w-7 h-7 rounded-lg flex items-center justify-center transition-colors"
