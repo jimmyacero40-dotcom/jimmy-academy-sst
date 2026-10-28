@@ -13,8 +13,11 @@ export interface WP {
   dependientes_economicos?: number; cabeza_hogar?: boolean
   nivel_educativo?: string; profesion?: string; actualmente_estudia?: boolean
   cargo_confirmado?: string; area_confirmada?: string; tipo_contrato?: string
-  jornada_laboral?: string; fecha_ingreso?: string; centro_trabajo?: string
-  realiza_horas_extras?: boolean; trabaja_fines_semana?: boolean; horario_habitual?: string
+  // Picaduras de abejas y avispas: riesgo prioritario de la operación.
+  picadura_abeja?: string; sintomas_picadura?: string[]
+  alergia_picadura_dx?: string; urgencia_picadura?: string
+  recomendacion_picadura?: string; recomendacion_picadura_detalle?: string
+  fecha_ingreso?: string; centro_trabajo?: string
   medio_transporte?: string; tiempo_desplazamiento?: string
   conduce_vehiculo?: boolean; tipo_vehiculo?: string
   estatura_cm?: number; peso_kg?: number
@@ -89,9 +92,6 @@ export interface Analytics {
   areas: FreqRow[]
   cargos: FreqRow[]
   tipoContrato: FreqRow[]
-  jornadaLaboral: FreqRow[]
-  horasExtras: BoolStat
-  trabFinesSemana: BoolStat
   // ── desplazamiento ──
   medioTransporte: FreqRow[]
   tiempoDesplaz: FreqRow[]
@@ -230,9 +230,6 @@ export function computeAnalytics(profiles: WP[]): Analytics {
     areas: freq(profiles.map(w => w.area_confirmada || w.users?.area)),
     cargos: freq(profiles.map(w => w.cargo_confirmado)),
     tipoContrato: freq(profiles.map(w => w.tipo_contrato)),
-    jornadaLaboral: freq(profiles.map(w => w.jornada_laboral)),
-    horasExtras: boolStat(profiles, w => w.realiza_horas_extras),
-    trabFinesSemana: boolStat(profiles, w => w.trabaja_fines_semana),
     medioTransporte: freq(profiles.map(w => w.medio_transporte)),
     tiempoDesplaz: freq(profiles.map(w => w.tiempo_desplazamiento)),
     conduceVehiculo: boolStat(profiles, w => w.conduce_vehiculo),

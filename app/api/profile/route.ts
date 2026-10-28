@@ -63,7 +63,7 @@ const ALLOWED_COLS = new Set([
   'nivel_educativo','profesion','estudios_tecnicos','estudios_tecnologicos',
   'estudios_universitarios','especializacion','otros_estudios','cursos_certificados','actualmente_estudia',
   'cargo_confirmado','area_confirmada','centro_trabajo','jefe_inmediato','fecha_ingreso',
-  'tipo_contrato','jornada_laboral','horario_habitual','realiza_horas_extras','trabaja_fines_semana',
+  'tipo_contrato',
   'estatura_cm','peso_kg','talla_camisa','talla_pantalon','talla_overol',
   'talla_chaqueta','talla_impermeable','talla_zapato','talla_botas','talla_guantes','obs_tallas',
   'municipio_vivienda','medio_transporte','tiempo_desplazamiento','distancia_aprox',
@@ -84,6 +84,9 @@ const ALLOWED_COLS = new Set([
   'grupo_sanguineo','eps','arl','fondo_pension','caja_compensacion',
   'tiene_discapacidad','discapacidad_detalle','poblacion_vulnerable',
   'telefono_alterno','contacto_emergencia2','parentesco_contacto2','tel_contacto2',
+  // Picaduras de abejas y avispas: riesgo prioritario de la operación.
+  'picadura_abeja','sintomas_picadura','alergia_picadura_dx','urgencia_picadura',
+  'recomendacion_picadura','recomendacion_picadura_detalle',
 ])
 
 export async function PUT(req: NextRequest) {

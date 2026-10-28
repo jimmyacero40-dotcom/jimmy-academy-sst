@@ -6,7 +6,7 @@ import { useSession } from 'next-auth/react'
 import {
   User, Camera, CheckCircle, Clock, Loader2, Save,
   Heart, Briefcase, GraduationCap, Activity, Shield, Award,
-  FileText, Home, Car, ChevronRight, Info, AlertCircle, PenTool
+  FileText, Home, Car, ChevronRight, Info, AlertCircle, PenTool, AlertTriangle
 } from 'lucide-react'
 import { calcSections, calcPct, TOTAL_SECCIONES } from '@/lib/perfil-completitud'
 // La firma ya existe como pantalla propia; aquí se reutiliza tal cual.
@@ -36,8 +36,9 @@ interface ProfileData {
   actualmente_estudia?: Nullable<boolean>
   cargo_confirmado?: string; area_confirmada?: string; centro_trabajo?: string
   jefe_inmediato?: string; fecha_ingreso?: string; tipo_contrato?: string
-  jornada_laboral?: string; horario_habitual?: string
-  realiza_horas_extras?: Nullable<boolean>; trabaja_fines_semana?: Nullable<boolean>
+  picadura_abeja?: string; sintomas_picadura?: string[]
+  alergia_picadura_dx?: string; urgencia_picadura?: string
+  recomendacion_picadura?: string; recomendacion_picadura_detalle?: string
   estatura_cm?: number; peso_kg?: number
   talla_camisa?: string; talla_pantalon?: string
   talla_overol?: string; talla_chaqueta?: string; talla_impermeable?: string
@@ -144,13 +145,15 @@ function CheckGroup({ label, options, value, onChange, tip, otherValue, onOtherC
   label: string; options: string[]; value: string[]; onChange: (v: string[]) => void
   tip?: string; otherValue?: string; onOtherChange?: (v: string) => void; otherLabel?: string
 }) {
-  // "NINGUNA" es excluyente: responder que no aplica también es una respuesta, y
-  // así la sección queda completa en vez de parecer sin contestar.
-  const esNinguna = (o: string) => /^NINGUN[AO]$/.test(o.trim())
+  // Hay respuestas que excluyen a las demás: "ninguna", "nunca" y "no recuerda".
+  // Responder que no aplica también es una respuesta, y así la sección queda
+  // completa en vez de parecer sin contestar. Y evita el contrasentido de marcar
+  // "dificultad para respirar" junto con "nunca ha recibido una picadura".
+  const esExcluyente = (o: string) => /^(NINGUN[AO]|NUNCA .*|NO RECUERDA)$/.test(o.trim())
   const toggle = (opt: string) => {
     if (value.includes(opt)) return onChange(value.filter(x => x !== opt))
-    if (esNinguna(opt)) return onChange([opt])
-    onChange([...value.filter(x => !esNinguna(x)), opt])
+    if (esExcluyente(opt)) return onChange([opt])
+    onChange([...value.filter(x => !esExcluyente(x)), opt])
   }
   // detect if any selected option is an "OTRA/OTRO/OTRAS" variant
   const showOther = onOtherChange && value.some(v => /^OTRA[S]?$|^OTRO[S]?$/.test(v.trim()))
@@ -868,18 +871,6 @@ export default function MyProfilePage() {
                       {['TÉRMINO INDEFINIDO','TÉRMINO FIJO','OBRA O LABOR','PRESTACIÓN DE SERVICIOS','APRENDIZAJE','TEMPORAL'].map(o => <option key={o}>{o}</option>)}
                     </select>
                   </Field>
-                  <Field label="JORNADA LABORAL">
-                    <select value={data.jornada_laboral ?? ''} onChange={e => set('jornada_laboral', e.target.value)} className={inp}>
-                      <option value="">— Seleccionar —</option>
-                      {['DIURNA','NOCTURNA','MIXTA','POR TURNOS','FLEXIBLE','TELETRABAJO'].map(o => <option key={o}>{o}</option>)}
-                    </select>
-                  </Field>
-                  <Field label="HORARIO HABITUAL" tip="Ej: Lunes a viernes 7am - 5pm">
-                    <input className={inp} value={data.horario_habitual ?? ''}
-                      onChange={e => set('horario_habitual', UP(e.target.value))} placeholder="EJ: LUN-VIE 7AM - 5PM" spellCheck={false} />
-                  </Field>
-                  <BoolField label="¿HACE HORAS EXTRAS CON FRECUENCIA?" value={data.realiza_horas_extras ?? null} onChange={v => set('realiza_horas_extras', v)} />
-                  <BoolField label="¿TRABAJA FINES DE SEMANA?" value={data.trabaja_fines_semana ?? null} onChange={v => set('trabaja_fines_semana', v)} />
 
                   <p className="col-span-2 text-[11px] font-bold uppercase tracking-wider pt-2" style={{ color: 'var(--text-faint)' }}>🏥 Afiliaciones a seguridad social</p>
                   <Field label="EPS (SALUD)">
@@ -1126,6 +1117,64 @@ export default function MyProfilePage() {
                   otherValue={data.antecedentes_familiares_otra ?? ''}
                   onOtherChange={v => set('antecedentes_familiares_otra', v)}
                   otherLabel="¿QUÉ OTRA(S) ENFERMEDAD(ES) TIENEN SUS FAMILIARES?" />
+              </SectionCard>
+
+              {/* Las abejas son un riesgo prioritario de la operación: aquí queda
+                  constancia de quién ya fue picado, qué le pasó y si hay alergia
+                  diagnosticada. De ahí sale a quién vigilar de cerca en campo. */}
+              <SectionCard title="Picaduras de abejas y avispas" icon={AlertTriangle} accent="#F59E0B">
+                <div className="grid grid-cols-2 gap-4">
+                  <Field label="¿ALGUNA VEZ HA RECIBIDO UNA PICADURA DE ABEJA O AVISPA?">
+                    <select value={data.picadura_abeja ?? ''} onChange={e => set('picadura_abeja', e.target.value)} className={inp}>
+                      <option value="">— Seleccionar —</option>
+                      {['SÍ', 'NO', 'NO RECUERDA'].map(o => <option key={o}>{o}</option>)}
+                    </select>
+                  </Field>
+                  <Field label="¿UN PROFESIONAL DE LA SALUD LE HA DIAGNOSTICADO ALERGIA A ESTAS PICADURAS?">
+                    <select value={data.alergia_picadura_dx ?? ''} onChange={e => set('alergia_picadura_dx', e.target.value)} className={inp}>
+                      <option value="">— Seleccionar —</option>
+                      {['SÍ', 'NO', 'NO ESTÁ SEGURO'].map(o => <option key={o}>{o}</option>)}
+                    </select>
+                  </Field>
+
+                  <CheckGroup label="¿QUÉ SÍNTOMAS HA PRESENTADO DESPUÉS DE UNA PICADURA DE ABEJA O AVISPA?"
+                    tip="Selecciona todas las que apliquen"
+                    options={[
+                      'DOLOR, ENROJECIMIENTO O HINCHAZÓN EN LA ZONA DE LA PICADURA',
+                      'HINCHAZÓN EXTENSA EN LA ZONA AFECTADA',
+                      'RONCHAS O PICAZÓN EN DIFERENTES PARTES DEL CUERPO',
+                      'HINCHAZÓN DE LABIOS, LENGUA O GARGANTA',
+                      'DIFICULTAD PARA RESPIRAR',
+                      'MAREO INTENSO O DESMAYO',
+                      'NUNCA HA RECIBIDO UNA PICADURA DE ABEJA O AVISPA',
+                      'NO RECUERDA',
+                    ]}
+                    value={data.sintomas_picadura ?? []}
+                    onChange={v => setArr('sintomas_picadura', v)} />
+
+                  <Field label="¿HA REQUERIDO ATENCIÓN MÉDICA DE URGENCIA DESPUÉS DE UNA PICADURA?">
+                    <select value={data.urgencia_picadura ?? ''} onChange={e => set('urgencia_picadura', e.target.value)} className={inp}>
+                      <option value="">— Seleccionar —</option>
+                      {['SÍ', 'NO', 'NO RECUERDA'].map(o => <option key={o}>{o}</option>)}
+                    </select>
+                  </Field>
+                  <Field label="¿TIENE RECOMENDACIÓN MÉDICA O PRECAUCIONES ESPECIALES FRENTE A ESTAS PICADURAS?">
+                    <select value={data.recomendacion_picadura ?? ''} onChange={e => set('recomendacion_picadura', e.target.value)} className={inp}>
+                      <option value="">— Seleccionar —</option>
+                      {['SÍ', 'NO', 'NO ESTÁ SEGURO'].map(o => <option key={o}>{o}</option>)}
+                    </select>
+                  </Field>
+
+                  {/* Saber que tiene una recomendación sin saber cuál no sirve
+                      para protegerlo, así que se pregunta cuando responde que sí. */}
+                  {data.recomendacion_picadura === 'SÍ' && (
+                    <Field label="¿CUÁL ES ESA RECOMENDACIÓN O PRECAUCIÓN?" span2>
+                      <textarea className={`${inp} resize-none`} rows={2} value={data.recomendacion_picadura_detalle ?? ''}
+                        onChange={e => set('recomendacion_picadura_detalle', UP(e.target.value))}
+                        placeholder="EJ: DEBE CARGAR ADRENALINA AUTOINYECTABLE, NO ACERCARSE A LOS APIARIOS" spellCheck={false} />
+                    </Field>
+                  )}
+                </div>
               </SectionCard>
 
               <SectionCard title="Salud ocupacional" icon={Shield} accent="#F59E0B">

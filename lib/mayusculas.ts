@@ -25,7 +25,7 @@ export const CAMPOS_PERFIL = [
   'nivel_educativo', 'profesion', 'estudios_tecnicos', 'estudios_tecnologicos',
   'estudios_universitarios', 'especializacion', 'otros_estudios', 'cursos_certificados',
   'cargo_confirmado', 'area_confirmada', 'centro_trabajo', 'jefe_inmediato',
-  'tipo_contrato', 'jornada_laboral', 'horario_habitual',
+  'tipo_contrato',
   'medio_transporte', 'tiempo_desplazamiento', 'tipo_vehiculo', 'distancia_aprox',
   'tipo_actividad_fisica', 'consumo_alcohol', 'consume_psicoactivos',
   'categoria_licencia', 'otras_certificaciones',

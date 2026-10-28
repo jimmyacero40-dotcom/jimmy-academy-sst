@@ -101,10 +101,6 @@ export const FICHA: SeccionFicha[] = [
       { campo: 'centro_trabajo', etiqueta: 'Sede / centro de trabajo' },
       { campo: 'fecha_ingreso', etiqueta: 'Fecha de ingreso a la empresa' },
       { campo: 'tipo_contrato', etiqueta: 'Tipo de contrato' },
-      { campo: 'jornada_laboral', etiqueta: 'Jornada laboral' },
-      { campo: 'horario_habitual', etiqueta: 'Horario habitual' },
-      { campo: 'realiza_horas_extras', etiqueta: '¿Hace horas extras con frecuencia?' },
-      { campo: 'trabaja_fines_semana', etiqueta: '¿Trabaja fines de semana?' },
       { campo: 'eps', etiqueta: 'EPS (salud)' },
       { campo: 'arl', etiqueta: 'ARL (riesgos laborales)' },
       { campo: 'fondo_pension', etiqueta: 'Fondo de pensiones' },
@@ -171,6 +167,17 @@ export const FICHA: SeccionFicha[] = [
       { campo: 'alergias_detalle', etiqueta: '¿A qué es alérgico/a?', opcional: true },
       { campo: 'medicamentos_detalle', etiqueta: '¿Cuáles medicamentos?', opcional: true },
       { campo: 'limitacion_detalle', etiqueta: 'Describa la limitación', opcional: true },
+    ],
+  },
+  {
+    nombre: 'Picaduras de abejas',
+    campos: [
+      { campo: 'picadura_abeja', etiqueta: '¿Alguna vez ha recibido una picadura de abeja o avispa?' },
+      { campo: 'sintomas_picadura', etiqueta: '¿Qué síntomas ha presentado después de una picadura?' },
+      { campo: 'alergia_picadura_dx', etiqueta: '¿Le han diagnosticado alergia a estas picaduras?' },
+      { campo: 'urgencia_picadura', etiqueta: '¿Ha requerido atención médica de urgencia por una picadura?' },
+      { campo: 'recomendacion_picadura', etiqueta: '¿Tiene recomendación médica o precauciones especiales?' },
+      { campo: 'recomendacion_picadura_detalle', etiqueta: '¿Cuál es esa recomendación o precaución?', opcional: true },
     ],
   },
   {

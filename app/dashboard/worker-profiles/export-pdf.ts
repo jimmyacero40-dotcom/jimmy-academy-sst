@@ -266,18 +266,11 @@ export async function exportToPDF(analytics: Analytics, company = 'Organización
   y = sectionTitle('Tipo de contrato y jornada laboral', y)
   text('Tipo de contrato', ML, y + 4, 8, C.navy, true)
   hBarChart(analytics.tipoContrato, ML, y + 6, half, 5, C.teal)
-  text('Jornada', ML + half + 8, y + 4, 8, C.navy, true)
-  hBarChart(analytics.jornadaLaboral, ML + half + 8, y + 6, half, 5, [139,92,246])
-  y += Math.max(analytics.tipoContrato.length, analytics.jornadaLaboral.length) * 8 + 18
+  y += analytics.tipoContrato.length * 8 + 18
 
   if (y > H - 60) { newPage('Laboral (cont.)'); y = 24 }
   y = sectionTitle('Distribución por áreas', y)
   y = hBarChart(analytics.areas, ML, y, CW, 5, C.blue) + 4
-
-  if (y > H - 40) { newPage('Laboral (cont.)'); y = 24 }
-  y = sectionTitle('Condiciones laborales', y)
-  y = boolBar('Realiza horas extras', analytics.horasExtras.si, analytics.horasExtras.no, analytics.horasExtras.pctSi, ML, y, CW)
-  y = boolBar('Trabaja fines de semana', analytics.trabFinesSemana.si, analytics.trabFinesSemana.no, analytics.trabFinesSemana.pctSi, ML, y, CW)
 
   // ══════════════════════════════════════════════════════════════════════
   // PÁGINA 6 — DESPLAZAMIENTO

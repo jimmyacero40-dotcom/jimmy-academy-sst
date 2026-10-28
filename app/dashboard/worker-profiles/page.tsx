@@ -376,16 +376,11 @@ export default function WorkerProfilesPage() {
                 <Sec title="Distribución por área"><FreqTable data={a.areas} /></Sec>
                 <Sec title="Distribución por cargo" accent="#8B5CF6"><FreqTable data={a.cargos} color="#8B5CF6" /></Sec>
               </div>
-              <div className="grid lg:grid-cols-2 gap-4">
-                <Sec title="Tipo de contrato" accent="#10B981"><DonutChart data={a.tipoContrato} /></Sec>
-                <Sec title="Jornada laboral" accent="#F59E0B"><DonutChart data={a.jornadaLaboral} /></Sec>
-              </div>
+              <Sec title="Tipo de contrato" accent="#10B981"><DonutChart data={a.tipoContrato} /></Sec>
               <Sec title="Nivel educativo" accent="#06B6D4"><FreqTable data={a.nivelEducativo} color="#06B6D4" /></Sec>
               <Sec title="Condiciones de trabajo">
                 <div className="grid lg:grid-cols-2 gap-4">
                   <div className="space-y-3">
-                    <BoolBar label="Realiza horas extras" si={a.horasExtras.si} no={a.horasExtras.no} pctSi={a.horasExtras.pctSi} colorT="#F59E0B" colorF="var(--bg-card)" />
-                    <BoolBar label="Trabaja fines de semana" si={a.trabFinesSemana.si} no={a.trabFinesSemana.no} pctSi={a.trabFinesSemana.pctSi} colorT="#F97316" colorF="var(--bg-card)" />
                     <BoolBar label="Actualmente estudia" si={a.estudiaActualmente.si} no={a.estudiaActualmente.no} pctSi={a.estudiaActualmente.pctSi} colorT="#8B5CF6" colorF="var(--bg-card)" />
                   </div>
                   <div className="space-y-3">
