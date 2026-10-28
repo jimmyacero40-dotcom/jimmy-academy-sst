@@ -564,7 +564,7 @@ export default function WorkerProfilesPage() {
                         <col key={COLUMNAS_CONSULTAS[i].id} style={{ width: `${a}%` }} />
                       ))}
                     </colgroup>
-                    <thead>
+                    <thead className="tabla-encabezado">
                       <tr style={{ background: 'var(--bg-card)', borderBottom: '1px solid var(--border)' }}>
                         {[
                           { label: 'Trabajador',   col: 'nombres' },

@@ -452,9 +452,9 @@ function TH({ children, className = '', manija }: {
   return (
     // `position: relative` para que la manija del ancho se pueda pegar al
     // borde derecho de esta celda y no al de la tabla.
-    <th className={`px-3 py-0 text-left align-top ${className}`}
-      style={{ borderBottom: '1px solid var(--border)', overflow: 'hidden', position: 'relative' }}>
-      <div className="py-3 min-w-0">{children}</div>
+    <th className={`px-3 py-0 align-middle ${className}`}
+      style={{ overflow: 'hidden', position: 'relative' }}>
+      <div className="py-3.5 min-w-0">{children}</div>
       {manija}
     </th>
   )
@@ -474,17 +474,21 @@ function EtiquetaColumna({ children, field, sortField, sortDir, onSort }: {
   children: React.ReactNode; field?: CampoOrden
   sortField: CampoOrden | null; sortDir: string; onSort: (f: any) => void
 }) {
+  // Sin campo de orden no hay botón, pero se ve igual: el encabezado tiene que
+  // leerse como una sola fila, no como unos títulos sueltos y otros pulsables.
+  const estilo = 'w-full flex items-center justify-center text-center gap-0.5 '
+    + 'text-[11px] font-bold uppercase tracking-[0.1em] leading-tight'
+
   if (!field) {
-    return (
-      <span className="text-[10px] font-semibold uppercase tracking-widest block leading-tight" style={{ color: 'var(--text-faint)' }}>
-        {children}
-      </span>
-    )
+    return <span className={estilo} style={{ color: 'var(--text-dim)' }}>{children}</span>
   }
+  const activa = sortField === field
   return (
     <button onClick={() => onSort(field)}
-      className="flex items-start gap-0.5 text-left text-[10px] font-semibold uppercase tracking-widest leading-tight min-h-[26px] transition-colors hover:opacity-80"
-      style={{ color: sortField === field ? 'var(--primary)' : 'var(--text-faint)' }}>
+      className={`${estilo} transition-colors`}
+      style={{ color: activa ? 'var(--primary)' : 'var(--text-dim)' }}
+      onMouseEnter={e => { if (!activa) e.currentTarget.style.color = 'var(--text)' }}
+      onMouseLeave={e => { if (!activa) e.currentTarget.style.color = 'var(--text-dim)' }}>
       {children}<SortIcon field={field} sortField={sortField} sortDir={sortDir} />
     </button>
   )
@@ -1328,11 +1332,11 @@ export default function UsersPage() {
               </colgroup>
 
               {/* ── Table header with embedded filters ───────────────── */}
-              <thead>
+              <thead className="tabla-encabezado">
                 <tr>
                   {/* Checkbox */}
-                  <th className="px-4 py-3 text-left align-middle"
-                    style={{ borderBottom: '1px solid var(--border)', position: 'relative' }}>
+                  <th className="px-4 py-3 align-middle text-center"
+                    style={{ position: 'relative' }}>
                     <input type="checkbox"
                       checked={selected.size === sorted.length && sorted.length > 0}
                       onChange={toggleSelectAll}
@@ -1386,8 +1390,8 @@ export default function UsersPage() {
                   </TH>
 
                   {/* Acciones */}
-                  <th className="px-4 py-3 text-center align-middle" style={{ borderBottom: '1px solid var(--border)' }}>
-                    <span className="text-[10px] font-semibold uppercase tracking-widest" style={{ color: 'var(--text-faint)' }}>Acciones</span>
+                  <th className="px-4 py-3 text-center align-middle">
+                    <span className="text-[11px] font-bold uppercase tracking-[0.1em]" style={{ color: 'var(--text-dim)' }}>Acciones</span>
                   </th>
                 </tr>
               </thead>

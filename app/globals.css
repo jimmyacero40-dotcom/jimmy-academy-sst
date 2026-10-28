@@ -360,6 +360,24 @@ select option { background: var(--bg-surface); color: var(--text); }
 .terra-table tr:last-child td { border-bottom: none; }
 .terra-table tr:hover td { background: var(--bg-card-hover); }
 
+/* ── Encabezado de tabla ──────────────────────────────────────────────
+   Una franja con el color de la marca, títulos centrados y en negrilla.
+   El tinte sale de --primary-dim y no de un color escrito a mano, porque
+   la plataforma tiene dos temas -cian y verde- y la franja debe ser la
+   del que esté puesto. Sin ella el encabezado era blanco igual que las
+   filas y no se distinguía de los datos.                               */
+.tabla-encabezado th {
+  background: var(--primary-dim);
+  border-bottom: 2px solid var(--primary-border);
+  text-align: center;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: .1em;
+  text-transform: uppercase;
+  color: var(--text-dim);
+  white-space: normal;
+}
+
 /* ═══════════════════════════════════════════════════════════════════
    ANIMATIONS
    ═══════════════════════════════════════════════════════════════════ */

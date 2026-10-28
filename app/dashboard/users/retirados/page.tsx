@@ -255,7 +255,7 @@ export default function RetiradosPage() {
                   <col key={COLUMNAS_RETIRADOS[i].id} style={{ width: `${a}%` }} />
                 ))}
               </colgroup>
-              <thead>
+              <thead className="tabla-encabezado">
                 <tr>
                   {['Trabajador', 'Cédula', 'Cargo', 'Grupos', 'Fecha ingreso', 'Fecha retiro', 'Acción'].map((titulo, i) => (
                     <th key={titulo} className="px-4 py-3 text-left"

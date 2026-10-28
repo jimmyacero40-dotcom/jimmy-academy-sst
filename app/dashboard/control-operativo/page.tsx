@@ -500,7 +500,7 @@ export default function ControlOperativoPage() {
                   <col key={COLUMNAS_MOVIMIENTOS[i].id} style={{ width: `${a}%` }} />
                 ))}
               </colgroup>
-              <thead>
+              <thead className="tabla-encabezado">
                 <tr>
                   {['F. ingreso', 'Entrada', 'Salida', 'Permanencia', 'Trabajador', 'Cédula', 'Área', 'Portería', 'Estado']
                     .map((titulo, i) => (
