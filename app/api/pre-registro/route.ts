@@ -61,12 +61,16 @@ export async function POST(req: NextRequest) {
   const cedula = soloDigitos(String(body.cedula ?? ''))
   const nombres = String(body.nombres ?? '').trim()
   const apellidos = String(body.apellidos ?? '').trim()
-  const password = String(body.password ?? '')
+  // Si no escribe contraseña, la suya es el documento, igual que para el
+  // personal que registra el administrador.
+  const password = String(body.password ?? '').trim() || cedula
   const correo = String(body.correo ?? '').trim().toLowerCase()
 
   if (cedula.length < 5) return NextResponse.json({ error: 'Escribe un número de documento válido' }, { status: 400 })
   if (!nombres || !apellidos) return NextResponse.json({ error: 'Escribe tus nombres y apellidos' }, { status: 400 })
-  if (password.length < 6) return NextResponse.json({ error: 'La contraseña debe tener al menos 6 caracteres' }, { status: 400 })
+  if (password !== cedula && password.length < 6) {
+    return NextResponse.json({ error: 'La contraseña debe tener al menos 6 caracteres' }, { status: 400 })
+  }
   if (correo && !/^\S+@\S+\.\S+$/.test(correo)) {
     return NextResponse.json({ error: 'El correo no tiene un formato válido' }, { status: 400 })
   }

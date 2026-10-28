@@ -106,7 +106,11 @@ export default function PreRegistroPage() {
   }
 
   const completo = (n: number) => {
-    if (n === 0) return (d.cedula ?? '').replace(/\D/g, '').length >= 5 && (d.password ?? '').length >= 6
+    if (n === 0) {
+      const clave = (d.password ?? '')
+      // Sin contraseña se usa el documento, así que no bloquea el paso.
+      return (d.cedula ?? '').replace(/\D/g, '').length >= 5 && (clave.length === 0 || clave.length >= 6)
+    }
     if (n === 1) return !!d.nombres?.trim() && !!d.apellidos?.trim()
     return true
   }
@@ -206,7 +210,7 @@ export default function PreRegistroPage() {
                   ayuda="Este será tu usuario para entrar."  valor={d.cedula ?? ''} onChange={set} />
                 <div>
                   <label className="block text-[11px] font-bold uppercase tracking-wider mb-1.5" style={{ color: C.tenue }}>
-                    Crea tu contraseña <span style={{ color: C.error }}>*</span>
+                    Contraseña <span className="font-normal normal-case tracking-normal" style={{ color: C.debil }}>(opcional)</span>
                   </label>
                   <div className="relative">
                     <input className={inp} style={estiloInput} type={verClave ? 'text' : 'password'}
@@ -216,7 +220,10 @@ export default function PreRegistroPage() {
                       {verClave ? <EyeOff size={15} /> : <Eye size={15} />}
                     </button>
                   </div>
-                  <p className="text-[11px] mt-1" style={{ color: C.debil }}>Mínimo 6 caracteres. Anótala, la vas a necesitar.</p>
+                  <p className="text-[11px] mt-1" style={{ color: C.debil }}>
+                    Si la dejas vacía, tu contraseña es tu número de documento.
+                    Si prefieres otra, mínimo 6 caracteres; anótala, la vas a necesitar.
+                  </p>
                 </div>
               </>
             )}

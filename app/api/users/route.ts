@@ -118,7 +118,19 @@ async function sincronizarArea(cambios: Record<string, any>, companyId: string |
 
 export async function POST(req: NextRequest) {
   const body = await req.json()
-  const { email, correo, password, name, cedula, role, area, cargo, permissions } = body
+  const { correo, name, cedula, role, area, cargo, permissions } = body
+  let { email, password } = body
+
+  // Para el personal, el documento es la credencial: con él entra y con él
+  // es su contraseña mientras no la cambie. Se resuelve aquí y no solo en la
+  // pantalla, para que valga igual desde el formulario, desde la importación
+  // de Excel o desde cualquier otro sitio que cree trabajadores.
+  const esTrabajador = !role || role === 'worker'
+  const documento = String(cedula ?? '').trim()
+  if (esTrabajador && documento) {
+    email = documento
+    if (!String(password ?? '').trim()) password = documento
+  }
 
   // Crear un trabajador y crear una cuenta de acceso son capacidades distintas.
   const esCuentaDePlataforma = role && role !== 'worker'
@@ -131,7 +143,11 @@ export async function POST(req: NextRequest) {
   if (!companyId) return NextResponse.json({ error: 'Selecciona una empresa primero' }, { status: 400 })
 
   if (!email || !password || !name) {
-    return NextResponse.json({ error: 'Email, contraseña y nombre son requeridos' }, { status: 400 })
+    return NextResponse.json({
+      error: esTrabajador
+        ? 'Nombre y cédula son requeridos'
+        : 'Email, contraseña y nombre son requeridos',
+    }, { status: 400 })
   }
 
   const hash = await bcrypt.hash(password, 10)
