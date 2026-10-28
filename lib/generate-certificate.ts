@@ -1,17 +1,47 @@
-const C = {
-  green: '#0F4D24',
-  greenDark: '#0A3318',
-  greenMid: '#1B6B35',
-  greenLight: '#2E8B4A',
-  gold: '#C89B3C',
-  goldLight: '#D4AD4E',
-  goldDark: '#A67E1F',
-  ivory: '#FDFBF5',
-  white: '#FFFFFF',
-  black: '#111111',
-  text: '#1A1A1A',
-  textMid: '#3A3A3A',
-  textLight: '#666666',
+// ─── Paleta del certificado ───────────────────────────────────────────
+// Sale de la identidad de AgroSafe, no del verde y dorado de AgroVenture:
+// el certificado lo emite la plataforma y tiene que leerse como suya.
+//
+// La marca tiene dos vestidos -Navy y Green- y el certificado se pone el
+// mismo que lleve puesto la plataforma, para que el documento que descarga
+// el trabajador no vaya de un color y la pantalla de otro.
+type Paleta = {
+  base: string; baseOscuro: string; baseMedio: string; baseClaro: string
+  acento: string; acentoClaro: string; acentoOscuro: string
+  papel: string; white: string
+  texto: string; textoMedio: string; textoTenue: string
+  tarjeta: string; tarjetaBorde: string
+}
+
+const PALETAS: Record<string, Paleta> = {
+  // AgroSafe Navy — el recomendado, y el que viste la pantalla de ingreso.
+  light: {
+    base: '#0B1736', baseOscuro: '#060E22', baseMedio: '#16284F', baseClaro: '#24406F',
+    acento: '#06B6D4', acentoClaro: '#7DD9EA', acentoOscuro: '#0E7490',
+    papel: '#FBFCFE', white: '#FFFFFF',
+    texto: '#0F172A', textoMedio: '#33415C', textoTenue: '#6B7A90',
+    tarjeta: '#F1F5FA', tarjetaBorde: '#D5E0EC',
+  },
+  // AgroSafe Green.
+  verde: {
+    base: '#234B27', baseOscuro: '#16301A', baseMedio: '#2F6435', baseClaro: '#3F8347',
+    acento: '#6BA644', acentoClaro: '#A9CF86', acentoOscuro: '#4A7A2C',
+    papel: '#FBFDFA', white: '#FFFFFF',
+    texto: '#16210F', textoMedio: '#3A472C', textoTenue: '#6E7C5E',
+    tarjeta: '#F2F7EE', tarjetaBorde: '#D8E4CD',
+  },
+}
+
+/** La paleta en uso. Se fija al empezar a dibujar. */
+let C: Paleta = PALETAS.light
+
+function paletaActiva(): Paleta {
+  try {
+    const tema = document.documentElement.getAttribute('data-theme') ?? 'light'
+    return PALETAS[tema] ?? PALETAS.light
+  } catch {
+    return PALETAS.light
+  }
 }
 
 export async function generateCertificatePNG(data: {
@@ -33,6 +63,8 @@ export async function generateCertificatePNG(data: {
   canvas.height = H
   const ctx = canvas.getContext('2d')!
 
+  C = paletaActiva()
+
   await loadFonts()
   const titleFont = '"Cinzel", "Playfair Display", Georgia, serif'
   const elegantFont = '"Cormorant Garamond", "Playfair Display", Georgia, serif'
@@ -41,12 +73,12 @@ export async function generateCertificatePNG(data: {
   const FRAME = 52
 
   // ═══ BACKGROUND ═══
-  ctx.fillStyle = C.ivory
+  ctx.fillStyle = C.papel
   ctx.fillRect(0, 0, W, H)
 
   // Subtle topographic texture
   ctx.globalAlpha = 0.025
-  ctx.strokeStyle = C.green
+  ctx.strokeStyle = C.base
   ctx.lineWidth = 1.5
   for (let i = 0; i < 45; i++) {
     ctx.beginPath()
@@ -61,52 +93,54 @@ export async function generateCertificatePNG(data: {
   ctx.globalAlpha = 1.0
 
   // ═══ GEOMETRIC CORNER BLOCKS ═══
-  for (const [ox, oy, dx, dy] of [[0, 0, 1, 1], [W, 0, -1, 1], [0, H, 1, -1], [W, H, -1, -1]] as [number, number, number, number][]) {
-    ctx.fillStyle = C.green
+  // Solo las dos de abajo: arriba el peso lo lleva la banda del logo, y
+  // cuatro esquinas macizas además de la banda cargaban el documento.
+  for (const [ox, oy, dx, dy] of [[0, H, 1, -1], [W, H, -1, -1]] as [number, number, number, number][]) {
+    ctx.fillStyle = C.base
     ctx.beginPath()
     ctx.moveTo(ox, oy)
-    ctx.lineTo(ox + dx * 480, oy)
-    ctx.lineTo(ox, oy + dy * 480)
+    ctx.lineTo(ox + dx * 420, oy)
+    ctx.lineTo(ox, oy + dy * 420)
     ctx.closePath()
     ctx.fill()
 
-    ctx.fillStyle = C.gold
+    ctx.fillStyle = C.acento
     ctx.beginPath()
-    ctx.moveTo(ox + dx * 370, oy)
-    ctx.lineTo(ox + dx * 500, oy)
-    ctx.lineTo(ox, oy + dy * 500)
-    ctx.lineTo(ox, oy + dy * 370)
+    ctx.moveTo(ox + dx * 330, oy)
+    ctx.lineTo(ox + dx * 440, oy)
+    ctx.lineTo(ox, oy + dy * 440)
+    ctx.lineTo(ox, oy + dy * 330)
     ctx.closePath()
     ctx.fill()
 
-    ctx.fillStyle = C.greenDark
+    ctx.fillStyle = C.baseOscuro
     ctx.beginPath()
     ctx.moveTo(ox, oy)
-    ctx.lineTo(ox + dx * 200, oy)
-    ctx.lineTo(ox, oy + dy * 200)
+    ctx.lineTo(ox + dx * 170, oy)
+    ctx.lineTo(ox, oy + dy * 170)
     ctx.closePath()
     ctx.fill()
 
-    ctx.fillStyle = C.goldLight
+    ctx.fillStyle = C.acentoClaro
     ctx.beginPath()
     ctx.moveTo(ox, oy)
-    ctx.lineTo(ox + dx * 90, oy)
-    ctx.lineTo(ox, oy + dy * 90)
+    ctx.lineTo(ox + dx * 80, oy)
+    ctx.lineTo(ox, oy + dy * 80)
     ctx.closePath()
     ctx.fill()
   }
 
   // ═══ DOUBLE FRAME ═══
-  ctx.strokeStyle = C.green
+  ctx.strokeStyle = C.base
   ctx.lineWidth = 6
   ctx.strokeRect(35, 35, W - 70, H - 70)
-  ctx.strokeStyle = C.gold
+  ctx.strokeStyle = C.acento
   ctx.lineWidth = 3
   ctx.strokeRect(FRAME, FRAME, W - FRAME * 2, H - FRAME * 2)
 
   // Subtle dots left
   ctx.globalAlpha = 0.08
-  ctx.fillStyle = C.green
+  ctx.fillStyle = C.base
   for (let row = 0; row < 55; row++) {
     for (let col = 0; col < 4; col++) {
       const dx = 72 + col * 16
@@ -124,12 +158,12 @@ export async function generateCertificatePNG(data: {
   const footerH = 130
   const footerY = H - FRAME - footerH
   const fGrd = ctx.createLinearGradient(0, footerY, W, footerY)
-  fGrd.addColorStop(0, C.green)
-  fGrd.addColorStop(0.5, C.greenMid)
-  fGrd.addColorStop(1, C.greenDark)
+  fGrd.addColorStop(0, C.base)
+  fGrd.addColorStop(0.5, C.baseMedio)
+  fGrd.addColorStop(1, C.baseOscuro)
   ctx.fillStyle = fGrd
   ctx.fillRect(FRAME, footerY, W - FRAME * 2, footerH)
-  ctx.fillStyle = C.gold
+  ctx.fillStyle = C.acento
   ctx.fillRect(FRAME, footerY, W - FRAME * 2, 4)
 
   // Footer content
@@ -140,7 +174,7 @@ export async function generateCertificatePNG(data: {
   ctx.arc(fsx, fsy, 40, 0, Math.PI * 2)
   ctx.fillStyle = 'rgba(255,255,255,0.12)'
   ctx.fill()
-  ctx.strokeStyle = C.goldLight
+  ctx.strokeStyle = C.acentoClaro
   ctx.lineWidth = 2.5
   ctx.stroke()
   ctx.fillStyle = C.white
@@ -153,12 +187,12 @@ export async function generateCertificatePNG(data: {
   ctx.lineTo(fsx - 18, fsy - 12)
   ctx.closePath()
   ctx.fill()
-  ctx.fillStyle = C.green
+  ctx.fillStyle = C.base
   ctx.fillRect(fsx - 8, fsy - 2, 16, 4)
   ctx.fillRect(fsx - 2, fsy - 8, 4, 16)
 
   ctx.textAlign = 'left'
-  ctx.fillStyle = C.goldLight
+  ctx.fillStyle = C.acentoClaro
   ctx.font = `italic 42px ${elegantFont}`
   ctx.fillText('Capacitar hoy,', FRAME + 170, fsy - 4)
   ctx.font = `italic 700 42px ${elegantFont}`
@@ -174,7 +208,7 @@ export async function generateCertificatePNG(data: {
   const chkX = W - FRAME - 40 - copW - 35
   ctx.beginPath()
   ctx.arc(chkX, fsy + 10, 20, 0, Math.PI * 2)
-  ctx.fillStyle = C.gold
+  ctx.fillStyle = C.acento
   ctx.fill()
   ctx.beginPath()
   ctx.moveTo(chkX - 7, fsy + 10)
@@ -194,74 +228,94 @@ export async function generateCertificatePNG(data: {
 
   ctx.textAlign = 'center'
 
-  // ── LOGO 0%-20% ──
-  const logoH = usableH * 0.20
+  // ── BANDA DEL LOGO ──
+  // El logo de AgroSafe es blanco sobre transparente, hecho para fondos
+  // oscuros: sobre el papel del certificado sería invisible. Va sobre una
+  // banda del color de la marca, que es además como se ve en la plataforma.
+  const bandaH = Math.round(usableH * 0.20)
+  const bandaY = usableTop
+  const bGrd = ctx.createLinearGradient(0, bandaY, 0, bandaY + bandaH)
+  bGrd.addColorStop(0, C.baseOscuro)
+  bGrd.addColorStop(1, C.base)
+  ctx.fillStyle = bGrd
+  ctx.fillRect(FRAME, bandaY, W - FRAME * 2, bandaH)
+  ctx.fillStyle = C.acento
+  ctx.fillRect(FRAME, bandaY + bandaH - 5, W - FRAME * 2, 5)
+
   let logoImg: HTMLImageElement | null = null
   if (data.logoUrl) { try { logoImg = await loadImage(data.logoUrl) } catch (_) {} }
   if (logoImg) {
+    const logoH = bandaH * 0.62
     const lw = logoH * (logoImg.width / logoImg.height)
-    ctx.drawImage(logoImg, CX - lw / 2, p(0), lw, logoH)
+    ctx.drawImage(logoImg, CX - lw / 2, bandaY + (bandaH - logoH) / 2, lw, logoH)
   } else {
-    drawFallbackLogo(ctx, CX, p(0.10), dataFont)
+    drawFallbackLogo(ctx, CX, bandaY + bandaH / 2, dataFont)
   }
 
-  // ── CERTIFICADO 17%-25% ──
-  ctx.fillStyle = C.green
+  // El resto del contenido se reparte bajo la banda.
+  const contTop = bandaY + bandaH
+  const contH = usableBot - contTop
+  const q = (frac: number) => contTop + contH * frac
+
+  // ── CERTIFICADO ──
+  ctx.fillStyle = C.base
   ctx.font = `700 240px ${titleFont}`
-  ctx.fillText('CERTIFICADO', CX, p(0.23))
+  ctx.fillText('CERTIFICADO', CX, q(0.10))
 
   // DE CAPACITACIÓN
-  ctx.fillStyle = C.gold
+  const subY = q(0.138)
+  ctx.fillStyle = C.acentoOscuro
   ctx.font = `600 60px ${dataFont}`
   ctx.letterSpacing = '30px'
-  ctx.fillText('DE   CAPACITACIÓN', CX + 15, p(0.265))
+  ctx.fillText('DE   CAPACITACIÓN', CX + 15, subY)
+  // El ancho se mide CON el espaciado puesto. Midiéndolo después de quitarlo
+  // salía más corto de lo que ocupa, y las rayitas se montaban sobre el texto.
+  const tw = ctx.measureText('DE   CAPACITACIÓN').width + 60
   ctx.letterSpacing = '0px'
-  const tw = ctx.measureText('DE   CAPACITACIÓN').width + 50
-  drawLine(ctx, CX - tw / 2 - 180, CX - tw / 2 - 15, p(0.265) - 14, C.gold, 3)
-  drawLine(ctx, CX + tw / 2 + 15, CX + tw / 2 + 180, p(0.265) - 14, C.gold, 3)
+  drawLine(ctx, CX - tw / 2 - 190, CX - tw / 2 - 40, subY - 18, C.acento, 3)
+  drawLine(ctx, CX + tw / 2 + 40, CX + tw / 2 + 190, subY - 18, C.acento, 3)
 
-  // ── Otorgado a: 28% ──
-  ctx.fillStyle = C.textMid
+  // ── Otorgado a: ──
+  ctx.fillStyle = C.textoMedio
   ctx.font = `italic 62px ${elegantFont}`
-  ctx.fillText('Otorgado a:', CX, p(0.30))
+  ctx.fillText('Otorgado a:', CX, q(0.195))
 
-  // ── NAME 32%-40% ──
-  ctx.fillStyle = C.green
+  // ── NOMBRE ──
+  ctx.fillStyle = C.base
   ctx.font = `700 200px ${dataFont}`
   const nameLines = wrapText(ctx, data.employeeName.toUpperCase(), W - 700)
-  let nameY = p(0.37)
-  for (const line of nameLines) {
+  let nameY = q(0.275)
+  // El salto va ENTRE renglones, no después del último. Sumándolo siempre, un
+  // nombre de dos líneas dejaba un vacío de más bajo el nombre y el documento
+  // quedaba descompensado según lo largo que fuera.
+  nameLines.forEach((line, i) => {
     ctx.fillText(line, CX, nameY)
-    nameY += 210
-  }
+    if (i < nameLines.length - 1) nameY += 210
+  })
 
-  // Laurel branches
-  drawLaurel(ctx, 380, p(0.30), usableH * 0.14, true)
-  drawLaurel(ctx, W - 380, p(0.30), usableH * 0.14, false)
-
-  // Diamond + cédula
-  const cedulaY = nameY + 75
-  drawDiamond(ctx, CX, nameY + 15, 14, C.gold)
-  ctx.fillStyle = C.textMid
+  // Rombo + cédula
+  const cedulaY = nameY + 160
+  drawDiamond(ctx, CX, cedulaY - 62, 14, C.acento)
+  ctx.fillStyle = C.textoMedio
   ctx.font = `400 48px ${dataFont}`
   ctx.fillText(`Cédula de Ciudadanía N° ${data.employeeCedula}`, CX, cedulaY)
 
   // ── Ha participado (relative to cédula) ──
-  const haParticY = cedulaY + 100
-  ctx.fillStyle = C.textMid
+  const haParticY = cedulaY + 105
+  ctx.fillStyle = C.textoMedio
   ctx.font = `italic 48px ${elegantFont}`
   ctx.fillText('Ha participado y aprobado satisfactoriamente la capacitación en:', CX, haParticY)
 
   // ── COURSE BAR ──
-  const barH = 120
+  const barH = 130
   const barW = W - 280
   const barX = CX - barW / 2
-  const barY = haParticY + 40
+  const barY = haParticY + 45
 
   const barGrd = ctx.createLinearGradient(barX, barY, barX + barW, barY)
-  barGrd.addColorStop(0, C.green)
-  barGrd.addColorStop(0.5, C.greenMid)
-  barGrd.addColorStop(1, C.greenDark)
+  barGrd.addColorStop(0, C.base)
+  barGrd.addColorStop(0.5, C.baseMedio)
+  barGrd.addColorStop(1, C.baseOscuro)
   roundRect(ctx, barX, barY, barW, barH, 60)
   ctx.fillStyle = barGrd
   ctx.fill()
@@ -295,7 +349,7 @@ export async function generateCertificatePNG(data: {
   ctx.lineTo(shdX - 16, hlmY - 9)
   ctx.closePath()
   ctx.fill()
-  ctx.strokeStyle = C.green
+  ctx.strokeStyle = C.base
   ctx.lineWidth = 3
   ctx.lineCap = 'round'
   ctx.lineJoin = 'round'
@@ -318,7 +372,7 @@ export async function generateCertificatePNG(data: {
   }
 
   // ── INFO CARDS ──
-  const infoY = barY + barH + 50
+  const infoY = barY + barH + 70
   const cardW = (W - 600) / 2
   const cardH = 120
   const cardGap = 60
@@ -345,7 +399,7 @@ export async function generateCertificatePNG(data: {
     const iconY = by + cardH / 2
     ctx.beginPath()
     ctx.arc(iconX, iconY, 34, 0, Math.PI * 2)
-    ctx.fillStyle = C.green
+    ctx.fillStyle = C.base
     ctx.fill()
 
     ctx.strokeStyle = C.white
@@ -383,30 +437,36 @@ export async function generateCertificatePNG(data: {
     }
 
     ctx.textAlign = 'left'
-    ctx.fillStyle = C.textLight
+    ctx.fillStyle = C.textoTenue
     ctx.font = `500 30px ${dataFont}`
     ctx.fillText(infoItems[i].label, bx + 112, by + 44)
-    ctx.fillStyle = C.text
+    ctx.fillStyle = C.texto
     ctx.font = `700 42px ${dataFont}`
     ctx.fillText(infoItems[i].value, bx + 112, by + 88)
   }
   ctx.textAlign = 'center'
 
   // ── Code + Normative ──
-  const codeY = infoY + cardH + 50
-  ctx.fillStyle = C.text
+  const codeY = infoY + cardH + 75
+  ctx.fillStyle = C.texto
   ctx.font = `700 38px ${dataFont}`
   ctx.fillText(`Código de autenticidad: ${data.code}`, CX, codeY)
-  ctx.fillStyle = C.textLight
+  ctx.fillStyle = C.textoTenue
   ctx.font = `italic 32px ${elegantFont}`
   ctx.fillText('Conforme al Decreto 1072 de 2015 y la Resolución 0312 de 2019 — Ministerio del Trabajo de Colombia', CX, codeY + 45)
 
   // ── SIGNATURES ──
-  const sigLineW = 680
-  const empX = 200 + sigLineW / 2
-  const instrX = W - 200 - sigLineW / 2
+  const sigLineW = 760
+  const empX = 320 + sigLineW / 2
+  const instrX = W - 320 - sigLineW / 2
   const sigImgH = 170
-  const sigImgTop = codeY + 80
+  // Las firmas se anclan abajo, a una distancia fija del pie, en vez de
+  // colgar de lo que haya encima. Si no, un nombre de una línea subía todo el
+  // bloque y dejaba un vacío al final; uno de dos líneas lo bajaba. Así el
+  // certificado se ve igual de equilibrado sea quien sea el trabajador, y el
+  // `max` evita que se monte sobre el código cuando el nombre es largo.
+  const altoFirma = sigImgH + 5 + 156
+  const sigImgTop = Math.max(codeY + 110, usableBot - 60 - altoFirma)
 
   if (data.employeeSignature) {
     try {
@@ -415,13 +475,13 @@ export async function generateCertificatePNG(data: {
       ctx.drawImage(sig, empX - sw / 2, sigImgTop, sw, sigImgH)
     } catch (_) {
       // signature image failed to load — draw placeholder
-      ctx.fillStyle = C.textLight
+      ctx.fillStyle = C.textoTenue
       ctx.font = `italic 34px ${elegantFont}`
       ctx.textAlign = 'center'
       ctx.fillText('Firma no registrada', empX, sigImgTop + sigImgH / 2)
     }
   } else {
-    ctx.fillStyle = C.textLight
+    ctx.fillStyle = C.textoTenue
     ctx.font = `italic 34px ${elegantFont}`
     ctx.textAlign = 'center'
     ctx.fillText('Firma no registrada', empX, sigImgTop + sigImgH / 2)
@@ -435,7 +495,7 @@ export async function generateCertificatePNG(data: {
   }
 
   const sigLineY = sigImgTop + sigImgH + 5
-  ctx.strokeStyle = C.textMid
+  ctx.strokeStyle = C.textoMedio
   ctx.lineWidth = 2.5
   for (const sx of [empX, instrX]) {
     ctx.beginPath()
@@ -445,142 +505,26 @@ export async function generateCertificatePNG(data: {
   }
 
   ctx.textAlign = 'center'
-  ctx.fillStyle = C.text
+  ctx.fillStyle = C.texto
   ctx.font = `700 36px ${dataFont}`
   ctx.fillText('FIRMA DEL PARTICIPANTE', empX, sigLineY + 46)
-  ctx.fillStyle = C.textMid
+  ctx.fillStyle = C.textoMedio
   ctx.font = `400 32px ${dataFont}`
   ctx.fillText(data.employeeName, empX, sigLineY + 84)
   ctx.fillText(`C.C. ${data.employeeCedula}`, empX, sigLineY + 118)
 
-  ctx.fillStyle = C.text
+  ctx.fillStyle = C.texto
   ctx.font = `700 36px ${dataFont}`
   ctx.fillText('JIMMY JOANNY ACERO CHAPETÓN', instrX, sigLineY + 46)
-  ctx.fillStyle = C.textMid
+  ctx.fillStyle = C.textoMedio
   ctx.font = `400 32px ${dataFont}`
   ctx.fillText('C.C. 1.052.392.965', instrX, sigLineY + 84)
   ctx.fillText('Profesional en Seguridad y Salud en el Trabajo', instrX, sigLineY + 118)
-  ctx.fillStyle = C.green
+  ctx.fillStyle = C.base
   ctx.font = `700 30px ${dataFont}`
   ctx.fillText('Instructor — Responsable de la Capacitación', instrX, sigLineY + 156)
 
-  // ── SEAL centered ──
-  drawPremiumSeal(ctx, CX, sigLineY - 10, dataFont)
-
   return canvas.toDataURL('image/png', 1.0)
-}
-
-// ═══ LAUREL BRANCHES ═══
-function drawLaurel(ctx: CanvasRenderingContext2D, x: number, y: number, h: number, left: boolean) {
-  ctx.save()
-  ctx.globalAlpha = 0.35
-  const dir = left ? 1 : -1
-  const leaves = Math.max(6, Math.floor(h / 35))
-  for (let i = 0; i < leaves; i++) {
-    const ly = y + (h / leaves) * (i + 0.5)
-    const spread = 0.35 + (i / leaves) * 0.15
-    ctx.save()
-    ctx.translate(x, ly)
-    ctx.rotate(dir * spread)
-    ctx.fillStyle = C.gold
-    ctx.beginPath()
-    ctx.ellipse(dir * 28, 0, 24, 8, 0, 0, Math.PI * 2)
-    ctx.fill()
-    ctx.restore()
-  }
-  ctx.strokeStyle = C.gold
-  ctx.lineWidth = 2
-  ctx.beginPath()
-  ctx.moveTo(x, y + 10)
-  ctx.lineTo(x, y + h - 10)
-  ctx.stroke()
-  ctx.restore()
-}
-
-// ═══ PREMIUM SEAL ═══
-function drawPremiumSeal(ctx: CanvasRenderingContext2D, x: number, y: number, sans: string) {
-  const r = 140
-  ctx.save()
-  ctx.shadowColor = 'rgba(0,0,0,0.25)'
-  ctx.shadowBlur = 25
-  ctx.shadowOffsetY = 6
-
-  // Outer gold ring
-  ctx.beginPath()
-  ctx.arc(x, y, r, 0, Math.PI * 2)
-  ctx.fillStyle = C.gold
-  ctx.fill()
-  ctx.restore()
-
-  // Inner green body
-  ctx.beginPath()
-  ctx.arc(x, y, r - 9, 0, Math.PI * 2)
-  ctx.fillStyle = C.green
-  ctx.fill()
-
-  // Inner gold ring
-  ctx.beginPath()
-  ctx.arc(x, y, r - 20, 0, Math.PI * 2)
-  ctx.strokeStyle = C.gold
-  ctx.lineWidth = 1.5
-  ctx.stroke()
-
-  // Decorative zigzag border top and bottom
-  ctx.strokeStyle = C.gold
-  ctx.lineWidth = 2
-  for (const side of [-1, 1]) {
-    ctx.beginPath()
-    const zy = y + side * 55
-    for (let i = -6; i <= 6; i++) {
-      const zx = x + i * 12
-      const zyy = zy + (i % 2 === 0 ? -4 : 4) * side
-      if (i === -6) ctx.moveTo(zx, zyy)
-      else ctx.lineTo(zx, zyy)
-    }
-    ctx.stroke()
-  }
-
-  // "REPUBLICA DE" text
-  ctx.textAlign = 'center'
-  ctx.fillStyle = C.gold
-  ctx.font = `700 22px ${sans}`
-  ctx.letterSpacing = '6px'
-  ctx.fillText('REPÚBLICA DE', x + 3, y - 68)
-  ctx.letterSpacing = '0px'
-
-  // "COLOMBIA" text
-  ctx.fillStyle = C.white
-  ctx.font = `700 42px ${sans}`
-  ctx.letterSpacing = '4px'
-  ctx.fillText('COLOMBIA', x + 2, y - 32)
-  ctx.letterSpacing = '0px'
-
-  // Divider line top
-  ctx.strokeStyle = C.gold
-  ctx.lineWidth = 1.5
-  ctx.beginPath()
-  ctx.moveTo(x - 80, y - 20)
-  ctx.lineTo(x + 80, y - 20)
-  ctx.stroke()
-
-  // "SG-SST" large
-  ctx.fillStyle = C.white
-  ctx.font = `700 72px ${sans}`
-  ctx.fillText('SG-SST', x, y + 30)
-
-  // Divider line bottom
-  ctx.beginPath()
-  ctx.moveTo(x - 80, y + 42)
-  ctx.lineTo(x + 80, y + 42)
-  ctx.stroke()
-
-  // "SEGURIDAD Y SALUD"
-  ctx.fillStyle = C.gold
-  ctx.font = `600 20px ${sans}`
-  ctx.letterSpacing = '3px'
-  ctx.fillText('SEGURIDAD Y SALUD', x + 2, y + 70)
-  ctx.fillText('EN EL TRABAJO', x + 2, y + 95)
-  ctx.letterSpacing = '0px'
 }
 
 // ═══ UTILITIES ═══
@@ -608,15 +552,15 @@ function drawLine(ctx: CanvasRenderingContext2D, x1: number, x2: number, y: numb
 function drawFallbackLogo(ctx: CanvasRenderingContext2D, x: number, y: number, sans: string) {
   ctx.textAlign = 'center'
   ctx.font = `700 90px ${sans}`
-  ctx.fillStyle = C.green
+  ctx.fillStyle = C.base
   const a = 'AGRO', v = 'VENTURE'
   const wa = ctx.measureText(a).width, wv = ctx.measureText(v).width
   const t = wa + 14 + wv
   ctx.fillText(a, x - t / 2 + wa / 2, y)
-  ctx.fillStyle = C.gold
+  ctx.fillStyle = C.acento
   ctx.fillText(v, x - t / 2 + wa + 14 + wv / 2, y)
   roundRect(ctx, x - 130, y + 16, 260, 48, 8)
-  ctx.fillStyle = C.green
+  ctx.fillStyle = C.base
   ctx.fill()
   ctx.fillStyle = C.white
   ctx.font = `700 26px ${sans}`

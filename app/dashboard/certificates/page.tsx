@@ -82,7 +82,7 @@ export default function CertificatesPage() {
         score: cert.score || '100%',
         code: cert.code,
         employeeSignature,
-        logoUrl: '/images/LOGO.png',
+        logoUrl: '/images/agrosafe-completo.png',
         instructorSignatureUrl: '/images/FIRMA FIRMA.png',
       })
       const link = document.createElement('a')
