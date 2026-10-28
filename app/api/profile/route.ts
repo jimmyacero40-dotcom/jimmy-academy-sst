@@ -4,6 +4,7 @@ import { getCurrentUser, getActiveCompanyId } from '@/lib/get-company'
 import { tienePermiso } from '@/lib/permisos'
 import { calcPct } from '@/lib/perfil-completitud'
 import { normalizarPerfil } from '@/lib/mayusculas'
+import { partirNombre } from '@/lib/correccion-nombres'
 
 export async function GET() {
   const user = await getCurrentUser()
@@ -17,12 +18,36 @@ export async function GET() {
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
 
-  // Si el trabajador todavía no ha confirmado su cargo o su área, se le
-  // muestran los que tiene registrados: así ve lo que ya hay en vez de un
-  // campo en blanco, y al guardar no manda vacío.
+  // Lo que la empresa ya tiene registrado llega diligenciado.
+  //
+  // Antes la encuesta arrancaba del todo en blanco: la pantalla saludaba al
+  // trabajador por su nombre y acto seguido le pedía que escribiera ese mismo
+  // nombre, además del cargo, el área y la sede que ya figuran en su registro.
+  // Se le pedía confirmar lo que la empresa sabe, no aportar lo que no sabe.
+  //
+  // Nada queda guardado por mostrarlo: son valores propuestos. Si algo está
+  // mal, el trabajador lo corrige y al guardar manda lo corregido.
   const ficha: Record<string, any> = { ...(data ?? {}) }
-  if (!ficha.cargo_confirmado && (user as any).cargo) ficha.cargo_confirmado = (user as any).cargo
-  if (!ficha.area_confirmada && (user as any).area) ficha.area_confirmada = (user as any).area
+  const llenar = (campo: string, valor: unknown) => {
+    const actual = ficha[campo]
+    const vacio = actual === null || actual === undefined || String(actual).trim() === ''
+    if (vacio && valor != null && String(valor).trim() !== '') ficha[campo] = valor
+  }
+
+  // El nombre completo se parte en apellidos y nombres con la convención de la
+  // casa. Si la ficha ya los tiene, manda la ficha.
+  if (!ficha.nombres || !ficha.apellidos) {
+    const partes = partirNombre({
+      name: (user as any).name ?? '',
+      nombres: ficha.nombres, apellidos: ficha.apellidos,
+    })
+    llenar('apellidos', partes.apellidos)
+    llenar('nombres', partes.nombres)
+  }
+
+  llenar('cargo_confirmado', (user as any).cargo)
+  llenar('area_confirmada', (user as any).area)
+  llenar('email_personal', (user as any).correo)
 
   return NextResponse.json(ficha)
 }
