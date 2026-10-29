@@ -4,7 +4,7 @@ import { useState, useCallback, useEffect, useMemo } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
   X, ChevronRight, ChevronLeft, Check,
-  Search, Plus, Trash2, Loader2, FileDown, AlertCircle, Users, Calendar, Edit3,
+  Search, Plus, Trash2, Loader2, FileDown, AlertCircle, Users, Calendar, Edit3, UserCheck,
 } from 'lucide-react'
 import { generateAttendancePDF } from '@/lib/generate-attendance-pdf'
 
@@ -78,7 +78,7 @@ function calcSchedule(startValue: string, durationMin: number): { schedule: stri
   return { schedule, intensity }
 }
 
-type SearchMode = 'all' | 'range' | 'manual'
+type SearchMode = 'all' | 'asignados' | 'range' | 'manual'
 
 export default function AttendanceWizard({ training, companyName, companyLogo, onClose, onSaved }: Props) {
   const [step, setStep] = useState(0)
@@ -119,10 +119,11 @@ export default function AttendanceWizard({ training, companyName, companyLogo, o
     ? new Date(eventDate + 'T12:00:00').toLocaleDateString('es-CO', { day: '2-digit', month: '2-digit', year: 'numeric' })
     : ''
 
-  // Auto-fetch when entering step 2 with mode=all
+  // Al entrar al paso 2 se busca solo. Por fechas no, que faltan las fechas;
+  // y manual tampoco, que ahí los escribe la persona.
   useEffect(() => {
-    if (step === 1 && searchMode === 'all' && !fetched && !fetching) {
-      fetchParticipants('all')
+    if (step === 1 && (searchMode === 'all' || searchMode === 'asignados') && !fetched && !fetching) {
+      fetchParticipants(searchMode)
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [step, searchMode])
@@ -135,6 +136,7 @@ export default function AttendanceWizard({ training, companyName, companyLogo, o
     try {
       let url = `/api/trainings/${training.id}/completions`
       if (mode === 'range') url += `?from=${fromDate}&to=${toDate}`
+      else if (mode === 'asignados') url += '?modo=asignados'
 
       const res  = await fetch(url)
       const data = await res.json()
@@ -217,7 +219,10 @@ export default function AttendanceWizard({ training, companyName, companyLogo, o
   }
 
   const MODE_OPTS: { mode: SearchMode; icon: React.ReactNode; label: string; desc: string }[] = [
-    { mode: 'all',    icon: <Users size={14} />,    label: 'Todos',        desc: 'Todos los que completaron la capacitación' },
+    { mode: 'all',    icon: <Users size={14} />,    label: 'Completaron',  desc: 'Quienes ya terminaron la capacitación' },
+    // Para una capacitación presencial recién programada: la lista se arma
+    // antes de que nadie la complete.
+    { mode: 'asignados', icon: <UserCheck size={14} />, label: 'Asignados', desc: 'Quienes la tienen asignada, la hayan hecho o no' },
     { mode: 'range',  icon: <Calendar size={14} />, label: 'Por fechas',   desc: 'Certificados emitidos en un rango de fechas' },
     { mode: 'manual', icon: <Edit3 size={14} />,    label: 'Solo manual',  desc: 'Ingresa participantes manualmente' },
   ]

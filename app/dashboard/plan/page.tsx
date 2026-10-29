@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect, useCallback, useRef } from 'react'
+import AsignarCapacitacion from '@/components/AsignarCapacitacion'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
   Calendar, Plus, Edit2, Trash2, X, Loader2, AlertCircle,
@@ -333,6 +334,8 @@ function SidePanel({
 
 // ── Main Page ──────────────────────────────────────────────────────────────
 export default function PlanPage() {
+  // Mes con el que se abre el asistente de asignación. null = cerrado.
+  const [asignarMes, setAsignarMes] = useState<number | null>(null)
   const [plans, setPlans]               = useState<Plan[]>([])
   const [profiles, setProfiles]         = useState<TrainingProfile[]>([])
   const [loading, setLoading]           = useState(true)
@@ -519,6 +522,25 @@ export default function PlanPage() {
   const trainingMonthMap = new Map(items.map(i => [i.trainings.id, i.month]))
 
   // ── EDITOR VIEW ──────────────────────────────────────────────────────────
+  // El asistente vale igual en la lista de planes y dentro del editor, así que
+  // se declara una sola vez y se monta en las dos vistas.
+  const asistente = (
+    <AsignarCapacitacion
+      abierto={asignarMes !== null}
+      mesInicial={asignarMes ?? undefined}
+      onCerrar={() => setAsignarMes(null)}
+      onListo={async () => {
+        // Lo asignado se ve en el acto: puede haber creado un ítem nuevo en el
+        // mes, y el Plan Anual tiene que mostrarlo sin recargar a mano.
+        await loadPlans()
+        if (editingPlan) {
+          const r = await fetch(`/api/plans/${editingPlan.id}/items`)
+          if (r.ok) setItems(await r.json())
+        }
+      }}
+    />
+  )
+
   if (editingPlan) {
     const itemsByMonth: Record<number, PlanItem[]> = {}
     for (let m = 1; m <= 12; m++) itemsByMonth[m] = items.filter(i => i.month === m)
@@ -692,8 +714,13 @@ export default function PlanPage() {
                           />
                         ))}
                         {monthItems.length === 0 && !isOver && (
-                          <div className="h-10 flex items-center justify-center">
+                          <div className="h-10 flex flex-col items-center justify-center gap-0.5">
                             <span className="text-[10px]" style={{ color: 'var(--text-faint)' }}>Sin capacitaciones</span>
+                            <button onClick={e => { e.stopPropagation(); setAsignarMes(month) }}
+                              className="text-[10px] font-bold px-2 py-0.5 rounded-md"
+                              style={{ background: 'var(--primary-dim)', color: 'var(--primary)' }}>
+                              + Asignar
+                            </button>
                           </div>
                         )}
                       </div>
@@ -736,7 +763,9 @@ export default function PlanPage() {
           )}
         </AnimatePresence>
 
-        {error && (
+        {asistente}
+
+      {error && (
           <div className="fixed bottom-4 left-1/2 -translate-x-1/2 z-50 flex items-center gap-2 px-4 py-2 rounded-xl text-sm shadow-xl"
             style={{ background: 'var(--red-dim)', border: '1px solid rgba(239,68,68,0.3)', color: '#FCA5A5' }}>
             <AlertCircle size={13} /> {error}
@@ -758,6 +787,7 @@ export default function PlanPage() {
 
   return (
     <div className="p-4 sm:p-6 max-w-4xl mx-auto">
+      {asistente}
       <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} className="mb-6">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div>
@@ -768,12 +798,19 @@ export default function PlanPage() {
               Organiza las capacitaciones por mes con drag & drop.
             </p>
           </div>
-          <button onClick={() => {
-            setForm({ name: `Plan SST ${currentYear}`, year: currentYear, profile_id: '' })
-            setShowCreate(true)
-          }} className="terra-btn self-start" style={{ padding: '10px 18px', fontSize: 13 }}>
-            <Plus size={15} /> Nuevo plan
-          </button>
+          <div className="flex items-center gap-2 self-start">
+            {/* Vía corta: asignar un curso a unas personas sin armar un perfil. */}
+            <button onClick={() => setAsignarMes(new Date().getMonth() + 1)}
+              className="terra-btn" style={{ padding: '10px 18px', fontSize: 13 }}>
+              <Plus size={15} /> Asignar capacitación
+            </button>
+            <button onClick={() => {
+              setForm({ name: `Plan SST ${currentYear}`, year: currentYear, profile_id: '' })
+              setShowCreate(true)
+            }} className="terra-btn-outline" style={{ padding: '10px 18px', fontSize: 13 }}>
+              <Plus size={15} /> Nuevo plan
+            </button>
+          </div>
         </div>
       </motion.div>
 

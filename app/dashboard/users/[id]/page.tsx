@@ -1,7 +1,8 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import FichaCompleta from '@/components/FichaCompleta'
+import AsignarCapacitacion from '@/components/AsignarCapacitacion'
 import { useParams, useRouter } from 'next/navigation'
 import { motion } from 'framer-motion'
 import {
@@ -61,6 +62,7 @@ function fmtDate(d: string | null) {
 }
 
 export default function UserDetailPage() {
+  const [asignando, setAsignando] = useState(false)
   const { id } = useParams<{ id: string }>()
   const router = useRouter()
   const [data, setData] = useState<{ user: UserProfile; enrollments: Enrollment[]; certificates: Certificate[]; groups: any[]; workerProfile: any } | null>(null)
@@ -71,12 +73,14 @@ export default function UserDetailPage() {
   const [cargoInput, setCargoInput] = useState('')
   const [savingCargo, setSavingCargo] = useState(false)
 
-  useEffect(() => {
+  const recargar = useCallback(() => {
     fetch(`/api/users/${id}`)
       .then(r => r.json())
       .then(d => { setData(d); setLoading(false) })
       .catch(() => setLoading(false))
   }, [id])
+
+  useEffect(() => { recargar() }, [recargar])
 
   if (loading) {
     return (
@@ -336,9 +340,24 @@ export default function UserDetailPage() {
         ))}
       </div>
 
+      <AsignarCapacitacion
+        abierto={asignando}
+        personaFijada={{ id: user.id, name: user.name }}
+        onCerrar={() => setAsignando(false)}
+        onListo={recargar}
+      />
+
       {/* Entrenamientos tab */}
       {tab === 'entrenamientos' && (
         <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
+
+          {/* Asignarle una capacitación sin salir de su ficha. */}
+          <div className="flex justify-end mb-3">
+            <button onClick={() => setAsignando(true)} className="terra-btn"
+              style={{ padding: '8px 14px', fontSize: 12 }}>
+              <BookOpen size={13} /> Asignar capacitación
+            </button>
+          </div>
 
           {/* Filter pills */}
           <div className="flex gap-2 flex-wrap mb-4">

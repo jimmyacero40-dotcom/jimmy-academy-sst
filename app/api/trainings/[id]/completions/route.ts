@@ -19,6 +19,11 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
   const url  = new URL(req.url)
   const from = url.searchParams.get('from') || null
   const to   = url.searchParams.get('to')   || null
+  // `asignados` lista a quienes tienen la capacitación asignada, hayan
+  // terminado o no. Hace falta para una capacitación presencial recién
+  // programada: la lista de asistencia se arma ANTES de que nadie la complete,
+  // y hasta ahora solo se podía partir de los certificados ya emitidos.
+  const soloAsignados = url.searchParams.get('modo') === 'asignados'
 
   // 1. Resolve training title from training_id
   const { data: training, error: tErr } = await supabase
@@ -29,6 +34,34 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
 
   if (tErr || !training)
     return NextResponse.json({ error: 'Capacitación no encontrada' }, { status: 404 })
+
+  // 2a. Los asignados salen de enrollments, no de los certificados.
+  if (soloAsignados) {
+    let qe = supabase
+      .from('enrollments')
+      .select('user_id, users!enrollments_user_id_fkey(id, name, cedula, cargo, active, retired_at)')
+      .eq('training_id', trainingId)
+    if (companyId) qe = qe.eq('company_id', companyId)
+
+    const { data: inscritos, error: eErr } = await qe
+    if (eErr) return NextResponse.json({ error: eErr.message }, { status: 500 })
+
+    const gente = (inscritos ?? [])
+      .map((e: any) => e.users)
+      .filter((u: any) => u && u.active && !u.retired_at)
+
+    const firmas = gente.length
+      ? (await supabase.from('signatures').select('user_id, signature_data').in('user_id', gente.map((u: any) => u.id))).data ?? []
+      : []
+    const firmaDe: Record<string, string> = {}
+    for (const f of firmas) if (f.signature_data) firmaDe[f.user_id] = f.signature_data
+
+    const participants = gente
+      .map((u: any) => ({ name: u.name ?? '', cedula: u.cedula ?? '', cargo: u.cargo ?? '', signature: firmaDe[u.id] ?? null }))
+      .sort((a: any, b: any) => a.name.localeCompare(b.name, 'es'))
+
+    return NextResponse.json({ participants, total: participants.length })
+  }
 
   // 2. Build certificates query
   //    - Always filter by course title (derived from training_id — user never types it)
