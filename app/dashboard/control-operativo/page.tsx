@@ -9,7 +9,7 @@ import Link from 'next/link'
 import {
   ArrowLeftRight, Users, LogIn, LogOut, Building2,
   Search, Filter, RefreshCw,
-  CheckCircle2, FileText, Table2, DoorOpen
+  CheckCircle2, FileText, Table2, DoorOpen, ChevronLeft, ChevronRight
 } from 'lucide-react'
 
 interface AccessLog {
@@ -69,6 +69,15 @@ function avatarColor(id: string) {
 }
 function initials(name: string) {
   return name.trim().split(/\s+/).slice(0,2).map(p => p[0]).join('').toUpperCase()
+}
+
+/** `isoDate` corrido `dias` días, sin pasarse de `tope`. */
+function correrDia(isoDate: string, dias: number, tope: string): string {
+  const [y, m, d] = isoDate.split('-').map(Number)
+  const base = new Date(Date.UTC(y, m - 1, d))
+  base.setUTCDate(base.getUTCDate() + dias)
+  const nuevo = base.toISOString().split('T')[0]
+  return nuevo > tope ? tope : nuevo
 }
 
 /** Lunes..domingo (inclusive) de la semana que contiene `isoDate`. */
@@ -314,8 +323,33 @@ export default function ControlOperativoPage() {
         {period === 'day' && (
           <div>
             <label className={labelCls} style={{ color: 'var(--text-label)' }}>Fecha</label>
-            <input type="date" value={selectedDate} max={today} onChange={e => setSelectedDate(e.target.value)}
-              className="px-3 py-1.5 rounded-lg text-sm outline-none" style={inputStyle} />
+            {/* Las flechas y "Hoy" son el camino corto del día a día, y además
+                la salida cuando el calendario del teléfono se abre cortado:
+                ese cuadro lo dibuja el sistema, no la página, así que aquí se
+                deja cómo cambiar de día sin tener que abrirlo. */}
+            <div className="flex items-center gap-1">
+              <button onClick={() => setSelectedDate(d => correrDia(d, -1, today))}
+                aria-label="Día anterior"
+                className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0"
+                style={{ ...inputStyle, color: 'var(--text-dim)' }}>
+                <ChevronLeft size={15} />
+              </button>
+              <input type="date" value={selectedDate} max={today} onChange={e => setSelectedDate(e.target.value)}
+                className="px-3 py-1.5 rounded-lg text-sm outline-none" style={inputStyle} />
+              <button onClick={() => setSelectedDate(d => correrDia(d, 1, today))}
+                aria-label="Día siguiente" disabled={selectedDate >= today}
+                className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 disabled:opacity-35"
+                style={{ ...inputStyle, color: 'var(--text-dim)' }}>
+                <ChevronRight size={15} />
+              </button>
+              {selectedDate !== today && (
+                <button onClick={() => setSelectedDate(today)}
+                  className="px-2.5 h-8 rounded-lg text-xs font-bold flex-shrink-0"
+                  style={{ background: 'var(--primary-dim)', color: 'var(--primary)' }}>
+                  Hoy
+                </button>
+              )}
+            </div>
           </div>
         )}
 
@@ -494,7 +528,12 @@ export default function ControlOperativoPage() {
           </div>
         ) : (
           <div className="overflow-x-auto" ref={columnas.contenedor}>
-            <table className="terra-table w-full" style={{ tableLayout: 'fixed' }}>
+            {/* Un ancho mínimo para las nueve columnas. Sin él, en un celular
+                la tabla se encogía al ancho de la pantalla: el área, la
+                portería y el estado quedaban en columnas de unos pocos
+                milímetros y el texto se montaba encima del de al lado. Con el
+                mínimo, lo que no cabe se desplaza de lado y se lee completo. */}
+            <table className="terra-table w-full" style={{ tableLayout: 'fixed', minWidth: 1060 }}>
               <colgroup>
                 {columnas.anchos.map((a, i) => (
                   <col key={COLUMNAS_MOVIMIENTOS[i].id} style={{ width: `${a}%` }} />

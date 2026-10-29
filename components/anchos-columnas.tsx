@@ -80,7 +80,13 @@ export function useAnchosColumnas(tablaId: string, base: ColumnaAncho[]) {
   const empezarArrastre = useCallback((i: number, e: React.PointerEvent) => {
     e.preventDefault()
     e.stopPropagation()
-    const ancho = contenedor.current?.offsetWidth ?? 0
+    // El porcentaje se mide contra la tabla, no contra la tarjeta: cuando la
+    // tabla tiene un ancho mínimo y se desplaza de lado -en un celular-, las
+    // dos cosas no son lo mismo y la manija se movería más rápido que el dedo.
+    const caja = contenedor.current
+    const ancho = caja
+      ? (caja.querySelector('table')?.getBoundingClientRect().width || caja.offsetWidth)
+      : 0
     if (!ancho || i >= base.length - 1) return
 
     const xInicial = e.clientX

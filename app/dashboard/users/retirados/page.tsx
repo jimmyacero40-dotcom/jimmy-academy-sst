@@ -249,7 +249,7 @@ export default function RetiradosPage() {
           </div>
         ) : (
           <div className="overflow-x-auto" ref={columnas.contenedor}>
-            <table className="terra-table w-full" style={{ tableLayout: 'fixed' }}>
+            <table className="terra-table w-full" style={{ tableLayout: 'fixed', minWidth: 880 }}>
               <colgroup>
                 {columnas.anchos.map((a, i) => (
                   <col key={COLUMNAS_RETIRADOS[i].id} style={{ width: `${a}%` }} />
