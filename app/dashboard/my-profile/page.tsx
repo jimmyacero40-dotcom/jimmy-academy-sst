@@ -931,15 +931,27 @@ export default function MyProfilePage() {
 
                 {([
                   ['talla_camisa',      'TALLA CAMISA / CAMISETA *',  ['XS','S','M','L','XL','XXL','XXXL']],
-                  ['talla_pantalon',    'TALLA PANTALÓN',              ['28','30','32','34','36','38','40','42','44','46']],
+                  // El pantalón traía solo el tallaje de caballero, de la 28 a la 46,
+                  // así que la mitad de la plantilla no tenía su talla en la lista.
+                  // Se agrupan los dos tallajes: no se pisan, porque el de dama va
+                  // de la 4 a la 20 y el de caballero arranca en la 28.
+                  ['talla_pantalon',    'TALLA PANTALÓN',
+                    { 'Dama': ['4','6','8','10','12','14','16','18','20'],
+                      'Caballero': ['28','30','32','34','36','38','40','42','44','46'] }],
                   ['talla_overol',      'TALLA OVEROL / MONO',         ['XS','S','M','L','XL','XXL','XXXL']],
                   ['talla_chaqueta',    'TALLA CHAQUETA / CHALECO',    ['XS','S','M','L','XL','XXL','XXXL']],
                   ['talla_impermeable', 'TALLA IMPERMEABLE / ROPA LLUVIA', ['XS','S','M','L','XL','XXL','XXXL']],
-                ] as [keyof ProfileData, string, string[]][]).map(([key, label, opts]) => (
+                ] as [keyof ProfileData, string, string[] | Record<string, string[]>][]).map(([key, label, opts]) => (
                   <Field key={key} label={label}>
                     <select value={(data[key] as string) ?? ''} onChange={e => set(key, e.target.value)} className={inp}>
                       <option value="">— TALLA —</option>
-                      {opts.map(o => <option key={o}>{o}</option>)}
+                      {Array.isArray(opts)
+                        ? opts.map(o => <option key={o}>{o}</option>)
+                        : Object.entries(opts).map(([grupo, tallas]) => (
+                            <optgroup key={grupo} label={grupo}>
+                              {tallas.map(o => <option key={o}>{o}</option>)}
+                            </optgroup>
+                          ))}
                     </select>
                   </Field>
                 ))}

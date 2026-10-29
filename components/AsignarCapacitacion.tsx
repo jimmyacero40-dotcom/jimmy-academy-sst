@@ -53,7 +53,9 @@ export default function AsignarCapacitacion({
   const [paso, setPaso] = useState(1)
   const [cursos, setCursos] = useState<Curso[]>([])
   const [personas, setPersonas] = useState<Persona[]>([])
-  const [yaLaTienen, setYaLaTienen] = useState<Set<string>>(new Set())
+  // Quién la tiene y en qué va. El estado importa: lo completado no se retira.
+  const [estadoDe, setEstadoDe] = useState<Record<string, string>>({})
+  const [modo, setModo] = useState<'asignar' | 'retirar'>('asignar')
   const [cargando, setCargando] = useState(true)
 
   const [curso, setCurso] = useState<Curso | null>(null)
@@ -95,12 +97,18 @@ export default function AsignarCapacitacion({
 
   // Quién ya la tiene este año: se consulta al elegir el curso.
   useEffect(() => {
-    if (!curso) { setYaLaTienen(new Set()); return }
+    if (!curso) { setEstadoDe({}); return }
     fetch(`/api/asignaciones?training_id=${curso.id}`)
       .then(r => r.ok ? r.json() : [])
-      .then((d: any[]) => setYaLaTienen(new Set(d.map(e => e.user_id))))
-      .catch(() => setYaLaTienen(new Set()))
+      .then((d: any[]) => {
+        const m: Record<string, string> = {}
+        for (const e of d) m[e.user_id] = e.status
+        setEstadoDe(m)
+      })
+      .catch(() => setEstadoDe({}))
   }, [curso])
+
+  const yaLaTienen = useMemo(() => new Set(Object.keys(estadoDe)), [estadoDe])
 
   // Abierto desde la ficha de alguien: esa persona va elegida y el paso de
   // personas se salta, porque ya está decidido a quién se le asigna.
@@ -144,8 +152,23 @@ export default function AsignarCapacitacion({
     })
   }, [personas, busca, fCargo, fArea, fSede, fGrupo])
 
-  /** Las que se pueden marcar: quien ya la tiene queda fuera. */
-  const marcables = useMemo(() => filtradas.filter(p => !yaLaTienen.has(p.id)), [filtradas, yaLaTienen])
+  /**
+   * Quién se puede marcar, según lo que se esté haciendo.
+   *  - Asignando: quien todavía no la tiene.
+   *  - Retirando: quien la tiene pendiente o en curso. Lo ya completado no,
+   *    porque esa persona hizo la capacitación y su constancia es soporte.
+   */
+  const marcables = useMemo(() => filtradas.filter(p => modo === 'asignar'
+    ? !yaLaTienen.has(p.id)
+    : estadoDe[p.id] === 'pending' || estadoDe[p.id] === 'in_progress'),
+    [filtradas, yaLaTienen, estadoDe, modo])
+
+  /** Por qué alguien no se puede marcar. Vacío = sí se puede. */
+  const motivoBloqueo = (id: string): string => {
+    if (modo === 'asignar') return yaLaTienen.has(id) ? 'Ya la tiene' : ''
+    if (estadoDe[id] === 'completed') return 'Ya la completó'
+    return yaLaTienen.has(id) ? '' : 'No la tiene'
+  }
   const todasMarcadas = marcables.length > 0 && marcables.every(p => elegidos.has(p.id))
 
   const alternarTodas = () => {
@@ -158,7 +181,7 @@ export default function AsignarCapacitacion({
   }
 
   const alternar = (id: string) => {
-    if (yaLaTienen.has(id)) return
+    if (motivoBloqueo(id)) return
     setElegidos(prev => { const n = new Set(prev); n.has(id) ? n.delete(id) : n.add(id); return n })
   }
 
@@ -167,6 +190,24 @@ export default function AsignarCapacitacion({
     [personas, elegidos])
 
   // ── Guardar ──
+  const retirar = async () => {
+    setGuardando(true); setError('')
+    try {
+      const r = await fetch('/api/asignaciones', {
+        method: 'DELETE', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ training_id: curso!.id, user_ids: [...elegidos] }),
+      })
+      const d = await r.json()
+      if (!r.ok) { setError(d.error || 'No fue posible retirar'); return }
+      setResultado({ ...d, retiro: true, curso: curso!.title })
+      onListo?.()
+    } catch {
+      setError('Error de conexión')
+    } finally {
+      setGuardando(false)
+    }
+  }
+
   const asignar = async () => {
     setGuardando(true); setError('')
     try {
@@ -223,7 +264,9 @@ export default function AsignarCapacitacion({
             <GraduationCap size={17} style={{ color: 'var(--primary)' }} />
           </div>
           <div className="flex-1 min-w-0">
-            <h3 className="font-bold text-sm sm:text-base" style={{ color: 'var(--text)' }}>Asignar capacitación</h3>
+            <h3 className="font-bold text-sm sm:text-base" style={{ color: 'var(--text)' }}>
+              {modo === 'retirar' ? 'Retirar capacitación' : 'Asignar capacitación'}
+            </h3>
             <p className="text-[11px] truncate" style={{ color: 'var(--text-dim)' }}>
               {personaFijada ? `Para ${personaFijada.name}` : 'Elige el curso, las personas y el mes'}
             </p>
@@ -265,18 +308,27 @@ export default function AsignarCapacitacion({
                 <CheckCircle2 size={30} style={{ color: '#10B981' }} />
               </div>
               <h4 className="font-bold text-lg mb-1" style={{ color: 'var(--text)' }}>
-                {resultado.asignadas === 1 ? 'Capacitación asignada' : `${resultado.asignadas} capacitaciones asignadas`}
+                {resultado.retiro
+                  ? (resultado.retiradas === 1 ? 'Capacitación retirada' : `${resultado.retiradas} capacitaciones retiradas`)
+                  : (resultado.asignadas === 1 ? 'Capacitación asignada' : `${resultado.asignadas} capacitaciones asignadas`)}
               </h4>
               <p className="text-xs mb-1" style={{ color: 'var(--text-dim)' }}>
-                {resultado.curso} · {MESES[mes - 1]}
+                {resultado.curso}{resultado.retiro ? '' : ` · ${MESES[mes - 1]}`}
               </p>
-              {resultado.yaLaTenian > 0 && (
+              {!resultado.retiro && resultado.yaLaTenian > 0 && (
                 <p className="text-[11px]" style={{ color: '#F59E0B' }}>
                   {resultado.yaLaTenian} ya la tenían y se dejaron como estaban.
                 </p>
               )}
+              {resultado.retiro && resultado.conservadas > 0 && (
+                <p className="text-[11px]" style={{ color: '#F59E0B' }}>
+                  {resultado.conservadas} ya la habían completado y se conservaron.
+                </p>
+              )}
               <p className="text-[11px] mt-3" style={{ color: 'var(--text-faint)' }}>
-                Ya aparece en el Plan Anual de {MESES[mes - 1]} y en la ficha de cada persona.
+                {resultado.retiro
+                  ? 'Ya no les figura en su plan de formación.'
+                  : `Ya aparece en el Plan Anual de ${MESES[mes - 1]} y en la ficha de cada persona.`}
               </p>
             </div>
           ) : paso === 1 ? (
@@ -321,6 +373,28 @@ export default function AsignarCapacitacion({
           ) : paso === 2 ? (
             /* ══ 2. Personas ══ */
             <div className="space-y-3">
+              {/* Asignar y retirar son la misma operación al revés, así que
+                  viven en el mismo sitio: equivocarse al asignar se arregla
+                  donde se asignó. */}
+              {!personaFijada && (
+                <div className="flex gap-1.5">
+                  {([['asignar', 'Asignar'], ['retirar', 'Retirar']] as const).map(([id, label]) => (
+                    <button key={id} onClick={() => { setModo(id); setElegidos(new Set()) }}
+                      className="px-3 py-1.5 rounded-lg text-xs font-bold transition-all"
+                      style={modo === id
+                        ? { background: id === 'retirar' ? '#EF4444' : 'var(--primary)', color: '#fff' }
+                        : { background: 'var(--bg-card)', border: '1px solid var(--border)', color: 'var(--text-dim)' }}>
+                      {label}
+                    </button>
+                  ))}
+                  <span className="text-[11px] self-center ml-1" style={{ color: 'var(--text-faint)' }}>
+                    {modo === 'asignar'
+                      ? 'Marca a quienes deben hacerla.'
+                      : 'Marca a quienes se les asignó por error. Lo ya completado no se retira.'}
+                  </span>
+                </div>
+              )}
+
               <div className="flex flex-wrap gap-2">
                 <div className="relative flex-1" style={{ minWidth: 180 }}>
                   <Search size={13} className="absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none"
@@ -366,7 +440,8 @@ export default function AsignarCapacitacion({
                     </p>
                   )}
                   {filtradas.map(p => {
-                    const tiene = yaLaTienen.has(p.id)
+                    const bloqueo = motivoBloqueo(p.id)
+                    const tiene = !!bloqueo
                     const marcado = elegidos.has(p.id)
                     return (
                       <label key={p.id}
@@ -381,9 +456,9 @@ export default function AsignarCapacitacion({
                             {[p.cedula, p.cargo, p.area_name, p.sede].filter(Boolean).join(' · ')}
                           </p>
                         </div>
-                        {tiene && (
+                        {bloqueo && (
                           <span className="text-[10px] font-bold px-2 py-0.5 rounded flex-shrink-0"
-                            style={{ background: 'rgba(245,158,11,0.14)', color: '#F59E0B' }}>Ya la tiene</span>
+                            style={{ background: 'rgba(245,158,11,0.14)', color: '#F59E0B' }}>{bloqueo}</span>
                         )}
                       </label>
                     )
@@ -394,7 +469,14 @@ export default function AsignarCapacitacion({
           ) : (
             /* ══ 3. Fecha y confirmar ══ */
             <div className="space-y-4">
-              <div className="grid sm:grid-cols-2 gap-3">
+              {modo === 'retirar' && (
+                <div className="flex items-start gap-2 text-xs p-3 rounded-xl"
+                  style={{ background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.25)', color: '#FCA5A5' }}>
+                  <AlertCircle size={14} className="flex-shrink-0 mt-0.5" />
+                  <span>Se les quita de su plan de formación. No borra nada de lo que ya hayan completado.</span>
+                </div>
+              )}
+              <div className="grid sm:grid-cols-2 gap-3" hidden={modo === 'retirar'}>
                 <div>
                   <label className="text-[11px] font-bold uppercase tracking-wider mb-1.5 block" style={{ color: 'var(--text-dim)' }}>Mes *</label>
                   <select value={mes} onChange={e => setMes(Number(e.target.value))} className={inp} style={estiloInp}>
@@ -436,9 +518,11 @@ export default function AsignarCapacitacion({
                   <GraduationCap size={13} style={{ color: 'var(--primary)' }} />
                   <span className="text-xs font-bold" style={{ color: 'var(--text)' }}>{curso?.title}</span>
                 </div>
-                <div className="flex items-center gap-2 mb-2 text-[11px]" style={{ color: 'var(--text-dim)' }}>
-                  <CalendarDays size={12} /> {MESES[mes - 1]}{fecha ? ` · ${fecha.split('-').reverse().join('/')}` : ''} · {MODALIDADES.find(m => m.id === modalidad)?.label}
-                </div>
+                {modo === 'asignar' && (
+                  <div className="flex items-center gap-2 mb-2 text-[11px]" style={{ color: 'var(--text-dim)' }}>
+                    <CalendarDays size={12} /> {MESES[mes - 1]}{fecha ? ` · ${fecha.split('-').reverse().join('/')}` : ''} · {MODALIDADES.find(m => m.id === modalidad)?.label}
+                  </div>
+                )}
                 <div className="flex items-start gap-2 text-[11px]" style={{ color: 'var(--text-dim)' }}>
                   <Users size={12} className="flex-shrink-0 mt-0.5" />
                   <span>{nombresElegidos.join(' · ') || 'Nadie seleccionado'}</span>
@@ -494,12 +578,13 @@ export default function AsignarCapacitacion({
                     Siguiente <ChevronRight size={12} />
                   </button>
                 ) : (
-                  <button onClick={asignar} disabled={guardando || !curso || elegidos.size === 0}
+                  <button onClick={modo === 'retirar' ? retirar : asignar}
+                    disabled={guardando || !curso || elegidos.size === 0}
                     className="px-4 py-2 rounded-lg text-xs font-bold flex items-center gap-1.5 disabled:opacity-40"
-                    style={{ background: 'var(--primary)', color: '#fff' }}>
+                    style={{ background: modo === 'retirar' ? '#EF4444' : 'var(--primary)', color: '#fff' }}>
                     {guardando
-                      ? <><Loader2 size={12} className="animate-spin" /> Asignando…</>
-                      : <><Check size={12} /> Asignar a {elegidos.size} {elegidos.size === 1 ? 'persona' : 'personas'}</>}
+                      ? <><Loader2 size={12} className="animate-spin" /> {modo === 'retirar' ? 'Retirando…' : 'Asignando…'}</>
+                      : <><Check size={12} /> {modo === 'retirar' ? 'Retirar a' : 'Asignar a'} {elegidos.size} {elegidos.size === 1 ? 'persona' : 'personas'}</>}
                   </button>
                 )}
               </div>

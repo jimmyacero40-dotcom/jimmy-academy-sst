@@ -462,50 +462,77 @@ export default function TrainingDetailPage() {
         .catch(() => setSavedSignatureLoaded(true))
     }
   }, [phase, savedSignatureLoaded])
-  const certCode = `AVC-${new Date().getFullYear()}-${String(new Date().getMonth() + 1).padStart(2, '0')}${String(new Date().getDate()).padStart(2, '0')}-${String(courseId).padStart(3, '0')}`
+  const [certCode, setCertCode] = useState('')
+  const [certError, setCertError] = useState('')
 
+  /**
+   * Primero se registra el certificado, después se dibuja.
+   *
+   * Iba al revés: se pintaba el PNG, se mostraba, y recién entonces se
+   * intentaba guardar dentro de un `try` con el `catch` vacío. Si el guardado
+   * fallaba -y fallaba siempre que otra persona hubiera terminado ese mismo
+   * curso ese mismo día, porque el número lo armaba el navegador sin nada de
+   * la persona y la columna es única- el trabajador veía su certificado, lo
+   * descargaba, y no quedaba registrado ni él ni su avance.
+   *
+   * Ahora el número lo da el servidor al registrarlo, y si no se puede
+   * registrar no se dibuja nada: se le dice al trabajador, en vez de dejarlo
+   * creyendo que terminó.
+   */
   const handleGenerateCert = async () => {
     if (!employeeName.trim() || !employeeCedula.trim() || !employeeSignature) return
     setGeneratingCert(true)
+    setCertError('')
+
     const durationMap: Record<string, string> = { '2h': '2 horas', '4h': '4 horas', '6h': '6 horas', '8h': '8 horas', '12h': '12 horas', '16h': '16 horas', '20h': '20 horas', '24h': '24 horas', '40h': '40 horas' }
     const dur = training?.duration || '8h'
-    const img = await generateCertificatePNG({
-      employeeName: employeeName.trim(),
-      employeeCedula: employeeCedula.trim(),
-      course: training?.title || 'Capacitación SST',
-      date: new Date().toLocaleDateString('es-CO', { day: 'numeric', month: 'long', year: 'numeric' }),
-      duration: durationMap[dur] || dur,
-      score: `${Math.round((score / questions.length) * 100)}%`,
-      code: certCode,
-      employeeSignature: employeeSignature,
-      logoUrl: '/images/agrosafe-completo.png',
-      instructorSignatureUrl: '/images/FIRMA FIRMA.png',
-    })
-    setCertImage(img)
-    setGeneratingCert(false)
-    setPhase('certificate')
+    const durationLabel = durationMap[dur] || dur
+    const nota = `${Math.round((score / questions.length) * 100)}%`
 
     try {
-      const durationLabel = durationMap[dur] || dur
-      const userId = (session?.user as any)?.id
-      if (userId) {
-        await fetch('/api/certificates', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            training_id: courseId,
-            code: certCode,
-            name: employeeName.trim(),
-            cedula: employeeCedula.trim(),
-            course: training?.title || 'Capacitación SST',
-            issued: new Date().toISOString().split('T')[0],
-            expires: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
-            duration: durationLabel,
-            score: `${Math.round((score / questions.length) * 100)}%`,
-          })
-        })
+      const res = await fetch('/api/certificates', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          training_id: courseId,
+          name: employeeName.trim(),
+          cedula: employeeCedula.trim(),
+          course: training?.title || 'Capacitación SST',
+          issued: new Date().toISOString().split('T')[0],
+          expires: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+          duration: durationLabel,
+          score: nota,
+        }),
+      })
+      const guardado = await res.json()
+      if (!res.ok) {
+        setCertError(guardado?.error || 'No fue posible registrar tu certificado. Inténtalo otra vez; tu avance no se pierde.')
+        setGeneratingCert(false)
+        return
       }
-    } catch (_) {}
+
+      const codigo = guardado.code as string
+      setCertCode(codigo)
+
+      const img = await generateCertificatePNG({
+        employeeName: employeeName.trim(),
+        employeeCedula: employeeCedula.trim(),
+        course: training?.title || 'Capacitación SST',
+        date: new Date(`${guardado.issued}T12:00:00`).toLocaleDateString('es-CO', { day: 'numeric', month: 'long', year: 'numeric' }),
+        duration: durationLabel,
+        score: nota,
+        code: codigo,
+        employeeSignature: employeeSignature,
+        logoUrl: '/images/agrosafe-completo.png',
+        instructorSignatureUrl: '/images/FIRMA FIRMA.png',
+      })
+      setCertImage(img)
+      setPhase('certificate')
+    } catch {
+      setCertError('No hay conexión. Inténtalo otra vez; tu avance no se pierde.')
+    } finally {
+      setGeneratingCert(false)
+    }
   }
 
   const downloadCert = () => {
@@ -1008,12 +1035,19 @@ export default function TrainingDetailPage() {
               Esta constancia se registra para los indicadores del SG-SST conforme al Decreto 1072 de 2015.
             </div>
 
+            {certError && (
+              <div className="p-3 rounded-xl text-sm mb-3 flex items-start gap-2"
+                style={{ background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.3)', color: '#FCA5A5' }}>
+                <span>⚠️</span><span>{certError}</span>
+              </div>
+            )}
+
             <button onClick={handleGenerateCert}
               disabled={!employeeName || !employeeCedula.trim() || !employeeSignature || generatingCert}
               className="terra-btn w-full py-3 justify-center disabled:opacity-40">
               {generatingCert
                 ? <><Loader2 size={18} className="animate-spin" /> Generando Certificado...</>
-                : <><Award size={18} /> Generar Certificado</>
+                : <><Award size={18} /> {certError ? 'Reintentar' : 'Generar Certificado'}</>
               }
             </button>
           </div>

@@ -146,6 +146,57 @@ export async function POST(req: NextRequest) {
   }, { status: 201 })
 }
 
+// ─── Retirar una capacitación asignada ────────────────────────────────
+// Para cuando se asignó por equivocación o a quien no era.
+//
+// Solo se retira lo que está pendiente o en curso. Lo ya completado no se
+// toca: esa persona hizo la capacitación, y su certificado y su constancia
+// son el soporte del SG-SST. Si de verdad hay que borrar un historial, se
+// hace desde Certificados, a conciencia y no de paso.
+export async function DELETE(req: NextRequest) {
+  const { authorized, companyId } = await requierePermiso('formacion.gestionar')
+  if (!authorized) return NextResponse.json({ error: 'No tiene permiso para retirar capacitaciones' }, { status: 403 })
+  if (!companyId) return NextResponse.json({ error: 'Selecciona una empresa primero' }, { status: 400 })
+
+  const body = await req.json()
+  const trainingId = Number(body.training_id)
+  const userIds: string[] = Array.isArray(body.user_ids) ? body.user_ids : []
+  if (!trainingId || !userIds.length) {
+    return NextResponse.json({ error: 'Falta la capacitación o las personas' }, { status: 400 })
+  }
+
+  // Qué se puede retirar y qué no, antes de tocar nada.
+  const { data: inscripciones } = await supabase
+    .from('enrollments')
+    .select('id, user_id, status, plan_item_id')
+    .eq('training_id', trainingId)
+    .eq('company_id', companyId)
+    .in('user_id', userIds)
+
+  const retirables = (inscripciones ?? []).filter(e => e.status === 'pending' || e.status === 'in_progress')
+  const completadas = (inscripciones ?? []).filter(e => e.status === 'completed')
+
+  if (retirables.length) {
+    const { error } = await supabase.from('enrollments').delete().in('id', retirables.map(e => e.id))
+    if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+
+    // También deja de figurar como destinatario del ítem del plan: si no, al
+    // activar el plan se le volvería a asignar lo que se acaba de retirar.
+    const items = [...new Set(retirables.map(e => e.plan_item_id).filter(Boolean))] as string[]
+    if (items.length) {
+      await supabase.from('plan_item_targets').delete()
+        .in('plan_item_id', items).eq('target_type', 'user')
+        .in('target_id', retirables.map(e => e.user_id))
+    }
+  }
+
+  return NextResponse.json({
+    retiradas: retirables.length,
+    conservadas: completadas.length,
+    noTenian: userIds.length - (inscripciones ?? []).length,
+  })
+}
+
 // ─── Quién ya tiene una capacitación este año ─────────────────────────
 // Para pintar en gris a quien no hay que volver a asignar.
 export async function GET(req: NextRequest) {
