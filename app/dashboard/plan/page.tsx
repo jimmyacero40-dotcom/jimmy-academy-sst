@@ -12,6 +12,7 @@ import BibliotecaTemas, { type FiltroTemas } from '@/components/plan/BibliotecaT
 import VistaMes from '@/components/plan/VistaMes'
 import VistaAno from '@/components/plan/VistaAno'
 import PanelAsignacion, { type ValoresIniciales } from '@/components/plan/PanelAsignacion'
+import PanelCapacitacion from '@/components/plan/PanelCapacitacion'
 import { colorCategoria, type PlanItem, type Tema } from '@/components/plan/tipos'
 import { MESES, partes, enPalabras, horas } from '@/lib/plan-fechas'
 import {
@@ -126,6 +127,7 @@ export default function PlanPage() {
           .filter(t => t.status !== 'inactivo')
           .map(t => ({
             id: t.id, title: t.title, duration: t.duration, category: t.category,
+            descripcion: t.description ?? null,
             obligatorio: t.category === 'Obligatorio',
           }))
           .sort((a, b) => a.title.localeCompare(b.title, 'es')),
@@ -450,22 +452,48 @@ export default function PlanPage() {
                 <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
                   className="fixed inset-0 z-40" style={{ background: 'rgba(0,0,0,0.3)' }}
                   onClick={() => setPanel(null)} />
-                <PanelAsignacion
-                  key={panel.modo === 'editar' ? panel.item.id : 'nueva'}
-                  modo={panel.modo}
-                  planId={editingPlan.id}
-                  anioPlan={editingPlan.year}
-                  tema={panel.modo === 'crear' ? panel.tema : null}
-                  temas={temas}
-                  item={panel.modo === 'editar' ? panel.item : null}
-                  inicial={panel.modo === 'crear' ? panel.inicial : undefined}
-                  onCerrar={() => setPanel(null)}
-                  onGuardado={alGuardar}
-                  onEliminado={id => {
-                    setItems(prev => prev.filter(i => i.id !== id))
-                    setPanel(null)
-                  }}
-                />
+                {panel.modo === 'editar' ? (
+                  <PanelCapacitacion
+                    key={panel.item.id}
+                    item={panel.item}
+                    planId={editingPlan.id}
+                    anioPlan={editingPlan.year}
+                    temas={temas}
+                    onCerrar={() => setPanel(null)}
+                    onGuardado={alGuardar}
+                    onEliminado={id => {
+                      setItems(prev => prev.filter(i => i.id !== id))
+                      setPanel(null)
+                    }}
+                    onCambioAsignacion={async aviso => {
+                      // La fecha pudo moverse al guardar, así que el calendario
+                      // y los contadores se rehacen con lo que hay en la base.
+                      const r = await fetch(`/api/plans/${editingPlan.id}/items`)
+                      if (r.ok) {
+                        const frescos: PlanItem[] = await r.json()
+                        setItems(frescos)
+                        const actual = frescos.find(i => i.id === panel.item.id)
+                        if (actual) {
+                          setPanel({ modo: 'editar', item: actual })
+                          if (vista.clase === 'mes') setMes(actual.month)
+                        }
+                      }
+                      setAviso({ texto: aviso })
+                    }}
+                  />
+                ) : (
+                  <PanelAsignacion
+                    key="nueva"
+                    modo="crear"
+                    planId={editingPlan.id}
+                    anioPlan={editingPlan.year}
+                    tema={panel.tema}
+                    temas={temas}
+                    inicial={panel.inicial}
+                    onCerrar={() => setPanel(null)}
+                    onGuardado={alGuardar}
+                  />
+                )}
               </>
             )}
           </AnimatePresence>

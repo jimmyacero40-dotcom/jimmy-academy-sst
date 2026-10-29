@@ -11,7 +11,7 @@
 // ──────────────────────────────────────────────────────────────────────
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { motion } from 'framer-motion'
 import {
   X, Search, Check, ChevronRight, ChevronLeft, Loader2, GraduationCap,
@@ -36,21 +36,71 @@ interface Persona {
   grupos: { id: string; name: string }[]
 }
 
+/**
+ * El marco de afuera. Declarado aquí y no dentro del componente para que React
+ * no lo trate como un tipo nuevo en cada pintada: si lo hiciera, la lista se
+ * volvería a montar y el buscador perdería el cursor en cada letra.
+ */
+function Marco({ variante, onFondo, children }: {
+  variante: 'modal' | 'panel'
+  onFondo: () => void
+  children: React.ReactNode
+}) {
+  if (variante === 'panel') {
+    return <div className="flex flex-col h-full overflow-hidden">{children}</div>
+  }
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4"
+      style={{ background: 'rgba(0,0,0,0.55)' }} onClick={onFondo}>
+      <motion.div initial={{ opacity: 0, scale: 0.97 }} animate={{ opacity: 1, scale: 1 }}
+        onClick={e => e.stopPropagation()}
+        className="w-full max-w-4xl max-h-[92vh] flex flex-col rounded-2xl overflow-hidden"
+        style={{ background: 'var(--bg-surface)', border: '1px solid var(--border)' }}>
+        {children}
+      </motion.div>
+    </div>
+  )
+}
+
 export default function AsignarCapacitacion({
   abierto, onCerrar, onListo,
   mesInicial,
   personaFijada,
+  cursoFijado,
+  planItemId,
+  fechaInicial,
+  publicoInicial,
+  variante = 'modal',
 }: {
   abierto: boolean
   onCerrar: () => void
   /** Se llama tras asignar, para que la pantalla de atrás se refresque. */
-  onListo?: () => void
+  onListo?: (resultado?: any) => void
   /** Mes preseleccionado, cuando se abre desde un mes del Plan Anual. */
   mesInicial?: number
   /** Al abrirlo desde la ficha de alguien: esa persona ya viene elegida. */
   personaFijada?: { id: string; name: string }
+  /**
+   * Abierto desde una capacitación del calendario: el curso ya está decidido,
+   * así que el paso de elegir curso sobra y quedan Personas → Fecha.
+   */
+  cursoFijado?: Curso
+  /**
+   * El ítem del plan al que se enganchan las inscripciones. Con él, el panel
+   * trabaja en modo edición: los que ya están vienen marcados y desmarcarlos
+   * los retira.
+   */
+  planItemId?: string
+  fechaInicial?: string
+  /**
+   * A quién iba dirigida la capacitación en el plan. Si todavía no tiene a
+   * nadie asignado, sirve de punto de partida -y se puede ajustar-.
+   */
+  publicoInicial?: { tipo: string; id: string | null }[]
+  /** 'panel' lo dibuja dentro de la barra lateral, sin ventana propia. */
+  variante?: 'modal' | 'panel'
 }) {
-  const [paso, setPaso] = useState(1)
+  const [paso, setPaso] = useState(cursoFijado ? 2 : 1)
   const [cursos, setCursos] = useState<Curso[]>([])
   const [personas, setPersonas] = useState<Persona[]>([])
   // Quién la tiene y en qué va. El estado importa: lo completado no se retira.
@@ -58,10 +108,13 @@ export default function AsignarCapacitacion({
   const [modo, setModo] = useState<'asignar' | 'retirar'>('asignar')
   const [cargando, setCargando] = useState(true)
 
-  const [curso, setCurso] = useState<Curso | null>(null)
+  const [curso, setCurso] = useState<Curso | null>(cursoFijado ?? null)
   const [elegidos, setElegidos] = useState<Set<string>>(new Set())
+  /** Quién está asignado a este ítem del plan y en qué va. Solo en edición. */
+  const [estadoItem, setEstadoItem] = useState<Record<string, string>>({})
+  const [yaEstaban, setYaEstaban] = useState<Set<string>>(new Set())
   const [mes, setMes] = useState(mesInicial ?? new Date().getMonth() + 1)
-  const [fecha, setFecha] = useState('')
+  const [fecha, setFecha] = useState(fechaInicial ?? '')
   const [modalidad, setModalidad] = useState('presencial')
   const [responsable, setResponsable] = useState('')
 
@@ -110,6 +163,51 @@ export default function AsignarCapacitacion({
 
   const yaLaTienen = useMemo(() => new Set(Object.keys(estadoDe)), [estadoDe])
 
+  // Modo edición: los que ya están asignados a esta capacitación del plan
+  // vienen marcados, y quitarles el chulo los retira al guardar.
+  const edicion = !!planItemId
+  const [asignadosLeidos, setAsignadosLeidos] = useState(false)
+  const publicoAplicado = useRef(false)
+
+  useEffect(() => {
+    if (!abierto || !planItemId) return
+    fetch(`/api/asignaciones?plan_item_id=${planItemId}`)
+      .then(r => r.ok ? r.json() : [])
+      .then((d: any[]) => {
+        const m: Record<string, string> = {}
+        for (const e of d) m[e.user_id] = e.status
+        setEstadoItem(m)
+        setYaEstaban(new Set(d.map(e => e.user_id)))
+        // Vacía no se toca: esta respuesta y la lista de personas llegan cada
+        // una por su lado, y si esta llegaba de última borraba la propuesta
+        // del público que ya se había marcado.
+        if (d.length) setElegidos(new Set(d.map(e => e.user_id)))
+      })
+      .catch(() => setEstadoItem({}))
+      .finally(() => setAsignadosLeidos(true))
+  }, [abierto, planItemId])
+
+  // Sin nadie asignado todavía, se parte del público que decía el plan -toda
+  // la empresa, un área, un grupo-. Es una propuesta: se desmarca lo que no
+  // corresponda y nada se guarda hasta pulsar Guardar.
+  useEffect(() => {
+    if (!edicion || !asignadosLeidos || publicoAplicado.current) return
+    if (yaEstaban.size > 0 || personas.length === 0) return
+    publicoAplicado.current = true
+    if (!publicoInicial?.length) return
+    const ids = new Set<string>()
+    for (const t of publicoInicial) {
+      if (t.tipo === 'all') personas.forEach(p => ids.add(p.id))
+      else if (t.tipo === 'area' && t.id) personas.filter(p => p.area_id === t.id).forEach(p => ids.add(p.id))
+      else if (t.tipo === 'group' && t.id) personas.filter(p => p.grupos.some(g => g.id === t.id)).forEach(p => ids.add(p.id))
+      else if (t.tipo === 'user' && t.id) ids.add(t.id)
+    }
+    if (ids.size) setElegidos(ids)
+  }, [edicion, asignadosLeidos, yaEstaban, personas, publicoInicial])
+
+  useEffect(() => { if (cursoFijado) setCurso(cursoFijado) }, [cursoFijado])
+  useEffect(() => { if (fechaInicial !== undefined) setFecha(fechaInicial) }, [fechaInicial])
+
   // Abierto desde la ficha de alguien: esa persona va elegida y el paso de
   // personas se salta, porque ya está decidido a quién se le asigna.
   useEffect(() => {
@@ -117,8 +215,9 @@ export default function AsignarCapacitacion({
   }, [abierto, personaFijada])
 
   const reiniciar = () => {
-    setPaso(1); setCurso(null); setError(''); setResultado(null)
-    setElegidos(personaFijada ? new Set([personaFijada.id]) : new Set())
+    setPaso(cursoFijado ? 2 : 1)
+    setCurso(cursoFijado ?? null); setError(''); setResultado(null)
+    setElegidos(cursoFijado ? new Set(yaEstaban) : personaFijada ? new Set([personaFijada.id]) : new Set())
     setBusca(''); setBuscaCurso(''); setFCargo(''); setFArea(''); setFSede(''); setFGrupo('')
   }
 
@@ -158,13 +257,18 @@ export default function AsignarCapacitacion({
    *  - Retirando: quien la tiene pendiente o en curso. Lo ya completado no,
    *    porque esa persona hizo la capacitación y su constancia es soporte.
    */
-  const marcables = useMemo(() => filtradas.filter(p => modo === 'asignar'
-    ? !yaLaTienen.has(p.id)
-    : estadoDe[p.id] === 'pending' || estadoDe[p.id] === 'in_progress'),
-    [filtradas, yaLaTienen, estadoDe, modo])
+  const marcables = useMemo(() => filtradas.filter(p => {
+    if (edicion) return estadoItem[p.id] !== 'completed'
+    return modo === 'asignar'
+      ? !yaLaTienen.has(p.id)
+      : estadoDe[p.id] === 'pending' || estadoDe[p.id] === 'in_progress'
+  }), [filtradas, yaLaTienen, estadoDe, estadoItem, edicion, modo])
 
   /** Por qué alguien no se puede marcar. Vacío = sí se puede. */
   const motivoBloqueo = (id: string): string => {
+    // Editando, la lista es la de esta capacitación: se marca y se desmarca a
+    // voluntad. Lo único intocable es lo ya hecho.
+    if (edicion) return estadoItem[id] === 'completed' ? 'Ya la hizo' : ''
     if (modo === 'asignar') return yaLaTienen.has(id) ? 'Ya la tiene' : ''
     if (estadoDe[id] === 'completed') return 'Ya la completó'
     return yaLaTienen.has(id) ? '' : 'No la tiene'
@@ -220,12 +324,15 @@ export default function AsignarCapacitacion({
           scheduled_date: fecha || null,
           modalidad,
           responsable,
+          // Editando una capacitación del calendario, la lista que se ve es la
+          // lista que queda: lo desmarcado se retira.
+          ...(planItemId ? { plan_item_id: planItemId, sincronizar: true } : {}),
         }),
       })
       const d = await r.json()
       if (!r.ok) { setError(d.error || 'No fue posible asignar'); return }
-      setResultado(d)
-      onListo?.()
+      setResultado({ ...d, edicion })
+      onListo?.(d)
     } catch {
       setError('Error de conexión')
     } finally {
@@ -240,23 +347,25 @@ export default function AsignarCapacitacion({
     background: 'var(--bg-card)', border: '1px solid var(--border)', color: 'var(--text)',
   }
 
-  // El paso de personas se salta cuando se abre desde la ficha de alguien.
-  const pasos = personaFijada
-    ? [{ n: 1, label: 'Capacitación' }, { n: 3, label: 'Fecha' }]
-    : [{ n: 1, label: 'Capacitación' }, { n: 2, label: 'Personas' }, { n: 3, label: 'Fecha' }]
+  // El paso de personas se salta cuando se abre desde la ficha de alguien, y
+  // el de la capacitación cuando ya se sabe cuál es.
+  const pasos = cursoFijado
+    ? [{ n: 2, label: 'Personas' }, { n: 3, label: 'Fecha' }]
+    : personaFijada
+      ? [{ n: 1, label: 'Capacitación' }, { n: 3, label: 'Fecha' }]
+      : [{ n: 1, label: 'Capacitación' }, { n: 2, label: 'Personas' }, { n: 3, label: 'Fecha' }]
 
   const siguiente = () => setPaso(p => (p === 1 && personaFijada ? 3 : p + 1))
   const anterior = () => setPaso(p => (p === 3 && personaFijada ? 1 : p - 1))
+  const esPrimerPaso = paso === pasos[0].n
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4"
-      style={{ background: 'rgba(0,0,0,0.55)' }} onClick={cerrar}>
-      <motion.div initial={{ opacity: 0, scale: 0.97 }} animate={{ opacity: 1, scale: 1 }}
-        onClick={e => e.stopPropagation()}
-        className="w-full max-w-4xl max-h-[92vh] flex flex-col rounded-2xl overflow-hidden"
-        style={{ background: 'var(--bg-surface)', border: '1px solid var(--border)' }}>
+    <Marco variante={variante} onFondo={cerrar}>
 
         {/* ── Encabezado ── */}
+        {/* En el panel lo pone la barra lateral, con la ficha de la
+            capacitación: aquí sobraría. */}
+        {variante === 'modal' && (
         <div className="px-4 sm:px-5 py-3.5 flex items-center gap-3"
           style={{ borderBottom: '1px solid var(--border)' }}>
           <div className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0"
@@ -273,6 +382,7 @@ export default function AsignarCapacitacion({
           </div>
           <button onClick={cerrar} style={{ color: 'var(--text-dim)' }}><X size={18} /></button>
         </div>
+        )}
 
         {/* ── Pasos ── */}
         {!resultado && (
@@ -310,11 +420,21 @@ export default function AsignarCapacitacion({
               <h4 className="font-bold text-lg mb-1" style={{ color: 'var(--text)' }}>
                 {resultado.retiro
                   ? (resultado.retiradas === 1 ? 'Capacitación retirada' : `${resultado.retiradas} capacitaciones retiradas`)
-                  : (resultado.asignadas === 1 ? 'Capacitación asignada' : `${resultado.asignadas} capacitaciones asignadas`)}
+                  : resultado.edicion
+                    ? `${resultado.total} ${resultado.total === 1 ? 'persona asignada' : 'personas asignadas'}`
+                    : (resultado.asignadas === 1 ? 'Capacitación asignada' : `${resultado.asignadas} capacitaciones asignadas`)}
               </h4>
               <p className="text-xs mb-1" style={{ color: 'var(--text-dim)' }}>
-                {resultado.curso}{resultado.retiro ? '' : ` · ${MESES[mes - 1]}`}
+                {resultado.curso}
+                {resultado.retiro ? '' : ` · ${fecha ? fecha.split('-').reverse().join('/') : MESES[mes - 1]}`}
               </p>
+              {resultado.edicion && (resultado.asignadas > 0 || resultado.retiradas > 0) && (
+                <p className="text-[11px]" style={{ color: 'var(--text-faint)' }}>
+                  {[resultado.asignadas ? `${resultado.asignadas} nueva${resultado.asignadas === 1 ? '' : 's'}` : '',
+                    resultado.retiradas ? `${resultado.retiradas} retirada${resultado.retiradas === 1 ? '' : 's'}` : '']
+                    .filter(Boolean).join(' · ')}
+                </p>
+              )}
               {!resultado.retiro && resultado.yaLaTenian > 0 && (
                 <p className="text-[11px]" style={{ color: '#F59E0B' }}>
                   {resultado.yaLaTenian} ya la tenían y se dejaron como estaban.
@@ -376,7 +496,7 @@ export default function AsignarCapacitacion({
               {/* Asignar y retirar son la misma operación al revés, así que
                   viven en el mismo sitio: equivocarse al asignar se arregla
                   donde se asignó. */}
-              {!personaFijada && (
+              {!personaFijada && !edicion && (
                 <div className="flex gap-1.5">
                   {([['asignar', 'Asignar'], ['retirar', 'Retirar']] as const).map(([id, label]) => (
                     <button key={id} onClick={() => { setModo(id); setElegidos(new Set()) }}
@@ -477,15 +597,22 @@ export default function AsignarCapacitacion({
                 </div>
               )}
               <div className="grid sm:grid-cols-2 gap-3" hidden={modo === 'retirar'}>
-                <div>
-                  <label className="text-[11px] font-bold uppercase tracking-wider mb-1.5 block" style={{ color: 'var(--text-dim)' }}>Mes *</label>
-                  <select value={mes} onChange={e => setMes(Number(e.target.value))} className={inp} style={estiloInp}>
-                    {MESES.map((m, i) => <option key={m} value={i + 1}>{m}</option>)}
-                  </select>
-                </div>
+                {/* Editando una capacitación del calendario el mes lo dicta la
+                    fecha: dos campos que digan cosas distintas sobre el mismo
+                    día es justo lo que hay que evitar. */}
+                {!edicion && (
+                  <div>
+                    <label className="text-[11px] font-bold uppercase tracking-wider mb-1.5 block" style={{ color: 'var(--text-dim)' }}>Mes *</label>
+                    <select value={mes} onChange={e => setMes(Number(e.target.value))} className={inp} style={estiloInp}>
+                      {MESES.map((m, i) => <option key={m} value={i + 1}>{m}</option>)}
+                    </select>
+                  </div>
+                )}
                 <div>
                   <label className="text-[11px] font-bold uppercase tracking-wider mb-1.5 block" style={{ color: 'var(--text-dim)' }}>
-                    Fecha <span className="font-normal normal-case tracking-normal" style={{ color: 'var(--text-faint)' }}>(opcional)</span>
+                    Fecha {edicion
+                      ? <span className="font-normal normal-case tracking-normal" style={{ color: 'var(--text-faint)' }}>(cambiarla mueve la capacitación en el calendario)</span>
+                      : <span className="font-normal normal-case tracking-normal" style={{ color: 'var(--text-faint)' }}>(opcional)</span>}
                   </label>
                   <input type="date" value={fecha} onChange={e => setFecha(e.target.value)} className={inp} style={estiloInp} />
                 </div>
@@ -555,7 +682,7 @@ export default function AsignarCapacitacion({
             </>
           ) : (
             <>
-              {paso > 1 && (
+              {!esPrimerPaso && (
                 <button onClick={anterior} className="px-3 py-2 rounded-lg text-xs font-semibold flex items-center gap-1.5"
                   style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', color: 'var(--text-dim)' }}>
                   <ChevronLeft size={12} /> Atrás
@@ -579,19 +706,20 @@ export default function AsignarCapacitacion({
                   </button>
                 ) : (
                   <button onClick={modo === 'retirar' ? retirar : asignar}
-                    disabled={guardando || !curso || elegidos.size === 0}
+                    disabled={guardando || !curso || (elegidos.size === 0 && !edicion)}
                     className="px-4 py-2 rounded-lg text-xs font-bold flex items-center gap-1.5 disabled:opacity-40"
                     style={{ background: modo === 'retirar' ? '#EF4444' : 'var(--primary)', color: '#fff' }}>
                     {guardando
-                      ? <><Loader2 size={12} className="animate-spin" /> {modo === 'retirar' ? 'Retirando…' : 'Asignando…'}</>
-                      : <><Check size={12} /> {modo === 'retirar' ? 'Retirar a' : 'Asignar a'} {elegidos.size} {elegidos.size === 1 ? 'persona' : 'personas'}</>}
+                      ? <><Loader2 size={12} className="animate-spin" /> {modo === 'retirar' ? 'Retirando…' : 'Guardando…'}</>
+                      : edicion
+                        ? <><Check size={12} /> Guardar cambios</>
+                        : <><Check size={12} /> {modo === 'retirar' ? 'Retirar a' : 'Asignar a'} {elegidos.size} {elegidos.size === 1 ? 'persona' : 'personas'}</>}
                   </button>
                 )}
               </div>
             </>
           )}
         </div>
-      </motion.div>
-    </div>
+    </Marco>
   )
 }

@@ -18,6 +18,69 @@ function finDeMes(anio: number, mes: number): string {
   return `${anio}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
 }
 
+/**
+ * Deja la lista de asignados de un ítem del plan igual a `idsValidos`.
+ *
+ * Con `reemplazar`, a quien se desmarcó se le quita -salvo que ya la haya
+ * completado: esa persona la hizo y su constancia es soporte del SG-SST-.
+ * Sin `reemplazar` solo se agrega, que es lo que hace el asistente de siempre.
+ */
+async function sincronizar(
+  itemId: string, trainingId: number, companyId: string,
+  idsValidos: string[], pedidos: string[], vence: string,
+  reemplazar: boolean, titulo: string, porQuien: string | null,
+) {
+  const { data: actuales } = await supabase
+    .from('enrollments').select('id, user_id, status').eq('plan_item_id', itemId)
+
+  const deseados = new Set(idsValidos)
+  const sobran = (actuales ?? []).filter(e =>
+    !deseados.has(e.user_id) && (e.status === 'pending' || e.status === 'in_progress'))
+  const conservadas = (actuales ?? []).filter(e => !deseados.has(e.user_id) && e.status === 'completed')
+
+  if (reemplazar && sobran.length) {
+    const { error } = await supabase.from('enrollments').delete().in('id', sobran.map(e => e.id))
+    if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+    await supabase.from('plan_item_targets').delete()
+      .eq('plan_item_id', itemId).eq('target_type', 'user')
+      .in('target_id', sobran.map(e => e.user_id))
+  }
+
+  let asignadas = 0
+  if (idsValidos.length) {
+    const { error: eTargets } = await supabase.from('plan_item_targets').upsert(
+      idsValidos.map(id => ({ plan_item_id: itemId, target_type: 'user', target_id: id })),
+      { onConflict: 'plan_item_id,target_type,target_id', ignoreDuplicates: true },
+    )
+    if (eTargets) return NextResponse.json({ error: eTargets.message }, { status: 500 })
+
+    const { data: insertadas, error: eIns } = await supabase
+      .from('enrollments')
+      .upsert(
+        idsValidos.map(id => ({
+          user_id: id, training_id: trainingId, plan_item_id: itemId,
+          company_id: companyId, status: 'pending', due_date: vence,
+        })),
+        { onConflict: 'user_id,training_id,plan_item_id', ignoreDuplicates: true },
+      )
+      .select('id')
+    if (eIns) return NextResponse.json({ error: eIns.message }, { status: 500 })
+    asignadas = insertadas?.length ?? 0
+  }
+
+  return NextResponse.json({
+    asignadas,
+    retiradas: reemplazar ? sobran.length : 0,
+    conservadas: reemplazar ? conservadas.length : 0,
+    yaLaTenian: idsValidos.length - asignadas,
+    descartadas: pedidos.length - idsValidos.length,
+    total: idsValidos.length,
+    curso: titulo,
+    plan_item_id: itemId,
+    asignado_por: porQuien,
+  }, { status: 201 })
+}
+
 export async function POST(req: NextRequest) {
   // Asignar formación es gestionar formación: no hace falta ser administrador
   // de la plataforma, basta con tener esa capacidad.
@@ -26,16 +89,41 @@ export async function POST(req: NextRequest) {
   if (!companyId) return NextResponse.json({ error: 'Selecciona una empresa primero' }, { status: 400 })
 
   const body = await req.json()
-  const trainingId = Number(body.training_id)
   const userIds: string[] = Array.isArray(body.user_ids) ? [...new Set(body.user_ids)] as string[] : []
-  const mes = Number(body.month)
   const fecha: string | null = body.scheduled_date || null
   const modalidad: string = body.modalidad || 'presencial'
   const responsable: string | null = body.responsable?.trim() || null
 
+  // ── Asignar sobre una capacitación que ya está en el calendario ──
+  // Cuando se abre desde el Plan Anual ya se sabe cuál es y qué día: no hay
+  // que volver a elegir el curso ni el mes, y lo asignado tiene que quedar
+  // colgando de ese mismo ítem y no de uno nuevo.
+  const planItemId: string | null = body.plan_item_id || null
+  let itemDelPlan: any = null
+  if (planItemId) {
+    const { data } = await supabase
+      .from('plan_items')
+      .select('id, month, training_id, scheduled_date, modalidad, annual_plans!inner(id, year, company_id)')
+      .eq('id', planItemId).maybeSingle()
+    if (!data || (data.annual_plans as any).company_id !== companyId) {
+      return NextResponse.json({ error: 'Capacitación del plan no encontrada' }, { status: 404 })
+    }
+    itemDelPlan = data
+  }
+
+  const trainingId = itemDelPlan ? Number(itemDelPlan.training_id) : Number(body.training_id)
+  // La fecha manda sobre el mes: si se corre la capacitación al 3 de marzo,
+  // el mes del plan tiene que irse con ella.
+  const mes = fecha
+    ? Number(fecha.slice(5, 7))
+    : itemDelPlan ? Number(itemDelPlan.month) : Number(body.month)
+
   if (!trainingId) return NextResponse.json({ error: 'Elige una capacitación' }, { status: 400 })
-  if (!userIds.length) return NextResponse.json({ error: 'Elige al menos una persona' }, { status: 400 })
   if (!(mes >= 1 && mes <= 12)) return NextResponse.json({ error: 'Elige el mes' }, { status: 400 })
+  // Sincronizando se admite la lista vacía: es quitar a todo el mundo.
+  if (!userIds.length && !body.sincronizar) {
+    return NextResponse.json({ error: 'Elige al menos una persona' }, { status: 400 })
+  }
 
   // ── El curso tiene que ser de la empresa ──
   const { data: curso } = await supabase
@@ -49,8 +137,26 @@ export async function POST(req: NextRequest) {
     .from('users').select('id')
     .in('id', userIds).eq('company_id', companyId).eq('active', true).is('retired_at', null)
   const idsValidos = (personas ?? []).map(p => p.id)
-  if (!idsValidos.length) {
+  if (!idsValidos.length && !body.sincronizar) {
     return NextResponse.json({ error: 'Ninguna de las personas elegidas está activa en esta empresa' }, { status: 400 })
+  }
+
+  // ── Sobre un ítem que ya existe: ese es el destino, no hay que buscar ──
+  if (itemDelPlan) {
+    // Si se cambió la fecha, la capacitación se mueve en el calendario -y de
+    // mes si hace falta-, porque el plan y lo asignado no pueden decir cosas
+    // distintas sobre el mismo día.
+    if (fecha && fecha !== itemDelPlan.scheduled_date) {
+      const { error } = await supabase.from('plan_items')
+        .update({ scheduled_date: fecha, month: mes }).eq('id', itemDelPlan.id)
+      if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+      // Las inscripciones que ya existían vencen el día de la capacitación.
+      await supabase.from('enrollments').update({ due_date: fecha })
+        .eq('plan_item_id', itemDelPlan.id).neq('status', 'completed')
+    }
+    return sincronizar(itemDelPlan.id, trainingId, companyId!, idsValidos, userIds,
+      fecha || itemDelPlan.scheduled_date || finDeMes((itemDelPlan.annual_plans as any).year, mes),
+      body.sincronizar === true, curso.title, user?.name ?? null)
   }
 
   // ── Plan del año ──
@@ -203,7 +309,35 @@ export async function GET(req: NextRequest) {
   const { authorized, companyId } = await requierePermiso('formacion.gestionar')
   if (!authorized) return NextResponse.json({ error: 'No autorizado' }, { status: 403 })
 
-  const trainingId = Number(new URL(req.url).searchParams.get('training_id'))
+  const params = new URL(req.url).searchParams
+
+  // Por ítem del plan: quiénes están asignados a esa capacitación concreta,
+  // con lo que hace falta para mostrarlos sin otra consulta.
+  const itemId = params.get('plan_item_id')
+  if (itemId) {
+    const { data, error } = await supabase
+      .from('enrollments')
+      .select('id, user_id, status, created_at, due_date, completed_at, score, users(id, name, cedula, cargo, correo, areas(name))')
+      .eq('plan_item_id', itemId)
+      .eq('company_id', companyId)
+    if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+    return NextResponse.json((data ?? []).map((e: any) => ({
+      id: e.id,
+      user_id: e.user_id,
+      status: e.status,
+      created_at: e.created_at,
+      due_date: e.due_date,
+      completed_at: e.completed_at,
+      score: e.score,
+      name: e.users?.name ?? '',
+      cedula: e.users?.cedula ?? '',
+      cargo: e.users?.cargo ?? '',
+      correo: e.users?.correo ?? '',
+      area: e.users?.areas?.name ?? '',
+    })))
+  }
+
+  const trainingId = Number(params.get('training_id'))
   if (!trainingId) return NextResponse.json([])
 
   const anio = new Date().getFullYear()

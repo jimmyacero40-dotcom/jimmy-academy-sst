@@ -26,8 +26,34 @@ export interface ValoresIniciales {
   required?: boolean
 }
 
+/**
+ * El marco. Fuera del componente para que React no lo vuelva a montar en cada
+ * pintada y los campos no pierdan el cursor mientras se escribe.
+ */
+function Marco({ variante, titulo, children }: {
+  variante: 'barra' | 'panel'
+  titulo: string
+  children: React.ReactNode
+}) {
+  if (variante === 'panel') {
+    return <div className="flex flex-col h-full overflow-hidden">{children}</div>
+  }
+  return (
+    <motion.div
+      initial={{ x: '100%' }} animate={{ x: 0 }} exit={{ x: '100%' }}
+      transition={{ type: 'spring', damping: 30, stiffness: 300 }}
+      role="dialog" aria-label={titulo}
+      className="fixed right-0 top-0 bottom-0 z-50 flex flex-col overflow-hidden shadow-2xl"
+      style={{ width: 360, maxWidth: '100vw', background: 'var(--bg-surface)', borderLeft: '1px solid var(--border)' }}>
+      {children}
+    </motion.div>
+  )
+}
+
 interface Props {
   modo: 'crear' | 'editar'
+  /** 'panel' lo dibuja dentro de otra barra lateral, sin ventana propia. */
+  variante?: 'barra' | 'panel'
   planId: string
   anioPlan: number
   /** El tema en modo crear. Si no viene, el panel muestra un selector. */
@@ -44,6 +70,7 @@ interface Props {
 
 export default function PanelAsignacion({
   modo, planId, anioPlan, tema, temas = [], item, inicial, onCerrar, onGuardado, onEliminado,
+  variante = 'barra',
 }: Props) {
   const crear = modo === 'crear'
 
@@ -109,7 +136,9 @@ export default function PanelAsignacion({
       valid_days: form.valid_days !== '' ? Number(form.valid_days) : null,
       modalidad: form.modalidad,
       observaciones: form.observaciones || null,
-      target_type: form.target_type,
+      // "Dirigido a" se quitó: decía "toda la empresa" sin asignarle nada a
+      // nadie. A quién le toca se decide en la pestaña Asignación, persona por
+      // persona, y al no mandar el campo lo ya guardado se queda como está.
     }
 
     const res = crear
@@ -154,14 +183,10 @@ export default function PanelAsignacion({
     : temas
 
   return (
-    <motion.div
-      initial={{ x: '100%' }} animate={{ x: 0 }} exit={{ x: '100%' }}
-      transition={{ type: 'spring', damping: 30, stiffness: 300 }}
-      role="dialog" aria-label={crear ? 'Nueva capacitación' : 'Editar capacitación'}
-      className="fixed right-0 top-0 bottom-0 z-50 flex flex-col overflow-hidden shadow-2xl"
-      style={{ width: 360, maxWidth: '100vw', background: 'var(--bg-surface)', borderLeft: '1px solid var(--border)' }}>
+    <Marco variante={variante} titulo={crear ? 'Nueva capacitación' : 'Editar capacitación'}>
 
       {/* Encabezado */}
+      {variante === 'barra' && (
       <div className="flex items-start gap-3 p-4 flex-shrink-0" style={{ borderBottom: '1px solid var(--border)' }}>
         <div className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0"
           style={{ background: color + '18', border: `1px solid ${color}30` }}>
@@ -189,6 +214,7 @@ export default function PanelAsignacion({
           <X size={14} />
         </button>
       </div>
+      )}
 
       <div className="flex-1 overflow-y-auto p-4 space-y-4">
         {/* Selector de tema, solo cuando se creó sin uno */}
@@ -272,16 +298,6 @@ export default function PanelAsignacion({
           </div>
         )}
 
-        <div>
-          <label className="field-label">Dirigido a</label>
-          <select value={form.target_type} onChange={e => f('target_type', e.target.value)} className="terra-input">
-            <option value="all">Toda la empresa</option>
-            <option value="area">Por área</option>
-            <option value="group">Por grupo</option>
-            <option value="profile">Por perfil</option>
-          </select>
-        </div>
-
         <div className="space-y-2">
           {[
             { key: 'required', label: 'Obligatoria', tc: '#FCD34D' },
@@ -351,6 +367,6 @@ export default function PanelAsignacion({
           </div>
         )}
       </div>
-    </motion.div>
+    </Marco>
   )
 }

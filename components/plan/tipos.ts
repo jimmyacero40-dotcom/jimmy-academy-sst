@@ -5,6 +5,8 @@ export interface Tema {
   title: string
   duration: string | null
   category: string | null
+  /** El objetivo del curso, para mostrarlo al abrir la capacitación. */
+  descripcion?: string | null
   /** Obligatorio según el perfil activo, o por categoría cuando no hay perfil. */
   obligatorio: boolean
 }
