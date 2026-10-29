@@ -1,14 +1,23 @@
 'use client'
 
-import { useState, useEffect, useCallback, useRef } from 'react'
-import AsignarCapacitacion from '@/components/AsignarCapacitacion'
-import { motion, AnimatePresence } from 'framer-motion'
+import { useState, useEffect, useCallback, useMemo } from 'react'
 import {
-  Calendar, Plus, Edit2, Trash2, X, Loader2, AlertCircle,
-  ChevronLeft, GripVertical, Star, Clock, Tag, Check, Save,
-  ChevronRight, LayoutGrid, Columns, AlertTriangle, BookOpen,
-  ToggleLeft, ToggleRight, RotateCcw, FileText, Users, ArrowRight,
-  GraduationCap
+  DndContext, DragOverlay, PointerSensor, KeyboardSensor,
+  useSensor, useSensors, closestCenter,
+  type DragStartEvent, type DragEndEvent,
+} from '@dnd-kit/core'
+import { motion, AnimatePresence } from 'framer-motion'
+import AsignarCapacitacion from '@/components/AsignarCapacitacion'
+import BibliotecaTemas, { type FiltroTemas } from '@/components/plan/BibliotecaTemas'
+import VistaMes from '@/components/plan/VistaMes'
+import VistaAno from '@/components/plan/VistaAno'
+import PanelAsignacion, { type ValoresIniciales } from '@/components/plan/PanelAsignacion'
+import { colorCategoria, type PlanItem, type Tema } from '@/components/plan/tipos'
+import { MESES, partes, enPalabras, horas } from '@/lib/plan-fechas'
+import {
+  Calendar, Plus, Trash2, X, Loader2, AlertCircle, ChevronLeft,
+  BookOpen, ArrowRight, GraduationCap, LayoutGrid, CalendarDays,
+  Check, Clock, AlertTriangle, Undo2, Users,
 } from 'lucide-react'
 
 // ── Types ─────────────────────────────────────────────────────────────────
@@ -21,397 +30,496 @@ interface Plan {
   item_count: number
 }
 
-interface TrainingProfile {
-  id: string
-  name: string
-}
+interface TrainingProfile { id: string; name: string }
 
-interface ProfileTraining {
-  id: number
-  title: string
-  duration: string | null
-  category: string | null
-  required: boolean
-  sort_order: number
-}
+interface Vista { clase: 'mes' | 'ano' }
 
-interface PlanItem {
-  id: string
-  plan_id?: string
-  month: number
-  scheduled_date: string | null
-  end_date: string | null
-  periodicity: string
-  required: boolean
-  valid_days: number | null
-  estado: string
-  reinduccion: boolean
-  observaciones: string | null
-  modalidad: string
-  trainings: { id: number; title: string; duration: string | null; category: string | null }
-  plan_item_targets: { id: string; target_type: string; target_id: string | null }[]
-}
+type Panel =
+  | { modo: 'crear'; tema: Tema | null; inicial: ValoresIniciales }
+  | { modo: 'editar'; item: PlanItem }
 
-const MONTHS_FULL = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre']
-
-const ESTADO_OPTS = ['pendiente','programada','en_curso','completada','cancelada','postergada']
-const ESTADO_LABELS: Record<string,string> = {
-  pendiente:'Pendiente', programada:'Programada', en_curso:'En curso',
-  completada:'Completada', cancelada:'Cancelada', postergada:'Postergada',
-}
-const ESTADO_COLORS: Record<string,string> = {
-  pendiente:'#6B7280', programada:'var(--primary)', en_curso:'#F59E0B',
-  completada:'#10B981', cancelada:'#EF4444', postergada:'#8B5CF6',
-}
-
-const PERIOD_OPTS = ['once','monthly','quarterly','biannual','annual']
-const PERIOD_LABELS: Record<string,string> = {
-  once:'Una vez', monthly:'Mensual', quarterly:'Trimestral',
-  biannual:'Semestral', annual:'Anual',
-}
-
-const CAT_COLORS: Record<string,string> = {
-  'SST':'#10B981','Seguridad':'#EF4444','Salud':'#EC4899',
-  'Ambiental':'#84CC16','Calidad':'var(--primary)','Alturas':'#F59E0B',
-  'Primeros Auxilios':'#F97316',
-}
-function catColor(cat: string | null) { return CAT_COLORS[cat ?? ''] ?? '#8B5CF6' }
-
-// ── Pill component ─────────────────────────────────────────────────────────
-function StatePill({ estado }: { estado: string }) {
-  const color = ESTADO_COLORS[estado] ?? '#6B7280'
-  return (
-    <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full"
-      style={{ background: color + '20', color, border: `1px solid ${color}30` }}>
-      {ESTADO_LABELS[estado] ?? estado}
-    </span>
-  )
-}
-
-// ── Plan-item card in calendar ─────────────────────────────────────────────
-function ItemChip({
-  item, selected, onClick, onRemove, dragging, onDragStart, onDragEnd,
-}: {
-  item: PlanItem; selected: boolean; dragging: boolean
-  onClick: () => void; onRemove: () => void
-  onDragStart: () => void; onDragEnd: () => void
-}) {
-  const color = catColor(item.trainings.category)
-  return (
-    <div
-      draggable
-      onDragStart={e => { e.stopPropagation(); onDragStart() }}
-      onDragEnd={e => { e.stopPropagation(); onDragEnd() }}
-      onClick={e => { e.stopPropagation(); onClick() }}
-      className="group/chip relative select-none"
-      style={{ opacity: dragging ? 0.4 : 1, cursor: 'grab' }}>
-      <div className="rounded-lg px-2 py-1.5 transition-all"
-        style={{
-          background: selected ? color + '22' : color + '12',
-          border: `1px solid ${selected ? color + '60' : color + '30'}`,
-        }}>
-        <div className="flex items-center gap-1 min-w-0">
-          {item.required && <Star size={8} style={{ color: '#FCD34D', flexShrink: 0 }} fill="#FCD34D" />}
-          <span className="text-[11px] font-semibold truncate" style={{ color: 'var(--text)', flex: 1, minWidth: 0 }}>
-            {item.trainings.title}
-          </span>
-          <button
-            onClick={e => { e.stopPropagation(); onRemove() }}
-            className="flex-shrink-0 w-3.5 h-3.5 flex items-center justify-center rounded opacity-0 group-hover:opacity-100 transition-opacity"
-            style={{ color: 'var(--text-faint)' }}
-            onMouseEnter={e => { (e.currentTarget as HTMLElement).style.color = '#FCA5A5' }}
-            onMouseLeave={e => { (e.currentTarget as HTMLElement).style.color = 'var(--text-faint)' }}>
-            <X size={9} />
-          </button>
-        </div>
-        <div className="flex items-center gap-1.5 mt-0.5">
-          <StatePill estado={item.estado} />
-          {item.trainings.duration && (
-            <span className="text-[9px] flex items-center gap-0.5" style={{ color: 'var(--text-faint)' }}>
-              <Clock size={7} />{item.trainings.duration}
-            </span>
-          )}
-        </div>
-      </div>
-    </div>
-  )
-}
-
-// ── Side panel ─────────────────────────────────────────────────────────────
-function SidePanel({
-  item, planId, onClose, onSaved, onDeleted,
-}: {
-  item: PlanItem; planId: string
-  onClose: () => void
-  onSaved: (updated: PlanItem) => void
-  onDeleted: (id: string) => void
-}) {
-  const [form, setForm] = useState({
-    month: item.month,
-    scheduled_date: item.scheduled_date ?? '',
-    end_date: item.end_date ?? '',
-    estado: item.estado,
-    required: item.required,
-    reinduccion: item.reinduccion,
-    periodicity: item.periodicity,
-    valid_days: item.valid_days ?? '',
-    modalidad: item.modalidad,
-    observaciones: item.observaciones ?? '',
-    target_type: item.plan_item_targets[0]?.target_type ?? 'all',
-  })
-  const [saving, setSaving] = useState(false)
-  const [deleting, setDeleting] = useState(false)
-
-  const f = (k: string, v: any) => setForm(p => ({ ...p, [k]: v }))
-
-  const save = async () => {
-    setSaving(true)
-    const res = await fetch(`/api/plans/${planId}/items`, {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        item_id: item.id,
-        month: form.month,
-        scheduled_date: form.scheduled_date || null,
-        end_date: form.end_date || null,
-        estado: form.estado,
-        required: form.required,
-        reinduccion: form.reinduccion,
-        periodicity: form.periodicity,
-        valid_days: form.valid_days !== '' ? Number(form.valid_days) : null,
-        modalidad: form.modalidad,
-        observaciones: form.observaciones || null,
-        target_type: form.target_type,
-      }),
-    })
-    if (res.ok) onSaved(await res.json())
-    setSaving(false)
-  }
-
-  const remove = async () => {
-    if (!confirm('¿Eliminar esta capacitación del plan?')) return
-    setDeleting(true)
-    const res = await fetch(`/api/plans/${planId}/items`, {
-      method: 'DELETE',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ item_id: item.id }),
-    })
-    if (res.ok) onDeleted(item.id)
-    setDeleting(false)
-  }
-
-  const color = catColor(item.trainings.category)
-
-  return (
-    <motion.div
-      initial={{ x: '100%' }} animate={{ x: 0 }} exit={{ x: '100%' }}
-      transition={{ type: 'spring', damping: 30, stiffness: 300 }}
-      className="fixed right-0 top-0 bottom-0 z-50 flex flex-col overflow-hidden shadow-2xl"
-      style={{ width: 360, background: 'var(--bg-surface)', borderLeft: '1px solid var(--border)' }}>
-
-      {/* Header */}
-      <div className="flex items-start gap-3 p-4 flex-shrink-0"
-        style={{ borderBottom: '1px solid var(--border)' }}>
-        <div className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0"
-          style={{ background: color + '18', border: `1px solid ${color}30` }}>
-          <BookOpen size={14} style={{ color }} />
-        </div>
-        <div className="flex-1 min-w-0">
-          <div className="font-bold text-sm leading-snug" style={{ color: 'var(--text)' }}>
-            {item.trainings.title}
-          </div>
-          <div className="text-xs mt-0.5" style={{ color: 'var(--text-faint)' }}>
-            {item.trainings.category}{item.trainings.duration ? ` · ${item.trainings.duration}` : ''}
-          </div>
-        </div>
-        <button onClick={onClose} className="w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0"
-          style={{ background: 'var(--bg-card)', color: 'var(--text-dim)' }}>
-          <X size={14} />
-        </button>
-      </div>
-
-      <div className="flex-1 overflow-y-auto p-4 space-y-4">
-        {/* Mes */}
-        <div>
-          <label className="field-label">Mes</label>
-          <select value={form.month} onChange={e => f('month', Number(e.target.value))} className="terra-input">
-            {MONTHS_FULL.map((m, i) => <option key={i} value={i + 1}>{m}</option>)}
-          </select>
-        </div>
-
-        {/* Fechas */}
-        <div className="grid grid-cols-2 gap-3">
-          <div>
-            <label className="field-label">Fecha inicio</label>
-            <input type="date" value={form.scheduled_date} onChange={e => f('scheduled_date', e.target.value)} className="terra-input" />
-          </div>
-          <div>
-            <label className="field-label">Fecha fin</label>
-            <input type="date" value={form.end_date} onChange={e => f('end_date', e.target.value)} className="terra-input" />
-          </div>
-        </div>
-
-        {/* Estado */}
-        <div>
-          <label className="field-label">Estado</label>
-          <select value={form.estado} onChange={e => f('estado', e.target.value)} className="terra-input">
-            {ESTADO_OPTS.map(s => <option key={s} value={s}>{ESTADO_LABELS[s]}</option>)}
-          </select>
-        </div>
-
-        {/* Modalidad + Periodicidad */}
-        <div className="grid grid-cols-2 gap-3">
-          <div>
-            <label className="field-label">Modalidad</label>
-            <select value={form.modalidad} onChange={e => f('modalidad', e.target.value)} className="terra-input">
-              <option value="presencial">Presencial</option>
-              <option value="virtual">Virtual</option>
-              <option value="mixta">Mixta</option>
-              <option value="e-learning">E-learning</option>
-            </select>
-          </div>
-          <div>
-            <label className="field-label">Periodicidad</label>
-            <select value={form.periodicity} onChange={e => f('periodicity', e.target.value)} className="terra-input">
-              {PERIOD_OPTS.map(p => <option key={p} value={p}>{PERIOD_LABELS[p]}</option>)}
-            </select>
-          </div>
-        </div>
-
-        {/* Dirigido a */}
-        <div>
-          <label className="field-label">Dirigido a</label>
-          <select value={form.target_type} onChange={e => f('target_type', e.target.value)} className="terra-input">
-            <option value="all">Toda la empresa</option>
-            <option value="area">Por área</option>
-            <option value="group">Por grupo</option>
-            <option value="profile">Por perfil</option>
-          </select>
-        </div>
-
-        {/* Toggles */}
-        <div className="space-y-2">
-          {[
-            { key: 'required', label: 'Obligatoria', tc: '#FCD34D' },
-            { key: 'reinduccion', label: 'Es reinducción', tc: '#A78BFA' },
-          ].map(({ key, label, tc }) => (
-            <div key={key} className="flex items-center justify-between py-2 px-3 rounded-xl"
-              style={{ background: 'var(--bg-card)', border: '1px solid var(--border)' }}>
-              <span className="text-xs font-semibold" style={{ color: 'var(--text)' }}>{label}</span>
-              <button onClick={() => f(key, !(form as any)[key])}>
-                {(form as any)[key]
-                  ? <ToggleRight size={20} style={{ color: tc }} />
-                  : <ToggleLeft size={20} style={{ color: 'var(--text-faint)' }} />}
-              </button>
-            </div>
-          ))}
-        </div>
-
-        {/* Observaciones */}
-        <div>
-          <label className="field-label">Observaciones</label>
-          <textarea rows={3} value={form.observaciones}
-            onChange={e => f('observaciones', e.target.value)}
-            placeholder="Notas adicionales..."
-            className="terra-input resize-none" />
-        </div>
-      </div>
-
-      {/* Footer */}
-      <div className="flex gap-2 p-4 flex-shrink-0" style={{ borderTop: '1px solid var(--border)' }}>
-        <button onClick={remove} disabled={deleting}
-          className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0 transition-all"
-          style={{ background: 'var(--red-dim)', color: '#FCA5A5', border: '1px solid rgba(239,68,68,0.2)' }}>
-          {deleting ? <Loader2 size={13} className="animate-spin" /> : <Trash2 size={13} />}
-        </button>
-        <button onClick={save} disabled={saving} className="terra-btn flex-1 text-sm">
-          {saving ? <><Loader2 size={13} className="animate-spin" />Guardando...</> : <><Save size={13} />Guardar</>}
-        </button>
-      </div>
-    </motion.div>
-  )
-}
-
-// ── Main Page ──────────────────────────────────────────────────────────────
 export default function PlanPage() {
-  // Mes con el que se abre el asistente de asignación. null = cerrado.
+  // Asistente de asignación nominal (el de "Asignar capacitación").
   const [asignarMes, setAsignarMes] = useState<number | null>(null)
-  const [plans, setPlans]               = useState<Plan[]>([])
-  const [profiles, setProfiles]         = useState<TrainingProfile[]>([])
-  const [loading, setLoading]           = useState(true)
-  const [error, setError]               = useState('')
 
-  // Create modal
-  const [showCreate, setShowCreate]     = useState(false)
-  const [form, setForm]                 = useState({ name: '', year: new Date().getFullYear(), profile_id: '' })
-  const [saving, setSaving]             = useState(false)
+  const [plans, setPlans]       = useState<Plan[]>([])
+  const [profiles, setProfiles] = useState<TrainingProfile[]>([])
+  const [loading, setLoading]   = useState(true)
+  const [error, setError]       = useState('')
+
+  // Crear plan
+  const [showCreate, setShowCreate] = useState(false)
+  const [form, setForm]   = useState({ name: '', year: new Date().getFullYear(), profile_id: '' })
+  const [saving, setSaving] = useState(false)
+  const [deleting, setDeleting] = useState<string | null>(null)
 
   // Editor
-  const [editingPlan, setEditingPlan]     = useState<Plan | null>(null)
-  const [items, setItems]                 = useState<PlanItem[]>([])
-  const [profileTrainings, setProfileTrainings] = useState<ProfileTraining[]>([])
+  const [editingPlan, setEditingPlan]   = useState<Plan | null>(null)
+  const [items, setItems]               = useState<PlanItem[]>([])
+  const [biblioteca, setBiblioteca]     = useState<Tema[]>([])
+  const [perfilActivo, setPerfilActivo] = useState('')
+  const [idsPerfil, setIdsPerfil]       = useState<Map<number, boolean> | null>(null)
   const [loadingEditor, setLoadingEditor] = useState(false)
-  const [loadingProfile, setLoadingProfile] = useState(false)
-  const [selectedItem, setSelectedItem]   = useState<PlanItem | null>(null)
-  const [deleting, setDeleting]           = useState<string | null>(null)
-  // Active profile in the left panel (can be changed without affecting the plan record)
-  const [activePanelProfile, setActivePanelProfile] = useState<string>('')
+  const [loadingPerfil, setLoadingPerfil] = useState(false)
 
-  // DnD
-  const [dragSrc, setDragSrc]             = useState<{ type: 'pool' | 'item'; id: number | string } | null>(null)
-  const [dragOverMonth, setDragOverMonth] = useState<number | null>(null)
-  const dragCounter                       = useRef<Record<number, number>>({})
+  // Calendario
+  const [vista, setVista]   = useState<Vista>({ clase: 'mes' })
+  const [mesVisible, setMes] = useState(new Date().getMonth() + 1)
+  const [filtroTemas, setFiltroTemas] = useState<FiltroTemas>('todos')
+  const [armado, setArmado] = useState<number | null>(null)
+  const [panel, setPanel]   = useState<Panel | null>(null)
+  const [arrastrando, setArrastrando] = useState<{ clase: string; etiqueta: string; color: string } | null>(null)
+  const [aviso, setAviso]   = useState<{ texto: string; deshacer?: () => void } | null>(null)
 
-  // ── Load ────────────────────────────────────────────────────────────────
+  const sensores = useSensors(
+    // Un umbral pequeño: así un clic sigue siendo un clic y no empieza a
+    // arrastrar, que es lo que rompe el modo de dos toques en celular.
+    useSensor(PointerSensor, { activationConstraint: { distance: 6 } }),
+    useSensor(KeyboardSensor),
+  )
+
+  // ── Cargar ──────────────────────────────────────────────────────────────
   const loadPlans = useCallback(async () => {
     setLoading(true)
-    const [pRes, prRes] = await Promise.all([
-      fetch('/api/plans'),
-      fetch('/api/profiles'),
-    ])
+    const [pRes, prRes] = await Promise.all([fetch('/api/plans'), fetch('/api/profiles')])
     if (pRes.ok) setPlans(await pRes.json())
     if (prRes.ok) setProfiles(await prRes.json())
     setLoading(false)
   }, [])
 
-  const openEditor = useCallback(async (plan: Plan) => {
-    setEditingPlan(plan)
-    setLoadingEditor(true)
-    setSelectedItem(null)
-    setItems([])
-    setProfileTrainings([])
+  useEffect(() => { loadPlans() }, [loadPlans])
 
-    const startProfileId = plan.profile_id ?? ''
-    setActivePanelProfile(startProfileId)
-
-    const [iRes, ptRes] = await Promise.all([
-      fetch(`/api/plans/${plan.id}/items`),
-      startProfileId ? fetch(`/api/profiles/${startProfileId}/trainings`) : Promise.resolve(null),
-    ])
-    if (iRes.ok) setItems(await iRes.json())
-    if (ptRes?.ok) {
-      const data = await ptRes.json()
-      setProfileTrainings([...data].sort((a: any, b: any) => (a.sort_order ?? 0) - (b.sort_order ?? 0)))
-    }
-    setLoadingEditor(false)
-  }, [])
-
-  // Switch profile in the left panel
-  const switchPanelProfile = useCallback(async (profileId: string) => {
-    setActivePanelProfile(profileId)
-    if (!profileId) { setProfileTrainings([]); return }
-    setLoadingProfile(true)
+  const cargarPerfil = useCallback(async (profileId: string) => {
+    setPerfilActivo(profileId)
+    if (!profileId) { setIdsPerfil(null); return }
+    setLoadingPerfil(true)
     const res = await fetch(`/api/profiles/${profileId}/trainings`)
     if (res.ok) {
       const data = await res.json()
-      setProfileTrainings([...data].sort((a: any, b: any) => (a.sort_order ?? 0) - (b.sort_order ?? 0)))
+      setIdsPerfil(new Map(data.map((t: any) => [t.id as number, t.required !== false])))
     }
-    setLoadingProfile(false)
+    setLoadingPerfil(false)
   }, [])
 
-  useEffect(() => { loadPlans() }, [loadPlans])
+  const openEditor = useCallback(async (plan: Plan) => {
+    setEditingPlan(plan)
+    setLoadingEditor(true)
+    setPanel(null); setArmado(null); setItems([]); setBiblioteca([])
+    setVista({ clase: 'mes' })
+    // Si el plan es del año en curso se abre en el mes de hoy; si es de otro
+    // año, en enero, porque "hoy" no dice nada dentro de ese plan.
+    setMes(plan.year === new Date().getFullYear() ? new Date().getMonth() + 1 : 1)
 
-  // ── Plan CRUD ────────────────────────────────────────────────────────────
+    const perfil = plan.profile_id ?? ''
+    setPerfilActivo(perfil)
+
+    const [iRes, tRes, pRes] = await Promise.all([
+      fetch(`/api/plans/${plan.id}/items`),
+      fetch('/api/trainings'),
+      perfil ? fetch(`/api/profiles/${perfil}/trainings`) : Promise.resolve(null),
+    ])
+    if (iRes.ok) setItems(await iRes.json())
+    if (tRes.ok) {
+      const data = await tRes.json()
+      setBiblioteca(
+        (data as any[])
+          .filter(t => t.status !== 'inactivo')
+          .map(t => ({
+            id: t.id, title: t.title, duration: t.duration, category: t.category,
+            obligatorio: t.category === 'Obligatorio',
+          }))
+          .sort((a, b) => a.title.localeCompare(b.title, 'es')),
+      )
+    }
+    if (pRes?.ok) {
+      const data = await pRes.json()
+      setIdsPerfil(new Map(data.map((t: any) => [t.id as number, t.required !== false])))
+    } else setIdsPerfil(null)
+    setLoadingEditor(false)
+  }, [])
+
+  // ── Temas visibles y sus conteos ────────────────────────────────────────
+  // El ×N sale del arreglo de ítems que ya se cargó con el plan: no hay una
+  // consulta por tema.
+  const temas: Tema[] = useMemo(() => {
+    if (!idsPerfil) return biblioteca
+    return biblioteca
+      .filter(t => idsPerfil.has(t.id))
+      .map(t => ({ ...t, obligatorio: idsPerfil.get(t.id) === true }))
+  }, [biblioteca, idsPerfil])
+
+  const conteos = useMemo(() => {
+    const m = new Map<number, number>()
+    for (const i of items) m.set(i.trainings.id, (m.get(i.trainings.id) ?? 0) + 1)
+    return m
+  }, [items])
+
+  const obligatoriosSinProgramar = useMemo(
+    () => temas.filter(t => t.obligatorio && (conteos.get(t.id) ?? 0) === 0).length,
+    [temas, conteos],
+  )
+
+  const delMes = useMemo(() => items.filter(i => i.month === mesVisible), [items, mesVisible])
+
+  const resumen = useMemo(() => ({
+    total: delMes.length,
+    ejecutadas: delMes.filter(i => i.estado === 'completada').length,
+    programadas: delMes.filter(i => i.estado === 'programada').length,
+    pendientes: delMes.filter(i => i.estado === 'pendiente').length,
+    horas: delMes.reduce((s, i) => s + horas(i.trainings.duration), 0),
+  }), [delMes])
+
+  // ── Mover una capacitación ──────────────────────────────────────────────
+  const moverItem = useCallback(async (
+    item: PlanItem, mes: number, fecha: string | null, conAviso = true,
+  ) => {
+    if (!editingPlan) return
+    if (item.month === mes && (item.scheduled_date ?? null) === fecha) return
+
+    const antes = { month: item.month, scheduled_date: item.scheduled_date }
+    // Actualización optimista: el chip se mueve ya, y si Supabase falla vuelve.
+    setItems(prev => prev.map(i => i.id === item.id ? { ...i, month: mes, scheduled_date: fecha } : i))
+
+    const res = await fetch(`/api/plans/${editingPlan.id}/items`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ item_id: item.id, month: mes, scheduled_date: fecha }),
+    })
+
+    if (!res.ok) {
+      setItems(prev => prev.map(i => i.id === item.id ? { ...i, ...antes } : i))
+      setError('No se pudo mover la capacitación')
+      return
+    }
+
+    if (conAviso) {
+      setAviso({
+        texto: `Movida a ${fecha ? enPalabras(fecha) : MESES[mes - 1]}`,
+        deshacer: () => {
+          setAviso(null)
+          moverItem({ ...item, month: mes, scheduled_date: fecha }, antes.month, antes.scheduled_date, false)
+        },
+      })
+    }
+  }, [editingPlan])
+
+  useEffect(() => {
+    if (!aviso) return
+    const t = setTimeout(() => setAviso(null), 6000)
+    return () => clearTimeout(t)
+  }, [aviso])
+
+  // Esc cancela el tema armado.
+  useEffect(() => {
+    if (armado === null) return
+    const alTeclear = (e: KeyboardEvent) => { if (e.key === 'Escape') setArmado(null) }
+    window.addEventListener('keydown', alTeclear)
+    return () => window.removeEventListener('keydown', alTeclear)
+  }, [armado])
+
+  // ── Abrir el panel en modo creación ─────────────────────────────────────
+  const crearEn = useCallback((temaId: number | null, mes: number, fecha: string | null) => {
+    const tema = temaId !== null ? (temas.find(t => t.id === temaId) ?? null) : null
+    setPanel({ modo: 'crear', tema, inicial: { month: mes, scheduled_date: fecha, required: tema?.obligatorio } })
+    setArmado(null)
+  }, [temas])
+
+  // ── Arrastrar y soltar ──────────────────────────────────────────────────
+  const alEmpezar = (e: DragStartEvent) => {
+    const d = e.active.data.current as any
+    if (d?.clase === 'tema') {
+      const t = temas.find(x => x.id === d.temaId)
+      setArrastrando({ clase: 'tema', etiqueta: t?.title ?? '', color: colorCategoria(t?.category ?? null) })
+    } else {
+      const i = items.find(x => x.id === d?.itemId)
+      setArrastrando({ clase: 'item', etiqueta: i?.trainings.title ?? '', color: colorCategoria(i?.trainings.category ?? null) })
+    }
+  }
+
+  const alSoltar = (e: DragEndEvent) => {
+    setArrastrando(null)
+    const origen = e.active.data.current as any
+    const destino = e.over?.data.current as any
+    if (!origen || !destino) return
+
+    // ¿A qué mes y fecha corresponde el destino?
+    let mes: number, fecha: string | null
+    if (destino.clase === 'dia' && destino.fecha) {
+      fecha = destino.fecha
+      mes = partes(destino.fecha)!.mes
+    } else if (destino.clase === 'mes') {
+      mes = destino.mes; fecha = null
+    } else if (destino.clase === 'sin_fecha') {
+      mes = destino.mes; fecha = null
+    } else return
+
+    if (origen.clase === 'tema') {
+      crearEn(origen.temaId, mes, fecha)
+    } else {
+      const item = items.find(i => i.id === origen.itemId)
+      if (item) moverItem(item, mes, fecha)
+    }
+  }
+
+  // ── Resultado del panel ─────────────────────────────────────────────────
+  const alGuardar = (guardados: PlanItem[]) => {
+    setItems(prev => {
+      const mapa = new Map(prev.map(i => [i.id, i]))
+      for (const g of guardados) {
+        const viejo = mapa.get(g.id)
+        // El PATCH devuelve el ítem sin la categoría del curso; se conserva la
+        // que ya se tenía para que el chip no cambie de color al guardar.
+        mapa.set(g.id, viejo
+          ? { ...g, trainings: { ...viejo.trainings, ...g.trainings }, plan_item_targets: g.plan_item_targets ?? viejo.plan_item_targets }
+          : g)
+      }
+      return [...mapa.values()]
+    })
+    // Que se vea lo que se acabó de crear, aunque cayera en otro mes.
+    const primero = guardados[0]
+    if (primero && vista.clase === 'mes') setMes(primero.month)
+    setPanel(null)
+  }
+
+  const asistente = (
+    <AsignarCapacitacion
+      abierto={asignarMes !== null}
+      mesInicial={asignarMes ?? undefined}
+      onCerrar={() => setAsignarMes(null)}
+      onListo={async () => {
+        await loadPlans()
+        if (editingPlan) {
+          const r = await fetch(`/api/plans/${editingPlan.id}/items`)
+          if (r.ok) setItems(await r.json())
+        }
+      }}
+    />
+  )
+
+  // ── EDITOR ──────────────────────────────────────────────────────────────
+  if (editingPlan) {
+    const temaArmado = armado !== null ? temas.find(t => t.id === armado) : null
+
+    const INDICADORES = [
+      { nombre: 'Del mes', valor: resumen.total, icono: Calendar, color: 'var(--primary)' },
+      { nombre: 'Ejecutadas', valor: resumen.ejecutadas, icono: Check, color: '#10B981' },
+      { nombre: 'Programadas', valor: resumen.programadas, icono: CalendarDays, color: 'var(--primary)' },
+      { nombre: 'Pendientes', valor: resumen.pendientes, icono: Clock, color: '#6B7280' },
+      { nombre: 'Horas', valor: resumen.horas % 1 === 0 ? resumen.horas : resumen.horas.toFixed(1), icono: Clock, color: '#F59E0B' },
+    ]
+
+    return (
+      <DndContext sensors={sensores} collisionDetection={closestCenter}
+        onDragStart={alEmpezar} onDragEnd={alSoltar} onDragCancel={() => setArrastrando(null)}>
+        <div className="h-[calc(100vh-64px)] flex flex-col overflow-hidden">
+
+          {/* Barra superior */}
+          <div className="flex flex-wrap items-center justify-between gap-2 px-3 sm:px-5 py-2.5 flex-shrink-0"
+            style={{ borderBottom: '1px solid var(--border)', background: 'var(--bg-surface)' }}>
+            <div className="flex items-center gap-2 min-w-0">
+              <button onClick={() => { setEditingPlan(null); setPanel(null); setArmado(null) }}
+                className="flex items-center gap-1 text-sm flex-shrink-0" style={{ color: 'var(--text-dim)' }}>
+                <ChevronLeft size={15} /> Planes
+              </button>
+              <span style={{ color: 'var(--border)' }}>/</span>
+              <span className="font-bold text-sm truncate" style={{ color: 'var(--text)' }}>{editingPlan.name}</span>
+              <span className="text-xs flex-shrink-0" style={{ color: 'var(--text-faint)' }}>{editingPlan.year}</span>
+            </div>
+
+            <div className="flex items-center gap-2">
+              {/* Mes | Año */}
+              <div className="flex rounded-xl overflow-hidden" style={{ border: '1px solid var(--border)' }}>
+                {([['mes', 'Mes', CalendarDays], ['ano', 'Año', LayoutGrid]] as const).map(([k, nombre, Icono]) => (
+                  <button key={k} onClick={() => setVista({ clase: k })}
+                    className="flex items-center gap-1 px-2.5 py-1.5 text-[11px] font-bold transition-all"
+                    style={{
+                      background: vista.clase === k ? 'var(--primary)' : 'transparent',
+                      color: vista.clase === k ? '#fff' : 'var(--text-dim)',
+                    }}>
+                    <Icono size={11} /> {nombre}
+                  </button>
+                ))}
+              </div>
+              <button onClick={() => setAsignarMes(mesVisible)}
+                className="terra-btn-outline flex items-center gap-1" style={{ padding: '6px 12px', fontSize: 11 }}>
+                <Users size={12} /> Asignar a personas
+              </button>
+            </div>
+          </div>
+
+          {/* Indicadores */}
+          <div className="flex flex-wrap items-center gap-1.5 px-3 sm:px-5 py-2 flex-shrink-0"
+            style={{ borderBottom: '1px solid var(--border)' }}>
+            {INDICADORES.map(({ nombre, valor, icono: Icono, color }) => (
+              <div key={nombre} className="flex items-center gap-1.5 px-2.5 py-1 rounded-xl"
+                style={{ background: 'var(--bg-card)', border: '1px solid var(--border)' }}>
+                <Icono size={11} style={{ color }} />
+                <span className="text-[10px]" style={{ color: 'var(--text-faint)' }}>{nombre}</span>
+                <span className="text-xs font-black" style={{ color: 'var(--text)' }}>{valor}</span>
+              </div>
+            ))}
+            {obligatoriosSinProgramar > 0 && (
+              <button onClick={() => setFiltroTemas('sin_programar')}
+                className="flex items-center gap-1.5 px-2.5 py-1 rounded-xl transition-all"
+                style={{ background: 'var(--red-dim)', border: '1px solid rgba(239,68,68,0.3)' }}>
+                <AlertTriangle size={11} style={{ color: '#FCA5A5' }} />
+                <span className="text-[10px]" style={{ color: '#FCA5A5' }}>Obligatorios sin programar</span>
+                <span className="text-xs font-black" style={{ color: '#FCA5A5' }}>{obligatoriosSinProgramar}</span>
+              </button>
+            )}
+          </div>
+
+          {/* Barra del modo "dos toques" */}
+          <AnimatePresence>
+            {temaArmado && (
+              <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }} exit={{ height: 0, opacity: 0 }}
+                className="flex items-center gap-2 px-3 sm:px-5 py-2 flex-shrink-0 overflow-hidden"
+                style={{ background: 'var(--primary-dim)', borderBottom: '1px solid rgba(59,130,246,0.3)' }}>
+                <CalendarDays size={13} style={{ color: 'var(--primary)', flexShrink: 0 }} />
+                <span className="text-xs font-semibold truncate" style={{ color: 'var(--text)' }}>
+                  Toca un día para programar «{temaArmado.title}»
+                </span>
+                <button onClick={() => setArmado(null)}
+                  className="ml-auto text-[11px] font-bold px-2 py-0.5 rounded-lg flex-shrink-0"
+                  style={{ background: 'var(--bg-card)', color: 'var(--text-dim)' }}>
+                  Cancelar
+                </button>
+              </motion.div>
+            )}
+          </AnimatePresence>
+
+          {/* Cuerpo: temas + calendario. En pantallas chicas, temas arriba. */}
+          <div className="flex flex-col lg:flex-row flex-1 overflow-hidden">
+            <div className="flex flex-col flex-shrink-0 lg:border-r overflow-hidden"
+              style={{ borderColor: 'var(--border)', background: 'var(--bg-surface)' }}>
+              <div className="lg:w-[244px] flex flex-col overflow-hidden max-h-[38vh] lg:max-h-none lg:h-full">
+                <div className="px-3 pt-2.5 pb-2 flex-shrink-0">
+                  <div className="text-[9px] font-bold uppercase tracking-widest mb-1" style={{ color: 'var(--text-faint)' }}>
+                    Perfil
+                  </div>
+                  <select value={perfilActivo} onChange={e => cargarPerfil(e.target.value)}
+                    className="terra-input text-xs py-1.5 w-full" aria-label="Filtrar temas por perfil">
+                    <option value="">Toda la Biblioteca</option>
+                    {profiles.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+                  </select>
+                </div>
+                {loadingPerfil ? (
+                  <div className="flex items-center justify-center py-8">
+                    <Loader2 size={16} className="animate-spin" style={{ color: 'var(--primary)' }} />
+                  </div>
+                ) : (
+                  <BibliotecaTemas temas={temas} conteos={conteos}
+                    filtro={filtroTemas} onFiltro={setFiltroTemas}
+                    armado={armado} onArmar={setArmado} />
+                )}
+              </div>
+            </div>
+
+            {/* Calendario */}
+            <div className="flex-1 overflow-auto p-2 sm:p-3">
+              {loadingEditor ? (
+                <div className="flex items-center justify-center h-full">
+                  <Loader2 size={24} className="animate-spin" style={{ color: 'var(--primary)' }} />
+                </div>
+              ) : vista.clase === 'mes' ? (
+                <VistaMes
+                  anio={editingPlan.year} mes={mesVisible} items={delMes}
+                  seleccionado={panel?.modo === 'editar' ? panel.item.id : null}
+                  armado={armado !== null}
+                  onMes={setMes}
+                  onAbrirItem={item => setPanel({ modo: 'editar', item })}
+                  onCrearEnDia={fecha => crearEn(armado, fecha ? partes(fecha)!.mes : mesVisible, fecha)}
+                />
+              ) : (
+                <VistaAno
+                  items={items}
+                  seleccionado={panel?.modo === 'editar' ? panel.item.id : null}
+                  armado={armado !== null}
+                  onAbrirMes={m => { setMes(m); setVista({ clase: 'mes' }) }}
+                  onAbrirItem={item => setPanel({ modo: 'editar', item })}
+                  onCrearEnMes={m => crearEn(armado, m, null)}
+                />
+              )}
+            </div>
+          </div>
+
+          {/* Panel */}
+          <AnimatePresence>
+            {panel && (
+              <>
+                <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+                  className="fixed inset-0 z-40" style={{ background: 'rgba(0,0,0,0.3)' }}
+                  onClick={() => setPanel(null)} />
+                <PanelAsignacion
+                  key={panel.modo === 'editar' ? panel.item.id : 'nueva'}
+                  modo={panel.modo}
+                  planId={editingPlan.id}
+                  anioPlan={editingPlan.year}
+                  tema={panel.modo === 'crear' ? panel.tema : null}
+                  temas={temas}
+                  item={panel.modo === 'editar' ? panel.item : null}
+                  inicial={panel.modo === 'crear' ? panel.inicial : undefined}
+                  onCerrar={() => setPanel(null)}
+                  onGuardado={alGuardar}
+                  onEliminado={id => {
+                    setItems(prev => prev.filter(i => i.id !== id))
+                    setPanel(null)
+                  }}
+                />
+              </>
+            )}
+          </AnimatePresence>
+
+          {/* Lo que se arrastra */}
+          <DragOverlay dropAnimation={null}>
+            {arrastrando && (
+              <div className="rounded-lg px-2 py-1 text-[11px] font-bold shadow-xl"
+                style={{
+                  background: arrastrando.color + '28',
+                  border: `1px solid ${arrastrando.color}`,
+                  color: 'var(--text)', maxWidth: 220,
+                }}>
+                <span className="block truncate">{arrastrando.etiqueta}</span>
+              </div>
+            )}
+          </DragOverlay>
+
+          {asistente}
+
+          {/* Aviso con Deshacer */}
+          <AnimatePresence>
+            {aviso && (
+              <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 12 }}
+                className="fixed bottom-4 left-1/2 -translate-x-1/2 z-[60] flex items-center gap-3 px-4 py-2.5 rounded-xl shadow-2xl"
+                style={{ background: 'var(--bg-surface)', border: '1px solid var(--border)' }}>
+                <span className="text-xs font-semibold" style={{ color: 'var(--text)' }}>{aviso.texto}</span>
+                {aviso.deshacer && (
+                  <button onClick={aviso.deshacer}
+                    className="flex items-center gap-1 text-[11px] font-bold px-2 py-1 rounded-lg"
+                    style={{ background: 'var(--primary-dim)', color: 'var(--primary)' }}>
+                    <Undo2 size={11} /> Deshacer
+                  </button>
+                )}
+                <button onClick={() => setAviso(null)} aria-label="Cerrar aviso" style={{ color: 'var(--text-faint)' }}>
+                  <X size={12} />
+                </button>
+              </motion.div>
+            )}
+          </AnimatePresence>
+
+          {error && (
+            <div className="fixed bottom-4 left-1/2 -translate-x-1/2 z-[60] flex items-center gap-2 px-4 py-2 rounded-xl text-sm shadow-xl"
+              style={{ background: 'var(--red-dim)', border: '1px solid rgba(239,68,68,0.3)', color: '#FCA5A5' }}>
+              <AlertCircle size={13} /> {error}
+              <button onClick={() => setError('')} className="ml-2"><X size={12} /></button>
+            </div>
+          )}
+        </div>
+      </DndContext>
+    )
+  }
+
+  // ── LISTA DE PLANES ─────────────────────────────────────────────────────
   const createPlan = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!form.name.trim()) return
@@ -443,340 +551,6 @@ export default function PlanPage() {
     setDeleting(null)
   }
 
-  // ── Item operations ──────────────────────────────────────────────────────
-  const addItem = async (trainingId: number, month: number) => {
-    if (!editingPlan) return
-    // If this training is already scheduled, move it instead of duplicating
-    const existing = items.find(i => i.trainings.id === trainingId)
-    if (existing) {
-      if (existing.month !== month) await moveItem(existing.id, month)
-      return
-    }
-    const res = await fetch(`/api/plans/${editingPlan.id}/items`, {
-      method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ training_id: trainingId, month }),
-    })
-    if (res.ok) {
-      const newItem = await res.json()
-      setItems(prev => [...prev, newItem])
-    } else {
-      const err = await res.json().catch(() => ({}))
-      setError(err.error || 'Error al agregar')
-    }
-  }
-
-  const moveItem = async (itemId: string, newMonth: number) => {
-    if (!editingPlan) return
-    const res = await fetch(`/api/plans/${editingPlan.id}/items`, {
-      method: 'PATCH', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ item_id: itemId, month: newMonth }),
-    })
-    if (res.ok) {
-      setItems(prev => prev.map(i => i.id === itemId ? { ...i, month: newMonth } : i))
-      if (selectedItem?.id === itemId) setSelectedItem(si => si ? { ...si, month: newMonth } : si)
-    }
-  }
-
-  const removeItem = async (itemId: string) => {
-    if (!editingPlan) return
-    const res = await fetch(`/api/plans/${editingPlan.id}/items`, {
-      method: 'DELETE', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ item_id: itemId }),
-    })
-    if (res.ok) {
-      setItems(prev => prev.filter(i => i.id !== itemId))
-      if (selectedItem?.id === itemId) setSelectedItem(null)
-    }
-  }
-
-  // ── DnD handlers ─────────────────────────────────────────────────────────
-  const onMonthDragOver = (e: React.DragEvent, month: number) => {
-    e.preventDefault()
-    if (dragSrc) setDragOverMonth(month)
-  }
-
-  const onMonthDragEnter = (month: number) => {
-    dragCounter.current[month] = (dragCounter.current[month] ?? 0) + 1
-    if (dragSrc) setDragOverMonth(month)
-  }
-
-  const onMonthDragLeave = (month: number) => {
-    dragCounter.current[month] = Math.max(0, (dragCounter.current[month] ?? 0) - 1)
-    if (dragCounter.current[month] === 0 && dragOverMonth === month) setDragOverMonth(null)
-  }
-
-  const onMonthDrop = (e: React.DragEvent, month: number) => {
-    e.preventDefault()
-    setDragOverMonth(null)
-    dragCounter.current = {}
-    if (!dragSrc) return
-    if (dragSrc.type === 'pool') {
-      addItem(dragSrc.id as number, month)
-    } else {
-      moveItem(dragSrc.id as string, month)
-    }
-    setDragSrc(null)
-  }
-
-  // ── Map training id → scheduled month ───────────────────────────────────
-  const trainingMonthMap = new Map(items.map(i => [i.trainings.id, i.month]))
-
-  // ── EDITOR VIEW ──────────────────────────────────────────────────────────
-  // El asistente vale igual en la lista de planes y dentro del editor, así que
-  // se declara una sola vez y se monta en las dos vistas.
-  const asistente = (
-    <AsignarCapacitacion
-      abierto={asignarMes !== null}
-      mesInicial={asignarMes ?? undefined}
-      onCerrar={() => setAsignarMes(null)}
-      onListo={async () => {
-        // Lo asignado se ve en el acto: puede haber creado un ítem nuevo en el
-        // mes, y el Plan Anual tiene que mostrarlo sin recargar a mano.
-        await loadPlans()
-        if (editingPlan) {
-          const r = await fetch(`/api/plans/${editingPlan.id}/items`)
-          if (r.ok) setItems(await r.json())
-        }
-      }}
-    />
-  )
-
-  if (editingPlan) {
-    const itemsByMonth: Record<number, PlanItem[]> = {}
-    for (let m = 1; m <= 12; m++) itemsByMonth[m] = items.filter(i => i.month === m)
-    const totalCompleted = items.filter(i => i.estado === 'completada').length
-
-    return (
-      <div className="h-[calc(100vh-64px)] flex flex-col overflow-hidden">
-        {/* Header */}
-        <div className="flex items-center justify-between px-5 py-3 flex-shrink-0"
-          style={{ borderBottom: '1px solid var(--border)', background: 'var(--bg-surface)' }}>
-          <div className="flex items-center gap-3">
-            <button onClick={() => { setEditingPlan(null); setSelectedItem(null) }}
-              className="flex items-center gap-1.5 text-sm transition-colors"
-              style={{ color: 'var(--text-dim)' }}
-              onMouseEnter={e => { (e.currentTarget as HTMLElement).style.color = 'var(--text)' }}
-              onMouseLeave={e => { (e.currentTarget as HTMLElement).style.color = 'var(--text-dim)' }}>
-              <ChevronLeft size={15} /> Planes
-            </button>
-            <span style={{ color: 'var(--border)' }}>/</span>
-            <div>
-              <span className="font-bold text-sm" style={{ color: 'var(--text)' }}>{editingPlan.name}</span>
-              <span className="text-xs ml-2" style={{ color: 'var(--text-faint)' }}>{editingPlan.year}</span>
-            </div>
-          </div>
-          <div className="flex items-center gap-4 text-xs" style={{ color: 'var(--text-faint)' }}>
-            <span>{items.length} capacitaciones</span>
-            {totalCompleted > 0 && (
-              <span className="flex items-center gap-1">
-                <Check size={10} className="text-emerald-400" />{totalCompleted} completadas
-              </span>
-            )}
-            <span className="px-2 py-0.5 rounded-full text-[10px] font-bold uppercase"
-              style={{ background: 'rgba(59,130,246,0.1)', color: '#93C5FD' }}>
-              {editingPlan.status}
-            </span>
-          </div>
-        </div>
-
-        <div className="flex flex-1 overflow-hidden">
-          {/* ── LEFT: Profile selector + courses ────────────────────────── */}
-          <div className="flex flex-col overflow-hidden border-r flex-shrink-0"
-            style={{ width: 236, borderColor: 'var(--border)', background: 'var(--bg-surface)' }}>
-
-            {/* Profile selector */}
-            <div className="px-3 pt-3 pb-2 flex-shrink-0" style={{ borderBottom: '1px solid var(--border)' }}>
-              <div className="text-[10px] font-bold uppercase tracking-widest mb-1.5" style={{ color: 'var(--text-faint)' }}>
-                Perfil
-              </div>
-              <select
-                value={activePanelProfile}
-                onChange={e => switchPanelProfile(e.target.value)}
-                className="terra-input text-xs py-1.5 w-full">
-                <option value="">— Selecciona un perfil —</option>
-                {profiles.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
-              </select>
-            </div>
-
-            {/* Course list */}
-            <div className="flex-1 overflow-y-auto px-2 py-2 space-y-1">
-              {loadingProfile ? (
-                <div className="flex items-center justify-center py-8">
-                  <Loader2 size={16} className="animate-spin" style={{ color: 'var(--primary)' }} />
-                </div>
-              ) : !activePanelProfile ? (
-                <div className="flex flex-col items-center justify-center py-8 text-center px-3">
-                  <GraduationCap size={22} className="mb-2 opacity-30" style={{ color: 'var(--text-faint)' }} />
-                  <p className="text-[10px]" style={{ color: 'var(--text-faint)' }}>
-                    Selecciona un perfil para ver sus cursos y arrastrarlos al calendario
-                  </p>
-                </div>
-              ) : profileTrainings.length === 0 ? (
-                <p className="text-[10px] text-center py-8 px-3" style={{ color: 'var(--text-faint)' }}>
-                  Este perfil no tiene cursos asignados. Ve a Perfiles de Formación para agregarlos.
-                </p>
-              ) : (
-                profileTrainings.map(t => {
-                  const color = catColor(t.category)
-                  const scheduledMonth = trainingMonthMap.get(t.id)
-                  const isScheduled = scheduledMonth !== undefined
-                  return (
-                    <div key={t.id}
-                      draggable
-                      onDragStart={() => setDragSrc({ type: 'pool', id: t.id })}
-                      onDragEnd={() => setDragSrc(null)}
-                      style={{ cursor: 'grab' }}>
-                      <div className="rounded-xl px-2 py-1.5 transition-all"
-                        style={{
-                          background: isScheduled ? color + '18' : color + '0d',
-                          border: `1px solid ${isScheduled ? color + '40' : color + '20'}`,
-                        }}>
-                        <div className="flex items-center gap-1 min-w-0">
-                          {t.required && <Star size={8} fill="#FCD34D" style={{ color: '#FCD34D', flexShrink: 0 }} />}
-                          <span className="text-[11px] font-semibold truncate" style={{ color: 'var(--text)' }}>{t.title}</span>
-                        </div>
-                        <div className="flex items-center justify-between mt-0.5">
-                          <span className="text-[9px] truncate" style={{ color: 'var(--text-faint)' }}>{t.category}</span>
-                          {isScheduled ? (
-                            <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full flex-shrink-0 ml-1"
-                              style={{ background: color + '20', color, border: `1px solid ${color}30` }}>
-                              {MONTHS_FULL[scheduledMonth - 1].slice(0, 3)}
-                            </span>
-                          ) : (
-                            <span className="text-[9px] px-1 rounded flex-shrink-0 ml-1" style={{ color: 'var(--text-faint)' }}>
-                              Sin prog.
-                            </span>
-                          )}
-                        </div>
-                      </div>
-                    </div>
-                  )
-                })
-              )}
-            </div>
-
-            {activePanelProfile && profileTrainings.length > 0 && (
-              <div className="px-2 pb-2 text-[9px] text-center flex-shrink-0" style={{ color: 'var(--text-faint)' }}>
-                Arrastra a un mes → · arrastrar reprograma
-              </div>
-            )}
-          </div>
-
-          {/* ── RIGHT: Calendar grid ────────────────────────────────────── */}
-          <div className="flex-1 overflow-auto p-3">
-            {loadingEditor ? (
-              <div className="flex items-center justify-center h-full">
-                <Loader2 size={24} className="animate-spin" style={{ color: 'var(--primary)' }} />
-              </div>
-            ) : (
-              <div className="grid grid-cols-3 gap-2" style={{ minWidth: 640 }}>
-                {Array.from({ length: 12 }, (_, i) => i + 1).map(month => {
-                  const monthItems = itemsByMonth[month] ?? []
-                  const isOver = dragOverMonth === month
-                  return (
-                    <div key={month}
-                      onDragOver={e => onMonthDragOver(e, month)}
-                      onDragEnter={() => onMonthDragEnter(month)}
-                      onDragLeave={() => onMonthDragLeave(month)}
-                      onDrop={e => onMonthDrop(e, month)}
-                      className="rounded-xl overflow-hidden transition-all"
-                      style={{
-                        background: isOver ? 'rgba(59,130,246,0.06)' : 'var(--bg-surface)',
-                        border: isOver ? '1.5px dashed var(--primary)' : '1px solid var(--border)',
-                        minHeight: 140,
-                      }}>
-                      <div className="flex items-center justify-between px-3 py-2"
-                        style={{ borderBottom: '1px solid var(--border)', background: 'var(--bg-card)' }}>
-                        <span className="text-xs font-bold" style={{ color: 'var(--text)' }}>
-                          {MONTHS_FULL[month - 1]}
-                        </span>
-                        <div className="flex items-center gap-1">
-                          {monthItems.length > 0 && (
-                            <span className="text-[10px] px-1.5 py-0.5 rounded-full font-semibold"
-                              style={{ background: 'rgba(59,130,246,0.1)', color: '#93C5FD' }}>
-                              {monthItems.length}
-                            </span>
-                          )}
-                          {isOver && <span className="text-[10px] font-bold" style={{ color: 'var(--primary)' }}>+</span>}
-                        </div>
-                      </div>
-                      <div className="p-1.5 space-y-1">
-                        {monthItems.map(item => (
-                          <ItemChip
-                            key={item.id}
-                            item={item}
-                            selected={selectedItem?.id === item.id}
-                            dragging={dragSrc?.type === 'item' && dragSrc.id === item.id}
-                            onClick={() => setSelectedItem(s => s?.id === item.id ? null : item)}
-                            onRemove={() => removeItem(item.id)}
-                            onDragStart={() => setDragSrc({ type: 'item', id: item.id })}
-                            onDragEnd={() => { setDragSrc(null); setDragOverMonth(null) }}
-                          />
-                        ))}
-                        {monthItems.length === 0 && !isOver && (
-                          <div className="h-10 flex flex-col items-center justify-center gap-0.5">
-                            <span className="text-[10px]" style={{ color: 'var(--text-faint)' }}>Sin capacitaciones</span>
-                            <button onClick={e => { e.stopPropagation(); setAsignarMes(month) }}
-                              className="text-[10px] font-bold px-2 py-0.5 rounded-md"
-                              style={{ background: 'var(--primary-dim)', color: 'var(--primary)' }}>
-                              + Asignar
-                            </button>
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  )
-                })}
-              </div>
-            )}
-          </div>
-        </div>
-
-        {/* Side panel */}
-        <AnimatePresence>
-          {selectedItem && (
-            <>
-              <motion.div
-                initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-                className="fixed inset-0 z-40"
-                style={{ background: 'rgba(0,0,0,0.3)' }}
-                onClick={() => setSelectedItem(null)} />
-              <SidePanel
-                key={selectedItem.id}
-                item={selectedItem}
-                planId={editingPlan.id}
-                onClose={() => setSelectedItem(null)}
-                onSaved={updated => {
-                  setItems(prev => prev.map(i =>
-                    i.id === updated.id
-                      ? { ...updated, trainings: i.trainings, plan_item_targets: updated.plan_item_targets ?? i.plan_item_targets }
-                      : i
-                  ))
-                  setSelectedItem(null)
-                }}
-                onDeleted={id => {
-                  setItems(prev => prev.filter(i => i.id !== id))
-                  setSelectedItem(null)
-                }}
-              />
-            </>
-          )}
-        </AnimatePresence>
-
-        {asistente}
-
-      {error && (
-          <div className="fixed bottom-4 left-1/2 -translate-x-1/2 z-50 flex items-center gap-2 px-4 py-2 rounded-xl text-sm shadow-xl"
-            style={{ background: 'var(--red-dim)', border: '1px solid rgba(239,68,68,0.3)', color: '#FCA5A5' }}>
-            <AlertCircle size={13} /> {error}
-            <button onClick={() => setError('')} className="ml-2"><X size={12} /></button>
-          </div>
-        )}
-      </div>
-    )
-  }
-
-  // ── LIST VIEW ─────────────────────────────────────────────────────────────
   const currentYear = new Date().getFullYear()
   const plansByYear: Record<number, Plan[]> = {}
   for (const p of plans) {
@@ -795,11 +569,10 @@ export default function PlanPage() {
               Plan Anual de Capacitaciones
             </h1>
             <p className="text-sm" style={{ color: 'var(--text-dim)' }}>
-              Organiza las capacitaciones por mes con drag & drop.
+              Arrastra los temas de la Biblioteca al calendario para programarlos.
             </p>
           </div>
           <div className="flex items-center gap-2 self-start">
-            {/* Vía corta: asignar un curso a unas personas sin armar un perfil. */}
             <button onClick={() => setAsignarMes(new Date().getMonth() + 1)}
               className="terra-btn" style={{ padding: '10px 18px', fontSize: 13 }}>
               <Plus size={15} /> Asignar capacitación
@@ -829,7 +602,7 @@ export default function PlanPage() {
       ) : plans.length === 0 ? (
         <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} className="text-center py-16">
           <div className="w-14 h-14 rounded-2xl flex items-center justify-center mb-3 mx-auto"
-            style={{ background: 'rgba(59,130,246,0.1)' }}>
+            style={{ background: 'var(--primary-dim)' }}>
             <Calendar size={24} style={{ color: 'var(--primary)' }} />
           </div>
           <h3 className="font-semibold mb-1" style={{ color: 'var(--text)' }}>Sin planes creados</h3>
@@ -864,14 +637,14 @@ export default function PlanPage() {
                       className="terra-card p-4 cursor-pointer group">
                       <div className="flex items-center gap-3">
                         <div className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0"
-                          style={{ background: 'rgba(59,130,246,0.1)', border: '1px solid rgba(59,130,246,0.2)' }}>
+                          style={{ background: 'var(--primary-dim)', border: '1px solid rgba(59,130,246,0.2)' }}>
                           <Calendar size={16} style={{ color: 'var(--primary)' }} />
                         </div>
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center gap-2">
                             <span className="font-semibold text-sm" style={{ color: 'var(--text)' }}>{plan.name}</span>
                             <span className="text-[10px] px-1.5 py-0.5 rounded-full font-bold uppercase"
-                              style={{ background: 'rgba(59,130,246,0.08)', color: '#93C5FD' }}>
+                              style={{ background: 'var(--primary-dim)', color: 'var(--primary)' }}>
                               {plan.status}
                             </span>
                           </div>
@@ -889,10 +662,8 @@ export default function PlanPage() {
                         <div className="flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity"
                           onClick={e => e.stopPropagation()}>
                           <button onClick={() => deletePlan(plan.id)} disabled={deleting === plan.id}
-                            className="w-7 h-7 rounded-lg flex items-center justify-center transition-all"
-                            style={{ color: 'var(--text-faint)' }}
-                            onMouseEnter={e => { (e.currentTarget as HTMLElement).style.color = '#FCA5A5'; (e.currentTarget as HTMLElement).style.background = 'var(--red-dim)' }}
-                            onMouseLeave={e => { (e.currentTarget as HTMLElement).style.color = 'var(--text-faint)'; (e.currentTarget as HTMLElement).style.background = 'transparent' }}>
+                            className="w-7 h-7 rounded-lg flex items-center justify-center"
+                            style={{ color: 'var(--text-faint)' }}>
                             {deleting === plan.id ? <Loader2 size={12} className="animate-spin" /> : <Trash2 size={12} />}
                           </button>
                         </div>
@@ -907,7 +678,7 @@ export default function PlanPage() {
         </div>
       )}
 
-      {/* Create plan modal */}
+      {/* Crear plan */}
       <AnimatePresence>
         {showCreate && (
           <>
@@ -933,14 +704,12 @@ export default function PlanPage() {
                     <label className="field-label">Nombre del plan *</label>
                     <input type="text" value={form.name}
                       onChange={e => setForm({ ...form, name: e.target.value })}
-                      placeholder="ej. Plan SST 2026"
-                      className="terra-input" autoFocus />
+                      placeholder="ej. Plan SST 2026" className="terra-input" autoFocus />
                   </div>
                   <div>
                     <label className="field-label">Año *</label>
                     <input type="number" value={form.year} min={2020} max={2040}
-                      onChange={e => setForm({ ...form, year: Number(e.target.value) })}
-                      className="terra-input" />
+                      onChange={e => setForm({ ...form, year: Number(e.target.value) })} className="terra-input" />
                   </div>
                   <div>
                     <label className="field-label">
@@ -948,11 +717,11 @@ export default function PlanPage() {
                     </label>
                     <select value={form.profile_id}
                       onChange={e => setForm({ ...form, profile_id: e.target.value })} className="terra-input">
-                      <option value="">Sin perfil — plan libre</option>
+                      <option value="">Sin perfil — toda la Biblioteca</option>
                       {profiles.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
                     </select>
                     <p className="text-[10px] mt-1.5" style={{ color: 'var(--text-faint)' }}>
-                      Si eliges un perfil, sus cursos aparecerán en el panel lateral para arrastrarlos al calendario.
+                      El perfil solo filtra los temas del panel; siempre puedes cambiarlo o ver la Biblioteca completa.
                     </p>
                   </div>
                   <div className="flex gap-3 pt-2">
