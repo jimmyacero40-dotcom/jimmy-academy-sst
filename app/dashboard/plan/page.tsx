@@ -465,21 +465,21 @@ export default function PlanPage() {
                       setItems(prev => prev.filter(i => i.id !== id))
                       setPanel(null)
                     }}
-                    onCambioAsignacion={async aviso => {
-                      // La fecha pudo moverse al guardar, así que el calendario
-                      // y los contadores se rehacen con lo que hay en la base.
+                    onRecargarPlan={async () => {
+                      // La fecha o el estado pudieron cambiar, así que el
+                      // calendario y los contadores se rehacen con lo que hay
+                      // en la base.
                       const r = await fetch(`/api/plans/${editingPlan.id}/items`)
-                      if (r.ok) {
-                        const frescos: PlanItem[] = await r.json()
-                        setItems(frescos)
-                        const actual = frescos.find(i => i.id === panel.item.id)
-                        if (actual) {
-                          setPanel({ modo: 'editar', item: actual })
-                          if (vista.clase === 'mes') setMes(actual.month)
-                        }
+                      if (!r.ok) return
+                      const frescos: PlanItem[] = await r.json()
+                      setItems(frescos)
+                      const actual = frescos.find(i => i.id === panel.item.id)
+                      if (actual) {
+                        setPanel({ modo: 'editar', item: actual })
+                        if (vista.clase === 'mes') setMes(actual.month)
                       }
-                      setAviso({ texto: aviso })
                     }}
+                    onAviso={(texto, deshacer) => setAviso({ texto, deshacer })}
                   />
                 ) : (
                   <PanelAsignacion

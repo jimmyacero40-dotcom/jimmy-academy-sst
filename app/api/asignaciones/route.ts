@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { supabaseAdmin as supabase } from '@/lib/supabase-admin'
 import { requierePermiso } from '@/lib/get-company'
+import { anotar } from '@/lib/auditoria-plan'
+import { enviarCorreo, correoConfigurado, plantillaCapacitacion } from '@/lib/correo'
 
 // ─── Asignar una capacitación a personas concretas ────────────────────
 // Vía corta a lo que ya hacían los Perfiles de Formación: en vez de armar un
@@ -252,6 +254,157 @@ export async function POST(req: NextRequest) {
   }, { status: 201 })
 }
 
+// ─── Seguimiento: lo que se hace con cada persona ya asignada ─────────
+// Anotar asistencia, quitar a alguien, devolverlo y avisar por correo. Todo
+// pasa por aquí para que todo quede anotado igual en la auditoría.
+export async function PATCH(req: NextRequest) {
+  const { authorized, user, companyId } = await requierePermiso('formacion.gestionar')
+  if (!authorized) return NextResponse.json({ error: 'No tiene permiso' }, { status: 403 })
+  if (!companyId) return NextResponse.json({ error: 'Selecciona una empresa primero' }, { status: 400 })
+
+  const body = await req.json()
+  const accion: string = body.accion
+  const ids: string[] = Array.isArray(body.enrollment_ids) ? body.enrollment_ids : []
+  const quien = { usuarioId: user?.id ?? null, usuarioNombre: user?.name ?? null }
+
+  // ── Devolver lo retirado (el "Deshacer" del aviso) ──
+  if (accion === 'restaurar') {
+    const filas: any[] = Array.isArray(body.filas) ? body.filas : []
+    if (!filas.length) return NextResponse.json({ error: 'Nada que devolver' }, { status: 400 })
+    const { error } = await supabase.from('enrollments').upsert(
+      filas.map(f => ({ ...f, company_id: companyId })),
+      { onConflict: 'user_id,training_id,plan_item_id', ignoreDuplicates: true },
+    )
+    if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+    if (body.plan_item_id) {
+      await supabase.from('plan_item_targets').upsert(
+        filas.map(f => ({ plan_item_id: body.plan_item_id, target_type: 'user', target_id: f.user_id })),
+        { onConflict: 'plan_item_id,target_type,target_id', ignoreDuplicates: true })
+      await anotar(body.plan_item_id, 'restaurar', { detalle: { personas: filas.length }, ...quien })
+    }
+    return NextResponse.json({ restauradas: filas.length })
+  }
+
+  if (!ids.length) return NextResponse.json({ error: 'Elige al menos una persona' }, { status: 400 })
+
+  // Siempre sobre inscripciones de la empresa activa.
+  const { data: filas } = await supabase
+    .from('enrollments')
+    .select('id, user_id, training_id, plan_item_id, status, due_date, created_at, score, started_at, completed_at, users(name, correo)')
+    .in('id', ids).eq('company_id', companyId)
+  if (!filas?.length) return NextResponse.json({ error: 'No se encontraron esas asignaciones' }, { status: 404 })
+
+  const itemId = filas[0].plan_item_id as string | null
+
+  // ── Anotar lo que pasó el día de la capacitación ──
+  if (accion === 'asistencia') {
+    const valor: string | null = body.valor ?? null
+    if (valor && !['asistio', 'no_asistio', 'excusado'].includes(valor)) {
+      return NextResponse.json({ error: 'Asistencia no válida' }, { status: 400 })
+    }
+    const cambios: Record<string, any> = {
+      asistencia: valor,
+      asistencia_nota: body.nota?.trim() || null,
+      asistencia_at: valor ? new Date().toISOString() : null,
+      asistencia_por: valor ? user?.id ?? null : null,
+    }
+    // Quien asistió queda como que la hizo: es lo que sostiene el indicador de
+    // cobertura y lo que se reporta como ejecutado.
+    if (valor === 'asistio') {
+      cambios.status = 'completed'
+      cambios.completed_at = new Date().toISOString()
+    } else if (valor) {
+      cambios.status = 'pending'
+      cambios.completed_at = null
+    }
+
+    const { error } = await supabase.from('enrollments').update(cambios).in('id', ids)
+    if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+    if (itemId) {
+      await anotar(itemId, 'asistencia', {
+        motivo: body.nota?.trim() || null,
+        detalle: { valor, personas: filas.map((f: any) => f.users?.name).filter(Boolean) },
+        ...quien,
+      })
+    }
+    return NextResponse.json({ marcadas: ids.length, valor })
+  }
+
+  // ── Quitar a alguien de la capacitación ──
+  if (accion === 'retirar') {
+    const completadas = filas.filter((f: any) => f.status === 'completed')
+    const retirables = filas.filter((f: any) => f.status !== 'completed')
+    if (!retirables.length) {
+      return NextResponse.json({ error: 'Ya hicieron la capacitación: no se pueden quitar' }, { status: 400 })
+    }
+    // El registro completo se guarda antes de borrarlo, que es lo que permite
+    // devolverlo igual si fue un error.
+    const copia = retirables.map((f: any) => ({
+      user_id: f.user_id, training_id: f.training_id, plan_item_id: f.plan_item_id,
+      status: f.status, due_date: f.due_date, started_at: f.started_at, score: f.score,
+    }))
+    const { error } = await supabase.from('enrollments').delete().in('id', retirables.map((f: any) => f.id))
+    if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+    if (itemId) {
+      await supabase.from('plan_item_targets').delete()
+        .eq('plan_item_id', itemId).eq('target_type', 'user')
+        .in('target_id', retirables.map((f: any) => f.user_id))
+      await anotar(itemId, 'retirar', {
+        motivo: body.motivo?.trim() || null,
+        detalle: { filas: copia, personas: retirables.map((f: any) => f.users?.name).filter(Boolean) },
+        ...quien,
+      })
+    }
+    return NextResponse.json({
+      retiradas: retirables.length,
+      conservadas: completadas.length,
+      filas: copia,
+      nombres: retirables.map((f: any) => f.users?.name).filter(Boolean),
+    })
+  }
+
+  // ── Avisar por correo ──
+  if (accion === 'notificar') {
+    const recordatorio = body.recordatorio === true
+    const { data: curso } = await supabase
+      .from('trainings').select('title, duration').eq('id', filas[0].training_id).maybeSingle()
+    const { data: item } = itemId
+      ? await supabase.from('plan_items').select('scheduled_date, modalidad').eq('id', itemId).maybeSingle()
+      : { data: null as any }
+
+    let enviados = 0
+    const fallos: { nombre: string; motivo: string }[] = []
+    for (const f of filas as any[]) {
+      const { asunto, html } = plantillaCapacitacion({
+        nombre: f.users?.name ?? '',
+        curso: curso?.title ?? 'Capacitación',
+        fecha: item?.scheduled_date ?? f.due_date ?? null,
+        duracion: curso?.duration ?? null,
+        modalidad: item?.modalidad ?? null,
+        recordatorio,
+      })
+      const r = await enviarCorreo(f.users?.correo ?? '', asunto, html)
+      if (r.enviado) enviados++
+      else fallos.push({ nombre: f.users?.name ?? '', motivo: r.motivo ?? 'No se pudo enviar' })
+      await supabase.from('enrollments').update({
+        notificado_at: r.enviado ? new Date().toISOString() : null,
+        notificacion_error: r.enviado ? null : (r.motivo ?? 'No se pudo enviar'),
+      }).eq('id', f.id)
+    }
+    if (itemId) {
+      await anotar(itemId, 'notificar', {
+        detalle: { enviados, fallidos: fallos.length, recordatorio }, ...quien,
+      })
+    }
+    return NextResponse.json({
+      enviados, fallos,
+      configurado: correoConfigurado(),
+    })
+  }
+
+  return NextResponse.json({ error: 'Acción no reconocida' }, { status: 400 })
+}
+
 // ─── Retirar una capacitación asignada ────────────────────────────────
 // Para cuando se asignó por equivocación o a quien no era.
 //
@@ -317,7 +470,7 @@ export async function GET(req: NextRequest) {
   if (itemId) {
     const { data, error } = await supabase
       .from('enrollments')
-      .select('id, user_id, status, created_at, due_date, completed_at, score, users(id, name, cedula, cargo, correo, areas(name))')
+      .select('id, user_id, status, created_at, due_date, completed_at, score, asistencia, asistencia_nota, asistencia_at, notificado_at, notificacion_error, users(id, name, cedula, cargo, correo, areas(name))')
       .eq('plan_item_id', itemId)
       .eq('company_id', companyId)
     if (error) return NextResponse.json({ error: error.message }, { status: 500 })
@@ -329,6 +482,11 @@ export async function GET(req: NextRequest) {
       due_date: e.due_date,
       completed_at: e.completed_at,
       score: e.score,
+      asistencia: e.asistencia ?? null,
+      asistencia_nota: e.asistencia_nota ?? null,
+      asistencia_at: e.asistencia_at ?? null,
+      notificado_at: e.notificado_at ?? null,
+      notificacion_error: e.notificacion_error ?? null,
       name: e.users?.name ?? '',
       cedula: e.users?.cedula ?? '',
       cargo: e.users?.cargo ?? '',

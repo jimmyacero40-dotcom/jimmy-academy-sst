@@ -5,9 +5,11 @@ import { useCallback, useEffect, useState } from 'react'
 import { motion } from 'framer-motion'
 import {
   X, Loader2, BookOpen, Users, Clock, CalendarDays, Target, UserCheck,
+  ClipboardList, Ban, AlertTriangle,
 } from 'lucide-react'
 import AsignarCapacitacion from '@/components/AsignarCapacitacion'
 import PanelAsignacion from './PanelAsignacion'
+import Seguimiento, { estadoDe, type Asignado } from './Seguimiento'
 import { ESTADO_COLOR, ESTADO_NOMBRE, colorCategoria, type PlanItem, type Tema } from './tipos'
 import { enPalabras, MESES } from '@/lib/plan-fechas'
 
@@ -17,9 +19,9 @@ import { enPalabras, MESES } from '@/lib/plan-fechas'
 // asignar de verdad tocaba ir a "Asignar a personas" y volver a buscar el
 // mismo curso.
 //
-// Ahora se abre aquí: arriba la ficha con su cobertura, y debajo el mismo
-// asistente de asignación -el de siempre, sin el paso de elegir curso, que ya
-// se sabe cuál es-.
+// Ahora se abre aquí: arriba la ficha con su cobertura, y debajo tres
+// pestañas -quiénes la tienen y cómo van, a quién asignarla, y los datos de
+// la capacitación dentro del plan-.
 // ──────────────────────────────────────────────────────────────────────────
 
 export interface Cobertura { asignados: number; asistieron: number; faltan: number }
@@ -65,7 +67,7 @@ function Barra({ cobertura }: { cobertura: Cobertura }) {
 }
 
 export default function PanelCapacitacion({
-  item, planId, anioPlan, temas, onCerrar, onGuardado, onEliminado, onCambioAsignacion,
+  item, planId, anioPlan, temas, onCerrar, onGuardado, onEliminado, onRecargarPlan, onAviso,
 }: {
   item: PlanItem
   planId: string
@@ -74,34 +76,65 @@ export default function PanelCapacitacion({
   onCerrar: () => void
   onGuardado: (items: PlanItem[]) => void
   onEliminado: (id: string) => void
-  /** Tras asignar: la pantalla de atrás recarga el plan y sus contadores. */
-  onCambioAsignacion: (aviso: string) => void
+  /** Vuelve a leer el plan: la fecha o el estado pudieron cambiar. */
+  onRecargarPlan: () => Promise<void> | void
+  onAviso: (texto: string, deshacer?: () => void) => void
 }) {
-  const [pestana, setPestana] = useState<'asignacion' | 'detalles'>('asignacion')
-  const [cobertura, setCobertura] = useState<Cobertura | null>(null)
+  const [pestana, setPestana] = useState<'seguimiento' | 'asignacion' | 'detalles'>('seguimiento')
+  const [asignados, setAsignados] = useState<Asignado[] | null>(null)
+  const [cancelando, setCancelando] = useState(false)
+  const [motivo, setMotivo] = useState('')
+  const [avisarCancelacion, setAvisarCancelacion] = useState(true)
+  const [guardandoCancelacion, setGuardandoCancelacion] = useState(false)
 
-  const cargarCobertura = useCallback(async () => {
+  const cargar = useCallback(async () => {
     const r = await fetch(`/api/asignaciones?plan_item_id=${item.id}`)
-    if (!r.ok) { setCobertura({ asignados: 0, asistieron: 0, faltan: 0 }); return }
-    const d: any[] = await r.json()
-    const asistieron = d.filter(e => e.status === 'completed').length
-    setCobertura({ asignados: d.length, asistieron, faltan: d.length - asistieron })
+    setAsignados(r.ok ? await r.json() : [])
   }, [item.id])
 
-  useEffect(() => { cargarCobertura() }, [cargarCobertura])
+  useEffect(() => { cargar() }, [cargar])
 
-  // Esc cierra el panel.
+  // Sin nadie asignado, el seguimiento no tiene nada que seguir: se abre
+  // directamente donde se asigna.
+  useEffect(() => {
+    if (asignados && asignados.length === 0) setPestana(p => (p === 'seguimiento' ? 'asignacion' : p))
+  }, [asignados])
+
   useEffect(() => {
     const alTeclear = (e: KeyboardEvent) => { if (e.key === 'Escape') onCerrar() }
     window.addEventListener('keydown', alTeclear)
     return () => window.removeEventListener('keydown', alTeclear)
   }, [onCerrar])
 
+  const cobertura: Cobertura = {
+    asignados: asignados?.length ?? 0,
+    asistieron: (asignados ?? []).filter(a => estadoDe(a) === 'asistio').length,
+    faltan: (asignados ?? []).filter(a => estadoDe(a) !== 'asistio').length,
+  }
+
+  const cancelar = async () => {
+    if (!motivo.trim()) return
+    setGuardandoCancelacion(true)
+    const r = await fetch(`/api/plan-items/${item.id}`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ accion: 'cancelar', motivo, notificar: avisarCancelacion }),
+    })
+    const d = await r.json()
+    setGuardandoCancelacion(false)
+    if (!r.ok) { onAviso(d.error ?? 'No se pudo cancelar'); return }
+    setCancelando(false); setMotivo('')
+    await onRecargarPlan()
+    onAviso(avisarCancelacion && !d.enviados
+      ? 'Capacitación cancelada · no se enviaron correos'
+      : `Capacitación cancelada${d.enviados ? ` · ${d.enviados} avisados` : ''}`)
+  }
+
   const color = colorCategoria(item.trainings.category)
   const responsable = responsableDe(item.observaciones)
   const tema = temas.find(t => t.id === item.trainings.id)
-  const objetivo = (tema as any)?.descripcion as string | undefined
+  const objetivo = tema?.descripcion ?? undefined
   const cuando = item.scheduled_date ? enPalabras(item.scheduled_date) : MESES[item.month - 1]
+  const cancelada = item.estado === 'cancelada'
 
   return (
     <motion.div
@@ -146,11 +179,21 @@ export default function PanelCapacitacion({
               </span>
             </div>
           </div>
-          <button onClick={onCerrar} aria-label="Cerrar"
-            className="w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0"
-            style={{ background: 'var(--bg-card)', color: 'var(--text-dim)' }}>
-            <X size={14} />
-          </button>
+          <div className="flex items-center gap-1 flex-shrink-0">
+            {!cancelada && (
+              <button onClick={() => setCancelando(true)} aria-label="Cancelar la capacitación"
+                title="Cancelar la capacitación"
+                className="w-7 h-7 rounded-lg flex items-center justify-center"
+                style={{ background: 'var(--red-dim)', color: '#FCA5A5' }}>
+                <Ban size={13} />
+              </button>
+            )}
+            <button onClick={onCerrar} aria-label="Cerrar"
+              className="w-7 h-7 rounded-lg flex items-center justify-center"
+              style={{ background: 'var(--bg-card)', color: 'var(--text-dim)' }}>
+              <X size={14} />
+            </button>
+          </div>
         </div>
 
         {(objetivo || responsable) && (
@@ -169,28 +212,84 @@ export default function PanelCapacitacion({
           </div>
         )}
 
-        {cobertura
+        {asignados
           ? <Barra cobertura={cobertura} />
           : <div className="h-8 flex items-center"><Loader2 size={13} className="animate-spin" style={{ color: 'var(--text-faint)' }} /></div>}
       </div>
 
+      {/* ── Cancelar la capacitación ── */}
+      {cancelando && (
+        <div className="p-3 flex-shrink-0" style={{ background: 'var(--red-dim)', borderBottom: '1px solid rgba(239,68,68,0.3)' }}>
+          <div className="flex items-start gap-2 mb-2">
+            <AlertTriangle size={13} className="flex-shrink-0 mt-0.5" style={{ color: '#FCA5A5' }} />
+            <p className="text-[11px]" style={{ color: '#FCA5A5' }}>
+              No se borra: queda como <b>Cancelada</b> con su motivo, visible en el historial del plan.
+            </p>
+          </div>
+          <input value={motivo} onChange={e => setMotivo(e.target.value)} autoFocus
+            placeholder="Motivo de la cancelación"
+            className="w-full text-xs rounded-lg px-3 py-2 outline-none mb-2"
+            style={{ background: 'var(--bg)', border: '1px solid var(--border)', color: 'var(--text)' }} />
+          {cobertura.asignados > 0 && (
+            <label className="flex items-center gap-2 mb-2 cursor-pointer">
+              <input type="checkbox" checked={avisarCancelacion}
+                onChange={e => setAvisarCancelacion(e.target.checked)}
+                className="w-4 h-4 rounded accent-blue-500" />
+              <span className="text-[11px]" style={{ color: 'var(--text-dim)' }}>
+                Avisar por correo a los {cobertura.asignados} asignados
+              </span>
+            </label>
+          )}
+          <div className="flex gap-2">
+            <button onClick={() => { setCancelando(false); setMotivo('') }}
+              className="terra-btn-outline flex-1 text-xs py-1.5">
+              No cancelar
+            </button>
+            <button onClick={cancelar} disabled={!motivo.trim() || guardandoCancelacion}
+              className="flex-1 text-xs py-1.5 rounded-xl font-bold flex items-center justify-center gap-1.5 disabled:opacity-40"
+              style={{ background: '#EF4444', color: '#fff' }}>
+              {guardandoCancelacion ? <Loader2 size={12} className="animate-spin" /> : <Ban size={12} />} Cancelar
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* ── Pestañas ── */}
-      <div className="flex gap-1 px-3 pt-2 flex-shrink-0" style={{ borderBottom: '1px solid var(--border)' }}>
-        {([['asignacion', 'Asignación', Users], ['detalles', 'Detalles del plan', CalendarDays]] as const).map(([id, nombre, Icono]) => (
+      <div className="flex gap-1 px-3 pt-2 flex-shrink-0 overflow-x-auto" style={{ borderBottom: '1px solid var(--border)' }}>
+        {([
+          ['seguimiento', 'Seguimiento', ClipboardList],
+          ['asignacion', cobertura.asignados ? 'Editar asignación' : 'Asignar', Users],
+          ['detalles', 'Detalles del plan', CalendarDays],
+        ] as const).map(([id, nombre, Icono]) => (
           <button key={id} onClick={() => setPestana(id)}
-            className="flex items-center gap-1.5 px-3 py-2 text-[11px] font-bold transition-all"
+            className="flex items-center gap-1.5 px-3 py-2 text-[11px] font-bold transition-all whitespace-nowrap"
             style={{
               color: pestana === id ? 'var(--primary)' : 'var(--text-dim)',
               borderBottom: `2px solid ${pestana === id ? 'var(--primary)' : 'transparent'}`,
             }}>
             <Icono size={12} /> {nombre}
+            {id === 'seguimiento' && cobertura.asignados > 0 && (
+              <span className="text-[9px] font-black px-1.5 rounded-full"
+                style={{ background: 'var(--primary-dim)', color: 'var(--primary)' }}>
+                {cobertura.asignados}
+              </span>
+            )}
           </button>
         ))}
       </div>
 
       {/* ── Cuerpo ── */}
       <div className="flex-1 overflow-hidden">
-        {pestana === 'asignacion' ? (
+        {pestana === 'seguimiento' ? (
+          <Seguimiento
+            item={item}
+            asignados={asignados ?? []}
+            cargando={asignados === null}
+            onRecargar={async () => { await cargar(); await onRecargarPlan() }}
+            onAviso={onAviso}
+            irAAsignar={() => setPestana('asignacion')}
+          />
+        ) : pestana === 'asignacion' ? (
           <AsignarCapacitacion
             abierto
             variante="panel"
@@ -204,8 +303,9 @@ export default function PanelCapacitacion({
             fechaInicial={item.scheduled_date ?? ''}
             onCerrar={onCerrar}
             onListo={async () => {
-              await cargarCobertura()
-              onCambioAsignacion('Asignación guardada')
+              await cargar()
+              await onRecargarPlan()
+              onAviso('Asignación guardada')
             }}
           />
         ) : (
