@@ -28,6 +28,9 @@ export interface PlanItem {
   plan_item_targets: { id: string; target_type: string; target_id: string | null }[]
 }
 
+/** Cuánta gente lleva cada capacitación del plan, por id del ítem. */
+export type Cobertura = Record<string, { asignados: number; asistieron: number }>
+
 export const ESTADOS = ['pendiente', 'programada', 'en_curso', 'completada', 'cancelada', 'postergada']
 
 export const ESTADO_NOMBRE: Record<string, string> = {

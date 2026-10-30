@@ -9,12 +9,14 @@ import {
 import { motion, AnimatePresence } from 'framer-motion'
 import AsignarCapacitacion from '@/components/AsignarCapacitacion'
 import BibliotecaTemas, { type FiltroTemas } from '@/components/plan/BibliotecaTemas'
+import { CoberturaCtx } from '@/components/plan/ChipItem'
 import VistaMes from '@/components/plan/VistaMes'
 import VistaAno from '@/components/plan/VistaAno'
 import PanelAsignacion, { type ValoresIniciales } from '@/components/plan/PanelAsignacion'
 import PanelCapacitacion from '@/components/plan/PanelCapacitacion'
-import { colorCategoria, type PlanItem, type Tema } from '@/components/plan/tipos'
+import { colorCategoria, type PlanItem, type Tema, type Cobertura } from '@/components/plan/tipos'
 import { MESES, partes, enPalabras, horas } from '@/lib/plan-fechas'
+import { DialogoReprogramar } from '@/components/plan/DialogoReprogramar'
 import {
   Calendar, Plus, Trash2, X, Loader2, AlertCircle, ChevronLeft,
   BookOpen, ArrowRight, GraduationCap, LayoutGrid, CalendarDays,
@@ -71,6 +73,11 @@ export default function PlanPage() {
   const [panel, setPanel]   = useState<Panel | null>(null)
   const [arrastrando, setArrastrando] = useState<{ clase: string; etiqueta: string; color: string } | null>(null)
   const [aviso, setAviso]   = useState<{ texto: string; deshacer?: () => void } | null>(null)
+  // Cuánta gente lleva cada capacitación: alimenta el 12/40 de los chips y
+  // decide si mover una por arrastre merece preguntar antes.
+  const [cobertura, setCobertura] = useState<Cobertura>({})
+  const [porReprogramar, setPorReprogramar] = useState<
+    { item: PlanItem; mes: number; fecha: string | null } | null>(null)
 
   const sensores = useSensors(
     // Un umbral pequeño: así un clic sigue siendo un clic y no empieza a
@@ -114,12 +121,14 @@ export default function PlanPage() {
     const perfil = plan.profile_id ?? ''
     setPerfilActivo(perfil)
 
-    const [iRes, tRes, pRes] = await Promise.all([
+    const [iRes, tRes, pRes, cRes] = await Promise.all([
       fetch(`/api/plans/${plan.id}/items`),
       fetch('/api/trainings'),
       perfil ? fetch(`/api/profiles/${perfil}/trainings`) : Promise.resolve(null),
+      fetch(`/api/plans/${plan.id}/cobertura`),
     ])
     if (iRes.ok) setItems(await iRes.json())
+    setCobertura(cRes.ok ? await cRes.json() : {})
     if (tRes.ok) {
       const data = await tRes.json()
       setBiblioteca(
@@ -172,6 +181,20 @@ export default function PlanPage() {
   }), [delMes])
 
   // ── Mover una capacitación ──────────────────────────────────────────────
+  /** Vuelve a traer las capacitaciones del plan y su cobertura. */
+  const recargarItems = useCallback(async (): Promise<PlanItem[] | null> => {
+    if (!editingPlan) return null
+    const [iRes, cRes] = await Promise.all([
+      fetch(`/api/plans/${editingPlan.id}/items`),
+      fetch(`/api/plans/${editingPlan.id}/cobertura`),
+    ])
+    if (cRes.ok) setCobertura(await cRes.json())
+    if (!iRes.ok) return null
+    const frescos: PlanItem[] = await iRes.json()
+    setItems(frescos)
+    return frescos
+  }, [editingPlan])
+
   const moverItem = useCallback(async (
     item: PlanItem, mes: number, fecha: string | null, conAviso = true,
   ) => {
@@ -259,7 +282,12 @@ export default function PlanPage() {
       crearEn(origen.temaId, mes, fecha)
     } else {
       const item = items.find(i => i.id === origen.itemId)
-      if (item) moverItem(item, mes, fecha)
+      if (!item) return
+      if (item.month === mes && (item.scheduled_date ?? null) === fecha) return
+      // Mover una capacitación que ya tiene gente asignada no es acomodar el
+      // calendario: es cambiarle el día a cuarenta personas. Eso se pregunta.
+      if ((cobertura[item.id]?.asignados ?? 0) > 0) setPorReprogramar({ item, mes, fecha })
+      else moverItem(item, mes, fecha)
     }
   }
 
@@ -313,6 +341,7 @@ export default function PlanPage() {
     return (
       <DndContext sensors={sensores} collisionDetection={closestCenter}
         onDragStart={alEmpezar} onDragEnd={alSoltar} onDragCancel={() => setArrastrando(null)}>
+        <CoberturaCtx.Provider value={cobertura}>
         <div className="h-[calc(100vh-64px)] flex flex-col overflow-hidden">
 
           {/* Barra superior */}
@@ -469,10 +498,8 @@ export default function PlanPage() {
                       // La fecha o el estado pudieron cambiar, así que el
                       // calendario y los contadores se rehacen con lo que hay
                       // en la base.
-                      const r = await fetch(`/api/plans/${editingPlan.id}/items`)
-                      if (!r.ok) return
-                      const frescos: PlanItem[] = await r.json()
-                      setItems(frescos)
+                      const frescos = await recargarItems()
+                      if (!frescos) return
                       const actual = frescos.find(i => i.id === panel.item.id)
                       if (actual) {
                         setPanel({ modo: 'editar', item: actual })
@@ -514,6 +541,19 @@ export default function PlanPage() {
 
           {asistente}
 
+          {porReprogramar && (
+            <DialogoReprogramar
+              item={porReprogramar.item}
+              fecha={porReprogramar.fecha}
+              asignados={cobertura[porReprogramar.item.id]?.asignados ?? 0}
+              onCerrar={() => setPorReprogramar(null)}
+              onHecho={async texto => {
+                setPorReprogramar(null)
+                setAviso({ texto })
+                await recargarItems()
+              }} />
+          )}
+
           {/* Aviso con Deshacer */}
           <AnimatePresence>
             {aviso && (
@@ -543,6 +583,7 @@ export default function PlanPage() {
             </div>
           )}
         </div>
+        </CoberturaCtx.Provider>
       </DndContext>
     )
   }

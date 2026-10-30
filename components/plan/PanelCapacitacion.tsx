@@ -5,11 +5,13 @@ import { useCallback, useEffect, useState } from 'react'
 import { motion } from 'framer-motion'
 import {
   X, Loader2, BookOpen, Users, Clock, CalendarDays, Target, UserCheck,
-  ClipboardList, Ban, AlertTriangle,
+  ClipboardList, Ban, AlertTriangle, CalendarClock, History,
 } from 'lucide-react'
 import AsignarCapacitacion from '@/components/AsignarCapacitacion'
 import PanelAsignacion from './PanelAsignacion'
 import Seguimiento, { estadoDe, type Asignado } from './Seguimiento'
+import { DialogoReprogramar } from './DialogoReprogramar'
+import { Historial } from './Historial'
 import { ESTADO_COLOR, ESTADO_NOMBRE, colorCategoria, type PlanItem, type Tema } from './tipos'
 import { enPalabras, MESES } from '@/lib/plan-fechas'
 
@@ -81,6 +83,7 @@ export default function PanelCapacitacion({
   onAviso: (texto: string, deshacer?: () => void) => void
 }) {
   const [pestana, setPestana] = useState<'seguimiento' | 'asignacion' | 'detalles'>('seguimiento')
+  const [reprogramando, setReprogramando] = useState(false)
   const [asignados, setAsignados] = useState<Asignado[] | null>(null)
   const [cancelando, setCancelando] = useState(false)
   const [motivo, setMotivo] = useState('')
@@ -180,6 +183,12 @@ export default function PanelCapacitacion({
             </div>
           </div>
           <div className="flex items-center gap-1 flex-shrink-0">
+            <button onClick={() => setReprogramando(true)} aria-label="Reprogramar"
+              title="Reprogramar"
+              className="w-7 h-7 rounded-lg flex items-center justify-center"
+              style={{ background: 'var(--bg-card)', color: '#F59E0B' }}>
+              <CalendarClock size={13} />
+            </button>
             {!cancelada && (
               <button onClick={() => setCancelando(true)} aria-label="Cancelar la capacitación"
                 title="Cancelar la capacitación"
@@ -309,19 +318,42 @@ export default function PanelCapacitacion({
             }}
           />
         ) : (
-          <PanelAsignacion
-            variante="panel"
-            modo="editar"
-            planId={planId}
-            anioPlan={anioPlan}
-            item={item}
-            temas={temas}
-            onCerrar={onCerrar}
-            onGuardado={onGuardado}
-            onEliminado={onEliminado}
-          />
+          <div className="h-full overflow-y-auto">
+            <PanelAsignacion
+              variante="panel"
+              modo="editar"
+              planId={planId}
+              anioPlan={anioPlan}
+              item={item}
+              temas={temas}
+              onCerrar={onCerrar}
+              onGuardado={onGuardado}
+              onEliminado={onEliminado}
+            />
+            <div className="px-4 pb-6">
+              <p className="text-[11px] font-bold uppercase tracking-wider flex items-center gap-1.5 mb-1"
+                style={{ color: 'var(--text-dim)' }}>
+                <History size={12} /> Historial
+              </p>
+              <Historial planItemId={item.id} />
+            </div>
+          </div>
         )}
       </div>
+
+      {reprogramando && (
+        <DialogoReprogramar
+          item={item}
+          fecha={item.scheduled_date ?? null}
+          asignados={(asignados ?? []).length}
+          onCerrar={() => setReprogramando(false)}
+          onHecho={async texto => {
+            setReprogramando(false)
+            await cargar()
+            await onRecargarPlan()
+            onAviso(texto)
+          }} />
+      )}
     </motion.div>
   )
 }
