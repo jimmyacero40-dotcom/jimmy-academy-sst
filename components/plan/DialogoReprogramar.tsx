@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { CalendarClock, Loader2, AlertCircle } from 'lucide-react'
 import { enPalabras } from '@/lib/plan-fechas'
 import type { PlanItem } from './tipos'
@@ -26,6 +26,18 @@ export function DialogoReprogramar({
   const [notificar, setNotificar] = useState(true)
   const [guardando, setGuardando] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [choques, setChoques] = useState<{ nombre: string; curso: string }[]>([])
+
+  // ¿La nueva fecha le cae encima a otra capacitación de la misma gente?
+  useEffect(() => {
+    if (!nueva) { setChoques([]); return }
+    let vigente = true
+    fetch(`/api/asignaciones/choques?fecha=${nueva}&excluir=${item.id}`)
+      .then(r => r.ok ? r.json() : [])
+      .then(d => { if (vigente) setChoques(Array.isArray(d) ? d : []) })
+      .catch(() => { if (vigente) setChoques([]) })
+    return () => { vigente = false }
+  }, [nueva, item.id])
 
   const guardar = async () => {
     if (!nueva) { setError('Elige la nueva fecha'); return }
@@ -86,6 +98,18 @@ export function DialogoReprogramar({
         </label>
         <input type="date" value={nueva} onChange={e => setNueva(e.target.value)}
           className={`${inp} mb-3`} style={estiloInp} />
+
+        {choques.length > 0 && (
+          <div className="flex items-start gap-2 text-[11px] p-2.5 rounded-lg mb-3 leading-relaxed"
+            style={{ background: 'rgba(245,158,11,0.08)', border: '1px solid rgba(245,158,11,0.3)', color: '#F59E0B' }}>
+            <AlertCircle size={13} className="flex-shrink-0 mt-0.5" />
+            <span>
+              Ese día {choques.length === 1 ? 'ya hay 1 persona' : `ya hay ${choques.length} personas`} con
+              otra capacitación: {choques.slice(0, 2).map(c => `${c.nombre} (${c.curso})`).join(' · ')}
+              {choques.length > 2 && ` y ${choques.length - 2} más`}.
+            </span>
+          </div>
+        )}
 
         <label className="text-[11px] font-bold uppercase tracking-wider mb-1.5 block" style={{ color: 'var(--text-dim)' }}>
           Motivo <span className="font-normal normal-case tracking-normal" style={{ color: 'var(--text-faint)' }}>(opcional)</span>

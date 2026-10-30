@@ -118,6 +118,8 @@ export default function AsignarCapacitacion({
   // marcado. A quien ya estaba no se le escribe por haber tocado la lista.
   const [notificar, setNotificar] = useState(true)
   const [verMensaje, setVerMensaje] = useState(false)
+  // Quién ya tiene otra capacitación ese mismo día.
+  const [choques, setChoques] = useState<{ user_id: string; nombre: string; curso: string }[]>([])
   const [mes, setMes] = useState(mesInicial ?? new Date().getMonth() + 1)
   const [fecha, setFecha] = useState(fechaInicial ?? '')
   const [modalidad, setModalidad] = useState('presencial')
@@ -294,6 +296,21 @@ export default function AsignarCapacitacion({
     if (motivoBloqueo(id)) return
     setElegidos(prev => { const n = new Set(prev); n.has(id) ? n.delete(id) : n.add(id); return n })
   }
+
+  // Se consulta al llegar al paso de la fecha, no en cada tecla.
+  useEffect(() => {
+    if (paso !== 3 || !fecha) { setChoques([]); return }
+    let vigente = true
+    fetch(`/api/asignaciones/choques?fecha=${fecha}${planItemId ? `&excluir=${planItemId}` : ''}`)
+      .then(r => r.ok ? r.json() : [])
+      .then(d => { if (vigente) setChoques(Array.isArray(d) ? d : []) })
+      .catch(() => { if (vigente) setChoques([]) })
+    return () => { vigente = false }
+  }, [paso, fecha, planItemId])
+
+  const choquesElegidos = useMemo(
+    () => choques.filter(c => elegidos.has(c.user_id)),
+    [choques, elegidos])
 
   // Los que no estaban antes: son los únicos a los que se avisaría.
   const nuevos = useMemo(
@@ -678,6 +695,26 @@ export default function AsignarCapacitacion({
                   <span>{nombresElegidos.join(' · ') || 'Nadie seleccionado'}</span>
                 </div>
               </div>
+
+              {/* Dos capacitaciones el mismo día casi siempre es un descuido,
+                  pero puede ser a propósito: se avisa, no se bloquea. */}
+              {choquesElegidos.length > 0 && (
+                <div className="flex items-start gap-2 text-xs p-3 rounded-xl"
+                  style={{ background: 'rgba(245,158,11,0.08)', border: '1px solid rgba(245,158,11,0.3)', color: '#F59E0B' }}>
+                  <AlertCircle size={14} className="flex-shrink-0 mt-0.5" />
+                  <div className="leading-relaxed">
+                    <p className="font-bold">
+                      {choquesElegidos.length === 1
+                        ? 'Una persona ya tiene otra capacitación ese día'
+                        : `${choquesElegidos.length} personas ya tienen otra capacitación ese día`}
+                    </p>
+                    <p className="mt-0.5">
+                      {choquesElegidos.slice(0, 3).map(c => `${c.nombre} (${c.curso})`).join(' · ')}
+                      {choquesElegidos.length > 3 && ` y ${choquesElegidos.length - 3} más`}
+                    </p>
+                  </div>
+                </div>
+              )}
 
               {/* ── Avisar por correo ── */}
               {modo === 'asignar' && nuevos.length > 0 && (

@@ -12,6 +12,7 @@ import BibliotecaTemas, { type FiltroTemas } from '@/components/plan/BibliotecaT
 import { CoberturaCtx } from '@/components/plan/ChipItem'
 import VistaMes from '@/components/plan/VistaMes'
 import VistaAno from '@/components/plan/VistaAno'
+import VistaCobertura from '@/components/plan/VistaCobertura'
 import PanelAsignacion, { type ValoresIniciales } from '@/components/plan/PanelAsignacion'
 import PanelCapacitacion from '@/components/plan/PanelCapacitacion'
 import { colorCategoria, type PlanItem, type Tema, type Cobertura } from '@/components/plan/tipos'
@@ -19,7 +20,7 @@ import { MESES, partes, enPalabras, horas } from '@/lib/plan-fechas'
 import { DialogoReprogramar } from '@/components/plan/DialogoReprogramar'
 import {
   Calendar, Plus, Trash2, X, Loader2, AlertCircle, ChevronLeft,
-  BookOpen, ArrowRight, GraduationCap, LayoutGrid, CalendarDays,
+  BookOpen, ArrowRight, GraduationCap, LayoutGrid, CalendarDays, BarChart2,
   Check, Clock, AlertTriangle, Undo2, Users,
 } from 'lucide-react'
 
@@ -35,7 +36,7 @@ interface Plan {
 
 interface TrainingProfile { id: string; name: string }
 
-interface Vista { clase: 'mes' | 'ano' }
+interface Vista { clase: 'mes' | 'ano' | 'cobertura' }
 
 type Panel =
   | { modo: 'crear'; tema: Tema | null; inicial: ValoresIniciales }
@@ -360,7 +361,7 @@ export default function PlanPage() {
             <div className="flex items-center gap-2">
               {/* Mes | Año */}
               <div className="flex rounded-xl overflow-hidden" style={{ border: '1px solid var(--border)' }}>
-                {([['mes', 'Mes', CalendarDays], ['ano', 'Año', LayoutGrid]] as const).map(([k, nombre, Icono]) => (
+                {([['mes', 'Mes', CalendarDays], ['ano', 'Año', LayoutGrid], ['cobertura', 'Cobertura', BarChart2]] as const).map(([k, nombre, Icono]) => (
                   <button key={k} onClick={() => setVista({ clase: k })}
                     className="flex items-center gap-1 px-2.5 py-1.5 text-[11px] font-bold transition-all"
                     style={{
@@ -460,6 +461,13 @@ export default function PlanPage() {
                   onMes={setMes}
                   onAbrirItem={item => setPanel({ modo: 'editar', item })}
                   onCrearEnDia={fecha => crearEn(armado, fecha ? partes(fecha)!.mes : mesVisible, fecha)}
+                />
+              ) : vista.clase === 'cobertura' ? (
+                <VistaCobertura
+                  planId={editingPlan.id}
+                  anioPlan={editingPlan.year}
+                  items={items}
+                  onAbrirItem={item => setPanel({ modo: 'editar', item })}
                 />
               ) : (
                 <VistaAno
