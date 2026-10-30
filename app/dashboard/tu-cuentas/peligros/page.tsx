@@ -5,7 +5,7 @@ import { motion, AnimatePresence } from 'framer-motion'
 import Link from 'next/link'
 import {
   ShieldAlert, Loader2, CheckCircle, ChevronLeft, ChevronRight,
-  Save, User, AlertCircle, Send,
+  Save, User, AlertCircle, Send, Clock,
 } from 'lucide-react'
 import { CampoDictado } from '@/components/CampoDictado'
 import {
@@ -30,6 +30,7 @@ export default function ParticipacionPeligrosPage() {
   const [enviada, setEnviada] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [intento, setIntento] = useState(false)
+  const [cerrada, setCerrada] = useState(false)
 
   useEffect(() => {
     fetch('/api/participacion-peligros')
@@ -37,6 +38,7 @@ export default function ParticipacionPeligrosPage() {
       .then(d => {
         setPeriodo(d.periodo)
         setTrabajador(d.trabajador ?? {})
+        setCerrada(d.periodoEstado?.estado === 'cerrado')
         if (d.participacion) {
           setDatos(d.participacion)
           if (d.participacion.estado === 'enviado') setEnviada(true)
@@ -105,6 +107,29 @@ export default function ParticipacionPeligrosPage() {
     <div className="flex flex-col items-center justify-center py-32 gap-3">
       <Loader2 size={28} className="animate-spin" style={{ color: 'var(--primary)' }} />
       <p className="text-sm" style={{ color: 'var(--text-dim)' }}>Cargando…</p>
+    </div>
+  )
+
+  // El plazo se acabó. Se dice así, en vez de dejarlo llenar todo para que el
+  // envío le falle al final.
+  if (cerrada && !enviada) return (
+    <div className="max-w-2xl mx-auto p-4 pb-24">
+      <motion.div initial={{ opacity: 0, scale: 0.97 }} animate={{ opacity: 1, scale: 1 }}
+        className="terra-card p-10 text-center flex flex-col items-center gap-3">
+        <div className="w-16 h-16 rounded-2xl flex items-center justify-center"
+          style={{ background: 'rgba(245,158,11,0.12)', color: '#F59E0B', border: '1px solid rgba(245,158,11,0.3)' }}>
+          <Clock size={30} />
+        </div>
+        <p className="text-lg font-black" style={{ color: 'var(--text)' }}>El plazo ya se cerró</p>
+        <p className="text-sm leading-relaxed" style={{ color: 'var(--text-dim)', maxWidth: 420 }}>
+          La identificación de peligros {periodo} está cerrada y ya no recibe respuestas.
+          Si necesitas contar algo sobre los riesgos de tu labor, háblalo con el área de
+          Seguridad y Salud en el Trabajo.
+        </p>
+        <Link href="/dashboard/tu-cuentas" className="terra-btn mt-2" style={{ padding: '11px 20px', fontSize: 13 }}>
+          Volver a Tú Cuentas
+        </Link>
+      </motion.div>
     </div>
   )
 

@@ -18,6 +18,22 @@ const CAMPOS_RESPUESTA = [
 ] as const
 
 /**
+ * ¿El periodo admite respuestas? Sin fila se considera abierto, para que los
+ * años que ya existían sigan comportándose igual que antes.
+ */
+async function estadoPeriodo(companyId: string, periodo: number) {
+  const { data } = await supabase.from('participacion_periodos')
+    .select('estado, motivo, cambiado_at, cambiado_por_nombre')
+    .eq('company_id', companyId).eq('periodo', periodo).maybeSingle()
+  return {
+    estado: (data?.estado as 'abierto' | 'cerrado') ?? 'abierto',
+    motivo: data?.motivo ?? null,
+    cambiado_at: data?.cambiado_at ?? null,
+    cambiado_por_nombre: data?.cambiado_por_nombre ?? null,
+  }
+}
+
+/**
  * GET sin parámetros: la participación del propio trabajador.
  * GET ?alcance=empresa: el consolidado, solo para quien pueda consultarlas.
  */
@@ -63,7 +79,7 @@ export async function GET(req: NextRequest) {
       }
     })
 
-    return NextResponse.json({ periodo, filas })
+    return NextResponse.json({ periodo, filas, periodoEstado: await estadoPeriodo(companyId, periodo) })
   }
 
   const user = await getCurrentUser()
@@ -88,7 +104,42 @@ export async function GET(req: NextRequest) {
     centro_trabajo: perfil?.centro_trabajo || null,
   }
 
-  return NextResponse.json({ periodo, participacion: data ?? null, trabajador })
+  return NextResponse.json({
+    periodo,
+    participacion: data ?? null,
+    trabajador,
+    periodoEstado: user.company_id ? await estadoPeriodo(user.company_id, periodo) : { estado: 'abierto' },
+  })
+}
+
+/** Abre o cierra el periodo. Lo que ya se respondió no se toca. */
+export async function PATCH(req: NextRequest) {
+  const { authorized, companyId } = await requierePermiso('sst.participacion.administrar')
+  if (!authorized) return NextResponse.json({ error: 'No autorizado' }, { status: 403 })
+  if (!companyId) return NextResponse.json({ error: 'Sin empresa activa' }, { status: 400 })
+
+  const body = await req.json().catch(() => ({}))
+  const periodo = Number.isInteger(body.periodo) ? body.periodo : new Date().getFullYear()
+  const estado = body.estado === 'cerrado' ? 'cerrado' : body.estado === 'abierto' ? 'abierto' : null
+  if (!estado) return NextResponse.json({ error: 'Estado no válido' }, { status: 400 })
+
+  const quien = await getCurrentUser()
+
+  const { data, error } = await supabase.from('participacion_periodos')
+    .upsert({
+      company_id: companyId,
+      periodo,
+      estado,
+      motivo: typeof body.motivo === 'string' && body.motivo.trim() ? body.motivo.trim() : null,
+      cambiado_at: new Date().toISOString(),
+      cambiado_por: quien?.id ?? null,
+      cambiado_por_nombre: quien?.name ?? null,
+    }, { onConflict: 'company_id,periodo' })
+    .select('estado, motivo, cambiado_at, cambiado_por_nombre')
+    .single()
+
+  if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+  return NextResponse.json({ periodo, periodoEstado: data })
 }
 
 /**
@@ -135,6 +186,15 @@ export async function POST(req: NextRequest) {
     respuestas[campo] = campo === 'peligros'
       ? (Array.isArray(body.peligros) ? body.peligros : [])
       : body[campo]
+  }
+
+  // El cierre se comprueba aquí y no solo en la pantalla: si no, bastaría con
+  // dejar la página abierta desde antes para seguir respondiendo.
+  const { estado: estadoPer } = await estadoPeriodo(companyId, periodo)
+  if (estadoPer === 'cerrado') {
+    return NextResponse.json(
+      { error: `La participación del ${periodo} está cerrada y ya no admite respuestas` },
+      { status: 403 })
   }
 
   const { data: actual } = await supabase.from('hazard_participations')

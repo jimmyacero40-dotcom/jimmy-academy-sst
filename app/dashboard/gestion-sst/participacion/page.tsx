@@ -6,6 +6,7 @@ import { motion } from 'framer-motion'
 import {
   ShieldAlert, Loader2, Search, Download, FileText, Eye, X,
   CheckCircle, Clock, BarChart2, Users, Table2, Trash2, AlertTriangle,
+  Lock, Unlock,
 } from 'lucide-react'
 import { tienePermiso } from '@/lib/permisos'
 import { RespuestasPeligros } from '@/components/RespuestasPeligros'
@@ -15,6 +16,13 @@ import { exportarFormularioPDF } from './export-pdf'
 import { exportarResultadosExcel } from './export-excel'
 
 const COLOR_GRUPO = Object.fromEntries(GRUPOS_PELIGROS.map(g => [g.grupo, g.color]))
+interface EstadoPeriodo {
+  estado: 'abierto' | 'cerrado'
+  motivo?: string | null
+  cambiado_at?: string | null
+  cambiado_por_nombre?: string | null
+}
+
 const sel = 'bg-[var(--bg-surface)] border border-[var(--border)] rounded-lg px-3 py-2 text-xs text-[var(--text)] focus:outline-none focus:border-[var(--primary)]'
 
 export default function ParticipacionAdminPage() {
@@ -33,6 +41,31 @@ export default function ParticipacionAdminPage() {
   const { data: session } = useSession()
   const usuario = session?.user as { role?: string; permissions?: string[] | null } | undefined
   const puedeEliminar = !!usuario?.role && tienePermiso(usuario.role, usuario.permissions, 'sst.participacion.eliminar')
+  const puedeAdministrar = !!usuario?.role && tienePermiso(usuario.role, usuario.permissions, 'sst.participacion.administrar')
+
+  // Estado del periodo: abierto admite respuestas, cerrado no.
+  const [estadoPeriodo, setEstadoPeriodo] = useState<EstadoPeriodo>({ estado: 'abierto' })
+  const [panelCierre, setPanelCierre] = useState(false)
+  const [motivoCierre, setMotivoCierre] = useState('')
+  const [cambiandoEstado, setCambiandoEstado] = useState(false)
+  const [errorEstado, setErrorEstado] = useState<string | null>(null)
+  const cerrado = estadoPeriodo.estado === 'cerrado'
+
+  const cambiarEstado = async (nuevo: 'abierto' | 'cerrado') => {
+    setCambiandoEstado(true); setErrorEstado(null)
+    try {
+      const res = await fetch('/api/participacion-peligros', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ periodo, estado: nuevo, motivo: nuevo === 'cerrado' ? motivoCierre : null }),
+      })
+      const body = await res.json().catch(() => ({}))
+      if (!res.ok) { setErrorEstado(body.error ?? 'No fue posible cambiar el estado'); return }
+      setEstadoPeriodo(body.periodoEstado ?? { estado: nuevo })
+      setPanelCierre(false)
+      setMotivoCierre('')
+    } finally { setCambiandoEstado(false) }
+  }
 
   const [busqueda, setBusqueda] = useState('')
   const [fArea, setFArea] = useState('')
@@ -49,7 +82,7 @@ export default function ParticipacionAdminPage() {
         if (!r.ok) throw new Error((await r.json().catch(() => ({}))).error ?? 'Error')
         return r.json()
       })
-      .then(d => setFilas(d.filas ?? []))
+      .then(d => { setFilas(d.filas ?? []); setEstadoPeriodo(d.periodoEstado ?? { estado: 'abierto' }) })
       .catch(e => setError(e.message))
       .finally(() => setCargando(false))
   }, [periodo])
@@ -133,8 +166,15 @@ export default function ParticipacionAdminPage() {
             <h1 className="text-xl font-black" style={{ color: 'var(--text)', fontFamily: 'var(--font-display)' }}>
               Participación de trabajadores
             </h1>
-            <p className="text-sm" style={{ color: 'var(--text-dim)' }}>
+            <p className="text-sm flex items-center gap-2 flex-wrap" style={{ color: 'var(--text-dim)' }}>
               Identificación de peligros · Periodo {periodo}
+              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] font-bold"
+                style={cerrado
+                  ? { background: 'rgba(239,68,68,0.12)', color: '#EF4444' }
+                  : { background: 'rgba(16,185,129,0.12)', color: '#10B981' }}>
+                {cerrado ? <Lock size={10} /> : <Unlock size={10} />}
+                {cerrado ? 'CERRADA' : 'ABIERTA'}
+              </span>
             </p>
           </div>
         </div>
@@ -147,6 +187,20 @@ export default function ParticipacionAdminPage() {
             className="terra-btn-outline flex items-center gap-1.5" style={{ padding: '8px 14px', fontSize: 12 }}>
             <Download size={13} /> Excel
           </button>
+          {puedeAdministrar && (
+            cerrado
+              ? <button onClick={() => cambiarEstado('abierto')} disabled={cambiandoEstado}
+                  className="flex items-center gap-1.5 rounded-lg font-bold"
+                  style={{ padding: '8px 14px', fontSize: 12, border: '1px solid rgba(16,185,129,0.35)', color: '#10B981' }}>
+                  {cambiandoEstado ? <Loader2 size={13} className="animate-spin" /> : <Unlock size={13} />}
+                  Reabrir
+                </button>
+              : <button onClick={() => setPanelCierre(true)}
+                  className="flex items-center gap-1.5 rounded-lg font-bold"
+                  style={{ padding: '8px 14px', fontSize: 12, border: '1px solid rgba(245,158,11,0.35)', color: '#F59E0B' }}>
+                  <Lock size={13} /> Cerrar periodo
+                </button>
+          )}
           {puedeEliminar && !!visibles.filter(f => f.participacion).length && (
             <button onClick={() => setPorBorrar(visibles.filter(f => f.participacion))}
               className="flex items-center gap-1.5 rounded-lg font-bold"
@@ -156,6 +210,71 @@ export default function ParticipacionAdminPage() {
           )}
         </div>
       </div>
+
+      {/* Quién cerró y por qué: el dato que pide una auditoría. */}
+      {cerrado && (
+        <div className="mb-4 p-3 rounded-xl flex items-start gap-2.5"
+          style={{ background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.3)' }}>
+          <Lock size={15} style={{ color: '#EF4444' }} className="mt-0.5 flex-shrink-0" />
+          <div className="text-xs leading-relaxed" style={{ color: 'var(--text-dim)' }}>
+            <p className="font-bold" style={{ color: '#EF4444' }}>
+              La participación del {periodo} está cerrada
+            </p>
+            <p className="mt-0.5">
+              Los trabajadores ya no pueden responder ni modificar lo enviado. Lo registrado se conserva.
+              {estadoPeriodo.cambiado_por_nombre && ` Cerrada por ${estadoPeriodo.cambiado_por_nombre}`}
+              {estadoPeriodo.cambiado_at && ` el ${new Date(estadoPeriodo.cambiado_at).toLocaleDateString('es-CO', { day: 'numeric', month: 'long', year: 'numeric' })}`}
+              {estadoPeriodo.motivo && ` · ${estadoPeriodo.motivo}`}
+            </p>
+          </div>
+        </div>
+      )}
+
+      {errorEstado && (
+        <div className="mb-4 p-3 rounded-xl text-xs font-semibold"
+          style={{ background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.3)', color: '#FCA5A5' }}>
+          {errorEstado}
+        </div>
+      )}
+
+      {/* ── Confirmar el cierre ── */}
+      {panelCierre && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4"
+          style={{ background: 'rgba(0,0,0,0.6)' }} onClick={() => setPanelCierre(false)}>
+          <div className="terra-card p-5 w-full max-w-md" onClick={e => e.stopPropagation()}>
+            <div className="flex items-start gap-3 mb-3">
+              <AlertTriangle size={20} style={{ color: '#F59E0B' }} className="mt-0.5 flex-shrink-0" />
+              <div>
+                <p className="text-sm font-bold" style={{ color: 'var(--text)' }}>
+                  Cerrar la participación del {periodo}
+                </p>
+                <p className="text-xs mt-1 leading-relaxed" style={{ color: 'var(--text-dim)' }}>
+                  {t.pendientes > 0
+                    ? `Quedan ${t.pendientes} trabajadores sin responder y ya no van a poder hacerlo.`
+                    : 'Todos los trabajadores ya respondieron.'}
+                  {' '}Nada se borra, y usted puede reabrirla cuando quiera.
+                </p>
+              </div>
+            </div>
+            <label className="block text-xs font-semibold mb-1.5" style={{ color: 'var(--text-dim)' }}>
+              Motivo (opcional)
+            </label>
+            <input value={motivoCierre} onChange={e => setMotivoCierre(e.target.value)}
+              placeholder="Se cerró el plazo de la identificación anual"
+              className={`${sel} w-full mb-4`} />
+            <div className="flex justify-end gap-2">
+              <button onClick={() => setPanelCierre(false)} className="terra-btn-outline"
+                style={{ padding: '8px 16px', fontSize: 12 }}>Cancelar</button>
+              <button onClick={() => cambiarEstado('cerrado')} disabled={cambiandoEstado}
+                className="flex items-center gap-1.5 rounded-lg font-bold text-white"
+                style={{ padding: '8px 16px', fontSize: 12, background: '#EF4444' }}>
+                {cambiandoEstado ? <Loader2 size={13} className="animate-spin" /> : <Lock size={13} />}
+                Cerrar periodo
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* ── Indicadores ── */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-5">
