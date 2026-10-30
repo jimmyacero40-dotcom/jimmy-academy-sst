@@ -33,6 +33,7 @@ interface Curso { id: number; title: string; category?: string | null; duration?
 interface Persona {
   id: string; name: string; cedula: string; cargo: string
   area_name: string; area_id: string; sede: string
+  correo: string
   grupos: { id: string; name: string }[]
 }
 
@@ -113,6 +114,10 @@ export default function AsignarCapacitacion({
   /** Quién está asignado a este ítem del plan y en qué va. Solo en edición. */
   const [estadoItem, setEstadoItem] = useState<Record<string, string>>({})
   const [yaEstaban, setYaEstaban] = useState<Set<string>>(new Set())
+  // Avisarle a quien acaba de quedar asignado es lo normal, así que viene
+  // marcado. A quien ya estaba no se le escribe por haber tocado la lista.
+  const [notificar, setNotificar] = useState(true)
+  const [verMensaje, setVerMensaje] = useState(false)
   const [mes, setMes] = useState(mesInicial ?? new Date().getMonth() + 1)
   const [fecha, setFecha] = useState(fechaInicial ?? '')
   const [modalidad, setModalidad] = useState('presencial')
@@ -142,6 +147,7 @@ export default function AsignarCapacitacion({
         id: u.id, name: u.name, cedula: u.cedula ?? '',
         cargo: u.cargo ?? '', area_name: u.area ?? '', area_id: u.area_id ?? '',
         sede: u.sede ?? '',
+        correo: u.correo ?? '',
         grupos: (u.user_groups ?? []).map((g: any) => g.groups).filter(Boolean),
       })))
       setCargando(false)
@@ -289,6 +295,12 @@ export default function AsignarCapacitacion({
     setElegidos(prev => { const n = new Set(prev); n.has(id) ? n.delete(id) : n.add(id); return n })
   }
 
+  // Los que no estaban antes: son los únicos a los que se avisaría.
+  const nuevos = useMemo(
+    () => personas.filter(p => elegidos.has(p.id) && !yaEstaban.has(p.id)),
+    [personas, elegidos, yaEstaban])
+  const nuevosSinCorreo = useMemo(() => nuevos.filter(p => !p.correo.includes('@')), [nuevos])
+
   const nombresElegidos = useMemo(
     () => personas.filter(p => elegidos.has(p.id)).map(p => p.name),
     [personas, elegidos])
@@ -327,6 +339,7 @@ export default function AsignarCapacitacion({
           // Editando una capacitación del calendario, la lista que se ve es la
           // lista que queda: lo desmarcado se retira.
           ...(planItemId ? { plan_item_id: planItemId, sincronizar: true } : {}),
+          notificar: notificar && nuevos.length > 0,
         }),
       })
       const d = await r.json()
@@ -443,6 +456,16 @@ export default function AsignarCapacitacion({
               {resultado.retiro && resultado.conservadas > 0 && (
                 <p className="text-[11px]" style={{ color: '#F59E0B' }}>
                   {resultado.conservadas} ya la habían completado y se conservaron.
+                </p>
+              )}
+              {/* Qué pasó con los correos: se dice tal cual, sin dar por
+                  enviado lo que no salió. */}
+              {resultado.correos && (
+                <p className="text-[11px]" style={{ color: resultado.correos.fallos?.length ? '#F59E0B' : '#10B981' }}>
+                  {resultado.correos.enviados > 0
+                    ? `Se avisó por correo a ${resultado.correos.enviados} ${resultado.correos.enviados === 1 ? 'persona' : 'personas'}.`
+                    : 'No salió ningún correo.'}
+                  {!!resultado.correos.fallos?.length && ` ${resultado.correos.fallos.length} sin enviar: ${resultado.correos.fallos[0].motivo}`}
                 </p>
               )}
               <p className="text-[11px] mt-3" style={{ color: 'var(--text-faint)' }}>
@@ -655,6 +678,67 @@ export default function AsignarCapacitacion({
                   <span>{nombresElegidos.join(' · ') || 'Nadie seleccionado'}</span>
                 </div>
               </div>
+
+              {/* ── Avisar por correo ── */}
+              {modo === 'asignar' && nuevos.length > 0 && (
+                <div className="rounded-xl p-3" style={{ background: 'var(--bg-card)', border: '1px solid var(--border)' }}>
+                  <label className="flex items-start gap-2.5 cursor-pointer">
+                    <input type="checkbox" checked={notificar} onChange={e => setNotificar(e.target.checked)}
+                      className="w-4 h-4 rounded accent-blue-500 flex-shrink-0 mt-0.5" />
+                    <div className="flex-1 min-w-0">
+                      <p className="text-xs font-semibold" style={{ color: 'var(--text)' }}>
+                        Avisar por correo a {nuevos.length === 1 ? 'la persona nueva' : `las ${nuevos.length} personas nuevas`}
+                      </p>
+                      <p className="text-[11px] mt-0.5" style={{ color: 'var(--text-faint)' }}>
+                        {edicion && yaEstaban.size > 0
+                          ? 'A quienes ya estaban asignados no se les vuelve a escribir.'
+                          : 'Se les manda el tema, la fecha y la modalidad.'}
+                      </p>
+                    </div>
+                  </label>
+
+                  {notificar && nuevosSinCorreo.length > 0 && (
+                    <p className="text-[11px] mt-2 pl-6 flex items-start gap-1.5" style={{ color: '#F59E0B' }}>
+                      <AlertCircle size={12} className="flex-shrink-0 mt-0.5" />
+                      <span>
+                        {nuevosSinCorreo.length === 1
+                          ? `${nuevosSinCorreo[0].name} no tiene correo registrado, así que no le va a llegar. Queda asignada igual.`
+                          : `${nuevosSinCorreo.length} de ellas no tienen correo registrado, así que no les va a llegar. Quedan asignadas igual.`}
+                      </span>
+                    </p>
+                  )}
+
+                  {notificar && (
+                    <>
+                      <button onClick={() => setVerMensaje(v => !v)}
+                        className="text-[11px] font-semibold mt-2 pl-6 hover:underline"
+                        style={{ color: 'var(--primary)' }}>
+                        {verMensaje ? 'Ocultar el mensaje' : 'Ver el mensaje que les llega'}
+                      </button>
+                      {verMensaje && (
+                        <div className="mt-2 ml-6 rounded-lg p-3 text-[11px] leading-relaxed"
+                          style={{ background: 'var(--bg-surface)', border: '1px solid var(--border)', color: 'var(--text-dim)' }}>
+                          <p className="font-bold mb-1.5" style={{ color: 'var(--text)' }}>
+                            Asunto: Capacitación asignada: {curso?.title}
+                          </p>
+                          <p>Buen día, <b style={{ color: 'var(--text)' }}>{nuevos[0]?.name ?? 'NOMBRE'}</b>.</p>
+                          <p className="mt-1">Se le asignó la siguiente capacitación:</p>
+                          <p className="mt-1.5">
+                            <b style={{ color: 'var(--text)' }}>Tema:</b> {curso?.title}<br />
+                            <b style={{ color: 'var(--text)' }}>Fecha:</b> {fecha
+                              ? new Date(`${fecha}T12:00:00`).toLocaleDateString('es-CO', { day: 'numeric', month: 'long', year: 'numeric' })
+                              : 'Por confirmar'}<br />
+                            <b style={{ color: 'var(--text)' }}>Modalidad:</b> {MODALIDADES.find(m => m.id === modalidad)?.label}
+                          </p>
+                          <p className="mt-1.5" style={{ color: 'var(--text-faint)' }}>
+                            Su asistencia es parte del Sistema de Gestión de Seguridad y Salud en el Trabajo.
+                          </p>
+                        </div>
+                      )}
+                    </>
+                  )}
+                </div>
+              )}
 
               {error && (
                 <div className="flex items-center gap-2 text-xs p-2.5 rounded-lg"

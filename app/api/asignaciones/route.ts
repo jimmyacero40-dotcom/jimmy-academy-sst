@@ -27,10 +27,54 @@ function finDeMes(anio: number, mes: number): string {
  * completado: esa persona la hizo y su constancia es soporte del SG-SST-.
  * Sin `reemplazar` solo se agrega, que es lo que hace el asistente de siempre.
  */
+/**
+ * Avisa a quienes acaban de quedar asignados. Solo a los nuevos: a quien ya
+ * estaba no se le vuelve a escribir por haber tocado la lista.
+ *
+ * Nunca tumba la asignación. Si el correo falla, la persona queda asignada
+ * igual y el motivo se guarda en su inscripción, que es donde la pantalla lo
+ * muestra.
+ */
+async function avisarDeNuevas(
+  enrollmentIds: string[], itemId: string | null, trainingId: number,
+): Promise<{ enviados: number; fallos: { nombre: string; motivo: string }[] }> {
+  if (!enrollmentIds.length) return { enviados: 0, fallos: [] }
+
+  const [{ data: filas }, { data: curso }, { data: item }] = await Promise.all([
+    supabase.from('enrollments')
+      .select('id, due_date, users(name, correo)').in('id', enrollmentIds),
+    supabase.from('trainings').select('title, duration').eq('id', trainingId).maybeSingle(),
+    itemId
+      ? supabase.from('plan_items').select('scheduled_date, modalidad').eq('id', itemId).maybeSingle()
+      : Promise.resolve({ data: null as any }),
+  ])
+
+  let enviados = 0
+  const fallos: { nombre: string; motivo: string }[] = []
+  for (const f of (filas ?? []) as any[]) {
+    const { asunto, html } = plantillaCapacitacion({
+      nombre: f.users?.name ?? '',
+      curso: curso?.title ?? 'Capacitación',
+      fecha: item?.scheduled_date ?? f.due_date ?? null,
+      duracion: curso?.duration ?? null,
+      modalidad: item?.modalidad ?? null,
+    })
+    const r = await enviarCorreo(f.users?.correo ?? '', asunto, html)
+    if (r.enviado) enviados++
+    else fallos.push({ nombre: f.users?.name ?? '', motivo: r.motivo ?? 'No se pudo enviar' })
+    await supabase.from('enrollments').update({
+      notificado_at: r.enviado ? new Date().toISOString() : null,
+      notificacion_error: r.enviado ? null : (r.motivo ?? 'No se pudo enviar'),
+    }).eq('id', f.id)
+  }
+  return { enviados, fallos }
+}
+
 async function sincronizar(
   itemId: string, trainingId: number, companyId: string,
   idsValidos: string[], pedidos: string[], vence: string,
   reemplazar: boolean, titulo: string, porQuien: string | null,
+  notificar: boolean,
 ) {
   const { data: actuales } = await supabase
     .from('enrollments').select('id, user_id, status').eq('plan_item_id', itemId)
@@ -49,6 +93,7 @@ async function sincronizar(
   }
 
   let asignadas = 0
+  let nuevas: string[] = []
   if (idsValidos.length) {
     const { error: eTargets } = await supabase.from('plan_item_targets').upsert(
       idsValidos.map(id => ({ plan_item_id: itemId, target_type: 'user', target_id: id })),
@@ -68,10 +113,16 @@ async function sincronizar(
       .select('id')
     if (eIns) return NextResponse.json({ error: eIns.message }, { status: 500 })
     asignadas = insertadas?.length ?? 0
+    nuevas = (insertadas ?? []).map((e: any) => e.id)
   }
+
+  const correos = notificar
+    ? await avisarDeNuevas(nuevas, itemId, trainingId)
+    : null
 
   return NextResponse.json({
     asignadas,
+    correos,
     retiradas: reemplazar ? sobran.length : 0,
     conservadas: reemplazar ? conservadas.length : 0,
     yaLaTenian: idsValidos.length - asignadas,
@@ -158,7 +209,8 @@ export async function POST(req: NextRequest) {
     }
     return sincronizar(itemDelPlan.id, trainingId, companyId!, idsValidos, userIds,
       fecha || itemDelPlan.scheduled_date || finDeMes((itemDelPlan.annual_plans as any).year, mes),
-      body.sincronizar === true, curso.title, user?.name ?? null)
+      body.sincronizar === true, curso.title, user?.name ?? null,
+      body.notificar === true)
   }
 
   // ── Plan del año ──
@@ -242,8 +294,13 @@ export async function POST(req: NextRequest) {
   if (eIns) return NextResponse.json({ error: eIns.message }, { status: 500 })
 
   const asignadas = insertadas?.length ?? 0
+  const correos = body.notificar === true
+    ? await avisarDeNuevas((insertadas ?? []).map((e: any) => e.id), item!.id, trainingId)
+    : null
+
   return NextResponse.json({
     asignadas,
+    correos,
     yaLaTenian: idsValidos.length - asignadas,
     descartadas: userIds.length - idsValidos.length,
     curso: curso.title,
