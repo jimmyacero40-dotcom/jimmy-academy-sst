@@ -89,7 +89,9 @@ async function compressImage(file: File): Promise<Blob> {
     const url = URL.createObjectURL(file)
     img.onload = () => {
       URL.revokeObjectURL(url)
-      const MAX = 600
+      // 512 px sobra para una foto de perfil: se ve a 80 px en pantalla y a
+      // unos 120 en la ficha impresa. Así cada foto pesa decenas de KB.
+      const MAX = 512
       let { width, height } = img
       if (width > height) { if (width > MAX) { height = Math.round(height * MAX / width); width = MAX } }
       else { if (height > MAX) { width = Math.round(width * MAX / height); height = MAX } }
@@ -340,7 +342,12 @@ export default function MyProfilePage() {
 
     const allowed = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp']
     if (!allowed.includes(file.type)) {
-      setPhotoError('Solo se aceptan imágenes JPG, PNG o WEBP')
+      // El HEIC es lo que sale de un iPhone sin convertir, y el navegador no
+      // sabe abrirlo: conviene decir cómo se arregla, no solo que no sirve.
+      const heic = /heic|heif/i.test(file.type) || /\.(heic|heif)$/i.test(file.name)
+      setPhotoError(heic
+        ? 'Esa foto es formato HEIC y el navegador no puede abrirla. En el iPhone, entre a Ajustes › Cámara › Formatos y elija "Más compatible", o tome una captura de pantalla de la foto y suba esa.'
+        : 'Solo se aceptan imágenes JPG, PNG o WEBP')
       if (photoRef.current) photoRef.current.value = ''
       return
     }
@@ -425,7 +432,9 @@ export default function MyProfilePage() {
                 ? <Loader2 size={13} className="animate-spin text-white" />
                 : <Camera size={13} className="text-white" />}
             </button>
-            <input ref={photoRef} type="file" accept=".jpg,.jpeg,.png,.webp" onChange={uploadPhoto} className="hidden" />
+            {/* HEIC entra a propósito: así el iPhone deja escogerla y se puede
+                explicar qué hacer, en vez de que el archivo ni aparezca. */}
+            <input ref={photoRef} type="file" accept=".jpg,.jpeg,.png,.webp,.heic,.heif" onChange={uploadPhoto} className="hidden" />
           </div>
 
           {/* Name + progress */}

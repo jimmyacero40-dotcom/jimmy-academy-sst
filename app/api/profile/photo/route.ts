@@ -35,5 +35,19 @@ export async function POST(req: NextRequest) {
 
   const { data: urlData } = supabase.storage.from(BUCKET).getPublicUrl(fileName)
 
-  return NextResponse.json({ url: urlData.publicUrl })
+  // El archivo siempre se llama igual, así que la dirección no cambiaba y el
+  // navegador seguía mostrando la foto vieja. La marca de tiempo la obliga a
+  // pedir la nueva, sin dejar archivos sueltos en el almacenamiento.
+  const url = `${urlData.publicUrl}?v=${Date.now()}`
+
+  // Se guarda de una: antes la foto solo quedaba en la pantalla, y si la
+  // persona salía sin apretar GUARDAR, se perdía.
+  const { error: guardar } = await supabase
+    .from('worker_profiles')
+    .upsert({ user_id: user.id, company_id: user.company_id, photo_url: url },
+      { onConflict: 'user_id' })
+
+  if (guardar) return NextResponse.json({ error: guardar.message }, { status: 500 })
+
+  return NextResponse.json({ url })
 }

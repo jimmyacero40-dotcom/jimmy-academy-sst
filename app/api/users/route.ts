@@ -56,9 +56,11 @@ export async function GET(req: NextRequest) {
     if (row.groups) groupsByUser[row.user_id].push(row.groups)
   }
 
-  // Fetch photo_url from user_profiles
+  // La foto vive en worker_profiles. Antes se pedía a "user_profiles", que no
+  // existe: la consulta fallaba callada y la lista mostraba siempre iniciales,
+  // por más que la persona hubiera cambiado su foto.
   const { data: profilesData } = await supabaseAdmin
-    .from('user_profiles')
+    .from('worker_profiles')
     .select('user_id, photo_url')
     .in('user_id', userIds.length ? userIds : ['_'])
 
