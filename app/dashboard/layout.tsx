@@ -11,7 +11,7 @@ import {
   Layers, UserCheck, Briefcase,
   CalendarDays, GraduationCap, TrendingUp,
   Home, Activity, FileCheck2,
-  HardHat, FileText, ArrowLeftRight, AlertTriangle, MessageSquare,
+  HardHat, FileText, ArrowLeftRight, AlertTriangle, MessageSquare, LayoutList,
   Bell, Shield, Leaf, LogIn, DoorOpen, UserX, MapPin
 } from 'lucide-react'
 import { CommandPalette } from '@/components/CommandPalette'
@@ -124,6 +124,7 @@ const ADMIN_NAV: NavEntry[] = [
     items: [
       { href: '/dashboard/gestion-sst/reportal',       icon: FileText,      label: 'RePortal' },
       { href: '/dashboard/gestion-sst/participacion', icon: MessageSquare, label: 'Participación de trabajadores' },
+      { href: '/dashboard/gestion-sst/modulos',       icon: LayoutList,    label: 'Módulos' },
       { href: null, icon: HardHat,       label: 'EPP',            disabled: true },
       { href: null, icon: Layers,        label: 'Documentos',     disabled: true },
       { href: null, icon: AlertTriangle, label: 'Emergencias',    disabled: true },

@@ -45,6 +45,8 @@ export const CATALOGO_PERMISOS: GrupoPermisos[] = [
       { id: 'sst.participacion.exportar', label: 'Exportar participaciones',  descripcion: 'Descargar formularios en PDF y los resultados en Excel' },
       { id: 'sst.participacion.eliminar', label: 'Eliminar participaciones',  descripcion: 'Borrar respuestas ya registradas. Sirve para limpiar pruebas y no tiene vuelta atrás' },
       { id: 'sst.participacion.administrar', label: 'Abrir y cerrar la participación', descripcion: 'Cerrar el periodo para que nadie más pueda responder, y volverlo a abrir' },
+      { id: 'sst.modulos.ver',        label: 'Consultar módulos',   descripcion: 'Ver los módulos de participación y lo que respondieron los trabajadores' },
+      { id: 'sst.modulos.gestionar',  label: 'Gestionar módulos',   descripcion: 'Crear módulos de participación, escribir sus preguntas y abrirlos o cerrarlos' },
       { id: 'sst.reportes.ver',           label: 'Consultar reportes HSE',    descripcion: 'Ver las tarjetas de reporte que envían los trabajadores' },
       { id: 'sst.reportes.gestionar',     label: 'Gestionar reportes HSE',    descripcion: 'Registrar el seguimiento y relacionarlos con la matriz de mejoras' },
       { id: 'sst.reportes.corregir',      label: 'Corregir reportes HSE',     descripcion: 'Enmendar lo que escribió el trabajador cuando quedó mal diligenciado' },
@@ -82,7 +84,7 @@ export const PERMISOS_POR_ROL: Record<string, string[]> = {
   consulta: [
     'accesos.ver', 'accesos.ver.todas', 'accesos.exportar',
     'personal.ver', 'formacion.ver',
-    'sst.participacion.ver', 'sst.reportes.ver',
+    'sst.participacion.ver', 'sst.modulos.ver', 'sst.reportes.ver',
   ],
   worker: [],
 }
