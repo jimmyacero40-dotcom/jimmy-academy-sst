@@ -1,24 +1,22 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
 import { useSession } from 'next-auth/react'
 import {
   LayoutList, Loader2, ArrowLeft, HelpCircle, Users, Settings, Lock, Unlock,
-  Trash2, AlertCircle, Download, Search, Send,
+  Trash2, AlertCircle, Download, Search, Send, FileText, BarChart2,
+  CheckCircle, Clock, X,
 } from 'lucide-react'
 import { tienePermiso } from '@/lib/permisos'
 import EditorPreguntas from '@/components/modulos/EditorPreguntas'
 import {
-  ESTADO_MODULO, comoTexto, type Modulo, type Pregunta,
+  ESTADO_MODULO, comoTexto, NOMBRE_TIPO, type Modulo, type Pregunta,
 } from '@/lib/modulos'
+import { tabular, type FilaModulo } from '@/lib/modulos-tabulacion'
+import { exportarRespuestaPDF } from './export-pdf'
 
-interface FilaResp {
-  user_id: string; nombre: string; cedula: string
-  cargo: string | null; area: string | null; centro_trabajo: string | null
-  estado: string; enviado_at: string | null
-  respuestas: Record<string, any> | null
-}
+type FilaResp = FilaModulo
 
 const inp = 'w-full text-sm rounded-lg px-3 py-2 outline-none'
 const estiloInp: React.CSSProperties = {
@@ -34,7 +32,13 @@ export default function ModuloPage({ params }: { params: { id: string } }) {
   const [modulo, setModulo] = useState<Modulo | null>(null)
   const [preguntas, setPreguntas] = useState<Pregunta[]>([])
   const [filas, setFilas] = useState<FilaResp[]>([])
-  const [pestana, setPestana] = useState<'preguntas' | 'respuestas' | 'ajustes'>('preguntas')
+  const [pestana, setPestana] = useState<'resumen' | 'preguntas' | 'respuestas' | 'ajustes'>('resumen')
+  const [empresa, setEmpresa] = useState('Organización')
+  const [fArea, setFArea] = useState('')
+  const [fCargo, setFCargo] = useState('')
+  const [fCentro, setFCentro] = useState('')
+  const [fEstado, setFEstado] = useState('')
+  const [porBorrar, setPorBorrar] = useState<FilaResp[] | null>(null)
   const [cargando, setCargando] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [trabajando, setTrabajando] = useState(false)
@@ -61,10 +65,49 @@ export default function ModuloPage({ params }: { params: { id: string } }) {
 
   useEffect(() => { cargar() /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, [params.id])
 
+  useEffect(() => {
+    fetch('/api/company-info').then(r => r.ok ? r.json() : null)
+      .then(d => { if (d?.name) setEmpresa(d.name) }).catch(() => {})
+  }, [])
+
   const respondieron = filas.filter(f => f.estado === 'Respondió')
-  const visibles = respondieron.length || filas.length
-    ? filas.filter(f => !busca || `${f.nombre} ${f.cedula}`.toLowerCase().includes(busca.toLowerCase()))
-    : []
+
+  const opciones = (campo: keyof FilaResp) =>
+    [...new Set(filas.map(f => (f[campo] as string | null)?.trim()).filter(Boolean) as string[])].sort()
+
+  // Todo lo de abajo —indicadores, resumen y Excel— se calcula sobre lo
+  // filtrado: así se puede mirar un área o una finca por separado.
+  const visibles = useMemo(() => {
+    const q = busca.trim().toLowerCase()
+    return filas.filter(f => {
+      if (q && !`${f.nombre} ${f.cedula}`.toLowerCase().includes(q)) return false
+      if (fArea && (f.area?.trim() || 'Sin asignar') !== fArea) return false
+      if (fCargo && (f.cargo?.trim() || 'Sin asignar') !== fCargo) return false
+      if (fCentro && (f.centro_trabajo?.trim() || 'Sin asignar') !== fCentro) return false
+      if (fEstado && f.estado !== fEstado) return false
+      return true
+    })
+  }, [filas, busca, fArea, fCargo, fCentro, fEstado])
+
+  const t = useMemo(() => tabular(visibles, preguntas), [visibles, preguntas])
+  const hayFiltro = !!(busca || fArea || fCargo || fCentro || fEstado)
+
+  const borrarRespuestas = async (objetivo: FilaResp[]) => {
+    setTrabajando(true); setError(null)
+    try {
+      const r = await fetch(`/api/modulos/${params.id}/respuestas`, {
+        method: 'DELETE', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ user_ids: objetivo.map(f => f.user_id) }),
+      })
+      const d = await r.json().catch(() => ({}))
+      if (!r.ok) { setError(d.error ?? 'No fue posible eliminar'); return }
+      const borrados = new Set(objetivo.map(f => f.user_id))
+      setFilas(fs => fs.map(f => borrados.has(f.user_id)
+        ? { ...f, estado: 'Pendiente', enviado_at: null, respuestas: null }
+        : f))
+      setPorBorrar(null); setVerDe(null)
+    } finally { setTrabajando(false) }
+  }
 
   const cambiarEstado = async (estado: 'borrador' | 'abierto' | 'cerrado', conMotivo?: string) => {
     setTrabajando(true); setError(null)
@@ -110,7 +153,7 @@ export default function ModuloPage({ params }: { params: { id: string } }) {
     const libro = XLSX.utils.book_new()
 
     XLSX.utils.book_append_sheet(libro, XLSX.utils.json_to_sheet(
-      filas.map(f => {
+      visibles.map(f => {
         const fila: Record<string, any> = {
           'TRABAJADOR': f.nombre, 'CÉDULA': f.cedula,
           'CARGO': f.cargo ?? '', 'ÁREA': f.area ?? '', 'FINCA / CENTRO': f.centro_trabajo ?? '',
@@ -123,6 +166,35 @@ export default function ModuloPage({ params }: { params: { id: string } }) {
         return fila
       }),
     ), 'Respuestas')
+
+    // La tabulación ya calculada, para no rehacerla a mano en el Excel.
+    const conteos: Record<string, any>[] = []
+    for (const r of t.preguntas) {
+      for (const c of r.conteos) {
+        conteos.push({
+          'PREGUNTA': r.pregunta.titulo,
+          'TIPO': NOMBRE_TIPO[r.pregunta.tipo],
+          'OPCIÓN': c.etiqueta,
+          'TRABAJADORES': c.n,
+          '% DE LOS QUE RESPONDIERON': c.pct,
+        })
+      }
+      if (r.promedio !== null) {
+        conteos.push({
+          'PREGUNTA': r.pregunta.titulo, 'TIPO': NOMBRE_TIPO[r.pregunta.tipo],
+          'OPCIÓN': 'PROMEDIO', 'TRABAJADORES': r.promedio, '% DE LOS QUE RESPONDIERON': '',
+        })
+      }
+    }
+    if (conteos.length) {
+      XLSX.utils.book_append_sheet(libro, XLSX.utils.json_to_sheet(conteos), 'Tabulación')
+    }
+
+    XLSX.utils.book_append_sheet(libro, XLSX.utils.json_to_sheet([
+      ...t.porArea.map(c => ({ 'CORTE': 'ÁREA', 'VALOR': c.etiqueta, 'RESPONDIERON': c.n, '%': c.pct })),
+      ...t.porCentro.map(c => ({ 'CORTE': 'FINCA / CENTRO', 'VALOR': c.etiqueta, 'RESPONDIERON': c.n, '%': c.pct })),
+      ...t.porCargo.map(c => ({ 'CORTE': 'CARGO', 'VALOR': c.etiqueta, 'RESPONDIERON': c.n, '%': c.pct })),
+    ]), 'Participación')
 
     XLSX.writeFile(libro, `${modulo?.nombre ?? 'MÓDULO'} ${modulo?.periodo ?? ''}.xlsx`)
   }
@@ -224,12 +296,74 @@ export default function ModuloPage({ params }: { params: { id: string } }) {
         </div>
       )}
 
+      {/* ── Indicadores ── */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-4">
+        {[
+          { label: 'Les toca', valor: t.total, color: 'var(--primary)', icono: Users },
+          { label: 'Respondieron', valor: t.respondieron, color: '#10B981', icono: CheckCircle },
+          { label: 'Pendientes', valor: t.pendientes, color: '#F59E0B', icono: Clock },
+          { label: '% de participación', valor: `${t.pct}%`, color: '#8B5CF6', icono: BarChart2 },
+        ].map(k => (
+          <div key={k.label} className="terra-card p-3.5">
+            <div className="flex items-center gap-2 mb-1">
+              <k.icono size={13} style={{ color: k.color }} />
+              <p className="text-[10px] font-bold uppercase tracking-wider" style={{ color: 'var(--text-faint)' }}>{k.label}</p>
+            </div>
+            <p className="text-2xl font-black" style={{ color: k.color, fontVariantNumeric: 'tabular-nums' }}>{k.valor}</p>
+          </div>
+        ))}
+      </div>
+
+      {/* ── Filtros ── */}
+      <div className="terra-card p-3 mb-4">
+        <div className="flex flex-wrap gap-2 items-center">
+          <div className="relative flex-1 min-w-[180px]">
+            <Search size={13} className="absolute left-3 top-1/2 -translate-y-1/2" style={{ color: 'var(--text-faint)' }} />
+            <input value={busca} onChange={ev => setBusca(ev.target.value)}
+              placeholder="Buscar por nombre o cédula" className={inp} style={{ ...estiloInp, paddingLeft: 30 }} />
+          </div>
+          <select value={fArea} onChange={ev => setFArea(ev.target.value)} className={inp} style={{ ...estiloInp, width: 'auto' }}>
+            <option value="">Todas las áreas</option>
+            {opciones('area').map(o => <option key={o}>{o}</option>)}
+          </select>
+          <select value={fCargo} onChange={ev => setFCargo(ev.target.value)} className={inp} style={{ ...estiloInp, width: 'auto' }}>
+            <option value="">Todos los cargos</option>
+            {opciones('cargo').map(o => <option key={o}>{o}</option>)}
+          </select>
+          <select value={fCentro} onChange={ev => setFCentro(ev.target.value)} className={inp} style={{ ...estiloInp, width: 'auto' }}>
+            <option value="">Todas las fincas</option>
+            {opciones('centro_trabajo').map(o => <option key={o}>{o}</option>)}
+          </select>
+          <select value={fEstado} onChange={ev => setFEstado(ev.target.value)} className={inp} style={{ ...estiloInp, width: 'auto' }}>
+            <option value="">Todos los estados</option>
+            {['Respondió', 'Empezada', 'Pendiente'].map(o => <option key={o}>{o}</option>)}
+          </select>
+          <button onClick={exportar} className="terra-btn-outline flex items-center gap-1.5"
+            style={{ padding: '8px 14px', fontSize: 12 }}>
+            <Download size={13} /> Excel
+          </button>
+          {puedeGestionar && !!visibles.filter(f => f.respuestas).length && (
+            <button onClick={() => setPorBorrar(visibles.filter(f => f.respuestas))}
+              className="flex items-center gap-1.5 rounded-lg font-bold"
+              style={{ padding: '8px 14px', fontSize: 12, border: '1px solid rgba(239,68,68,0.35)', color: '#EF4444' }}>
+              <Trash2 size={13} /> Eliminar {visibles.filter(f => f.respuestas).length}
+            </button>
+          )}
+          {hayFiltro && (
+            <button onClick={() => { setBusca(''); setFArea(''); setFCargo(''); setFCentro(''); setFEstado('') }}
+              className="text-[11px] font-semibold" style={{ color: 'var(--primary)' }}>
+              Quitar filtros
+            </button>
+          )}
+        </div>
+      </div>
+
       {/* ── Pestañas ── */}
-      <div className="flex gap-1 mb-4" style={{ borderBottom: '1px solid var(--border)' }}>
-        {([['preguntas', 'Preguntas', HelpCircle], ['respuestas', 'Respuestas', Users], ['ajustes', 'Ajustes', Settings]] as const)
+      <div className="flex gap-1 mb-4 overflow-x-auto" style={{ borderBottom: '1px solid var(--border)' }}>
+        {([['resumen', 'Resumen', BarChart2], ['respuestas', 'Trabajadores', Users], ['preguntas', 'Preguntas', HelpCircle], ['ajustes', 'Ajustes', Settings]] as const)
           .map(([id, nombre, Icono]) => (
             <button key={id} onClick={() => setPestana(id)}
-              className="flex items-center gap-1.5 px-3 py-2 text-xs font-bold"
+              className="flex items-center gap-1.5 px-3 py-2 text-xs font-bold flex-shrink-0"
               style={{
                 color: pestana === id ? 'var(--primary)' : 'var(--text-dim)',
                 borderBottom: `2px solid ${pestana === id ? 'var(--primary)' : 'transparent'}`,
@@ -239,7 +373,9 @@ export default function ModuloPage({ params }: { params: { id: string } }) {
           ))}
       </div>
 
-      {pestana === 'preguntas' ? (
+      {pestana === 'resumen' ? (
+        <Resumen t={t} hayFiltro={hayFiltro} />
+      ) : pestana === 'preguntas' ? (
         puedeGestionar ? (
           <EditorPreguntas
             moduloId={params.id}
@@ -259,18 +395,6 @@ export default function ModuloPage({ params }: { params: { id: string } }) {
         )
       ) : pestana === 'respuestas' ? (
         <div className="space-y-3">
-          <div className="flex items-center gap-2 flex-wrap">
-            <div className="relative flex-1 min-w-[180px]">
-              <Search size={13} className="absolute left-2.5 top-1/2 -translate-y-1/2" style={{ color: 'var(--text-faint)' }} />
-              <input value={busca} onChange={ev => setBusca(ev.target.value)}
-                placeholder="Buscar por nombre o cédula" className={inp} style={{ ...estiloInp, paddingLeft: 28 }} />
-            </div>
-            <button onClick={exportar} className="terra-btn-outline flex items-center gap-1.5"
-              style={{ padding: '8px 14px', fontSize: 12 }}>
-              <Download size={13} /> Excel
-            </button>
-          </div>
-
           <div className="rounded-xl overflow-hidden" style={{ border: '1px solid var(--border)' }}>
             <div className="overflow-x-auto">
               <table className="w-full text-left" style={{ minWidth: 600 }}>
@@ -327,11 +451,34 @@ export default function ModuloPage({ params }: { params: { id: string } }) {
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4"
           style={{ background: 'rgba(0,0,0,0.6)' }} onClick={() => setVerDe(null)}>
           <div className="terra-card p-5 w-full max-w-lg max-h-[85vh] overflow-y-auto" onClick={ev => ev.stopPropagation()}>
-            <p className="text-sm font-bold" style={{ color: 'var(--text)' }}>{verDe.nombre}</p>
-            <p className="text-[11px] mb-4" style={{ color: 'var(--text-faint)' }}>
-              {[verDe.cargo, verDe.area, verDe.centro_trabajo].filter(Boolean).join(' · ')}
-              {verDe.enviado_at && ` · ${new Date(verDe.enviado_at).toLocaleDateString('es-CO')}`}
-            </p>
+            <div className="flex items-start justify-between gap-3 mb-4">
+              <div className="min-w-0">
+                <p className="text-sm font-bold" style={{ color: 'var(--text)' }}>{verDe.nombre}</p>
+                <p className="text-[11px]" style={{ color: 'var(--text-faint)' }}>
+                  {[verDe.cargo, verDe.area, verDe.centro_trabajo].filter(Boolean).join(' · ')}
+                  {verDe.enviado_at && ` · ${new Date(verDe.enviado_at).toLocaleDateString('es-CO')}`}
+                </p>
+              </div>
+              <div className="flex items-center gap-1.5 flex-shrink-0">
+                <button onClick={() => exportarRespuestaPDF(modulo, preguntas, verDe, empresa)}
+                  className="terra-btn-outline flex items-center gap-1.5"
+                  style={{ padding: '6px 12px', fontSize: 11 }}>
+                  <FileText size={12} /> PDF
+                </button>
+                {puedeGestionar && (
+                  <button onClick={() => setPorBorrar([verDe])} aria-label="Eliminar esta respuesta"
+                    className="w-7 h-7 rounded-lg flex items-center justify-center"
+                    style={{ background: 'var(--red-dim)', color: '#FCA5A5' }}>
+                    <Trash2 size={13} />
+                  </button>
+                )}
+                <button onClick={() => setVerDe(null)} aria-label="Cerrar"
+                  className="w-7 h-7 rounded-lg flex items-center justify-center"
+                  style={{ background: 'var(--bg-card)', color: 'var(--text-dim)' }}>
+                  <X size={14} />
+                </button>
+              </div>
+            </div>
             <div className="space-y-3">
               {preguntas.map((p, i) => (
                 <div key={p.id}>
@@ -341,6 +488,38 @@ export default function ModuloPage({ params }: { params: { id: string } }) {
                   </p>
                 </div>
               ))}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Confirmar el borrado de respuestas ── */}
+      {porBorrar && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4"
+          style={{ background: 'rgba(0,0,0,0.6)' }} onClick={() => setPorBorrar(null)}>
+          <div className="terra-card p-5 w-full max-w-md" onClick={ev => ev.stopPropagation()}>
+            <div className="flex items-start gap-3 mb-3">
+              <AlertCircle size={20} style={{ color: '#EF4444' }} className="mt-0.5 flex-shrink-0" />
+              <div>
+                <p className="text-sm font-bold" style={{ color: 'var(--text)' }}>
+                  {porBorrar.length === 1
+                    ? `Eliminar la respuesta de ${porBorrar[0].nombre}`
+                    : `Eliminar ${porBorrar.length} respuestas`}
+                </p>
+                <p className="text-xs mt-1 leading-relaxed" style={{ color: 'var(--text-dim)' }}>
+                  Se borra lo que {porBorrar.length === 1 ? 'contestó' : 'contestaron'} y {porBorrar.length === 1 ? 'vuelve' : 'vuelven'} a
+                  quedar como pendiente. <b style={{ color: 'var(--text)' }}>No tiene vuelta atrás.</b>
+                </p>
+              </div>
+            </div>
+            <div className="flex justify-end gap-2">
+              <button onClick={() => setPorBorrar(null)} className="terra-btn-outline"
+                style={{ padding: '8px 16px', fontSize: 12 }}>Cancelar</button>
+              <button onClick={() => borrarRespuestas(porBorrar)} disabled={trabajando}
+                className="flex items-center gap-1.5 rounded-lg font-bold text-white"
+                style={{ padding: '8px 16px', fontSize: 12, background: '#EF4444' }}>
+                {trabajando ? <Loader2 size={13} className="animate-spin" /> : <Trash2 size={13} />} Eliminar
+              </button>
             </div>
           </div>
         </div>
@@ -372,6 +551,101 @@ export default function ModuloPage({ params }: { params: { id: string } }) {
           </div>
         </div>
       )}
+    </div>
+  )
+}
+
+// ─── Resumen ──────────────────────────────────────────────────────────
+
+function Barras({ conteos, color }: { conteos: { etiqueta: string; n: number; pct: number }[]; color: string }) {
+  const tope = Math.max(1, ...conteos.map(c => c.n))
+  return (
+    <div className="space-y-1.5">
+      {conteos.map(c => (
+        <div key={c.etiqueta} className="flex items-center gap-2">
+          <span className="text-[11px] flex-1 min-w-0 truncate" style={{ color: 'var(--text-dim)' }}>{c.etiqueta}</span>
+          <div className="h-2 rounded-full overflow-hidden" style={{ width: 110, background: 'var(--bg-card)' }}>
+            <div className="h-full rounded-full" style={{ width: `${(c.n / tope) * 100}%`, background: color }} />
+          </div>
+          <span className="text-[11px] font-bold tabular-nums text-right" style={{ color: 'var(--text)', width: 64 }}>
+            {c.n} · {c.pct}%
+          </span>
+        </div>
+      ))}
+    </div>
+  )
+}
+
+function Resumen({ t, hayFiltro }: { t: ReturnType<typeof tabular>; hayFiltro: boolean }) {
+  if (!t.respondieron) return (
+    <div className="terra-card p-10 text-center">
+      <p className="text-sm font-bold" style={{ color: 'var(--text)' }}>Todavía no hay respuestas</p>
+      <p className="text-xs mt-1.5" style={{ color: 'var(--text-dim)' }}>
+        {hayFiltro
+          ? 'Nadie de los que filtró ha respondido. Pruebe quitando los filtros.'
+          : 'Cuando los trabajadores empiecen a responder, aquí sale el consolidado.'}
+      </p>
+    </div>
+  )
+
+  return (
+    <div className="space-y-3">
+      <div className="grid md:grid-cols-3 gap-3">
+        {[
+          { titulo: 'Participación por área', datos: t.porArea },
+          { titulo: 'Por finca / centro', datos: t.porCentro },
+          { titulo: 'Por cargo', datos: t.porCargo },
+        ].map(b => (
+          <div key={b.titulo} className="terra-card p-4">
+            <p className="text-[10px] font-bold uppercase tracking-wider mb-2.5" style={{ color: 'var(--text-faint)' }}>
+              {b.titulo}
+            </p>
+            {b.datos.length
+              ? <Barras conteos={b.datos.slice(0, 8)} color="#8B5CF6" />
+              : <p className="text-[11px]" style={{ color: 'var(--text-faint)' }}>Sin datos.</p>}
+          </div>
+        ))}
+      </div>
+
+      {t.preguntas.map((r, i) => (
+        <div key={r.pregunta.id} className="terra-card p-4">
+          <div className="flex items-start justify-between gap-3 mb-2.5">
+            <p className="text-sm font-bold" style={{ color: 'var(--text)' }}>
+              {i + 1}. {r.pregunta.titulo}
+            </p>
+            <span className="text-[10px] font-bold px-2 py-0.5 rounded-full flex-shrink-0"
+              style={{ background: 'var(--bg-card)', color: 'var(--text-faint)' }}>
+              {NOMBRE_TIPO[r.pregunta.tipo]}
+            </span>
+          </div>
+
+          {r.promedio !== null && (
+            <p className="text-xs mb-2" style={{ color: 'var(--text-dim)' }}>
+              Promedio: <b style={{ color: '#8B5CF6' }}>{r.promedio}</b> de 5
+            </p>
+          )}
+
+          {r.conteos.length ? (
+            <Barras conteos={r.conteos} color="#10B981" />
+          ) : r.textos.length ? (
+            <div className="space-y-1.5 max-h-60 overflow-y-auto">
+              {r.textos.map((x, k) => (
+                <div key={k} className="rounded-lg px-2.5 py-2"
+                  style={{ background: 'var(--bg-card)', border: '1px solid var(--border)' }}>
+                  <p className="text-xs whitespace-pre-wrap" style={{ color: 'var(--text)' }}>{x.texto}</p>
+                  <p className="text-[10px] mt-0.5" style={{ color: 'var(--text-faint)' }}>{x.nombre}</p>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <p className="text-[11px]" style={{ color: 'var(--text-faint)' }}>Nadie la respondió.</p>
+          )}
+
+          <p className="text-[10px] mt-2" style={{ color: 'var(--text-faint)' }}>
+            {r.respondieron} de {t.respondieron} la respondieron
+          </p>
+        </div>
+      ))}
     </div>
   )
 }

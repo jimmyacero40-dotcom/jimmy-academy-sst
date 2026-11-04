@@ -11,7 +11,7 @@ import {
   Layers, UserCheck, Briefcase,
   CalendarDays, GraduationCap, TrendingUp,
   Home, Activity, FileCheck2,
-  HardHat, FileText, ArrowLeftRight, AlertTriangle, MessageSquare, LayoutList,
+  HardHat, FileText, ArrowLeftRight, AlertTriangle, MessageSquare,
   Bell, Shield, Leaf, LogIn, DoorOpen, UserX, MapPin
 } from 'lucide-react'
 import { CommandPalette } from '@/components/CommandPalette'
@@ -123,8 +123,9 @@ const ADMIN_NAV: NavEntry[] = [
     label: 'Gestión SST',
     items: [
       { href: '/dashboard/gestion-sst/reportal',       icon: FileText,      label: 'RePortal' },
-      { href: '/dashboard/gestion-sst/participacion', icon: MessageSquare, label: 'Participación de trabajadores' },
-      { href: '/dashboard/gestion-sst/modulos',       icon: LayoutList,    label: 'Módulos' },
+      // Una sola entrada: dentro vive la identificación de peligros y los
+      // módulos que arme la empresa, igual que los ve el trabajador.
+      { href: '/dashboard/gestion-sst/tu-cuentas',    icon: MessageSquare, label: 'Tú Cuentas' },
       { href: null, icon: HardHat,       label: 'EPP',            disabled: true },
       { href: null, icon: Layers,        label: 'Documentos',     disabled: true },
       { href: null, icon: AlertTriangle, label: 'Emergencias',    disabled: true },

@@ -72,6 +72,32 @@ export async function GET(_req: NextRequest, { params }: { params: { id: string 
   return NextResponse.json({ modulo, preguntas: await preguntasDe(params.id), filas })
 }
 
+/**
+ * Borra respuestas ya registradas. Existe sobre todo para limpiar pruebas;
+ * no hay papelera, así que se exige la lista explícita de trabajadores.
+ */
+export async function DELETE(req: NextRequest, { params }: { params: { id: string } }) {
+  const { authorized, companyId } = await requierePermiso('sst.modulos.gestionar')
+  if (!authorized) return NextResponse.json({ error: 'No tiene permiso' }, { status: 403 })
+  if (!companyId) return NextResponse.json({ error: 'Sin empresa activa' }, { status: 400 })
+
+  const { data: modulo } = await supabase.from('modulos')
+    .select('id, company_id').eq('id', params.id).maybeSingle()
+  if (!modulo || modulo.company_id !== companyId) {
+    return NextResponse.json({ error: 'Módulo no encontrado' }, { status: 404 })
+  }
+
+  const body = await req.json().catch(() => ({}))
+  const userIds: string[] = Array.isArray(body.user_ids) ? body.user_ids.filter(Boolean) : []
+  if (!userIds.length) return NextResponse.json({ error: 'No se indicó a quién borrar' }, { status: 400 })
+
+  const { data, error } = await supabase.from('modulo_respuestas')
+    .delete().eq('modulo_id', params.id).in('user_id', userIds).select('id')
+
+  if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+  return NextResponse.json({ eliminadas: data?.length ?? 0 })
+}
+
 /** El trabajador guarda lo suyo. Nadie responde por otro. */
 export async function POST(req: NextRequest, { params }: { params: { id: string } }) {
   const user = await getCurrentUser()
