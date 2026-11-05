@@ -167,6 +167,19 @@ export default function GroupsPage() {
   return (
     <div className="p-6">
 
+      {/* Los grupos los reemplazaron los Perfiles de Formación: allí la gente
+          entra sola por su cargo, y se puede corregir a mano. Esta pantalla
+          queda solo para consultar lo que había; ya no sale en el menú. */}
+      <div className="terra-card p-4 mb-6 flex items-start gap-3"
+        style={{ borderColor: 'var(--warning)' + '50', background: 'var(--warning)' + '0C' }}>
+        <div className="text-sm" style={{ color: 'var(--text-dim)' }}>
+          <strong style={{ color: 'var(--text)' }}>Esto ya no se usa.</strong>{' '}
+          La gente de estos grupos pasó a <a href="/dashboard/profiles"
+            className="underline" style={{ color: 'var(--primary)' }}>Perfiles de Formación</a>,
+          donde entra sola por su cargo. Esta pantalla queda solo para consultar.
+        </div>
+      </div>
+
       {/* Header */}
       <div className="flex items-center justify-between mb-8">
         <div>
