@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { supabaseAdmin as supabase } from '@/lib/supabase-admin'
 import { isAdminOrSuper } from '@/lib/get-company'
 import { perfilSugerido, cursosQueEncajan } from '@/lib/perfiles-sugeridos'
+import { conteoPorPerfil } from '@/lib/perfiles-personas'
 
 export async function GET() {
   const { authorized, companyId } = await isAdminOrSuper()
@@ -19,9 +20,13 @@ export async function GET() {
   const { data, error } = await query
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
 
+  // Cuánta gente tiene cada perfil: es lo que dice si el perfil sirve de algo.
+  const conteo = companyId ? await conteoPorPerfil(companyId) : {}
+
   const result = (data ?? []).map((p: any) => ({
     ...p,
     training_count: p.profile_trainings?.[0]?.count ?? 0,
+    personas: conteo[p.id] ?? 0,
     profile_trainings: undefined,
   }))
   return NextResponse.json(result)

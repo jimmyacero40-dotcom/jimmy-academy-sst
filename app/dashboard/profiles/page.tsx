@@ -10,6 +10,7 @@ import {
   Users, BookOpen, ChevronLeft, Save, GripVertical, AlertTriangle,
   Check, ArrowRight, Tag, Clock
 } from 'lucide-react'
+import QuienesPerfil from '@/components/perfiles/QuienesPerfil'
 
 interface Profile {
   id: string
@@ -17,6 +18,8 @@ interface Profile {
   cargo: string | null
   description: string | null
   training_count: number
+  /** Cuántos trabajadores quedan dentro por su cargo. */
+  personas?: number
   company_id: string
 }
 
@@ -90,7 +93,16 @@ function ProfileCard({
           <div className="text-xs mt-0.5 flex items-center gap-1.5" style={{ color: 'var(--text-dim)' }}>
             <BookOpen size={9} />
             <span>{profile.training_count} curso{profile.training_count !== 1 ? 's' : ''}</span>
-            {profile.cargo && <><span>·</span><span className="truncate opacity-75">{profile.cargo}</span></>}
+            <span>·</span>
+            {/* Un perfil sin gente no le aplica a nadie: se dice en rojo, no
+                escondido entre los demás datos. */}
+            <span className="flex items-center gap-1"
+              style={profile.personas ? undefined : { color: '#F59E0B', fontWeight: 700 }}>
+              <Users size={9} />
+              {profile.personas
+                ? `${profile.personas} persona${profile.personas !== 1 ? 's' : ''}`
+                : 'sin gente'}
+            </span>
           </div>
         </div>
         <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity"
@@ -206,6 +218,10 @@ export default function ProfilesPage() {
   const [editItem, setEditItem]       = useState<Profile | null>(null)
   const [form, setForm]               = useState({ name: '', cargo: '', description: '' })
   const [saving, setSaving]           = useState(false)
+
+  // Quiénes pertenecen al perfil: los cargos que lo forman y las correcciones.
+  const [viendoQuienes, setViendoQuienes] = useState<Profile | null>(null)
+  const [personasPorPerfil, setPersonasPorPerfil] = useState<Record<string, number>>({})
 
   // Editor
   const [editingProfile, setEditingProfile] = useState<Profile | null>(null)
@@ -451,6 +467,14 @@ export default function ProfilesPage() {
 
           <div className="flex items-center gap-3">
             <div className="flex items-center gap-3 text-xs" style={{ color: 'var(--text-faint)' }}>
+              <button onClick={() => setViendoQuienes(editingProfile)}
+                className="flex items-center gap-1 font-bold px-2.5 py-1.5 rounded-lg"
+                style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', color: 'var(--primary)' }}>
+                <Users size={11} />
+                {personasPorPerfil[editingProfile.id] !== undefined
+                  ? `${personasPorPerfil[editingProfile.id]} personas`
+                  : 'Quiénes'}
+              </button>
               <span className="flex items-center gap-1">
                 <Star size={10} className="text-amber-400" fill="#FCD34D" /> {obligatory} obligatorio{obligatory !== 1 ? 's' : ''}
               </span>
@@ -666,6 +690,14 @@ export default function ProfilesPage() {
             </div>
           </div>
         )}
+
+        {viendoQuienes && (
+          <QuienesPerfil
+            profileId={viendoQuienes.id}
+            nombrePerfil={viendoQuienes.name}
+            onCerrar={() => setViendoQuienes(null)}
+            onCambio={n => setPersonasPorPerfil(p => ({ ...p, [viendoQuienes.id]: n }))} />
+        )}
       </div>
     )
   }
@@ -837,6 +869,14 @@ export default function ProfilesPage() {
           </>
         )}
       </AnimatePresence>
+
+      {viendoQuienes && (
+        <QuienesPerfil
+          profileId={viendoQuienes.id}
+          nombrePerfil={viendoQuienes.name}
+          onCerrar={() => setViendoQuienes(null)}
+          onCambio={n => setPersonasPorPerfil(p => ({ ...p, [viendoQuienes.id]: n }))} />
+      )}
     </div>
   )
 }

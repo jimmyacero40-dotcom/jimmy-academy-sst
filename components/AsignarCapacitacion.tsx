@@ -156,6 +156,26 @@ export default function AsignarCapacitacion({
     }).catch(() => setCargando(false))
   }, [abierto])
 
+  // Lo que el perfil ya sabe: a quién le toca esta capacitación y desde qué
+  // perfiles. Es lo que se pre-marca para no volver a escogerlo a mano.
+  const [porPerfil, setPorPerfil] = useState<{
+    userIds: string[]
+    perfiles: { id: string; name: string; personas: number }[]
+  }>({ userIds: [], perfiles: [] })
+  const [perfilLeido, setPerfilLeido] = useState(false)
+
+  useEffect(() => {
+    if (!curso) { setPorPerfil({ userIds: [], perfiles: [] }); setPerfilLeido(false); return }
+    let vigente = true
+    setPerfilLeido(false)
+    fetch(`/api/asignaciones/por-perfil?training_id=${curso.id}`)
+      .then(r => r.ok ? r.json() : { userIds: [], perfiles: [] })
+      .then(d => { if (vigente) setPorPerfil({ userIds: d.userIds ?? [], perfiles: d.perfiles ?? [] }) })
+      .catch(() => { if (vigente) setPorPerfil({ userIds: [], perfiles: [] }) })
+      .finally(() => { if (vigente) setPerfilLeido(true) })
+    return () => { vigente = false }
+  }, [curso])
+
   // Quién ya la tiene este año: se consulta al elegir el curso.
   useEffect(() => {
     if (!curso) { setEstadoDe({}); return }
@@ -199,19 +219,28 @@ export default function AsignarCapacitacion({
   // la empresa, un área, un grupo-. Es una propuesta: se desmarca lo que no
   // corresponda y nada se guarda hasta pulsar Guardar.
   useEffect(() => {
-    if (!edicion || !asignadosLeidos || publicoAplicado.current) return
+    if (!edicion || !asignadosLeidos || !perfilLeido || publicoAplicado.current) return
     if (yaEstaban.size > 0 || personas.length === 0) return
     publicoAplicado.current = true
-    if (!publicoInicial?.length) return
+
     const ids = new Set<string>()
-    for (const t of publicoInicial) {
+
+    // Manda el perfil. Si la capacitación está en la plantilla de algún perfil,
+    // su gente es la propuesta: eso es lo que el usuario ya definió sobre a
+    // quién le toca, y es más fino que el "toda la empresa" del plan.
+    const conocidos = new Set(personas.map(p => p.id))
+    for (const id of porPerfil.userIds) if (conocidos.has(id)) ids.add(id)
+    if (ids.size) { setElegidos(ids); return }
+
+    // Sin perfil que lo diga, se parte del público que traía el plan.
+    for (const t of publicoInicial ?? []) {
       if (t.tipo === 'all') personas.forEach(p => ids.add(p.id))
       else if (t.tipo === 'area' && t.id) personas.filter(p => p.area_id === t.id).forEach(p => ids.add(p.id))
       else if (t.tipo === 'group' && t.id) personas.filter(p => p.grupos.some(g => g.id === t.id)).forEach(p => ids.add(p.id))
       else if (t.tipo === 'user' && t.id) ids.add(t.id)
     }
     if (ids.size) setElegidos(ids)
-  }, [edicion, asignadosLeidos, yaEstaban, personas, publicoInicial])
+  }, [edicion, asignadosLeidos, perfilLeido, yaEstaban, personas, publicoInicial, porPerfil])
 
   useEffect(() => { if (cursoFijado) setCurso(cursoFijado) }, [cursoFijado])
   useEffect(() => { if (fechaInicial !== undefined) setFecha(fechaInicial) }, [fechaInicial])
@@ -297,6 +326,32 @@ export default function AsignarCapacitacion({
     setElegidos(prev => { const n = new Set(prev); n.has(id) ? n.delete(id) : n.add(id); return n })
   }
 
+  // A qué perfiles pertenece la gente elegida, para ofrecer meter el curso en
+  // su plantilla y no tener que ir aparte a Perfiles a hacerlo otra vez.
+  const [perfilesDeLaGente, setPerfilesDeLaGente] = useState<
+    { id: string; name: string; personas: number; yaLaTiene: boolean }[]>([])
+  const [perfilesElegidos, setPerfilesElegidos] = useState<Set<string>>(new Set())
+
+  useEffect(() => {
+    if (paso !== 3 || !curso || elegidos.size === 0 || modo === 'retirar') {
+      setPerfilesDeLaGente([]); return
+    }
+    let vigente = true
+    fetch(`/api/asignaciones/por-perfil?training_id=${curso.id}&user_ids=${[...elegidos].join(',')}`)
+      .then(r => r.ok ? r.json() : { perfilesDeLaGente: [] })
+      .then(d => {
+        if (!vigente) return
+        const lista = d.perfilesDeLaGente ?? []
+        setPerfilesDeLaGente(lista)
+        // Vienen marcados los que todavía no la tienen: es lo que el usuario
+        // iba a hacer de todos modos, y se puede desmarcar.
+        setPerfilesElegidos(new Set(lista.filter((p: any) => !p.yaLaTiene).map((p: any) => p.id)))
+      })
+      .catch(() => { if (vigente) setPerfilesDeLaGente([]) })
+    return () => { vigente = false }
+    /* eslint-disable-next-line react-hooks/exhaustive-deps */
+  }, [paso, curso, modo, [...elegidos].sort().join(',')])
+
   // Se consulta al llegar al paso de la fecha, no en cada tecla.
   useEffect(() => {
     if (paso !== 3 || !fecha) { setChoques([]); return }
@@ -361,7 +416,20 @@ export default function AsignarCapacitacion({
       })
       const d = await r.json()
       if (!r.ok) { setError(d.error || 'No fue posible asignar'); return }
-      setResultado({ ...d, edicion })
+
+      // El perfil se alimenta con la misma acción: lo que se asignó queda en
+      // la plantilla de esos perfiles, para quien entre mañana.
+      const aPerfiles = [...perfilesElegidos]
+      let enPerfiles = 0
+      if (aPerfiles.length) {
+        const rp = await fetch('/api/asignaciones/por-perfil', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ training_id: curso!.id, profile_ids: aPerfiles }),
+        })
+        if (rp.ok) enPerfiles = (await rp.json()).agregados ?? 0
+      }
+
+      setResultado({ ...d, edicion, enPerfiles })
       onListo?.(d)
     } catch {
       setError('Error de conexión')
@@ -473,6 +541,12 @@ export default function AsignarCapacitacion({
               {resultado.retiro && resultado.conservadas > 0 && (
                 <p className="text-[11px]" style={{ color: '#F59E0B' }}>
                   {resultado.conservadas} ya la habían completado y se conservaron.
+                </p>
+              )}
+              {!!resultado.enPerfiles && (
+                <p className="text-[11px]" style={{ color: '#10B981' }}>
+                  Quedó en {resultado.enPerfiles} {resultado.enPerfiles === 1 ? 'perfil' : 'perfiles'}, así que
+                  al que entre con ese cargo también le va a tocar.
                 </p>
               )}
               {/* Qué pasó con los correos: se dice tal cual, sin dar por
@@ -695,6 +769,38 @@ export default function AsignarCapacitacion({
                   <span>{nombresElegidos.join(' · ') || 'Nadie seleccionado'}</span>
                 </div>
               </div>
+
+              {/* ── Que el perfil quede al día con la misma acción ── */}
+              {modo === 'asignar' && perfilesDeLaGente.some(p => !p.yaLaTiene) && (
+                <div className="rounded-xl p-3" style={{ background: 'var(--bg-card)', border: '1px solid var(--border)' }}>
+                  <p className="text-xs font-semibold mb-0.5" style={{ color: 'var(--text)' }}>
+                    Agregar también al perfil
+                  </p>
+                  <p className="text-[11px] mb-2.5 leading-relaxed" style={{ color: 'var(--text-faint)' }}>
+                    Así queda en la plantilla y al que entre mañana con ese cargo también le va a tocar.
+                  </p>
+                  <div className="space-y-1.5">
+                    {perfilesDeLaGente.map(p => (
+                      <label key={p.id}
+                        className={`flex items-center gap-2.5 ${p.yaLaTiene ? '' : 'cursor-pointer'}`}
+                        style={{ opacity: p.yaLaTiene ? 0.5 : 1 }}>
+                        <input type="checkbox" disabled={p.yaLaTiene}
+                          checked={p.yaLaTiene || perfilesElegidos.has(p.id)}
+                          onChange={e => setPerfilesElegidos(s => {
+                            const n = new Set(s)
+                            e.target.checked ? n.add(p.id) : n.delete(p.id)
+                            return n
+                          })}
+                          className="w-4 h-4 rounded accent-blue-500 flex-shrink-0" />
+                        <span className="text-xs" style={{ color: 'var(--text)' }}>{p.name}</span>
+                        <span className="text-[10px]" style={{ color: 'var(--text-faint)' }}>
+                          {p.personas} de los elegidos{p.yaLaTiene ? ' · ya la tiene' : ''}
+                        </span>
+                      </label>
+                    ))}
+                  </div>
+                </div>
+              )}
 
               {/* Dos capacitaciones el mismo día casi siempre es un descuido,
                   pero puede ser a propósito: se avisa, no se bloquea. */}
