@@ -9,6 +9,7 @@ import {
 import {
   MESES, enPalabras, ocurrencias as repetir, type Ocurrencia,
 } from '@/lib/plan-fechas'
+import { calcularCierre, DIAS_POR_DEFECTO } from '@/lib/ventana'
 import {
   ESTADOS, ESTADO_NOMBRE, PERIODICIDADES, PERIODICIDAD_NOMBRE,
   colorCategoria, type PlanItem, type Tema,
@@ -80,7 +81,9 @@ export default function PanelAsignacion({
   const [form, setForm] = useState({
     month: item?.month ?? inicial?.month ?? new Date().getMonth() + 1,
     scheduled_date: item?.scheduled_date ?? inicial?.scheduled_date ?? '',
-    end_date: item?.end_date ?? '',
+    // El cierre no se escribe a mano: se dice cuántos días dura la ronda y
+    // la fecha sale de ahí. Lo de antes era una "fecha fin" que nadie llenaba.
+    dias_vigencia: String(item?.dias_vigencia ?? DIAS_POR_DEFECTO),
     estado: item?.estado ?? 'pendiente',
     required: item?.required ?? inicial?.required ?? tema?.obligatorio ?? true,
     reinduccion: item?.reinduccion ?? false,
@@ -120,6 +123,12 @@ export default function PanelAsignacion({
     : []
   const extras = repeticiones.slice(1)
 
+  // Cuándo se cierra esta ronda, con lo que hay escrito ahora mismo.
+  const cierre = calcularCierre(
+    form.scheduled_date || null,
+    form.dias_vigencia === '' ? DIAS_POR_DEFECTO : Number(form.dias_vigencia),
+  )
+
   const guardar = async () => {
     setError('')
     if (crear && !temaId) { setError('Elige el tema'); return }
@@ -128,7 +137,7 @@ export default function PanelAsignacion({
     const cuerpo: Record<string, any> = {
       month: Number(form.month),
       scheduled_date: form.scheduled_date || null,
-      end_date: form.end_date || null,
+      dias_vigencia: form.dias_vigencia === '' ? DIAS_POR_DEFECTO : Number(form.dias_vigencia),
       estado: form.estado,
       required: form.required,
       reinduccion: form.reinduccion,
@@ -258,10 +267,25 @@ export default function PanelAsignacion({
               onChange={e => f('scheduled_date', e.target.value)} className="terra-input" />
           </div>
           <div>
-            <label className="field-label">Fecha fin</label>
-            <input type="date" value={form.end_date}
-              onChange={e => f('end_date', e.target.value)} className="terra-input" />
+            <label className="field-label">Se cierra a los</label>
+            <div className="flex items-center gap-2">
+              <input type="number" min={0} max={365} value={form.dias_vigencia}
+                onChange={e => f('dias_vigencia', e.target.value)} className="terra-input"
+                style={{ maxWidth: 80 }} />
+              <span className="text-sm" style={{ color: 'var(--text-dim)' }}>días</span>
+            </div>
           </div>
+        </div>
+
+        {/* Qué va a pasar cuando se venza, dicho antes de guardar. */}
+        <div className="text-xs" style={{ color: 'var(--text-dim)' }}>
+          {cierre
+            ? <>Queda abierta hasta el <strong style={{ color: 'var(--text)' }}>{enPalabras(cierre)}</strong>.
+                Después se cierra sola y a quien no haya ido le queda <strong style={{ color: 'var(--text)' }}>No asistió</strong>,
+                para que más adelante se le pueda asignar un refuerzo.</>
+            : form.scheduled_date
+              ? 'En 0 días no se cierra sola: queda abierta hasta que usted la cierre.'
+              : 'Sin fecha de inicio no hay de dónde contar, así que no se cierra sola.'}
         </div>
 
         <div>

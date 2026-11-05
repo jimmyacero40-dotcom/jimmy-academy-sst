@@ -17,6 +17,9 @@ export interface PlanItem {
   month: number
   scheduled_date: string | null
   end_date: string | null
+  /** Cuántos días queda abierta la ronda desde la fecha programada. */
+  dias_vigencia?: number | null
+  cerrado_at?: string | null
   periodicity: string
   required: boolean
   valid_days: number | null

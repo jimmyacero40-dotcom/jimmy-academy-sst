@@ -3,6 +3,7 @@ import { supabaseAdmin as supabase } from '@/lib/supabase-admin'
 import { requierePermiso } from '@/lib/get-company'
 import { anotar } from '@/lib/auditoria-plan'
 import { enviarCorreo, correoConfigurado, plantillaCapacitacion } from '@/lib/correo'
+import { estaAbierta } from '@/lib/vigencia'
 
 // ─── Asignar una capacitación a personas concretas ────────────────────
 // Vía corta a lo que ya hacían los Perfiles de Formación: en vez de armar un
@@ -558,11 +559,21 @@ export async function GET(req: NextRequest) {
   const anio = new Date().getFullYear()
   const { data, error } = await supabase
     .from('enrollments')
-    .select('user_id, status, created_at, due_date')
+    .select('user_id, status, created_at, due_date, plan_item_id, plan_items(estado, end_date)')
     .eq('training_id', trainingId)
     .eq('company_id', companyId)
     .gte('created_at', `${anio}-01-01`)
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
-  return NextResponse.json(data ?? [])
+
+  // Si la ronda de donde viene esta inscripción ya se cerró, la persona queda
+  // libre: un refuerzo en un mes posterior no tiene por qué chocar con una
+  // capacitación que se dictó y se cerró hace rato.
+  return NextResponse.json((data ?? []).map((e: any) => ({
+    user_id: e.user_id,
+    status: e.status,
+    created_at: e.created_at,
+    due_date: e.due_date,
+    vigente: e.plan_item_id ? estaAbierta(e.plan_items ?? {}) : true,
+  })))
 }

@@ -36,6 +36,54 @@ interface Persona {
   correo: string
   grupos: { id: string; name: string }[]
 }
+/** Otra vez que esta misma capacitación se programó, y en qué quedó. */
+interface Ronda {
+  id: string; mes: string; fecha: string | null; cierra: string | null
+  estado: string; abierta: boolean
+  asignados: number; asistieron: number; enCurso: number
+  pendientes: number; noAsistieron: number
+}
+
+/**
+ * Lo que ya pasó con esta capacitación, dicho antes de armar otra ronda.
+ *
+ * Si hay una abierta, armar otra encima casi siempre es un error -se duplica
+ * la lista y nadie sabe cuál vale-. Si todas están cerradas, esto es un
+ * refuerzo y está bien, pero conviene ver cómo fue la vez pasada.
+ */
+function Rondas({ rondas }: { rondas: Ronda[] }) {
+  if (!rondas.length) return null
+  const abiertas = rondas.filter(r => r.abierta)
+  const grave = abiertas.length > 0
+  const color = grave ? 'var(--warning)' : 'var(--text-dim)'
+
+  return (
+    <div className="rounded-xl p-3 mb-4"
+      style={{ background: grave ? 'var(--warning)0C' : 'var(--bg-elevated)',
+               border: `1px solid ${grave ? 'var(--warning)40' : 'var(--border)'}` }}>
+      <div className="text-xs font-semibold mb-2" style={{ color }}>
+        {grave
+          ? 'Ojo: esta capacitación ya está programada y la ronda sigue abierta'
+          : 'Esta capacitación ya se dictó antes. Lo de ahora sería un refuerzo.'}
+      </div>
+      <div className="space-y-1">
+        {rondas.map(r => (
+          <div key={r.id} className="text-xs" style={{ color: 'var(--text-dim)' }}>
+            <strong style={{ color: 'var(--text)' }}>{r.mes}</strong>
+            {' · '}{r.asistieron} de {r.asignados} asistieron
+            {r.enCurso > 0 && `, ${r.enCurso} en curso`}
+            {r.pendientes > 0 && `, ${r.pendientes} sin ir`}
+            {r.noAsistieron > 0 && `, ${r.noAsistieron} no asistieron`}
+            {' · '}
+            <span style={{ color: r.abierta ? 'var(--warning)' : 'var(--text-dim)' }}>
+              {r.abierta ? 'abierta' : 'cerrada'}
+            </span>
+          </div>
+        ))}
+      </div>
+    </div>
+  )
+}
 
 /**
  * El marco de afuera. Declarado aquí y no dentro del componente para que React
@@ -182,12 +230,28 @@ export default function AsignarCapacitacion({
     fetch(`/api/asignaciones?training_id=${curso.id}`)
       .then(r => r.ok ? r.json() : [])
       .then((d: any[]) => {
+        // Solo cuenta lo de rondas que siguen abiertas. Si la ronda de donde
+        // viene ya se cerró, esa persona está libre y se le puede asignar un
+        // refuerzo sin que la bloquee una capacitación de hace meses.
         const m: Record<string, string> = {}
-        for (const e of d) m[e.user_id] = e.status
+        for (const e of d) if (e.vigente !== false) m[e.user_id] = e.status
         setEstadoDe(m)
       })
       .catch(() => setEstadoDe({}))
   }, [curso])
+
+  // Las otras veces que esta capacitación se programó, para avisar antes de
+  // armar otra ronda encima.
+  const [rondas, setRondas] = useState<Ronda[]>([])
+  useEffect(() => {
+    if (!curso) { setRondas([]); return }
+    const url = `/api/asignaciones/rondas?training_id=${curso.id}` +
+      (planItemId ? `&excluir=${planItemId}` : '')
+    fetch(url)
+      .then(r => r.ok ? r.json() : { rondas: [] })
+      .then(d => setRondas(d.rondas ?? []))
+      .catch(() => setRondas([]))
+  }, [curso, planItemId])
 
   const yaLaTienen = useMemo(() => new Set(Object.keys(estadoDe)), [estadoDe])
 
@@ -607,6 +671,7 @@ export default function AsignarCapacitacion({
           ) : paso === 2 ? (
             /* ══ 2. Personas ══ */
             <div className="space-y-3">
+              <Rondas rondas={rondas} />
               {/* Asignar y retirar son la misma operación al revés, así que
                   viven en el mismo sitio: equivocarse al asignar se arregla
                   donde se asignó. */}

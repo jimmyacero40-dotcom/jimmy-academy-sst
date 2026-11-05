@@ -5,6 +5,7 @@
   "devCommand": "npm run dev",
   "installCommand": "npm install",
   "crons": [
-    { "path": "/api/cron/cierre-jornada", "schedule": "0 5 * * *" }
+    { "path": "/api/cron/cierre-jornada", "schedule": "0 5 * * *" },
+    { "path": "/api/cron/cerrar-rondas", "schedule": "30 5 * * *" }
   ]
 }
