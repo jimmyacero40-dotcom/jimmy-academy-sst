@@ -9,8 +9,9 @@ import Link from 'next/link'
 import {
   ArrowLeftRight, Users, LogIn, LogOut, Building2,
   Search, Filter, RefreshCw,
-  CheckCircle2, FileText, Table2, DoorOpen, ChevronLeft, ChevronRight
+  CheckCircle2, FileText, Table2, DoorOpen, ChevronLeft, ChevronRight, Clock, PencilLine
 } from 'lucide-react'
+import RegistroManual, { type MovimientoAEditar } from '@/components/accesos/RegistroManual'
 
 interface AccessLog {
   id: string
@@ -19,6 +20,9 @@ interface AccessLog {
   notes: string | null
   auto_exit: boolean | null
   auto_exit_reason: string | null
+  /** El movimiento se repuso después a mano, no se marcó en portería. */
+  manual?: boolean | null
+  manual_motivo?: string | null
   user: { id: string; name: string; cedula: string; cargo: string | null; area_id: string | null }
   area: { id: string; name: string; color: string } | null
   gatehouse: { id: string; name: string; location: string | null } | null
@@ -115,6 +119,11 @@ export default function ControlOperativoPage() {
   // registrar, que la llevarían a una pantalla que no puede usar.
   const puedeRegistrarIngreso = tienePermiso(rol, (session?.user as any)?.permissions, 'accesos.ingreso')
   const puedeRegistrarSalida  = tienePermiso(rol, (session?.user as any)?.permissions, 'accesos.salida')
+  // Escribir una hora a mano reescribe la evidencia de quién estuvo en la
+  // finca, así que es exclusivo del superadmin.
+  const puedeRegistrarAMano   = tienePermiso(rol, (session?.user as any)?.permissions, 'accesos.manual')
+  const [manualAbierto, setManualAbierto] = useState(false)
+  const [editandoMov, setEditandoMov] = useState<MovimientoAEditar | null>(null)
   const today = new Date().toISOString().split('T')[0]
 
   const [exporting, setExporting] = useState<'pdf' | 'excel' | null>(null)
@@ -299,6 +308,15 @@ export default function ControlOperativoPage() {
               style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', color: 'var(--text)' }}>
               <LogOut size={15} /> Registrar Salida
             </Link>
+          )}
+          {/* Lo que no se marcó en su momento: se repone con sus horas reales
+              y queda señalado como manual. Solo el superadmin. */}
+          {puedeRegistrarAMano && (
+            <button onClick={() => { setEditandoMov(null); setManualAbierto(true) }}
+              className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold transition-all"
+              style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', color: 'var(--text)' }}>
+              <Clock size={15} /> Registrar a mano
+            </button>
           )}
         </div>
       </div>
@@ -557,7 +575,25 @@ export default function ControlOperativoPage() {
                 {filtered.map(log => (
                   <tr key={log.id} className="hover:bg-[var(--bg-card-hover)] transition-colors">
                     <td className="px-4 py-3">
-                      <span className="text-xs font-semibold tabular-nums" style={{ color: 'var(--text-dim)' }}>{fmtDay(log.entry_time)}</span>
+                      <div className="flex items-center gap-1.5">
+                        <span className="text-xs font-semibold tabular-nums" style={{ color: 'var(--text-dim)' }}>{fmtDay(log.entry_time)}</span>
+                        {/* Un movimiento repuesto no es lo mismo que uno marcado
+                            en el momento, y en una auditoría tiene que verse. */}
+                        {log.manual && (
+                          <span className="text-[9px] font-bold px-1.5 py-0.5 rounded whitespace-nowrap"
+                            title={log.manual_motivo ? `A mano: ${log.manual_motivo}` : 'Registrado a mano'}
+                            style={{ background: 'rgba(245,158,11,0.12)', color: '#F59E0B', border: '1px solid rgba(245,158,11,0.35)' }}>
+                            A MANO
+                          </span>
+                        )}
+                        {puedeRegistrarAMano && (
+                          <button onClick={() => { setEditandoMov(log as MovimientoAEditar); setManualAbierto(true) }}
+                            title="Corregir las horas de este movimiento"
+                            style={{ color: 'var(--text-faint)' }}>
+                            <PencilLine size={12} />
+                          </button>
+                        )}
+                      </div>
                     </td>
                     <td className="px-4 py-3">
                       <span className="text-sm font-semibold tabular-nums" style={{ color: 'var(--text)' }}>{fmtTime(log.entry_time)}</span>
@@ -619,6 +655,16 @@ export default function ControlOperativoPage() {
           </div>
         )}
       </div>
+
+      {manualAbierto && (
+        <RegistroManual
+          editar={editandoMov}
+          areas={areas}
+          porterias={gatehouses}
+          onCerrar={() => { setManualAbierto(false); setEditandoMov(null) }}
+          onGuardado={() => { setManualAbierto(false); setEditandoMov(null); movimientos.recargar() }}
+        />
+      )}
     </div>
   )
 }

@@ -29,6 +29,7 @@ export const CATALOGO_PERMISOS: GrupoPermisos[] = [
       { id: 'accesos.salida',   label: 'Registrar salidas',     descripcion: 'Marcar salidas en portería' },
       { id: 'accesos.exportar', label: 'Exportar reportes',     descripcion: 'Descargar los movimientos en PDF y Excel' },
       { id: 'accesos.sedes',    label: 'Administrar sedes',     descripcion: 'Crear y editar porterías y sus operadores' },
+      { id: 'accesos.manual',   label: 'Registrar a mano',      descripcion: 'Dejar un movimiento que no se marcó en portería, escribiendo la hora de entrada y de salida. Queda señalado como manual, con el motivo' },
     ],
   },
   {
@@ -68,6 +69,9 @@ export const TODOS_LOS_PERMISOS = CATALOGO_PERMISOS.flatMap(g => g.permisos.map(
 /** Capacidades que no se heredan por ser admin: el superadmin las concede a mano. */
 const SOLO_SUPERADMIN = [
   'config.empresa',
+  // Escribir una hora de entrada o de salida a mano reescribe la evidencia de
+  // quién estuvo en la finca, así que no lo puede hacer quien opera la portería.
+  'accesos.manual',
   'sst.participacion.eliminar',
   'sst.reportes.corregir',
   'sst.reportes.eliminar',
