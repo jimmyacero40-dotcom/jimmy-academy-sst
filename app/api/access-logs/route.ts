@@ -62,6 +62,19 @@ export async function GET(req: NextRequest) {
 
   const { data, error } = await query
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+
+  // Que un movimiento se haya repuesto a mano solo lo ve quien puede
+  // reponerlos. Para los demás el movimiento es uno más: el dato se guarda y
+  // queda la trazabilidad, pero no se envía, así que no hay nada que mostrar
+  // ni que se escape a un export.
+  const { authorized: veLoManual } = await requierePermiso('accesos.manual')
+  if (!veLoManual) {
+    return NextResponse.json((data ?? []).map((l: any) => {
+      const { manual, manual_motivo, ...resto } = l
+      return resto
+    }))
+  }
+
   return NextResponse.json(data ?? [])
 }
 
