@@ -105,6 +105,8 @@ function PorteriaOperativaView({ gateId, gateName, puedeCambiarSede }: { gateId:
   const [toast, setToast] = useState<{ msg: string; type: 'ok' | 'err' } | null>(null)
   const [confirm, setConfirm] = useState<{ name: string; cedula: string; time: string } | null>(null)
   const [cedula, setCedula] = useState('')
+  /** A quién encontró la verificación, antes de registrar nada. */
+  const [candidato, setCandidato] = useState<{ worker?: Worker; noEncontrado?: string } | null>(null)
   const cedulaRef = useRef<HTMLInputElement>(null)
 
   // Cada consulta va atada a esta sede. Además el componente se monta con
@@ -156,13 +158,34 @@ function PorteriaOperativaView({ gateId, gateName, puedeCambiarSede }: { gateId:
     setRegistering(null)
   }
 
-  async function verifyCedula() {
+  /**
+   * Verificar no es ingresar.
+   *
+   * Antes, escribir la cédula y darle a Verificar metía a la persona de una,
+   * sin mostrar a quién. Si el número venía mal tecleado, entraba otro y el
+   * portero no se enteraba. Ahora se muestra la ficha y el ingreso se confirma
+   * aparte: el portero ve la cara y el nombre antes de decidir.
+   */
+  function verifyCedula() {
     if (!cedula.trim()) return
     const found = workers.find(w => w.cedula === cedula.trim())
-    if (!found) { showToast('Cédula no encontrada en el sistema', 'err'); return }
-    const st = getStatus(found)
-    if (st === 'blocked') { showToast(`${found.name} está bloqueado — verificar estado`, 'err'); return }
-    await registerEntry(found)
+    if (!found) {
+      setCandidato({ noEncontrado: cedula.trim() })
+      return
+    }
+    setCandidato({ worker: found })
+  }
+
+  async function confirmarIngreso() {
+    if (!candidato?.worker) return
+    await registerEntry(candidato.worker)
+    setCandidato(null)
+    setCedula('')
+    cedulaRef.current?.focus()
+  }
+
+  function descartar() {
+    setCandidato(null)
     setCedula('')
     cedulaRef.current?.focus()
   }
@@ -263,7 +286,7 @@ function PorteriaOperativaView({ gateId, gateName, puedeCambiarSede }: { gateId:
         </label>
         <div className="flex flex-col sm:flex-row gap-2">
           <input ref={cedulaRef} type="text" inputMode="numeric" value={cedula}
-            onChange={e => setCedula(e.target.value)}
+            onChange={e => { setCedula(e.target.value); setCandidato(null) }}
             onKeyDown={e => e.key === 'Enter' && verifyCedula()}
             placeholder="Escribe o escanea la cédula y presiona Enter…"
             className="flex-1 min-w-0 px-4 py-3 rounded-lg text-base outline-none font-mono"
@@ -271,9 +294,79 @@ function PorteriaOperativaView({ gateId, gateName, puedeCambiarSede }: { gateId:
           <button onClick={verifyCedula} disabled={loading}
             className="flex items-center justify-center gap-2 px-5 py-3 rounded-lg text-sm font-bold disabled:opacity-50"
             style={{ background: 'var(--primary)', color: '#fff' }}>
-            <LogIn size={15} /> Verificar
+            <Search size={15} /> Verificar
           </button>
         </div>
+
+        {/* La ficha de quien se va a ingresar. Se muestra antes de registrar
+            nada, para que el portero confirme que es la persona. */}
+        {candidato?.noEncontrado && (
+          <div className="mt-4 rounded-xl p-4 flex items-start gap-3"
+            style={{ background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.35)' }}>
+            <XCircle size={20} style={{ color: '#EF4444' }} className="flex-shrink-0" />
+            <div className="flex-1">
+              <p className="font-bold text-sm" style={{ color: '#FCA5A5' }}>Esa cédula no está registrada</p>
+              <p className="text-xs mt-0.5" style={{ color: 'var(--text-dim)' }}>
+                Ninguna persona con la cédula <span className="font-mono">{candidato.noEncontrado}</span>.
+                Revise el número, o búsquela en la lista de abajo.
+              </p>
+            </div>
+            <button onClick={descartar} style={{ color: 'var(--text-dim)' }}><XCircle size={16} /></button>
+          </div>
+        )}
+
+        {candidato?.worker && (() => {
+          const w = candidato.worker
+          const bloqueado = getStatus(w) === 'blocked'
+          const yaDentro  = insideIds.has(w.id)
+          const puede = !bloqueado && !yaDentro
+          const tono = puede ? '#10B981' : bloqueado ? '#EF4444' : '#F59E0B'
+
+          return (
+            <div className="mt-4 rounded-xl p-4"
+              style={{ background: `${tono}0D`, border: `1px solid ${tono}55` }}>
+              <div className="flex items-start gap-3">
+                <div className="w-11 h-11 rounded-full flex items-center justify-center text-white font-bold flex-shrink-0"
+                  style={{ background: avatarColor(w.id) }}>
+                  {initials(w.name)}
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="font-bold text-sm flex items-center gap-1.5" style={{ color: tono }}>
+                    {puede ? <><CheckCircle2 size={15} /> PUEDE ENTRAR</>
+                      : bloqueado ? <><XCircle size={15} /> NO PUEDE ENTRAR</>
+                      : <><DoorOpen size={15} /> YA ESTÁ ADENTRO</>}
+                  </p>
+                  <p className="font-bold text-lg leading-tight mt-0.5" style={{ color: 'var(--text-strong)' }}>{w.name}</p>
+                  <div className="flex flex-wrap gap-x-4 gap-y-1 mt-1.5 text-xs" style={{ color: 'var(--text-dim)' }}>
+                    <span className="font-mono">CC {w.cedula}</span>
+                    {w.cargo && <span>{w.cargo}</span>}
+                    {w.area_name && <span>{w.area_name}</span>}
+                  </div>
+                  {bloqueado && (
+                    <p className="text-xs mt-2" style={{ color: '#FCA5A5' }}>
+                      Su cuenta está inactiva. No registre el ingreso sin autorización.
+                    </p>
+                  )}
+                  {yaDentro && (
+                    <p className="text-xs mt-2" style={{ color: '#F59E0B' }}>
+                      Tiene un ingreso abierto. Si volvió a entrar, registre primero su salida.
+                    </p>
+                  )}
+                </div>
+                <button onClick={descartar} style={{ color: 'var(--text-dim)' }}><XCircle size={16} /></button>
+              </div>
+
+              <button onClick={confirmarIngreso} disabled={!puede || registering === w.id}
+                className="w-full mt-4 flex items-center justify-center gap-2 py-3 rounded-lg text-sm font-bold disabled:opacity-40"
+                style={{ background: puede ? 'var(--primary)' : 'var(--bg-card)',
+                         color: puede ? '#fff' : 'var(--text-dim)',
+                         border: puede ? 'none' : '1px solid var(--border)' }}>
+                <LogIn size={16} />
+                {registering === w.id ? 'Registrando…' : 'Registrar ingreso'}
+              </button>
+            </div>
+          )
+        })()}
       </div>
 
       {/* Filtros */}
