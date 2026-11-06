@@ -38,6 +38,31 @@ async function empresaActiva(): Promise<string | null> {
  * Responde sí o no y en qué estado, nunca el nombre ni otros datos.
  */
 export async function GET(req: NextRequest) {
+  // ?opciones=1 — los cargos, áreas y fincas que ya existen, para que el
+  // trabajador escoja en vez de escribir. Es lo que evita que convivan
+  // "OPERARIO DE CAMPO" y "Auxiliar de campo" como si fueran distintos.
+  // Son nombres de puestos y de fincas, no datos de nadie.
+  if (req.nextUrl.searchParams.get('opciones')) {
+    const companyId = await empresaActiva()
+    if (!companyId) return NextResponse.json({ cargos: [], areas: [], centros: [] })
+
+    const [{ data: gente }, { data: areas }, { data: perfiles }] = await Promise.all([
+      supabase.from('users').select('cargo').eq('company_id', companyId).is('purged_at', null),
+      supabase.from('areas').select('name').eq('company_id', companyId).order('name'),
+      supabase.from('worker_profiles').select('centro_trabajo').eq('company_id', companyId),
+    ])
+
+    const unicos = (vs: (string | null | undefined)[]) =>
+      [...new Set(vs.map(v => (v ?? '').trim()).filter(Boolean))]
+        .sort((a, b) => a.localeCompare(b, 'es'))
+
+    return NextResponse.json({
+      cargos: unicos((gente ?? []).map((u: any) => u.cargo)),
+      areas: (areas ?? []).map((a: any) => a.name),
+      centros: unicos((perfiles ?? []).map((p: any) => p.centro_trabajo)),
+    })
+  }
+
   const cedula = soloDigitos(req.nextUrl.searchParams.get('cedula') ?? '')
   if (cedula.length < 5) return NextResponse.json({ error: 'Cédula inválida' }, { status: 400 })
 

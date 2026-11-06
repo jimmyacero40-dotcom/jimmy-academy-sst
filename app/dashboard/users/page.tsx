@@ -1,7 +1,7 @@
 ﻿'use client'
 
 import { QrPreRegistro } from '@/components/QrPreRegistro'
-import { useState, useEffect, useRef, useCallback } from 'react'
+import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import CorreccionRapida from '@/components/CorreccionRapida'
 import { useAnchosColumnas, ManijaColumna, type ColumnaAncho } from '@/components/anchos-columnas'
 import { useRouter } from 'next/navigation'
@@ -83,6 +83,9 @@ const COLUMNAS_PERSONAS: ColumnaAncho[] = [
 
 const EMPTY_FORM = {
   name: '', email: '', correo: '', password: '', empresa: '', area_id: '', cargo: '', cedula: '',
+  // Sede y fecha de ingreso viven en el perfil, pero se piden aquí: dejarlas
+  // para después obligaba a volver a buscar a la persona en la lista.
+  sede: '', fechaIngreso: '',
   status: 'activo' as UserStatus, emailManual: false, passwordManual: false, selectedGroups: [] as string[],
 }
 
@@ -546,6 +549,8 @@ export default function UsersPage() {
   // Modals & UI state
   const [showModal, setShowModal]         = useState(false)
   const [editUser, setEditUser]           = useState<AppUser | null>(null)
+  /** El cargo se escoge de la lista; esto abre el campo para escribir uno nuevo. */
+  const [cargoNuevo, setCargoNuevo]       = useState(false)
   const [form, setForm]                   = useState(EMPTY_FORM)
   const [formErrors, setFormErrors]       = useState<Record<string, string>>({})
   const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null)
@@ -689,24 +694,32 @@ export default function UsersPage() {
     } finally { setAsignando(false) }
   }
 
+  // Los cargos y las sedes que ya existen: de ahí se escoge, para no inventar
+  // variantes del mismo cargo que después rompen perfiles y filtros.
+  const cargosExistentes = useMemo(
+    () => [...new Set(users.map(u => u.cargo).filter(Boolean))].sort((a, b) => a.localeCompare(b, 'es')),
+    [users])
+  const sedesExistentes = useMemo(
+    () => [...new Set(users.map(u => u.sede).filter(Boolean))].sort((a, b) => a.localeCompare(b, 'es')),
+    [users])
+
   const hasFilters    = !!(search || filterStatus || filterArea || filterGroup || filterRole || filterSede || filterCargo || filterMes)
 
   // ── CRUD ─────────────────────────────────────────────────────────────────
   const closeModal = () => { setShowModal(false); setIsDirty(false); setConfirmClose(false) }
   const tryClose   = () => { if (isDirty) { setConfirmClose(true) } else { closeModal() } }
 
-  const openNew = () => { setEditUser(null); setForm(EMPTY_FORM); setFormErrors({}); setIsDirty(false); setConfirmClose(false); setShowModal(true) }
+  const openNew = () => { setEditUser(null); setForm(EMPTY_FORM); setFormErrors({}); setIsDirty(false); setConfirmClose(false); setCargoNuevo(false); setShowModal(true) }
 
   const openEdit = async (u: AppUser) => {
     setEditUser(u)
-    setForm({ name: u.name, email: u.email || '', correo: u.correo || '', password: '', empresa: u.empresa, area_id: u.area_id || '', cargo: u.cargo || '', cedula: u.cedula, status: u.status, emailManual: true, passwordManual: true, selectedGroups: [] })
+    setForm({
+      name: u.name, email: u.email || '', correo: u.correo || '', password: '',
+      empresa: u.empresa, area_id: u.area_id || '', cargo: u.cargo || '', cedula: u.cedula,
+      sede: u.sede || '', fechaIngreso: u.fechaIngreso || '',
+      status: u.status, emailManual: true, passwordManual: true, selectedGroups: [],
+    })
     setFormErrors({}); setIsDirty(false); setConfirmClose(false); setShowModal(true)
-    setLoadingGroups(true)
-    try {
-      const res = await fetch(`/api/users/${u.id}/groups`)
-      if (res.ok) { const gList = await res.json(); setForm(f => ({ ...f, selectedGroups: gList.map((g: any) => g.id) })) }
-    } catch {}
-    setLoadingGroups(false)
   }
 
   const validate = () => {
@@ -715,10 +728,28 @@ export default function UsersPage() {
     if (!form.cedula.trim()) e.cedula = 'Cédula requerida'
     if (!form.email.trim()) e.email = 'Correo requerido'
     if (form.correo.trim() && !/\S+@\S+\.\S+/.test(form.correo)) e.correo = 'Correo inválido'
-    // La contraseña la asigna quien administra; al crear no puede quedar vacía.
-    if (!editUser && !form.password.trim()) e.password = 'Asigna una contraseña'
-    else if (form.password.trim() && form.password.trim().length < 4) e.password = 'Mínimo 4 caracteres'
+    // Al crear no se pide contraseña: la del trabajador es su propia cédula,
+    // que es lo que se le dice cuando se le pasa el enlace de registro.
+    // Editando sí se puede escribir otra, y ahí sí debe ser decente.
+    if (form.password.trim() && form.password.trim().length < 4) e.password = 'Mínimo 4 caracteres'
     return e
+  }
+
+  /**
+   * Sede y fecha de ingreso viven en el perfil del trabajador, no en la
+   * cuenta, así que van en una segunda llamada. No tumba el guardado: la
+   * persona ya quedó creada y esto se puede corregir después en la lista.
+   */
+  const guardarPerfil = async (userId: string) => {
+    if (!form.sede.trim() && !form.fechaIngreso) return
+    await fetch('/api/profile', {
+      method: 'PUT', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        user_id: userId,
+        centro_trabajo: form.sede.trim() || null,
+        fecha_ingreso: form.fechaIngreso || null,
+      }),
+    }).catch(() => {})
   }
 
   const handleSubmit = async () => {
@@ -732,14 +763,14 @@ export default function UsersPage() {
         if (form.password.trim()) body.password = form.password
         const res = await fetch('/api/users', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
         if (!res.ok) { const d = await res.json(); setFormErrors({ name: d.error || 'Error al guardar' }); setSaving(false); return }
-        await fetch(`/api/users/${editUser.id}/groups`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ group_ids: form.selectedGroups }) })
+        await guardarPerfil(editUser.id)
       } else {
-        const res = await fetch('/api/users', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: form.name, email: form.email, correo: form.correo.trim() || null, password: form.password.trim(), cedula: form.cedula, cargo: form.cargo.trim() || null, role: 'worker', area: areaText }) })
+        // La contraseña es la cédula. Es lo que se le dice al trabajador en el
+        // enlace de registro, así que no hay nada que escoger aquí.
+        const res = await fetch('/api/users', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: form.name, email: form.email, correo: form.correo.trim() || null, password: form.cedula.trim(), cedula: form.cedula, cargo: form.cargo.trim() || null, role: 'worker', area: areaText }) })
         if (!res.ok) { const d = await res.json(); setFormErrors({ email: d.error || 'Error al crear' }); setSaving(false); return }
         const created = await res.json()
-        if (form.selectedGroups.length && created.id) {
-          await fetch(`/api/users/${created.id}/groups`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ group_ids: form.selectedGroups }) })
-        }
+        if (created?.id) await guardarPerfil(created.id)
       }
       await loadUsers(); closeModal()
     } catch { setFormErrors({ name: 'Error de conexión' }) }
@@ -1722,7 +1753,6 @@ export default function UsersPage() {
                   { key: 'cedula', label: 'Cédula *',                                  placeholder: '1052392965',           mono: true,  type: 'text'  },
                   { key: 'email',  label: 'Usuario * (con esto entra a la plataforma)', placeholder: '1052392965', mono: true,  type: 'text'  },
                   { key: 'correo', label: 'Correo electrónico (dato de contacto)',   placeholder: 'juan.perez@empresa.com',      mono: false, type: 'email' },
-                  { key: 'cargo',  label: 'Cargo',                                  placeholder: 'SUPERVISOR DE MONTAJE',      mono: false, type: 'text'  },
                 ] as const).map(({ key, label, placeholder, mono, type }) => (
                   <div key={key}>
                     <label className="text-xs font-semibold mb-1.5 block" style={{ color: 'var(--text-dim)' }}>{label}</label>
@@ -1731,7 +1761,6 @@ export default function UsersPage() {
                         const val = key === 'cedula' ? e.target.value.replace(/\D/g, '') : e.target.value
                         if (key === 'name') { setForm(f => ({ ...f, name: val.toUpperCase() })) }
                         else if (key === 'cedula') { setForm(f => ({ ...f, cedula: val, ...(f.passwordManual ? {} : { password: val }), ...(f.emailManual ? {} : { email: val }) })) }
-                        else if (key === 'cargo') { setForm(f => ({ ...f, cargo: val.toUpperCase() })) }
                         else if (key === 'email') { setForm(f => ({ ...f, email: e.target.value, emailManual: true })) }
                         else { setForm(f => ({ ...f, [key]: val })) }
                       }}
@@ -1743,22 +1772,81 @@ export default function UsersPage() {
                   </div>
                 ))}
 
-                {/* La contraseña la asigna quien administra; se propone la cédula. */}
+                {/* El cargo se escoge de los que ya existen, no se escribe: así
+                    no conviven "OPERARIO DE CAMPO" y "Auxiliar de campo" como
+                    si fueran cosas distintas, que es lo que rompe los perfiles
+                    y los filtros. Para uno nuevo de verdad, está "Otro". */}
                 <div>
-                  <label className="text-xs font-semibold mb-1.5 block" style={{ color: 'var(--text-dim)' }}>
-                    {editUser ? 'Nueva contraseña (dejar vacío para no cambiarla)' : 'Contraseña * (tú la asignas)'}
-                  </label>
-                  <input type="text" value={form.password}
-                    onChange={e => setForm(f => ({ ...f, password: e.target.value, passwordManual: true }))}
-                    placeholder={editUser ? 'Sin cambios' : 'Puedes usar la cédula o escribir otra'}
-                    className="terra-input font-mono"
-                    style={formErrors.password ? { borderColor: 'rgba(239,68,68,0.5)' } : {}} />
-                  {formErrors.password
-                    ? <p className="text-xs mt-1" style={{ color: '#FCA5A5' }}>{formErrors.password}</p>
-                    : <p className="text-[11px] mt-1" style={{ color: 'var(--text-faint)' }}>
-                        El trabajador entra con su cédula como usuario y con esta contraseña.
-                      </p>}
+                  <label className="text-xs font-semibold mb-1.5 block" style={{ color: 'var(--text-dim)' }}>Cargo</label>
+                  {cargoNuevo ? (
+                    <div className="flex gap-2">
+                      <input type="text" value={form.cargo} autoFocus
+                        onChange={e => setForm(f => ({ ...f, cargo: e.target.value.toUpperCase() }))}
+                        placeholder="SUPERVISOR DE MONTAJE" className="terra-input flex-1" />
+                      <button type="button" onClick={() => { setCargoNuevo(false); setForm(f => ({ ...f, cargo: '' })) }}
+                        className="terra-btn-outline px-3 text-xs">Volver a la lista</button>
+                    </div>
+                  ) : (
+                    <select value={form.cargo}
+                      onChange={e => {
+                        if (e.target.value === '__nuevo__') { setCargoNuevo(true); setForm(f => ({ ...f, cargo: '' })) }
+                        else setForm(f => ({ ...f, cargo: e.target.value }))
+                      }}
+                      className="terra-input">
+                      <option value="">Sin cargo</option>
+                      {cargosExistentes.map((c: string) => <option key={c} value={c}>{c}</option>)}
+                      <option value="__nuevo__">+ Otro cargo (escribirlo)</option>
+                    </select>
+                  )}
+                  <p className="text-[11px] mt-1" style={{ color: 'var(--text-faint)' }}>
+                    De estos cargos salen los perfiles de formación. Escribir uno nuevo
+                    solo si de verdad no está en la lista.
+                  </p>
                 </div>
+
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="text-xs font-semibold mb-1.5 flex items-center gap-1.5" style={{ color: 'var(--text-dim)' }}>
+                      <Building2 size={12} style={{ color: 'var(--primary)' }} /> Sede
+                    </label>
+                    <input type="text" value={form.sede} list="sedes-conocidas"
+                      onChange={e => setForm(f => ({ ...f, sede: e.target.value.toUpperCase() }))}
+                      placeholder="FINCA LA ESPERANZA" className="terra-input" />
+                    <datalist id="sedes-conocidas">
+                      {sedesExistentes.map((s: string) => <option key={s} value={s} />)}
+                    </datalist>
+                  </div>
+                  <div>
+                    <label className="text-xs font-semibold mb-1.5 block" style={{ color: 'var(--text-dim)' }}>
+                      Fecha de ingreso
+                    </label>
+                    <input type="date" value={form.fechaIngreso}
+                      onChange={e => setForm(f => ({ ...f, fechaIngreso: e.target.value }))}
+                      className="terra-input" />
+                  </div>
+                </div>
+
+                {/* Al crear no se pide: la contraseña es la cédula, que es lo
+                    que dice el enlace de registro. Editando sí se puede cambiar. */}
+                {editUser ? (
+                  <div>
+                    <label className="text-xs font-semibold mb-1.5 block" style={{ color: 'var(--text-dim)' }}>
+                      Nueva contraseña (dejar vacío para no cambiarla)
+                    </label>
+                    <input type="text" value={form.password}
+                      onChange={e => setForm(f => ({ ...f, password: e.target.value, passwordManual: true }))}
+                      placeholder="Sin cambios" className="terra-input font-mono"
+                      style={formErrors.password ? { borderColor: 'rgba(239,68,68,0.5)' } : {}} />
+                    {formErrors.password && <p className="text-xs mt-1" style={{ color: '#FCA5A5' }}>{formErrors.password}</p>}
+                  </div>
+                ) : (
+                  <div className="rounded-xl p-3 text-xs"
+                    style={{ background: 'var(--primary-dim)', border: '1px solid var(--primary-border)', color: 'var(--text-dim)' }}>
+                    Entra con su <strong style={{ color: 'var(--text)' }}>cédula como usuario</strong> y
+                    la <strong style={{ color: 'var(--text)' }}>misma cédula como contraseña</strong>.
+                    Después la puede cambiar desde su perfil.
+                  </div>
+                )}
 
                 <div>
                   <label className="text-xs font-semibold mb-1.5 flex items-center gap-1.5" style={{ color: 'var(--text-dim)' }}>
@@ -1770,34 +1858,8 @@ export default function UsersPage() {
                   </select>
                 </div>
 
-                {groups.length > 0 && (
-                  <div>
-                    <label className="text-xs font-semibold mb-2 flex items-center gap-1.5" style={{ color: 'var(--text-dim)' }}>
-                      <UserCheck size={12} style={{ color: 'var(--primary)' }} /> Grupos
-                      {loadingGroups && <Loader2 size={11} className="animate-spin ml-1" style={{ color: 'var(--text-faint)' }} />}
-                    </label>
-                    <div className="grid grid-cols-2 gap-2">
-                      {groups.map(g => {
-                        const checked = form.selectedGroups.includes(g.id)
-                        return (
-                          <button key={g.id} type="button" onClick={() => toggleGroup(g.id)}
-                            className="flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-semibold text-left transition-all"
-                            style={{
-                              background: checked ? 'var(--primary-dim)' : 'var(--bg-card)',
-                              border: `1px solid ${checked ? 'var(--primary-border)' : 'var(--border)'}`,
-                              color: checked ? 'var(--primary)' : 'var(--text-dim)',
-                            }}>
-                            <div className="w-3 h-3 rounded flex items-center justify-center flex-shrink-0"
-                              style={{ background: checked ? 'var(--primary)' : 'var(--border)' }}>
-                              {checked && <span className="text-white text-[8px]">✓</span>}
-                            </div>
-                            <span className="truncate">{g.name}</span>
-                          </button>
-                        )
-                      })}
-                    </div>
-                  </div>
-                )}
+                {/* Los grupos se quitaron: a quién le toca qué formación lo
+                    deciden los Perfiles de Formación, por cargo. */}
 
                 {editUser && (
                   <div>

@@ -1,11 +1,11 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import Link from 'next/link'
 import {
   Loader2, CheckCircle, ChevronLeft, ChevronRight, AlertCircle,
-  CreditCard, User, Briefcase, Phone, Send, Eye, EyeOff,
+  CreditCard, User, Briefcase, Phone, Send,
 } from 'lucide-react'
 
 /**
@@ -72,7 +72,16 @@ function Campo({ k, label, valor, onChange, tipo = 'text', may = true, opciones,
 export default function PreRegistroPage() {
   const [paso, setPaso] = useState(0)
   const [d, setD] = useState<Record<string, string>>({ doc_type: 'CÉDULA DE CIUDADANÍA' })
-  const [verClave, setVerClave] = useState(false)
+  // Los cargos, áreas y fincas que ya existen, para escoger y no escribir.
+  const [listas, setListas] = useState<{ cargos: string[]; areas: string[]; centros: string[] }>(
+    { cargos: [], areas: [], centros: [] })
+  useEffect(() => {
+    fetch('/api/pre-registro?opciones=1')
+      .then(r => r.ok ? r.json() : null)
+      .then(d => { if (d) setListas({ cargos: d.cargos ?? [], areas: d.areas ?? [], centros: d.centros ?? [] }) })
+      .catch(() => {})
+  }, [])
+
   const [error, setError] = useState<string | null>(null)
   const [revisando, setRevisando] = useState(false)
   const [enviando, setEnviando] = useState(false)
@@ -106,18 +115,15 @@ export default function PreRegistroPage() {
   }
 
   const completo = (n: number) => {
-    if (n === 0) {
-      const clave = (d.password ?? '')
-      // Sin contraseña se usa el documento, así que no bloquea el paso.
-      return (d.cedula ?? '').replace(/\D/g, '').length >= 5 && (clave.length === 0 || clave.length >= 6)
-    }
+    // La contraseña es el documento, así que lo único que hace falta es eso.
+    if (n === 0) return (d.cedula ?? '').replace(/\D/g, '').length >= 5
     if (n === 1) return !!d.nombres?.trim() && !!d.apellidos?.trim()
     return true
   }
 
   const siguiente = () => {
     if (!completo(paso)) {
-      setError(paso === 0 ? 'Completa tu documento y una contraseña de al menos 6 caracteres'
+      setError(paso === 0 ? 'Escribe tu número de documento'
         : 'Escribe tus nombres y apellidos')
       return
     }
@@ -156,8 +162,8 @@ export default function PreRegistroPage() {
           Seguridad y Salud en el Trabajo lo revisará y te habilitará el acceso.
         </p>
         <p className="text-xs mt-1" style={{ color: C.debil }}>
-          Cuando te aprueben, entra con tu documento <strong style={{ color: C.tenue }}>{d.cedula}</strong> y la
-          contraseña que acabas de crear.
+          Cuando te aprueben, entra con tu documento <strong style={{ color: C.tenue }}>{d.cedula}</strong> como
+          usuario y <strong style={{ color: C.tenue }}>el mismo número</strong> como contraseña.
         </p>
         <Link href="/login" className="mt-3 px-5 py-2.5 rounded-xl text-sm font-bold"
           style={{ background: C.verde, color: '#0B1829' }}>
@@ -203,27 +209,17 @@ export default function PreRegistroPage() {
 
             {paso === 0 && (
               <>
-                <Encabezado icono={CreditCard} titulo="Tu documento y tu clave"
-                  texto="Con estos datos entrarás a la plataforma cuando te aprueben." />
+                <Encabezado icono={CreditCard} titulo="Tu documento"
+                  texto="Con esto entrarás a la plataforma cuando te aprueben." />
                 <Campo k="doc_type" label="Tipo de documento" opciones={OPCIONES.doc_type}  valor={d.doc_type ?? ''} onChange={set} />
                 <Campo k="cedula" label="Número de documento" tipo="tel" may={false} req
                   ayuda="Este será tu usuario para entrar."  valor={d.cedula ?? ''} onChange={set} />
-                <div>
-                  <label className="block text-[11px] font-bold uppercase tracking-wider mb-1.5" style={{ color: C.tenue }}>
-                    Contraseña <span className="font-normal normal-case tracking-normal" style={{ color: C.debil }}>(opcional)</span>
-                  </label>
-                  <div className="relative">
-                    <input className={inp} style={estiloInput} type={verClave ? 'text' : 'password'}
-                      value={d.password ?? ''} onChange={e => set('password', e.target.value, false)} />
-                    <button type="button" onClick={() => setVerClave(v => !v)}
-                      className="absolute right-3 top-1/2 -translate-y-1/2" style={{ color: C.debil }}>
-                      {verClave ? <EyeOff size={15} /> : <Eye size={15} />}
-                    </button>
-                  </div>
-                  <p className="text-[11px] mt-1" style={{ color: C.debil }}>
-                    Si la dejas vacía, tu contraseña es tu número de documento.
-                    Si prefieres otra, mínimo 6 caracteres; anótala, la vas a necesitar.
-                  </p>
+                {/* No se pide contraseña: es el mismo documento. Pedirla aquí
+                    solo servía para que la gente la olvidara. */}
+                <div className="rounded-xl p-3 text-[12px]"
+                  style={{ background: 'rgba(132,204,22,0.10)', border: `1px solid ${C.verde}40`, color: C.tenue }}>
+                  <strong style={{ color: C.texto }}>Tu contraseña es tu mismo número de documento.</strong>{' '}
+                  No tienes que inventar ninguna. Cuando entres la puedes cambiar desde tu perfil.
                 </div>
               </>
             )}
@@ -248,9 +244,14 @@ export default function PreRegistroPage() {
             {paso === 2 && (
               <>
                 <Encabezado icono={Briefcase} titulo="Tu trabajo" texto="Si no sabes alguno, déjalo en blanco." />
-                <Campo k="cargo_confirmado" label="Cargo" ayuda="Ej: OPERARIO DE CAMPO"  valor={d.cargo_confirmado ?? ''} onChange={set} />
-                <Campo k="area_confirmada" label="Área" ayuda="Ej: PRODUCCIÓN"  valor={d.area_confirmada ?? ''} onChange={set} />
-                <Campo k="centro_trabajo" label="Finca o centro de trabajo"  valor={d.centro_trabajo ?? ''} onChange={set} />
+                {/* Se escoge de lo que ya existe, no se escribe: de estos
+                    cargos salen los perfiles de formación, y una variante mal
+                    escrita deja a la persona por fuera de los suyos. */}
+                <Campo k="cargo_confirmado" label="Cargo" opciones={listas.cargos}
+                  ayuda={listas.cargos.length ? 'Escoge el que más se parezca al tuyo.' : undefined}
+                  valor={d.cargo_confirmado ?? ''} onChange={set} />
+                <Campo k="area_confirmada" label="Área" opciones={listas.areas}  valor={d.area_confirmada ?? ''} onChange={set} />
+                <Campo k="centro_trabajo" label="Finca o centro de trabajo" opciones={listas.centros}  valor={d.centro_trabajo ?? ''} onChange={set} />
                 <Campo k="fecha_ingreso" label="Fecha de ingreso a la empresa" tipo="date" may={false}  valor={d.fecha_ingreso ?? ''} onChange={set} />
               </>
             )}
