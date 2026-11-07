@@ -80,18 +80,32 @@ export async function generateAttendancePDF(p: AttendancePDFParams): Promise<Blo
   let y = M
   const r0H = 14, logoW = cW(0, 1)
 
-  // Logo + title
+  // El logo ocupa una sola celda alta, que cubre el título y las dos filas de
+  // versión y código. Antes eran tres celdas sueltas: el logo quedaba chico
+  // arriba y debajo le colgaban dos recuadros vacíos.
+  const bloqueLogoH = r0H + 6 + 6
   if (p.companyLogo) {
-    bd(cX(0), y, logoW, r0H)
-    try { doc.addImage(p.companyLogo, 'PNG', cX(0)+2, y+1, logoW-4, r0H-2) } catch {}
+    bd(cX(0), y, logoW, bloqueLogoH)
+    try {
+      const fmt = /^data:image\/jpe?g/i.test(p.companyLogo) ? 'JPEG' : 'PNG'
+      // Centrado y sin deformar: el logo manda su proporción, no la celda.
+      // Si no se pudo medir, se dibuja llenando la celda: vale más un logo
+      // algo estirado que un recuadro vacío.
+      const { w: iw, h: ih } = await getImgDims(p.companyLogo)
+      const maxW = logoW - 6, maxH = bloqueLogoH - 6
+      const ok = iw > 0 && ih > 0 && isFinite(iw) && isFinite(ih)
+      const escala = ok ? Math.min(maxW / iw, maxH / ih) : 0
+      const w = ok ? iw * escala : maxW
+      const h = ok ? ih * escala : maxH
+      doc.addImage(p.companyLogo, fmt, cX(0) + (logoW - w) / 2, y + (bloqueLogoH - h) / 2, w, h)
+    } catch {}
   } else {
-    cl(cX(0), y, logoW, r0H, p.companyName || '', { bold: true, size: 8 })
+    cl(cX(0), y, logoW, bloqueLogoH, p.companyName || '', { bold: true, size: 8 })
   }
   cl(cX(2), y, cW(2,10), r0H, 'REGISTRO DE ASISTENCIA A CAPACITACIÓN Y/O EVENTOS', { bold: true, size: 12 })
   y += r0H
 
   // Version/code labels
-  cl(cX(0), y, logoW, 6, '')
   cl(cX(2), y, cols[2], 6, 'Versión', { bold: true, size: 6.5 })
   cl(cX(3), y, cW(3,4), 6, 'Código',  { bold: true, size: 6.5 })
   cl(cX(5), y, cols[5], 6, 'Área',    { bold: true, size: 6.5 })
@@ -100,7 +114,6 @@ export async function generateAttendancePDF(p: AttendancePDFParams): Promise<Blo
   y += 6
 
   // Version/code values
-  cl(cX(0), y, logoW, 6, '')
   cl(cX(2), y, cols[2], 6, '1',          { size: 7 })
   cl(cX(3), y, cW(3,4), 6, 'AVC-FR05',  { size: 7 })
   cl(cX(5), y, cols[5], 6, 'CEO',        { size: 7 })

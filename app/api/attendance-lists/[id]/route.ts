@@ -1,5 +1,4 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { supabase } from '@/lib/supabase'
 import { supabaseAdmin } from '@/lib/supabase-admin'
 import { getActiveCompanyId, getCurrentUser } from '@/lib/get-company'
 
@@ -11,7 +10,8 @@ export async function GET(_req: NextRequest, { params }: { params: { id: string 
   const companyId = await getActiveCompanyId()
   const id = parseInt(params.id)
 
-  let q = supabase
+  // Igual que en el listado: el cliente anónimo no pasa el RLS de esta tabla.
+  let q = supabaseAdmin
     .from('attendance_lists')
     .select('*')
     .eq('id', id)
@@ -21,7 +21,7 @@ export async function GET(_req: NextRequest, { params }: { params: { id: string 
   const { data: list, error } = await q.single()
   if (error || !list) return NextResponse.json({ error: 'No encontrado' }, { status: 404 })
 
-  const { data: participants } = await supabase
+  const { data: participants } = await supabaseAdmin
     .from('attendance_list_participants')
     .select('name, cedula, cargo, signature_data')
     .eq('list_id', id)
@@ -30,7 +30,7 @@ export async function GET(_req: NextRequest, { params }: { params: { id: string 
   // Fetch company info for PDF regeneration
   let companyName = '', companyLogo = ''
   if (companyId) {
-    const { data: co } = await supabase
+    const { data: co } = await supabaseAdmin
       .from('companies').select('name, logo_url').eq('id', companyId).single()
     if (co) { companyName = co.name; companyLogo = co.logo_url || '' }
   }
@@ -57,7 +57,7 @@ export async function DELETE(_req: NextRequest, { params }: { params: { id: stri
   const id = parseInt(params.id)
 
   // Verify ownership
-  let q = supabase.from('attendance_lists').select('id').eq('id', id)
+  let q = supabaseAdmin.from('attendance_lists').select('id').eq('id', id)
   if (companyId) q = q.eq('company_id', companyId)
   const { data } = await q.single()
   if (!data) return NextResponse.json({ error: 'No encontrado' }, { status: 404 })

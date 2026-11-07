@@ -121,13 +121,27 @@ async function downloadAttendanceList(training: any) {
 
     let y = M
     const r0H=14, logoW=cW(0,1)
-    if(companyLogo){bd(cX(0),y,logoW,r0H);try{doc.addImage(companyLogo,'PNG',cX(0)+2,y+1,logoW-4,r0H-2)}catch{}}
-    else cl(cX(0),y,logoW,r0H,companyName||'',{bold:true,size:8})
+    // El logo va en una sola celda que cubre el título y las dos filas de
+    // versión y código, centrado y sin deformarse.
+    const bloqueLogoH = r0H + 6 + 6
+    if(companyLogo){
+      bd(cX(0),y,logoW,bloqueLogoH)
+      try{
+        const fmt = /^data:image\/jpe?g/i.test(companyLogo) ? 'JPEG' : 'PNG'
+        const {w:iw,h:ih} = await getImgDims(companyLogo)
+        const maxW = logoW-6, maxH = bloqueLogoH-6
+        const ok = iw>0 && ih>0 && isFinite(iw) && isFinite(ih)
+        const esc = ok ? Math.min(maxW/iw, maxH/ih) : 0
+        const w = ok ? iw*esc : maxW, h = ok ? ih*esc : maxH
+        doc.addImage(companyLogo,fmt,cX(0)+(logoW-w)/2,y+(bloqueLogoH-h)/2,w,h)
+      }catch{}
+    }
+    else cl(cX(0),y,logoW,bloqueLogoH,companyName||'',{bold:true,size:8})
     cl(cX(2),y,cW(2,10),r0H,'REGISTRO DE ASISTENCIA A CAPACITACIÓN Y/O EVENTOS',{bold:true,size:12});y+=r0H
-    cl(cX(0),y,logoW,6,'');cl(cX(2),y,cols[2],6,'Versión',{bold:true,size:6.5});cl(cX(3),y,cW(3,4),6,'Código',{bold:true,size:6.5})
+    cl(cX(2),y,cols[2],6,'Versión',{bold:true,size:6.5});cl(cX(3),y,cW(3,4),6,'Código',{bold:true,size:6.5})
     cl(cX(5),y,cols[5],6,'Área',{bold:true,size:6.5});cl(cX(6),y,cW(6,8),6,'Fecha de Elaboración',{bold:true,size:6.5})
     cl(cX(9),y,cW(9,10),6,'Fecha de Revisión',{bold:true,size:6.5});y+=6
-    cl(cX(0),y,logoW,6,'');cl(cX(2),y,cols[2],6,'1',{size:7});cl(cX(3),y,cW(3,4),6,'AVC-FR05',{size:7})
+    cl(cX(2),y,cols[2],6,'1',{size:7});cl(cX(3),y,cW(3,4),6,'AVC-FR05',{size:7})
     cl(cX(5),y,cols[5],6,'CEO',{size:7});cl(cX(6),y,cW(6,8),6,'14/10/2025',{size:7});cl(cX(9),y,cW(9,10),6,'22/01/2026',{size:7});y+=6
     cl(cX(0),y,cW(0,1),9,'FECHA',{bg:CG,color:CW,bold:true,size:8});cl(cX(2),y,cW(2,3),9,today,{size:8})
     cl(cX(4),y,cW(4,5),9,'HORARIO',{bg:CG,color:CW,bold:true,size:8});cl(cX(6),y,cW(6,7),9,horario||'',{size:7})

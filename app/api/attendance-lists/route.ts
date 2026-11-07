@@ -1,5 +1,4 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { supabase } from '@/lib/supabase'
 import { supabaseAdmin } from '@/lib/supabase-admin'
 import { getActiveCompanyId, getCurrentUser } from '@/lib/get-company'
 
@@ -10,7 +9,10 @@ export async function GET() {
 
   const companyId = await getActiveCompanyId()
 
-  let q = supabase
+  // Con el cliente anónimo, RLS tapa esta tabla y la consulta devuelve vacío
+  // sin error: por eso las listas generadas no aparecían. La escritura ya
+  // usaba el cliente de servicio; la lectura tiene que hacer lo mismo.
+  let q = supabaseAdmin
     .from('attendance_lists')
     .select('id, training_id, training_title, event_date, schedule, intensity, instructor, organized_by, directed_to, generated_by, generated_at, participant_count')
     .order('event_date', { ascending: false })
