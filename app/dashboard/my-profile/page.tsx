@@ -113,6 +113,45 @@ function Tip({ text }: { text: string }) {
   return <p className="text-[11px] mt-1 flex items-center gap-1" style={{ color: 'var(--text-faint)' }}><Info size={10} />{text}</p>
 }
 
+/**
+ * Un campo que se escoge de lo que la empresa ya tiene registrado.
+ *
+ * Escrito a mano, el mismo puesto acababa en la base cinco veces distintas
+ * -"LABORES CULTURALES", "LABORALES CULTURALES", "LABORES.CULTURALES"- y los
+ * filtros y los reportes los contaban como Ã¡reas diferentes. Queda el escape
+ * de "No estÃ¡ en la lista" para el caso de verdad nuevo.
+ */
+function CampoDeLista({ valor, opciones, onChange, ejemplo }: {
+  valor: string; opciones: string[]; onChange: (v: string) => void; ejemplo: string
+}) {
+  const fuera = !!valor && !opciones.includes(valor)
+  const [aMano, setAMano] = useState(fuera)
+
+  if (!opciones.length || aMano) {
+    return (
+      <div className="flex gap-2">
+        <input className={inp} value={valor} spellCheck={false}
+          onChange={e => onChange(UP(e.target.value))} placeholder={ejemplo} />
+        {opciones.length > 0 && (
+          <button type="button" onClick={() => { setAMano(false); onChange('') }}
+            className="terra-btn-outline text-xs px-3 whitespace-nowrap">Ver la lista</button>
+        )}
+      </div>
+    )
+  }
+  return (
+    <select className={inp} value={valor}
+      onChange={e => {
+        if (e.target.value === '__otro__') { setAMano(true); onChange('') }
+        else onChange(e.target.value)
+      }}>
+      <option value="">â Seleccionar â</option>
+      {opciones.map(o => <option key={o} value={o}>{o}</option>)}
+      <option value="__otro__">No estÃ¡ en la listaâ¦</option>
+    </select>
+  )
+}
+
 function Field({ label, tip, span2, children }: { label: string; tip?: string; span2?: boolean; children: React.ReactNode }) {
   return (
     <div className={span2 ? 'col-span-2' : ''}>
@@ -243,6 +282,15 @@ export default function MyProfilePage() {
   const { data: session } = useSession()
   const miId = (session?.user as any)?.id as string | undefined
   const [data, setData]             = useState<ProfileData>({})
+  // Los cargos, areas y fincas que ya existen, para escoger y no escribir.
+  const [listas, setListas] = useState<{ cargos: string[]; areas: string[]; centros: string[] }>(
+    { cargos: [], areas: [], centros: [] })
+  useEffect(() => {
+    fetch('/api/pre-registro?opciones=1')
+      .then(r => r.ok ? r.json() : null)
+      .then(d => { if (d) setListas({ cargos: d.cargos ?? [], areas: d.areas ?? [], centros: d.centros ?? [] }) })
+      .catch(() => {})
+  }, [])
   const [loading, setLoading]       = useState(true)
   const [saving, setSaving]         = useState(false)
   const [saveMsg, setSaveMsg]       = useState<'saved' | 'local' | null>(null)
@@ -856,16 +904,16 @@ export default function MyProfilePage() {
               <SectionCard title="Información del cargo actual" icon={Briefcase} accent="#06B6D4">
                 <div className="grid grid-cols-2 gap-4">
                   <Field label="CARGO ACTUAL">
-                    <input className={inp} value={data.cargo_confirmado ?? ''}
-                      onChange={e => set('cargo_confirmado', UP(e.target.value))} placeholder="EJ: OPERARIO DE PRODUCCIÓN" spellCheck={false} />
+                    <CampoDeLista valor={data.cargo_confirmado ?? ''} opciones={listas.cargos}
+                      onChange={v => set('cargo_confirmado', v)} ejemplo="EJ: OPERARIO DE CAMPO" />
                   </Field>
                   <Field label="ÁREA O DEPARTAMENTO">
-                    <input className={inp} value={data.area_confirmada ?? ''}
-                      onChange={e => set('area_confirmada', UP(e.target.value))} placeholder="EJ: LOGÍSTICA" spellCheck={false} />
+                    <CampoDeLista valor={data.area_confirmada ?? ''} opciones={listas.areas}
+                      onChange={v => set('area_confirmada', v)} ejemplo="EJ: LABORES CULTURALES" />
                   </Field>
                   <Field label="SEDE / CENTRO DE TRABAJO">
-                    <input className={inp} value={data.centro_trabajo ?? ''}
-                      onChange={e => set('centro_trabajo', UP(e.target.value))} placeholder="EJ: PLANTA NORTE" spellCheck={false} />
+                    <CampoDeLista valor={data.centro_trabajo ?? ''} opciones={listas.centros}
+                      onChange={v => set('centro_trabajo', v)} ejemplo="EJ: PAIPA" />
                   </Field>
                   <Field label="NOMBRE DEL JEFE INMEDIATO">
                     <input className={inp} value={data.jefe_inmediato ?? ''}
