@@ -382,6 +382,9 @@ export default function ModuloPage({ params }: { params: { id: string } }) {
             iniciales={preguntas}
             bloqueado={respondieron.length > 0}
             onGuardado={setPreguntas}
+            nombre={modulo.nombre}
+            descripcion={modulo.descripcion}
+            color={modulo.color}
           />
         ) : (
           <div className="space-y-2">

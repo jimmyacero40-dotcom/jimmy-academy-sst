@@ -2,9 +2,10 @@
 
 import { useState } from 'react'
 import {
-  Plus, Trash2, ChevronUp, ChevronDown, Loader2, Save, X, GripVertical, AlertCircle,
+  Plus, Trash2, ChevronUp, ChevronDown, Loader2, Save, X, GripVertical, AlertCircle, Eye,
 } from 'lucide-react'
 import { TIPOS, usaOpciones, type Pregunta, type TipoPregunta } from '@/lib/modulos'
+import VistaPrevia from '@/components/modulos/VistaPrevia'
 
 const inp = 'w-full text-sm rounded-lg px-3 py-2 outline-none'
 const estiloInp: React.CSSProperties = {
@@ -21,14 +22,19 @@ function enBlanco(orden: number): Pregunta {
 }
 
 export default function EditorPreguntas({
-  moduloId, iniciales, bloqueado, onGuardado,
+  moduloId, iniciales, bloqueado, onGuardado, nombre, descripcion, color,
 }: {
   moduloId: string
   iniciales: Pregunta[]
   /** Con respuestas enviadas no se borran preguntas a la ligera. */
   bloqueado: boolean
   onGuardado: (preguntas: Pregunta[]) => void
+  /** Para que la vista previa salga con la misma cabecera que verá el trabajador. */
+  nombre?: string
+  descripcion?: string | null
+  color?: string
 }) {
+  const [verPrevia, setVerPrevia] = useState(false)
   const [preguntas, setPreguntas] = useState<Pregunta[]>(iniciales)
   const [guardando, setGuardando] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -215,6 +221,13 @@ export default function EditorPreguntas({
       )}
 
       <div className="flex items-center justify-end gap-2 pt-1">
+        {/* Mirar cómo va quedando sin tener que guardar ni publicar: dibuja
+            lo que hay escrito ahora mismo, incluso lo que no se ha guardado. */}
+        <button onClick={() => setVerPrevia(true)}
+          className="terra-btn-outline flex items-center gap-1.5 mr-auto"
+          style={{ padding: '9px 16px', fontSize: 12 }}>
+          <Eye size={13} /> Vista previa
+        </button>
         {listo && <span className="text-xs font-semibold" style={{ color: '#10B981' }}>Guardado</span>}
         <button onClick={guardar} disabled={guardando}
           className="terra-btn flex items-center gap-1.5" style={{ padding: '9px 18px', fontSize: 12 }}>
@@ -222,6 +235,16 @@ export default function EditorPreguntas({
           Guardar preguntas
         </button>
       </div>
+
+      {verPrevia && (
+        <VistaPrevia
+          nombre={nombre ?? ''}
+          descripcion={descripcion}
+          color={color ?? 'var(--primary)'}
+          preguntas={preguntas}
+          onCerrar={() => setVerPrevia(false)}
+        />
+      )}
     </div>
   )
 }
