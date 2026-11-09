@@ -71,6 +71,55 @@ async function avisarDeNuevas(
   return { enviados, fallos }
 }
 
+/**
+ * Las inscripciones sueltas se enganchan al ítem del plan en vez de duplicarse.
+ *
+ * Un trabajador puede tener la misma capacitación por dos caminos: la que se
+ * le asignó sola al entrar -la inducción- y la que después se programa en el
+ * calendario. La llave única cuenta el ítem del plan, y una suelta tiene ese
+ * campo vacío, así que no chocaban: a la persona le aparecían dos tarjetas
+ * iguales, una "En progreso" y otra sin empezar.
+ *
+ * Aquí la suelta se adopta: pasa a ser la del plan y conserva su avance. Lo
+ * ya completado no se toca -esa persona la hizo y queda como constancia-, así
+ * que si se le vuelve a programar es un refuerzo y sí lleva inscripción nueva.
+ */
+async function adoptarSueltas(
+  itemId: string, trainingId: number, userIds: string[], vence: string,
+): Promise<number> {
+  if (!userIds.length) return 0
+
+  const { data: sueltas } = await supabase
+    .from('enrollments')
+    .select('id, user_id, status')
+    .is('plan_item_id', null)
+    .eq('training_id', trainingId)
+    .in('user_id', userIds)
+
+  const adoptables = (sueltas ?? []).filter((e: any) => e.status !== 'completed')
+  if (!adoptables.length) return 0
+
+  // Si alguien ya tiene inscripción en este ítem, su suelta no se puede
+  // enganchar -chocaría con la llave única-, así que ahí sí se descarta.
+  const { data: yaEnElItem } = await supabase
+    .from('enrollments').select('user_id').eq('plan_item_id', itemId)
+    .in('user_id', adoptables.map((e: any) => e.user_id))
+  const ocupados = new Set((yaEnElItem ?? []).map((e: any) => e.user_id))
+
+  const enganchar = adoptables.filter((e: any) => !ocupados.has(e.user_id))
+  const descartar = adoptables.filter((e: any) => ocupados.has(e.user_id))
+
+  if (enganchar.length) {
+    await supabase.from('enrollments')
+      .update({ plan_item_id: itemId, due_date: vence })
+      .in('id', enganchar.map((e: any) => e.id))
+  }
+  if (descartar.length) {
+    await supabase.from('enrollments').delete().in('id', descartar.map((e: any) => e.id))
+  }
+  return enganchar.length + descartar.length
+}
+
 async function sincronizar(
   itemId: string, trainingId: number, companyId: string,
   idsValidos: string[], pedidos: string[], vence: string,
@@ -96,6 +145,9 @@ async function sincronizar(
   let asignadas = 0
   let nuevas: string[] = []
   if (idsValidos.length) {
+    // Antes de crear nada: lo que la persona ya tenía suelto pasa a ser esto.
+    await adoptarSueltas(itemId, trainingId, idsValidos, vence)
+
     const { error: eTargets } = await supabase.from('plan_item_targets').upsert(
       idsValidos.map(id => ({ plan_item_id: itemId, target_type: 'user', target_id: id })),
       { onConflict: 'plan_item_id,target_type,target_id', ignoreDuplicates: true },

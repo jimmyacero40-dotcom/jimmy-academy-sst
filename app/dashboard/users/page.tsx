@@ -1452,9 +1452,16 @@ export default function UsersPage() {
                             ? <img src={u.photo_url} alt={u.name} className="w-8 h-8 rounded-full object-cover flex-shrink-0" />
                             : <div className="w-8 h-8 rounded-full flex items-center justify-center text-white text-[11px] font-bold flex-shrink-0" style={{ background: colorForUser(u.id) }}>{getInitials(u.name)}</div>
                           }
-                          <div className="text-sm font-semibold truncate" style={{ color: 'var(--text)' }} title={u.name}>
+                          {/* El nombre abre su hoja de vida, que es donde se ve
+                              qué formación tiene asignada y en qué va. Antes
+                              solo se llegaba por un icono que aparecía al pasar
+                              el mouse, así que nadie sabía que existía. */}
+                          <button onClick={() => router.push(`/dashboard/users/${u.id}`)}
+                            className="text-sm font-semibold truncate text-left hover:underline"
+                            style={{ color: 'var(--text)' }}
+                            title={`Ver la hoja de vida de ${u.name}`}>
                             {u.name}
-                          </div>
+                          </button>
                         </div>
                       </td>
 
@@ -1581,9 +1588,9 @@ export default function UsersPage() {
                             </button>
                           </div>
                         )}
-                        <div className="flex items-center justify-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
+                        <div className="flex items-center justify-center gap-0.5">
                           <button onClick={() => router.push(`/dashboard/users/${u.id}`)}
-                            title="Ver hoja de vida"
+                            title="Ver hoja de vida: su formación, certificados y datos"
                             className="w-7 h-7 rounded-lg flex items-center justify-center transition-colors"
                             style={{ color: 'var(--text-faint)' }}
                             onMouseEnter={e => { e.currentTarget.style.background = 'var(--bg-card)'; e.currentTarget.style.color = 'var(--primary)' }}
