@@ -3,6 +3,7 @@ import bcrypt from 'bcryptjs'
 import { supabaseAdmin as supabase } from '@/lib/supabase-admin'
 import { normalizarUsuario, normalizarPerfil } from '@/lib/mayusculas'
 import { asignarInduccion } from '@/lib/induccion'
+import { sincronizarArea } from '@/lib/areas'
 
 /**
  * Pre-registro público de trabajadores.
@@ -127,6 +128,12 @@ export async function POST(req: NextRequest) {
     area: String(body.area_confirmada ?? '').trim() || '',
   })
 
+  // El área se guarda también como llave, no solo como texto: si se queda
+  // sin area_id, la persona aparece con su área en la lista pero como "sin
+  // área" en los ingresos, los filtros y los reportes.
+  const campoArea: Record<string, any> = { area: basicos.area }
+  await sincronizarArea(campoArea, companyId)
+
   // El rol y el estado los pone el servidor. Nada de lo que mande el
   // formulario puede convertir a nadie en administrador ni activarlo.
   const { data: usuario, error } = await supabase.from('users').insert({
@@ -135,7 +142,8 @@ export async function POST(req: NextRequest) {
     password: hash,
     name: basicos.name,
     cargo: basicos.cargo,
-    area: basicos.area,
+    area: campoArea.area,
+    area_id: campoArea.area_id ?? null,
     cedula,
     role: 'worker',
     active: false,            // se activa cuando el superadmin lo apruebe

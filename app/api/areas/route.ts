@@ -62,6 +62,14 @@ export async function DELETE(req: NextRequest) {
   const { id } = await req.json()
   if (!id) return NextResponse.json({ error: 'ID requerido' }, { status: 400 })
 
+  // La llave se pone en nulo sola al borrar el área, pero el texto se queda.
+  // Si no se limpia, esa gente queda con un área escrita que ya no existe:
+  // se ve con área en la lista de personas y como "sin área" en todo lo que
+  // cuenta por la llave. Se limpia antes de borrar, mientras se sabe a quién.
+  let aLimpiar = supabase.from('users').update({ area: '' }).eq('area_id', id)
+  if (companyId) aLimpiar = aLimpiar.eq('company_id', companyId)
+  await aLimpiar
+
   let query = supabase.from('areas').delete().eq('id', id)
   if (companyId) query = query.eq('company_id', companyId)
 

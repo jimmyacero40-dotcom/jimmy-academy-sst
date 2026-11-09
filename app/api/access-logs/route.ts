@@ -109,7 +109,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Escriba por qué se registra a mano' }, { status: 400 })
 
     const { data: quien } = await supabaseAdmin
-      .from('users').select('id, active, retired_at, company_id').eq('id', user_id).single()
+      .from('users').select('id, active, retired_at, company_id, area_id').eq('id', user_id).single()
     if (!quien || quien.company_id !== companyId)
       return NextResponse.json({ error: 'Trabajador no encontrado' }, { status: 404 })
 
@@ -134,7 +134,7 @@ export async function POST(req: NextRequest) {
       .from('access_logs')
       .insert({
         company_id: companyId, user_id,
-        area_id: area_id || null, gatehouse_id: gatehouse_id || null,
+        area_id: area_id || quien.area_id || null, gatehouse_id: gatehouse_id || null,
         entry_time: entrada.toISOString(),
         exit_time: salida ? salida.toISOString() : null,
         notes: notes || null,
@@ -160,7 +160,7 @@ export async function POST(req: NextRequest) {
   // Verify worker is active and NOT retired
   const { data: worker } = await supabaseAdmin
     .from('users')
-    .select('id, active, retired_at, company_id')
+    .select('id, active, retired_at, company_id, area_id')
     .eq('id', user_id)
     .single()
 
@@ -224,7 +224,10 @@ export async function POST(req: NextRequest) {
     .insert({
       company_id: companyId,
       user_id,
-      area_id: area_id || null,
+      // Si la portería no mandó área, se toma la del trabajador. Antes
+      // quedaba en nulo y el ingreso salía como "Sin área" en los reportes
+      // aunque la persona tuviera la suya puesta.
+      area_id: area_id || worker.area_id || null,
       gatehouse_id: gatehouse_id || null,
       notes: notes || null,
       registered_by: user.id,

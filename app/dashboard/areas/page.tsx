@@ -104,8 +104,9 @@ export default function AreasPage() {
     const res = await fetch('/api/users')
     if (res.ok) {
       const data: any[] = await res.json()
-      const areaName = areas.find(a => a.id === areaId)?.name
-      setMembers(data.filter((u: any) => u.area === areaName))
+      // Por la llave, no por el nombre escrito: el texto puede estar mal
+      // tecleado o venir de un área que ya se borró.
+      setMembers(data.filter((u: any) => u.area_id === areaId))
     }
     setLoadingMembers(false)
   }, [areas])
@@ -124,14 +125,16 @@ export default function AreasPage() {
     await fetch('/api/users', {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ id: userId, area: activeArea.name }),
+      // Se manda la llave, no el nombre: el servidor completa el texto.
+      // Mandar el nombre obligaba a que coincidiera carácter por carácter.
+      body: JSON.stringify({ id: userId, area_id: activeArea.id }),
     })
     // Refresh
     const res = await fetch('/api/users')
     if (res.ok) {
       const data: any[] = await res.json()
       setAllUsers(data)
-      setMembers(data.filter((u: any) => u.area === activeArea.name))
+      setMembers(data.filter((u: any) => u.area_id === activeArea.id))
     }
     setSavingMember(null)
   }
@@ -142,13 +145,13 @@ export default function AreasPage() {
     await fetch('/api/users', {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ id: userId, area: '' }),
+      body: JSON.stringify({ id: userId, area_id: null, area: '' }),
     })
     const res = await fetch('/api/users')
     if (res.ok) {
       const data: any[] = await res.json()
       setAllUsers(data)
-      if (activeArea) setMembers(data.filter((u: any) => u.area === activeArea.name))
+      if (activeArea) setMembers(data.filter((u: any) => u.area_id === activeArea.id))
     }
     setSavingMember(null)
   }
@@ -186,7 +189,7 @@ export default function AreasPage() {
 
   // Users NOT in this area (candidates to add)
   const candidates = allUsers.filter((u: any) => {
-    const inArea = u.area === activeArea?.name
+    const inArea = u.area_id === activeArea?.id
     if (inArea) return false
     if (!addSearch.trim()) return true
     return u.name.toLowerCase().includes(addSearch.toLowerCase()) || u.cedula.includes(addSearch)
@@ -247,7 +250,7 @@ export default function AreasPage() {
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             {areas.map((area, i) => {
-              const count = allUsers.filter((u: any) => u.area === area.name).length
+              const count = allUsers.filter((u: any) => u.area_id === area.id).length
               const stats = areaStats[area.name]
               const pct   = stats?.pct ?? null
               const color = area.color || 'var(--primary)'

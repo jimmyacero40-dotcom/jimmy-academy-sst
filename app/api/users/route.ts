@@ -4,6 +4,7 @@ const supabase = supabaseAdmin
 import { normalizarUsuario } from '@/lib/mayusculas'
 import { asignarInduccion } from '@/lib/induccion'
 import { requierePermiso } from '@/lib/get-company'
+import { sincronizarArea } from '@/lib/areas'
 import bcrypt from 'bcryptjs'
 
 // Quien registra ingresos o salidas necesita el listado de trabajadores aunque no
@@ -96,26 +97,6 @@ export async function GET(req: NextRequest) {
   }))
 
   return NextResponse.json(result)
-}
-
-/**
- * El área vive en dos campos: `area` (texto que se muestra) y `area_id` (el que
- * usan los filtros y los registros de portería). Se guardaba solo el texto y
- * ningún filtro por área encontraba a nadie. Aquí se completa el que falte.
- */
-async function sincronizarArea(cambios: Record<string, any>, companyId: string | null) {
-  if (cambios.area !== undefined && cambios.area_id === undefined) {
-    const nombre = String(cambios.area || '').trim()
-    if (!nombre) { cambios.area_id = null; return }
-    let q = supabase.from('areas').select('id, name').ilike('name', nombre)
-    if (companyId) q = q.eq('company_id', companyId)
-    const { data } = await q.limit(1)
-    cambios.area_id = data?.[0]?.id ?? null
-  } else if (cambios.area_id !== undefined && cambios.area === undefined) {
-    if (!cambios.area_id) { cambios.area = ''; return }
-    const { data } = await supabase.from('areas').select('name').eq('id', cambios.area_id).maybeSingle()
-    cambios.area = data?.name ?? ''
-  }
 }
 
 export async function POST(req: NextRequest) {
