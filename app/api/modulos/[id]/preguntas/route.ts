@@ -56,6 +56,11 @@ export async function PUT(req: NextRequest, { params }: { params: { id: string }
       opciones,
       obligatoria: p.obligatoria !== false,
       placeholder: (p.placeholder ?? '').trim() || null,
+      // Solo tienen sentido donde aplican: un "Otro" en una pregunta de fecha
+      // o un porqué en una de texto confundirían al que responde.
+      pedir_porque: tipo === 'si_no' && ['siempre', 'si', 'no'].includes(p.pedir_porque)
+        ? p.pedir_porque : null,
+      permite_otro: usaOpciones(tipo) && p.permite_otro === true,
     })
   }
 
@@ -69,9 +74,20 @@ export async function PUT(req: NextRequest, { params }: { params: { id: string }
     if (error) return NextResponse.json({ error: error.message }, { status: 500 })
   }
 
-  if (limpias.length) {
+  // Las que ya existían y las nuevas van por separado a propósito.
+  // Mandadas juntas, PostgREST iguala las columnas de todas las filas y a las
+  // nuevas les mete un id nulo, que la tabla rechaza: agregar una pregunta a
+  // un módulo que ya tenía otras guardadas fallaba siempre.
+  const conId = limpias.filter(p => (p as any).id)
+  const sinId = limpias.filter(p => !(p as any).id)
+
+  if (conId.length) {
     const { error } = await supabase.from('modulo_preguntas')
-      .upsert(limpias, { onConflict: 'id' })
+      .upsert(conId, { onConflict: 'id' })
+    if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+  }
+  if (sinId.length) {
+    const { error } = await supabase.from('modulo_preguntas').insert(sinId)
     if (error) return NextResponse.json({ error: error.message }, { status: 500 })
   }
 

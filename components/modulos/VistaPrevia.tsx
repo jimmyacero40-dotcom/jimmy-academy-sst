@@ -6,7 +6,7 @@ import {
   X, LayoutList, ChevronLeft, ChevronRight, Send, Eye, Save,
   AlertCircle, RotateCcw,
 } from 'lucide-react'
-import { avance, type Pregunta } from '@/lib/modulos'
+import { avance, clavePorque, claveOtro, type Pregunta } from '@/lib/modulos'
 import CampoRespuesta from '@/components/modulos/CampoRespuesta'
 
 /**
@@ -142,7 +142,11 @@ export default function VistaPrevia({ nombre, descripcion, color, preguntas, onC
 
           <div className="mt-4">
             <CampoRespuesta pregunta={pregunta} valor={datos[pregunta.id]}
-              onCambio={v => setDatos(d => ({ ...d, [pregunta.id]: v }))} />
+              onCambio={v => setDatos(d => ({ ...d, [pregunta.id]: v }))}
+              extras={{ porque: datos[clavePorque(pregunta)] ?? '', otro: datos[claveOtro(pregunta)] ?? '' }}
+              onExtra={(cual, v) => setDatos(d => ({
+                ...d, [cual === 'porque' ? clavePorque(pregunta) : claveOtro(pregunta)]: v,
+              }))} />
           </div>
 
           {/* Una pregunta de escoger sin opciones no se puede contestar: en

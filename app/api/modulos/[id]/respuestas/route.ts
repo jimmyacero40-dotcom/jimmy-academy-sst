@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { supabaseAdmin as supabase } from '@/lib/supabase-admin'
 import { getCurrentUser, requierePermiso } from '@/lib/get-company'
-import { estaCompleta, type Pregunta } from '@/lib/modulos'
+import { estaCompleta, clavePorque, claveOtro, type Pregunta } from '@/lib/modulos'
 
 async function preguntasDe(id: string): Promise<Pregunta[]> {
   const { data } = await supabase.from('modulo_preguntas')
@@ -130,8 +130,15 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
   }
 
   const preguntas = await preguntasDe(params.id)
-  // Solo se guarda lo que corresponde a una pregunta que existe.
-  const validas = new Set(preguntas.map(p => p.id))
+  // Solo se guarda lo que corresponde a una pregunta que existe. Cuentan
+  // también las claves de al lado -el porqué y el "cuál" del Otro-, que
+  // llevan el id de su pregunta con un sufijo.
+  const validas = new Set<string>()
+  for (const p of preguntas) {
+    validas.add(p.id)
+    validas.add(clavePorque(p))
+    validas.add(claveOtro(p))
+  }
   const respuestas: Record<string, any> = { ...(actual?.respuestas ?? {}) }
   for (const [k, v] of Object.entries(entrantes)) if (validas.has(k)) respuestas[k] = v
 

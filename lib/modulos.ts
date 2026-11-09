@@ -17,6 +17,50 @@ export interface Pregunta {
   opciones: string[]
   obligatoria: boolean
   placeholder?: string | null
+  /**
+   * Solo en "sí o no": cuándo pedirle que explique. Un No sin el porqué no
+   * sirve para corregir nada. Nulo = no se le pide.
+   */
+  pedir_porque?: 'siempre' | 'si' | 'no' | null
+  /** En las de escoger: agrega "Otro" y, al marcarla, pide que diga cuál. */
+  permite_otro?: boolean
+}
+
+/**
+ * Lo que la persona escribe además de su respuesta -el porqué, o qué es ese
+ * "Otro"- se guarda al lado, con una clave derivada de la pregunta. Así lo ya
+ * contestado no se toca y la tabulación sigue contando por el valor de antes.
+ */
+export const clavePorque = (p: Pregunta | string) =>
+  `${typeof p === 'string' ? p : p.id}__porque`
+export const claveOtro = (p: Pregunta | string) =>
+  `${typeof p === 'string' ? p : p.id}__otro`
+
+export const ETIQUETA_OTRO = 'Otro'
+
+/** Las opciones que de verdad se le muestran, con "Otro" si se habilitó. */
+export function opcionesVisibles(p: Pregunta): string[] {
+  if (!p.permite_otro) return p.opciones
+  const yaEsta = p.opciones.some(o => o.trim().toLowerCase() === ETIQUETA_OTRO.toLowerCase())
+  return yaEsta ? p.opciones : [...p.opciones, ETIQUETA_OTRO]
+}
+
+/** ¿La opción marcada es la de "Otro"? */
+export const esOtro = (o: string) => o.trim().toLowerCase() === ETIQUETA_OTRO.toLowerCase()
+
+/** ¿A esta respuesta de sí o no hay que pedirle el porqué? */
+export function tocaPorque(p: Pregunta, valor: any): boolean {
+  if (p.tipo !== 'si_no' || !p.pedir_porque) return false
+  if (p.pedir_porque === 'siempre') return respondida(p, valor)
+  const dijoSi = valor === true || valor === 'si'
+  return p.pedir_porque === 'si' ? dijoSi : respondida(p, valor) && !dijoSi
+}
+
+/** ¿Marcó "Otro" y todavía no ha dicho cuál? */
+export function tocaDecirCual(p: Pregunta, valor: any): boolean {
+  if (!p.permite_otro || (p.tipo !== 'opcion' && p.tipo !== 'multiple')) return false
+  const marcadas = Array.isArray(valor) ? valor : valor ? [valor] : []
+  return marcadas.some(o => esOtro(String(o)))
 }
 
 export interface Modulo {
@@ -82,8 +126,24 @@ export function respondida(p: Pregunta, valor: any): boolean {
   return typeof valor === 'string' ? valor.trim() !== '' : valor !== null && valor !== undefined
 }
 
+/**
+ * Lo que falta de una pregunta, contando el porqué y el "cuál" cuando aplican.
+ * Devuelve el aviso que se le muestra, o '' si está completa.
+ */
+export function queFalta(p: Pregunta, respuestas: Record<string, any>): string {
+  const valor = respuestas[p.id]
+  if (p.obligatoria && !respondida(p, valor)) return 'Esta pregunta es obligatoria.'
+  if (tocaPorque(p, valor) && !String(respuestas[clavePorque(p)] ?? '').trim()) {
+    return 'Falta que explique por qué.'
+  }
+  if (tocaDecirCual(p, valor) && !String(respuestas[claveOtro(p)] ?? '').trim()) {
+    return 'Marcó "Otro": falta que diga cuál.'
+  }
+  return ''
+}
+
 export function estaCompleta(preguntas: Pregunta[], respuestas: Record<string, any>): boolean {
-  return preguntas.every(p => !p.obligatoria || respondida(p, respuestas[p.id]))
+  return preguntas.every(p => !queFalta(p, respuestas))
 }
 
 export function avance(preguntas: Pregunta[], respuestas: Record<string, any>) {
@@ -91,6 +151,19 @@ export function avance(preguntas: Pregunta[], respuestas: Record<string, any>) {
   const total = obligatorias.length
   const hechas = obligatorias.filter(p => respondida(p, respuestas[p.id])).length
   return { hechas, total, pct: total ? Math.round((hechas / total) * 100) : 0 }
+}
+
+/**
+ * La respuesta entera, con el porqué o el "cuál" pegados. Es lo que va al
+ * Excel, al PDF y a la ficha de cada quien: el valor suelto se queda corto.
+ */
+export function textoCompleto(p: Pregunta, respuestas: Record<string, any>): string {
+  const base = comoTexto(p, respuestas?.[p.id])
+  const razon = String(respuestas?.[clavePorque(p)] ?? '').trim()
+  const cual  = String(respuestas?.[claveOtro(p)] ?? '').trim()
+  if (cual && base) return razon ? `${base} (${cual}) — ${razon}` : `${base} (${cual})`
+  if (razon && base) return `${base} — ${razon}`
+  return base
 }
 
 /** Cómo se lee una respuesta en una tabla o en el Excel. */

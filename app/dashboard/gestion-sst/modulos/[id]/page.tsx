@@ -11,7 +11,7 @@ import {
 import { tienePermiso } from '@/lib/permisos'
 import EditorPreguntas from '@/components/modulos/EditorPreguntas'
 import {
-  ESTADO_MODULO, comoTexto, NOMBRE_TIPO, type Modulo, type Pregunta,
+  ESTADO_MODULO, textoCompleto, NOMBRE_TIPO, type Modulo, type Pregunta,
 } from '@/lib/modulos'
 import { tabular, type FilaModulo } from '@/lib/modulos-tabulacion'
 import { exportarRespuestaPDF } from './export-pdf'
@@ -161,7 +161,7 @@ export default function ModuloPage({ params }: { params: { id: string } }) {
           'RESPONDIÓ EL': f.enviado_at ? new Date(f.enviado_at).toLocaleDateString('es-CO') : '',
         }
         for (const p of preguntas) {
-          fila[p.titulo.slice(0, 80).toUpperCase()] = f.respuestas ? comoTexto(p, f.respuestas[p.id]) : ''
+          fila[p.titulo.slice(0, 80).toUpperCase()] = f.respuestas ? textoCompleto(p, f.respuestas) : ''
         }
         return fila
       }),
@@ -487,7 +487,7 @@ export default function ModuloPage({ params }: { params: { id: string } }) {
                 <div key={p.id}>
                   <p className="text-[11px] font-bold" style={{ color: 'var(--text-dim)' }}>{i + 1}. {p.titulo}</p>
                   <p className="text-sm mt-0.5 whitespace-pre-wrap" style={{ color: 'var(--text)' }}>
-                    {comoTexto(p, verDe.respuestas?.[p.id]) || <span style={{ color: 'var(--text-faint)' }}>Sin responder</span>}
+                    {textoCompleto(p, verDe.respuestas ?? {}) || <span style={{ color: 'var(--text-faint)' }}>Sin responder</span>}
                   </p>
                 </div>
               ))}
@@ -628,19 +628,31 @@ function Resumen({ t, hayFiltro }: { t: ReturnType<typeof tabular>; hayFiltro: b
             </p>
           )}
 
-          {r.conteos.length ? (
-            <Barras conteos={r.conteos} color="#10B981" />
-          ) : r.textos.length ? (
-            <div className="space-y-1.5 max-h-60 overflow-y-auto">
-              {r.textos.map((x, k) => (
-                <div key={k} className="rounded-lg px-2.5 py-2"
-                  style={{ background: 'var(--bg-card)', border: '1px solid var(--border)' }}>
-                  <p className="text-xs whitespace-pre-wrap" style={{ color: 'var(--text)' }}>{x.texto}</p>
-                  <p className="text-[10px] mt-0.5" style={{ color: 'var(--text-faint)' }}>{x.nombre}</p>
-                </div>
-              ))}
+          {r.conteos.length > 0 && <Barras conteos={r.conteos} color="#10B981" />}
+
+          {/* Con barras arriba, esto son los porqués o los "Otro": lo que
+              explica el número y sin lo cual la cuenta no dice nada. */}
+          {r.textos.length > 0 && (
+            <div className={r.conteos.length ? 'mt-3' : ''}>
+              {r.conteos.length > 0 && (
+                <p className="text-[10px] font-bold uppercase tracking-wider mb-1.5"
+                  style={{ color: 'var(--text-faint)' }}>
+                  {r.pregunta.tipo === 'si_no' ? 'Lo que explicaron' : 'Los que dijeron Otro'}
+                </p>
+              )}
+              <div className="space-y-1.5 max-h-60 overflow-y-auto">
+                {r.textos.map((x, k) => (
+                  <div key={k} className="rounded-lg px-2.5 py-2"
+                    style={{ background: 'var(--bg-card)', border: '1px solid var(--border)' }}>
+                    <p className="text-xs whitespace-pre-wrap" style={{ color: 'var(--text)' }}>{x.texto}</p>
+                    <p className="text-[10px] mt-0.5" style={{ color: 'var(--text-faint)' }}>{x.nombre}</p>
+                  </div>
+                ))}
+              </div>
             </div>
-          ) : (
+          )}
+
+          {!r.conteos.length && !r.textos.length && (
             <p className="text-[11px]" style={{ color: 'var(--text-faint)' }}>Nadie la respondió.</p>
           )}
 

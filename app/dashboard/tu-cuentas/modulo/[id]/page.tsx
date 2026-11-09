@@ -8,7 +8,8 @@ import {
   Save, AlertCircle, Send, Clock, User,
 } from 'lucide-react'
 import {
-  avance, respondida, estaCompleta, type Modulo, type Pregunta,
+  avance, respondida, estaCompleta, queFalta, clavePorque, claveOtro,
+  type Modulo, type Pregunta,
 } from '@/lib/modulos'
 import CampoRespuesta from '@/components/modulos/CampoRespuesta'
 
@@ -77,7 +78,9 @@ export default function ResponderModuloPage({ params }: { params: { id: string }
 
   const pregunta = preguntas[paso]
   const { hechas, total, pct } = avance(preguntas, datos)
-  const puedeAvanzar = !pregunta?.obligatoria || respondida(pregunta, datos[pregunta.id])
+  // Lo que falta incluye el porqué y el "cuál" del Otro, no solo la respuesta.
+  const falta = pregunta ? queFalta(pregunta, datos) : ''
+  const puedeAvanzar = !falta
   const esUltima = paso === preguntas.length - 1
 
   const siguiente = () => {
@@ -198,12 +201,15 @@ export default function ResponderModuloPage({ params }: { params: { id: string }
           )}
 
           <div className="mt-4">
-            <CampoRespuesta pregunta={pregunta} valor={datos[pregunta.id]} onCambio={v => set(pregunta.id, v)} />
+            <CampoRespuesta pregunta={pregunta} valor={datos[pregunta.id]}
+              onCambio={v => set(pregunta.id, v)}
+              extras={{ porque: datos[clavePorque(pregunta)] ?? '', otro: datos[claveOtro(pregunta)] ?? '' }}
+              onExtra={(cual, v) => set(cual === 'porque' ? clavePorque(pregunta) : claveOtro(pregunta), v)} />
           </div>
 
-          {intento && !puedeAvanzar && (
+          {intento && falta && (
             <p className="text-xs mt-3 flex items-center gap-1.5" style={{ color: '#FCA5A5' }}>
-              <AlertCircle size={13} /> Esta pregunta es obligatoria.
+              <AlertCircle size={13} /> {falta}
             </p>
           )}
           {error && (

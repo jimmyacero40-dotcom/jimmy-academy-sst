@@ -7,7 +7,9 @@
 // trabajadores y 40 %, aunque entre todos hayan marcado 300 opciones.
 // ──────────────────────────────────────────────────────────────────────
 
-import { comoTexto, type Pregunta } from './modulos'
+import {
+  comoTexto, opcionesVisibles, clavePorque, claveOtro, type Pregunta,
+} from './modulos'
 
 export interface FilaModulo {
   user_id: string
@@ -70,7 +72,10 @@ export function tabular(filas: FilaModulo[], preguntas: Pregunta[]): ResumenModu
     let suma = 0
 
     if (p.tipo === 'opcion' || p.tipo === 'multiple') {
-      const m = new Map<string, number>(p.opciones.map(o => [o, 0]))
+      // Con "Otro" habilitado, esa opcion cuenta como una mas y lo que cada
+      // quien escribio se lista debajo: un "Otro: 12" sin saber cuales no
+      // sirve para nada.
+      const m = new Map<string, number>(opcionesVisibles(p).map(o => [o, 0]))
       for (const f of contestaron) {
         const v = f.respuestas![p.id]
         const marcadas = Array.isArray(v) ? v : v ? [v] : []
@@ -80,6 +85,12 @@ export function tabular(filas: FilaModulo[], preguntas: Pregunta[]): ResumenModu
       conteos.push(...[...m.entries()]
         .map(([etiqueta, n]) => ({ etiqueta, n, pct: pctDe(n, base) }))
         .sort((a, b) => b.n - a.n))
+      if (p.permite_otro) {
+        for (const f of contestaron) {
+          const cual = String(f.respuestas![claveOtro(p)] ?? '').trim()
+          if (cual) textos.push({ nombre: f.nombre, texto: cual })
+        }
+      }
     } else if (p.tipo === 'si_no') {
       const m = new Map<string, number>([['Sí', 0], ['No', 0]])
       for (const f of contestaron) {
@@ -90,6 +101,16 @@ export function tabular(filas: FilaModulo[], preguntas: Pregunta[]): ResumenModu
         m.set(k, (m.get(k) ?? 0) + 1)
       }
       conteos.push(...[...m.entries()].map(([etiqueta, n]) => ({ etiqueta, n, pct: pctDe(n, base) })))
+      // Los porques, que son lo que de verdad explica el si o el no.
+      if (p.pedir_porque) {
+        for (const f of contestaron) {
+          const razon = String(f.respuestas![clavePorque(p)] ?? '').trim()
+          if (!razon) continue
+          const v = f.respuestas![p.id]
+          const dijo = v === true || v === 'si' ? 'Si' : 'No'
+          textos.push({ nombre: f.nombre, texto: `${dijo} - ${razon}` })
+        }
+      }
     } else if (p.tipo === 'escala') {
       const m = new Map<string, number>([1, 2, 3, 4, 5].map(n => [String(n), 0]))
       for (const f of contestaron) {

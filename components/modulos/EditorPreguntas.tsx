@@ -18,6 +18,7 @@ function enBlanco(orden: number): Pregunta {
     id: `nueva-${Date.now()}-${orden}`,
     orden, titulo: '', ayuda: '', tipo: 'parrafo',
     opciones: [], obligatoria: true, placeholder: '',
+    pedir_porque: null, permite_otro: false,
   }
 }
 
@@ -180,6 +181,51 @@ export default function EditorPreguntas({
                       onChange={e => tocar(p.id, { opciones: e.target.value.split('\n') })}
                       placeholder={'Muy de acuerdo\nDe acuerdo\nEn desacuerdo'}
                       className={`${inp} resize-none`} style={estiloInp} />
+
+                    {/* Un "Otro" sin decir cual es una respuesta perdida. */}
+                    <label className="flex items-center gap-2 cursor-pointer mt-2">
+                      <input type="checkbox" checked={p.permite_otro === true}
+                        onChange={e => tocar(p.id, { permite_otro: e.target.checked })}
+                        className="w-4 h-4 rounded accent-blue-500" />
+                      <span className="text-xs" style={{ color: 'var(--text)' }}>
+                        Agregar &ldquo;Otro&rdquo; y pedirle que diga cuál
+                      </span>
+                    </label>
+                    {p.permite_otro && (
+                      <p className="text-[11px] mt-1 ml-6" style={{ color: 'var(--text-faint)' }}>
+                        No hace falta escribirlo en la lista: se agrega solo al final.
+                      </p>
+                    )}
+                  </div>
+                )}
+
+                {/* Un No sin el porqué no sirve para corregir nada. */}
+                {p.tipo === 'si_no' && (
+                  <div>
+                    <label className="text-[11px] font-bold uppercase tracking-wider mb-1.5 block" style={{ color: 'var(--text-dim)' }}>
+                      Pedirle que explique
+                    </label>
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-1.5">
+                      {([
+                        [null,      'No preguntar'],
+                        ['siempre', 'Siempre'],
+                        ['si',      'Solo si dice Sí'],
+                        ['no',      'Solo si dice No'],
+                      ] as const).map(([v, n]) => (
+                        <button key={n} onClick={() => tocar(p.id, { pedir_porque: v })}
+                          className="text-[11px] font-semibold py-2 px-2 rounded-lg"
+                          style={(p.pedir_porque ?? null) === v
+                            ? { background: 'var(--primary)', color: '#fff' }
+                            : { background: 'var(--bg-card)', border: '1px solid var(--border)', color: 'var(--text-dim)' }}>
+                          {n}
+                        </button>
+                      ))}
+                    </div>
+                    {p.pedir_porque && (
+                      <p className="text-[11px] mt-1.5" style={{ color: 'var(--text-faint)' }}>
+                        Se le abre un recuadro de &ldquo;¿Por qué?&rdquo; y sin llenarlo no puede seguir.
+                      </p>
+                    )}
                   </div>
                 )}
 

@@ -1,4 +1,4 @@
-import { comoTexto, type Pregunta, type Modulo } from '@/lib/modulos'
+import { textoCompleto, type Pregunta, type Modulo } from '@/lib/modulos'
 import type { FilaModulo } from '@/lib/modulos-tabulacion'
 
 // Misma identidad visual que el resto de informes de la plataforma.
@@ -77,7 +77,7 @@ export async function exportarRespuestaPDF(
   // ── Las preguntas, con lo que respondió ──
   preguntas.forEach((p, i) => {
     const enunciado = doc.splitTextToSize(`${i + 1}. ${p.titulo}`, CW) as string[]
-    const valor = comoTexto(p, fila.respuestas?.[p.id]) || 'Sin responder'
+    const valor = textoCompleto(p, fila.respuestas ?? {}) || 'Sin responder'
     // Las de escoger varias se leen mejor una debajo de otra.
     const cuerpo = doc.splitTextToSize(
       p.tipo === 'multiple' ? valor.split(' · ').map(v => `•  ${v}`).join('\n') : valor,

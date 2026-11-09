@@ -1,7 +1,9 @@
 'use client'
 
-import { CheckCircle } from 'lucide-react'
-import type { Pregunta } from '@/lib/modulos'
+import { CheckCircle, CornerDownRight } from 'lucide-react'
+import {
+  opcionesVisibles, esOtro, tocaPorque, tocaDecirCual, type Pregunta,
+} from '@/lib/modulos'
 
 /**
  * Una respuesta, según el tipo de pregunta.
@@ -17,9 +19,34 @@ const estiloInp: React.CSSProperties = {
   background: 'var(--bg-card)', border: '1px solid var(--border)', color: 'var(--text)',
 }
 
-export default function CampoRespuesta({ pregunta, valor, onCambio }: {
-  pregunta: Pregunta; valor: any; onCambio: (v: any) => void
+/** El recuadro que se abre debajo para explicar o decir cuál. */
+function Aparte({ etiqueta, valor, onCambio, placeholder }: {
+  etiqueta: string; valor: string; onCambio: (v: string) => void; placeholder: string
 }) {
+  return (
+    <div className="mt-2.5 pl-3" style={{ borderLeft: '2px solid var(--primary-border)' }}>
+      <p className="text-[11px] font-semibold mb-1.5 flex items-center gap-1"
+        style={{ color: 'var(--primary)' }}>
+        <CornerDownRight size={11} /> {etiqueta}
+      </p>
+      <textarea rows={2} value={valor} onChange={e => onCambio(e.target.value)}
+        placeholder={placeholder} className={`${inp} resize-none`} style={estiloInp} />
+    </div>
+  )
+}
+
+export default function CampoRespuesta({ pregunta, valor, onCambio, extras, onExtra }: {
+  pregunta: Pregunta
+  valor: any
+  onCambio: (v: any) => void
+  /** Lo que escribió aparte: el porqué y el "cuál" del Otro. */
+  extras?: { porque?: string; otro?: string }
+  onExtra?: (cual: 'porque' | 'otro', v: string) => void
+}) {
+  const porque = extras?.porque ?? ''
+  const otro   = extras?.otro ?? ''
+  const pide = (cual: 'porque' | 'otro', v: string) => onExtra?.(cual, v)
+
   switch (pregunta.tipo) {
     case 'texto':
       return <input value={valor ?? ''} onChange={e => onCambio(e.target.value)}
@@ -39,17 +66,24 @@ export default function CampoRespuesta({ pregunta, valor, onCambio }: {
 
     case 'si_no':
       return (
-        <div className="flex gap-2">
-          {[['si', 'Sí'], ['no', 'No']].map(([v, n]) => (
-            <button key={v} onClick={() => onCambio(v)}
-              className="flex-1 py-3 rounded-xl text-sm font-bold"
-              style={valor === v
-                ? { background: 'var(--primary)', color: '#fff' }
-                : { background: 'var(--bg-card)', border: '1px solid var(--border)', color: 'var(--text-dim)' }}>
-              {n}
-            </button>
-          ))}
-        </div>
+        <>
+          <div className="flex gap-2">
+            {[['si', 'Sí'], ['no', 'No']].map(([v, n]) => (
+              <button key={v} onClick={() => onCambio(v)}
+                className="flex-1 py-3 rounded-xl text-sm font-bold"
+                style={valor === v
+                  ? { background: 'var(--primary)', color: '#fff' }
+                  : { background: 'var(--bg-card)', border: '1px solid var(--border)', color: 'var(--text-dim)' }}>
+                {n}
+              </button>
+            ))}
+          </div>
+          {tocaPorque(pregunta, valor) && (
+            <Aparte etiqueta="¿Por qué?" valor={porque}
+              onCambio={v => pide('porque', v)}
+              placeholder="Cuéntenos en una o dos líneas" />
+          )}
+        </>
       )
 
     case 'escala':
@@ -69,24 +103,32 @@ export default function CampoRespuesta({ pregunta, valor, onCambio }: {
 
     case 'opcion':
       return (
-        <div className="space-y-1.5">
-          {pregunta.opciones.map(o => (
-            <button key={o} onClick={() => onCambio(o)}
-              className="w-full text-left px-3 py-2.5 rounded-xl text-sm"
-              style={valor === o
-                ? { background: 'var(--primary-dim)', border: '1px solid var(--primary-border)', color: 'var(--text)' }
-                : { background: 'var(--bg-card)', border: '1px solid var(--border)', color: 'var(--text-dim)' }}>
-              {o}
-            </button>
-          ))}
-        </div>
+        <>
+          <div className="space-y-1.5">
+            {opcionesVisibles(pregunta).map(o => (
+              <button key={o} onClick={() => onCambio(o)}
+                className="w-full text-left px-3 py-2.5 rounded-xl text-sm"
+                style={valor === o
+                  ? { background: 'var(--primary-dim)', border: '1px solid var(--primary-border)', color: 'var(--text)' }
+                  : { background: 'var(--bg-card)', border: '1px solid var(--border)', color: 'var(--text-dim)' }}>
+                {o}
+              </button>
+            ))}
+          </div>
+          {tocaDecirCual(pregunta, valor) && (
+            <Aparte etiqueta="¿Cuál?" valor={otro}
+              onCambio={v => pide('otro', v)}
+              placeholder="Escriba cuál" />
+          )}
+        </>
       )
 
     case 'multiple': {
       const marcadas: string[] = Array.isArray(valor) ? valor : []
       return (
+        <>
         <div className="space-y-1.5">
-          {pregunta.opciones.map(o => {
+          {opcionesVisibles(pregunta).map(o => {
             const puesta = marcadas.includes(o)
             return (
               <button key={o}
@@ -107,6 +149,12 @@ export default function CampoRespuesta({ pregunta, valor, onCambio }: {
             )
           })}
         </div>
+        {tocaDecirCual(pregunta, valor) && (
+          <Aparte etiqueta="¿Cuál?" valor={otro}
+            onCambio={v => pide('otro', v)}
+            placeholder="Escriba cuál" />
+        )}
+        </>
       )
     }
 
