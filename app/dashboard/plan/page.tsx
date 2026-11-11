@@ -138,7 +138,9 @@ export default function PlanPage() {
           .map(t => ({
             id: t.id, title: t.title, duration: t.duration, category: t.category,
             descripcion: t.description ?? null,
-            obligatorio: t.category === 'Obligatorio',
+            // La obligación es su propia casilla; la categoría vieja queda
+            // solo de respaldo para lo que aún no se ha migrado.
+            obligatorio: t.obligatorio ?? (t.category === 'Obligatorio'),
           }))
           .sort((a, b) => a.title.localeCompare(b.title, 'es')),
       )

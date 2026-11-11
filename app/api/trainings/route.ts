@@ -3,11 +3,12 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { supabaseAdmin as supabase } from '@/lib/supabase-admin'
 import { isAdminOrSuper, getActiveCompanyId } from '@/lib/get-company'
+import { sugerirTema } from '@/lib/temas'
 
 export async function GET() {
   const companyId = await getActiveCompanyId()
 
-  const cols = 'id, title, category, duration, description, temario, status, due, slides_count, questions_count, color, file_name, created_by, company_id, valid_from, valid_until, created_at, cover_url'
+  const cols = 'id, title, category, duration, description, temario, status, due, slides_count, questions_count, color, file_name, created_by, company_id, valid_from, valid_until, created_at, cover_url, tema, obligatorio, portada_manual'
   let query = supabase.from('trainings').select(cols).order('created_at', { ascending: false })
   if (companyId) query = query.eq('company_id', companyId)
 
@@ -29,7 +30,7 @@ export async function POST(req: NextRequest) {
   if (!companyId) return NextResponse.json({ error: 'Selecciona una empresa primero' }, { status: 400 })
 
   const body = await req.json()
-  const { title, category, duration, description, status, due, slides_count, questions_count, cover_url, color, file_name, valid_from, valid_until } = body
+  const { title, category, duration, description, status, due, slides_count, questions_count, cover_url, color, file_name, valid_from, valid_until, tema, obligatorio } = body
 
   if (!title?.trim()) return NextResponse.json({ error: 'Título requerido' }, { status: 400 })
 
@@ -55,6 +56,10 @@ export async function POST(req: NextRequest) {
       company_id: companyId,
       valid_from: valid_from || null,
       valid_until: valid_until || null,
+      // Si no dicen el tema, se propone uno leyendo el título: más vale una
+      // propuesta revisable que dejarlo todo en el mismo cajón.
+      tema: tema || sugerirTema(tituloNormalizado, description),
+      obligatorio: obligatorio ?? (category === 'Obligatorio'),
     })
     .select()
     .single()

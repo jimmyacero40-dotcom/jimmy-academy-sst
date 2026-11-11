@@ -12,8 +12,11 @@ import {
   Users, Star, Play, Upload, ChevronRight, X, Award, Zap,
   FileText, Layers, Trash2, Loader2, Calendar, Save, Download,
   ImagePlus, Copy, Archive, ArchiveRestore, Tag, Filter, RotateCcw,
-  Pencil, RefreshCw, FileUp, AlignLeft, HelpCircle, History, FileDown, ClipboardList, Check, Sparkles
+  Pencil, RefreshCw, FileUp, AlignLeft, HelpCircle, History, FileDown, ClipboardList, Check, Sparkles,
+  LayoutGrid, List, AlertTriangle
 } from 'lucide-react'
+import { TEMAS, nombreTema, colorTema, sugerirTema, TEMA_POR_DEFECTO } from '@/lib/temas'
+import OrganizarTemas from '@/components/trainings/OrganizarTemas'
 import MenuCurso from '@/components/trainings/MenuCurso'
 import ConfirmarAccion from '@/components/trainings/ConfirmarAccion'
 import {
@@ -256,6 +259,7 @@ export default function BibliotecaPage() {
   const [editForm, setEditForm] = useState({
     title: '', category: 'Obligatorio', description: '', duration: '8h',
     status: 'activo', temario: '', valid_from: '', valid_until: '',
+    tema: TEMA_POR_DEFECTO, obligatorio: false,
   })
   const [editFile, setEditFile] = useState<File | null>(null)
   const editFileRef = useRef<HTMLInputElement>(null)
@@ -286,6 +290,27 @@ export default function BibliotecaPage() {
   const [porEliminar, setPorEliminar] = useState<any>(null)
   const [borrando, setBorrando] = useState(false)
   const [prepFilter, setPrepFilter] = useState<'todos' | EstadoPreparacion>('todos')
+  const [temaFilter, setTemaFilter] = useState('todos')
+  const [organizando, setOrganizando] = useState(false)
+  /**
+   * Por filas de tema o en una sola parrilla.
+   *
+   * Con sesenta y seis cursos ordenados por fecha de creación no se encuentra
+   * nada: entrar y ver "Emergencias", "Salud" o "Lo que falta preparar" dice
+   * mucho más. La parrilla se queda para cuando se busca algo puntual, y se
+   * recuerda la que usted dejó puesta.
+   */
+  const [vista, setVista] = useState<'temas' | 'lista'>('temas')
+  useEffect(() => {
+    try {
+      const v = localStorage.getItem('biblioteca-vista')
+      if (v === 'temas' || v === 'lista') setVista(v)
+    } catch (_) {}
+  }, [])
+  const cambiarVista = (v: 'temas' | 'lista') => {
+    setVista(v)
+    try { localStorage.setItem('biblioteca-vista', v) } catch (_) {}
+  }
   const [companyInfo, setCompanyInfo] = useState({ name: '', logo: '' })
 
   // ── Registro de Capacitaciones panel ─────────────────────────────────────
@@ -305,6 +330,8 @@ export default function BibliotecaPage() {
       temario: t.temario || '',
       valid_from: t.valid_from || '',
       valid_until: t.valid_until || '',
+      tema: t.tema || sugerirTema(t.title || '', t.description),
+      obligatorio: t.obligatorio ?? (t.category === 'Obligatorio'),
     })
     setEditFile(null)
     setShowPPTXSection(false)
@@ -368,6 +395,8 @@ export default function BibliotecaPage() {
           temario: editForm.temario || null,
           valid_from: editForm.valid_from || null,
           valid_until: editForm.valid_until || null,
+          tema: editForm.tema,
+          obligatorio: !!editForm.obligatorio,
         }),
       })
       if (!res.ok) {
@@ -775,6 +804,15 @@ Se alcanzaron a guardar ${r.guardadas} de ${slides.length} diapositivas.`)
 
   const now = new Date().toISOString().split('T')[0]
 
+  /**
+   * El tema del curso, o el que se le propone mientras nadie lo haya fijado.
+   *
+   * Así la biblioteca queda agrupada desde el primer día sin tocar un solo
+   * dato: lo que se propone se ve, y se vuelve definitivo cuando usted lo
+   * confirma en "Organizar por temas".
+   */
+  const temaDe = (t: any) => t?.tema || sugerirTema(t?.title ?? '', t?.description)
+
   const filtered = trainings.filter(t => {
     if (!t || !t.title) return false
     const q = search.toLowerCase()
@@ -791,7 +829,7 @@ Se alcanzaron a guardar ${r.guardadas} de ${slides.length} diapositivas.`)
         ? t.status !== 'archivado'
         : effectiveStatus === statusFilter
 
-    const matchCategory = categoryFilter === 'todos' || t.category === categoryFilter
+    const matchCategory = temaFilter === 'todos' || temaDe(t) === temaFilter
     const matchPrep = prepFilter === 'todos' || getCourseReadiness(t as any).status === prepFilter
     return matchSearch && matchStatus && matchCategory && matchPrep
   })
@@ -806,7 +844,7 @@ Se alcanzaron a guardar ${r.guardadas} de ${slides.length} diapositivas.`)
       : statusFilter === 'activos' ? t.status !== 'archivado'
       : efectivo === statusFilter
     if (!porEstado) return acc
-    if (categoryFilter !== 'todos' && t.category !== categoryFilter) return acc
+    if (temaFilter !== 'todos' && temaDe(t) !== temaFilter) return acc
     const e = getCourseReadiness(t as any).status
     acc[e] = (acc[e] ?? 0) + 1
     acc.todos = (acc.todos ?? 0) + 1
@@ -815,6 +853,221 @@ Se alcanzaron a guardar ${r.guardadas} de ${slides.length} diapositivas.`)
 
   const activeTrainings = trainings.filter(t => t.status !== 'archivado')
   const archivedCount = trainings.filter(t => t.status === 'archivado').length
+  const sinTema = trainings.filter(t => t?.title && !t.tema).length
+
+  /**
+   * Las filas de la pantalla, en el orden en que importan.
+   *
+   * Primero lo que la ley exige y lo que está a medio armar —que es lo que
+   * uno viene a mirar— y después cada tema con lo suyo. Una fila vacía no se
+   * dibuja: no hay por qué enseñar un hueco.
+   */
+  const filas: Array<{ id: string; nombre: string; color: string; pista?: string; tema?: string; cursos: any[] }> = []
+  if (filtered.length) {
+    const obligatorios = filtered.filter(t => t.obligatorio ?? (t.category === 'Obligatorio'))
+    if (obligatorios.length) filas.push({
+      id: 'obligatorios', nombre: 'Obligatorios', color: '#FCD34D',
+      pista: 'los que la ley exige', cursos: obligatorios,
+    })
+
+    const porPreparar = filtered.filter(t => getCourseReadiness(t as any).status !== 'listo')
+    if (porPreparar.length) filas.push({
+      id: 'preparar', nombre: 'Por preparar', color: '#FCA5A5',
+      pista: 'les falta material, evaluación o descripción', cursos: porPreparar,
+    })
+
+    for (const tema of TEMAS) {
+      const suyos = filtered.filter(t => temaDe(t) === tema.id)
+      if (suyos.length) filas.push({
+        id: tema.id, nombre: tema.nombre, color: tema.color,
+        pista: tema.pista, tema: tema.id, cursos: suyos,
+      })
+    }
+  }
+
+  /**
+   * La tarjeta de un curso.
+   *
+   * Se dibuja igual en las dos vistas: en filas por tema y en la parrilla
+   * de cuando se busca algo puntual.
+   */
+  const tarjeta = (t: any, i: number) => {
+    const isExpired = t.valid_until && t.valid_until < now
+    const notYetValid = t.valid_from && t.valid_from > now
+    const effectiveStatus = isExpired ? 'vencido' : (t.status || 'activo')
+    const st = statusStyles[effectiveStatus as keyof typeof statusStyles] || statusStyles.activo
+    const progress = (t.enrolled || 0) > 0 ? Math.round(((t.completed || 0) / t.enrolled) * 100) : 0
+    const cardAccent = t.color || CARD_ACCENT_COLORS[t.id % CARD_ACCENT_COLORS.length]
+    const isArchived = t.status === 'archivado'
+    const prep = getCourseReadiness(t as any)
+    const colorPrep = COLOR_PREPARACION[prep.status]
+    const tema = temaDe(t)
+    const esObligatorio = t.obligatorio ?? (t.category === 'Obligatorio')
+    return (
+      <motion.div key={t.id} id={`course-${t.id}`} initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.06 }}
+        className={`terra-card terra-card-lift overflow-hidden cursor-pointer group ${isArchived ? 'opacity-60' : ''}`}
+        style={highlightId === t.id ? { outline: '2px solid rgba(245,158,11,0.8)', outlineOffset: 2 } : {}}
+        onClick={() => !isArchived && router.push(`/dashboard/trainings/${t.id}`)}>
+
+        <div className="relative h-44 overflow-hidden">
+          {t.cover_url && t.cover_url.startsWith('http') ? (
+            <img src={t.cover_url} alt={t.title} className="w-full h-full object-cover" />
+          ) : (
+            <div className="w-full h-full flex items-center justify-center"
+              style={{ background: 'var(--bg-card-hover)' }}>
+              <BookOpen size={40} style={{ color: cardAccent, opacity: 0.5 }} />
+            </div>
+          )}
+          {!isArchived && (
+            <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+              <div className="w-14 h-14 rounded-full bg-white/20 backdrop-blur-sm border border-white/30 flex items-center justify-center">
+                <Play size={22} className="text-white ml-1" fill="white" />
+              </div>
+            </div>
+          )}
+
+          {isArchived && (
+            <div className="absolute inset-0 flex items-center justify-center bg-black/40">
+              <Archive size={36} className="text-white/40" />
+            </div>
+          )}
+
+        </div>
+
+        <div className="p-4">
+          {/* Las etiquetas van aquí abajo, no encima de la imagen: la portada
+              es lo que distingue un curso de otro de un vistazo, y tapada con
+              cuatro letreros no se ve. */}
+          <div className="flex items-center gap-1.5 flex-wrap mb-2">
+            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg text-[10px] font-bold"
+              style={{ background: `${colorTema(tema)}1F`, border: `1px solid ${colorTema(tema)}45`, color: colorTema(tema) }}>
+              {nombreTema(tema)}
+            </span>
+            {esObligatorio && (
+              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg text-[10px] font-bold"
+                title="La ley lo exige: el plan anual avisa si no está programado"
+                style={{ background: 'rgba(245,158,11,0.14)', border: '1px solid rgba(245,158,11,0.35)', color: '#FCD34D' }}>
+                <AlertTriangle size={9} /> Obligatorio
+              </span>
+            )}
+            {/* Dice la tarea concreta: con cincuenta cursos vacíos, un
+                "Borrador" a secas no le dice a nadie qué hacer. */}
+            <span className="inline-flex items-center px-2 py-0.5 rounded-lg text-[10px] font-bold whitespace-nowrap"
+              title={prep.pendientes ? prep.checks.filter((c: any) => !c.ok).map((c: any) => c.falta).join(' · ') : 'Este curso está listo para dictarse'}
+              style={{ background: colorPrep.fondo, border: `1px solid ${colorPrep.borde}`, color: colorPrep.color }}>
+              {prep.etiqueta}
+            </span>
+            {/* El estado normal no se dice: con sesenta y seis cursos vigentes,
+                repetir "Vigente" en todos no informa y parte la fila. */}
+            {effectiveStatus !== 'activo' && (
+              <span className="inline-flex items-center px-2 py-0.5 rounded-lg text-[10px] font-semibold"
+                style={{ background: st.bg, border: `1px solid ${st.border}`, color: st.color }}>
+                {st.label}
+              </span>
+            )}
+          </div>
+
+          <h3 className="font-bold text-[15px] mb-1.5 leading-snug" style={{ color: 'var(--text)' }}>{t.title}</h3>
+          <p className="text-xs mb-3 line-clamp-2 leading-relaxed" style={{ color: 'var(--text-dim)' }}>{t.description}</p>
+
+          {(t.valid_from || t.valid_until) && (
+            <div className="text-[10px] mb-2 px-2 py-1 rounded-lg inline-block"
+              style={{
+                background: isExpired ? 'rgba(239,68,68,0.1)' : notYetValid ? 'rgba(245,158,11,0.1)' : 'rgba(16,185,129,0.1)',
+                color: isExpired ? '#FCA5A5' : notYetValid ? '#FCD34D' : '#6EE7B7'
+              }}>
+              Vigencia: {t.valid_from || '...'} → {t.valid_until || '...'}
+            </div>
+          )}
+          {/* La cuenta de diapositivas y preguntas bajó de la portada: dice lo
+              mismo y aquí no tapa nada. */}
+          <div className="flex items-center gap-3 text-xs mb-3 flex-wrap" style={{ color: 'var(--text-dim)' }}>
+            <div className="flex items-center gap-1" title="Duración"><Clock size={11} /> {t.duration}</div>
+            <div className="flex items-center gap-1" title="Diapositivas"><Layers size={11} /> {t.slides_count || 0}</div>
+            <div className="flex items-center gap-1" title="Preguntas"><FileText size={11} /> {t.questions_count || 5}</div>
+            <div className="flex items-center gap-1" title="Inscritos"><Users size={11} /> {t.enrolled || 0}</div>
+          </div>
+
+          {/* La barra solo tiene sentido si hay a quien medirle el avance. */}
+          {(t.enrolled || 0) > 0 && (
+            <div className="mb-3">
+              <div className="flex justify-between mb-1">
+                <span className="text-xs" style={{ color: 'var(--text-dim)' }}>Progreso</span>
+                <span className="text-xs font-bold" style={{ color: 'var(--text)' }}>{progress}%</span>
+              </div>
+              <div className="terra-progress-track">
+                <motion.div initial={{ width: 0 }} animate={{ width: `${progress}%` }} transition={{ duration: 1, delay: 0.5 }}
+                  style={{ background: cardAccent }} />
+              </div>
+            </div>
+          )}
+
+          <div className="flex items-center gap-2.5 flex-wrap mb-3">
+            {prep.checks.map(c => (
+              <span key={c.id} className="inline-flex items-center gap-1 text-[11px]"
+                title={c.ok ? `${c.nombre}: listo` : c.falta}
+                style={{ color: c.ok ? 'var(--text-dim)' : '#FCA5A5', cursor: c.ok ? 'default' : 'help' }}>
+                {c.ok ? <Check size={11} className="text-emerald-400" /> : <X size={11} />}
+                {c.nombre}
+              </span>
+            ))}
+          </div>
+
+          <div className="flex items-center gap-2">
+            {/* Chip de una línea: antes se partía en tres. */}
+            <span className="inline-flex items-center gap-1 px-2 py-1 rounded-lg text-[10px] font-semibold whitespace-nowrap"
+              style={{ background: 'rgba(16,185,129,0.1)', border: '1px solid rgba(16,185,129,0.25)', color: '#6EE7B7' }}>
+              <CheckCircle size={10} /> Certificado
+            </span>
+
+            <div className="flex items-center gap-1 ml-auto">
+              {isAdmin && (
+                <MenuCurso etiqueta={`Acciones de ${t.title}`} grupos={[
+                  { titulo: 'Contenido', acciones: [
+                    { id: 'editar', texto: 'Editar capacitación', icono: <Pencil size={13} className="text-blue-400" />,
+                      onClick: () => openEditCourse(t) },
+                    { id: 'experiencia', texto: 'Diseñar experiencia', icono: <Sparkles size={13} className="text-violet-400" />,
+                      onClick: () => router.push(`/dashboard/trainings/${t.id}/experience`) },
+                    { id: 'portada', texto: 'Cambiar portada', icono: <ImagePlus size={13} className="text-blue-400" />,
+                      onClick: () => {},
+                      comoArchivo: { accept: 'image/*', onArchivo: (f: File) => cambiarPortada(t.id, f) } },
+                    { id: 'pptx', texto: 'Descargar PowerPoint original', icono: <FileUp size={13} className="text-orange-400" style={{ transform: 'rotate(180deg)' }} />,
+                      oculta: !t.file_name,
+                      onClick: () => downloadPPTX({ stopPropagation: () => {} } as any, t) },
+                  ] },
+                  { titulo: 'Gestión', acciones: [
+                    { id: 'vigencia', texto: 'Editar vigencia', icono: <Calendar size={13} className="text-amber-400" />,
+                      onClick: () => openEditValidity({ stopPropagation: () => {} } as any, t) },
+                    { id: 'lista', texto: 'Generar lista de asistencia', icono: <ClipboardList size={13} className="text-emerald-400" />,
+                      onClick: () => setWizardTraining(t) },
+                    { id: 'duplicar', texto: duplicating === t.id ? 'Duplicando…' : 'Duplicar curso',
+                      icono: duplicating === t.id
+                        ? <Loader2 size={13} className="animate-spin text-violet-400" />
+                        : <Copy size={13} className="text-violet-400" />,
+                      onClick: () => handleDuplicateCourse({ stopPropagation: () => {} } as any, t) },
+                  ] },
+                  { titulo: 'Zona de peligro', acciones: [
+                    { id: 'archivar', texto: isArchived ? 'Restaurar curso' : 'Archivar curso',
+                      icono: isArchived ? <ArchiveRestore size={13} /> : <Archive size={13} />,
+                      peligro: true, onClick: () => setPorArchivar(t) },
+                    { id: 'eliminar', texto: 'Eliminar curso', icono: <Trash2 size={13} />,
+                      peligro: true, onClick: () => setPorEliminar(t) },
+                  ] },
+                ]} />
+              )}
+              {!isArchived && (
+                <button onClick={e => { e.stopPropagation(); router.push(`/dashboard/trainings/${t.id}`) }}
+                  className="flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-bold transition-colors"
+                  style={{ background: 'rgba(245,158,11,0.12)', border: '1px solid rgba(245,158,11,0.3)', color: '#FCD34D' }}>
+                  Abrir <ChevronRight size={12} />
+                </button>
+              )}
+            </div>
+          </div>
+        </div>
+      </motion.div>
+    )
+  }
 
   return (
     <div className="p-4 sm:p-6">
@@ -834,6 +1087,15 @@ Se alcanzaron a guardar ${r.guardadas} de ${slides.length} diapositivas.`)
           </div>
           {isAdmin && (
             <div className="flex gap-2 flex-wrap">
+              <button onClick={() => setOrganizando(true)} className="terra-btn-outline text-sm py-2.5 px-4"
+                style={{ borderColor: 'rgba(139,92,246,0.35)', color: '#C4B5FD' }}
+                title="Revisar el tema de cada curso">
+                <Tag size={15} /> Organizar por temas
+                {sinTema > 0 && (
+                  <span className="ml-1 px-1.5 rounded-md text-[10px] font-bold"
+                    style={{ background: 'rgba(139,92,246,0.25)' }}>{sinTema}</span>
+                )}
+              </button>
               <button onClick={openRegister} className="terra-btn-outline text-sm py-2.5 px-4"
                 style={{ borderColor: 'rgba(20,184,166,0.35)', color: '#2dd4bf' }}>
                 <History size={15} /> Registro de Capacitaciones
@@ -884,6 +1146,22 @@ Se alcanzaron a guardar ${r.guardadas} de ${slides.length} diapositivas.`)
         </div>
 
         <div className="flex flex-wrap gap-2 items-center">
+          {/* Por filas de tema, o todo junto en una parrilla. */}
+          <div className="flex rounded-xl overflow-hidden mr-1" style={{ border: '1px solid var(--border)' }}>
+            {([
+              { v: 'temas', texto: 'Por temas', icono: <LayoutGrid size={11} /> },
+              { v: 'lista', texto: 'Todos', icono: <List size={11} /> },
+            ] as const).map(o => (
+              <button key={o.v} onClick={() => cambiarVista(o.v)}
+                className="px-2.5 py-1.5 text-xs font-semibold flex items-center gap-1 transition-colors"
+                style={vista === o.v
+                  ? { background: 'rgba(245,158,11,0.14)', color: '#FCD34D' }
+                  : { background: 'var(--bg-card)', color: 'var(--text-dim)' }}>
+                {o.icono}{o.texto}
+              </button>
+            ))}
+          </div>
+
           <span className="text-xs flex items-center gap-1 mr-1" style={{ color: 'var(--text-faint)' }}>
             <Filter size={11} /> Estado:
           </span>
@@ -905,15 +1183,23 @@ Se alcanzaron a guardar ${r.guardadas} de ${slides.length} diapositivas.`)
           <div className="w-px h-4 mx-1" style={{ background: 'var(--border)' }} />
 
           <span className="text-xs flex items-center gap-1 mr-1" style={{ color: 'var(--text-faint)' }}>
-            <Tag size={11} /> Categoría:
+            <Tag size={11} /> Tema:
           </span>
-          {['todos', ...CATEGORIES].map(c => (
-            <button key={c} onClick={() => setCategoryFilter(c)}
-              className="px-3 py-1.5 rounded-xl text-xs font-semibold transition-all"
-              style={categoryFilter === c
-                ? { background: 'rgba(16,185,129,0.12)', border: '1px solid rgba(16,185,129,0.3)', color: '#6EE7B7' }
+          <button onClick={() => setTemaFilter('todos')}
+            className="px-3 py-1.5 rounded-xl text-xs font-semibold transition-all"
+            style={temaFilter === 'todos'
+              ? { background: 'rgba(16,185,129,0.12)', border: '1px solid rgba(16,185,129,0.3)', color: '#6EE7B7' }
+              : { background: 'var(--bg-card)', border: '1px solid var(--border)', color: 'var(--text-dim)' }}>
+            Todos
+          </button>
+          {TEMAS.map(tema => (
+            <button key={tema.id} onClick={() => setTemaFilter(tema.id)} title={tema.pista}
+              className="px-3 py-1.5 rounded-xl text-xs font-semibold transition-all flex items-center gap-1.5"
+              style={temaFilter === tema.id
+                ? { background: `${tema.color}1F`, border: `1px solid ${tema.color}59`, color: tema.color }
                 : { background: 'var(--bg-card)', border: '1px solid var(--border)', color: 'var(--text-dim)' }}>
-              {c === 'todos' ? 'Todos' : c}
+              <span className="w-1.5 h-1.5 rounded-full" style={{ background: tema.color }} />
+              {tema.nombre}
             </button>
           ))}
 
@@ -942,8 +1228,8 @@ Se alcanzaron a guardar ${r.guardadas} de ${slides.length} diapositivas.`)
             )
           })}
 
-          {(search || statusFilter !== 'activos' || categoryFilter !== 'todos' || prepFilter !== 'todos') && (
-            <button onClick={() => { setSearch(''); setStatusFilter('activos'); setCategoryFilter('todos'); setPrepFilter('todos') }}
+          {(search || statusFilter !== 'activos' || temaFilter !== 'todos' || prepFilter !== 'todos') && (
+            <button onClick={() => { setSearch(''); setStatusFilter('activos'); setTemaFilter('todos'); setPrepFilter('todos') }}
               className="px-2.5 py-1.5 rounded-xl text-xs font-semibold flex items-center gap-1 ml-auto transition-all"
               style={{ background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.2)', color: '#FCA5A5' }}>
               <RotateCcw size={11} /> Limpiar
@@ -980,181 +1266,43 @@ Se alcanzaron a guardar ${r.guardadas} de ${slides.length} diapositivas.`)
       )}
 
       {/* Cards Grid */}
-      {!loading && (
+      {!loading && (vista === 'lista' || !!search ? (
         <div className="grid sm:grid-cols-2 xl:grid-cols-3 gap-5">
-          {filtered.map((t, i) => {
-            const isExpired = t.valid_until && t.valid_until < now
-            const notYetValid = t.valid_from && t.valid_from > now
-            const effectiveStatus = isExpired ? 'vencido' : (t.status || 'activo')
-            const st = statusStyles[effectiveStatus as keyof typeof statusStyles] || statusStyles.activo
-            const progress = (t.enrolled || 0) > 0 ? Math.round(((t.completed || 0) / t.enrolled) * 100) : 0
-            const cardAccent = t.color || CARD_ACCENT_COLORS[t.id % CARD_ACCENT_COLORS.length]
-            const isArchived = t.status === 'archivado'
-            const prep = getCourseReadiness(t as any)
-            const colorPrep = COLOR_PREPARACION[prep.status]
-            return (
-              <motion.div key={t.id} id={`course-${t.id}`} initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.06 }}
-                className={`terra-card terra-card-lift overflow-hidden cursor-pointer group ${isArchived ? 'opacity-60' : ''}`}
-                style={highlightId === t.id ? { outline: '2px solid rgba(245,158,11,0.8)', outlineOffset: 2 } : {}}
-                onClick={() => !isArchived && router.push(`/dashboard/trainings/${t.id}`)}>
-
-                <div className="relative h-44 overflow-hidden">
-                  {t.cover_url && t.cover_url.startsWith('http') ? (
-                    <img src={t.cover_url} alt={t.title} className="w-full h-full object-cover" />
-                  ) : (
-                    <div className="w-full h-full flex items-center justify-center"
-                      style={{ background: 'var(--bg-card-hover)' }}>
-                      <BookOpen size={40} style={{ color: cardAccent, opacity: 0.5 }} />
-                    </div>
-                  )}
-                  <div className="absolute inset-0" style={{ background: 'linear-gradient(to top, rgba(15,23,42,0.08), transparent)' }} />
-
-                  {!isArchived && (
-                    <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
-                      <div className="w-14 h-14 rounded-full bg-white/20 backdrop-blur-sm border border-white/30 flex items-center justify-center">
-                        <Play size={22} className="text-white ml-1" fill="white" />
-                      </div>
-                    </div>
-                  )}
-
-                  {isArchived && (
-                    <div className="absolute inset-0 flex items-center justify-center bg-black/40">
-                      <Archive size={36} className="text-white/40" />
-                    </div>
-                  )}
-
-                  <div className="absolute top-3 right-3">
-                    <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-semibold backdrop-blur-sm"
-                      style={{ background: st.bg, border: `1px solid ${st.border}`, color: st.color }}>
-                      {st.label}
-                    </span>
-                  </div>
-                  <div className="absolute top-3 left-3 flex items-center gap-1.5 flex-wrap" style={{ maxWidth: 'calc(100% - 110px)' }}>
-                    <span className="badge-amber">{t.category}</span>
-                    {/* Dice la tarea concreta: con cincuenta cursos vacíos, un
-                        "Borrador" a secas no le dice a nadie qué hacer. */}
-                    <span className="inline-flex items-center px-2 py-0.5 rounded-lg text-[10px] font-bold backdrop-blur-sm whitespace-nowrap"
-                      title={prep.pendientes ? prep.checks.filter(c => !c.ok).map(c => c.falta).join(' · ') : 'Este curso está listo para dictarse'}
-                      style={{ background: colorPrep.fondo, border: `1px solid ${colorPrep.borde}`, color: colorPrep.color }}>
-                      {prep.etiqueta}
-                    </span>
-                    {t.risk_type && (
-                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg text-[10px] font-semibold backdrop-blur-sm"
-                        style={{ background: 'rgba(139,92,246,0.2)', border: '1px solid rgba(139,92,246,0.35)', color: '#C4B5FD' }}>
-                        <Tag size={8} />{t.risk_type}
-                      </span>
-                    )}
-                  </div>
-                  <div className="absolute bottom-3 left-4 right-4 flex items-center justify-between">
-                    <div className="flex items-center gap-1.5 text-white/80 text-xs"><Layers size={11} /> {t.slides_count || 0} diapositivas</div>
-                    <div className="flex items-center gap-1.5 text-white/80 text-xs"><FileText size={11} /> {t.questions_count || 5} preguntas</div>
-                  </div>
-                </div>
-
-                <div className="p-4">
-                  <h3 className="font-bold text-[15px] mb-1.5 leading-snug" style={{ color: 'var(--text)' }}>{t.title}</h3>
-                  <p className="text-xs mb-3 line-clamp-2 leading-relaxed" style={{ color: 'var(--text-dim)' }}>{t.description}</p>
-
-                  {(t.valid_from || t.valid_until) && (
-                    <div className="text-[10px] mb-2 px-2 py-1 rounded-lg inline-block"
-                      style={{
-                        background: isExpired ? 'rgba(239,68,68,0.1)' : notYetValid ? 'rgba(245,158,11,0.1)' : 'rgba(16,185,129,0.1)',
-                        color: isExpired ? '#FCA5A5' : notYetValid ? '#FCD34D' : '#6EE7B7'
-                      }}>
-                      Vigencia: {t.valid_from || '...'} → {t.valid_until || '...'}
-                    </div>
-                  )}
-                  <div className="flex items-center gap-3 text-xs mb-3" style={{ color: 'var(--text-dim)' }}>
-                    <div className="flex items-center gap-1"><Clock size={11} /> {t.duration}</div>
-                    <div className="flex items-center gap-1"><Users size={11} /> {t.enrolled || 0}</div>
-                    <div className="flex items-center gap-1 ml-auto">
-                      <Award size={11} className="text-amber-400" />
-                      <span className="text-white font-semibold">{t.rating || 0}</span>
-                    </div>
-                  </div>
-
-                  {/* La barra solo tiene sentido si hay a quien medirle el avance. */}
-                  {(t.enrolled || 0) > 0 && (
-                    <div className="mb-3">
-                      <div className="flex justify-between mb-1">
-                        <span className="text-xs" style={{ color: 'var(--text-dim)' }}>Progreso</span>
-                        <span className="text-xs font-bold" style={{ color: 'var(--text)' }}>{progress}%</span>
-                      </div>
-                      <div className="terra-progress-track">
-                        <motion.div initial={{ width: 0 }} animate={{ width: `${progress}%` }} transition={{ duration: 1, delay: 0.5 }}
-                          style={{ background: cardAccent }} />
-                      </div>
-                    </div>
-                  )}
-
-                  <div className="flex items-center gap-2.5 flex-wrap mb-3">
-                    {prep.checks.map(c => (
-                      <span key={c.id} className="inline-flex items-center gap-1 text-[11px]"
-                        title={c.ok ? `${c.nombre}: listo` : c.falta}
-                        style={{ color: c.ok ? 'var(--text-dim)' : '#FCA5A5', cursor: c.ok ? 'default' : 'help' }}>
-                        {c.ok ? <Check size={11} className="text-emerald-400" /> : <X size={11} />}
-                        {c.nombre}
-                      </span>
-                    ))}
-                  </div>
-
-                  <div className="flex items-center gap-2">
-                    {/* Chip de una línea: antes se partía en tres. */}
-                    <span className="inline-flex items-center gap-1 px-2 py-1 rounded-lg text-[10px] font-semibold whitespace-nowrap"
-                      style={{ background: 'rgba(16,185,129,0.1)', border: '1px solid rgba(16,185,129,0.25)', color: '#6EE7B7' }}>
-                      <CheckCircle size={10} /> Certificado
-                    </span>
-
-                    <div className="flex items-center gap-1 ml-auto">
-                      {isAdmin && (
-                        <MenuCurso etiqueta={`Acciones de ${t.title}`} grupos={[
-                          { titulo: 'Contenido', acciones: [
-                            { id: 'editar', texto: 'Editar capacitación', icono: <Pencil size={13} className="text-blue-400" />,
-                              onClick: () => openEditCourse(t) },
-                            { id: 'experiencia', texto: 'Diseñar experiencia', icono: <Sparkles size={13} className="text-violet-400" />,
-                              onClick: () => router.push(`/dashboard/trainings/${t.id}/experience`) },
-                            { id: 'portada', texto: 'Cambiar portada', icono: <ImagePlus size={13} className="text-blue-400" />,
-                              onClick: () => {},
-                              comoArchivo: { accept: 'image/*', onArchivo: (f: File) => cambiarPortada(t.id, f) } },
-                            { id: 'pptx', texto: 'Descargar PowerPoint original', icono: <FileUp size={13} className="text-orange-400" style={{ transform: 'rotate(180deg)' }} />,
-                              oculta: !t.file_name,
-                              onClick: () => downloadPPTX({ stopPropagation: () => {} } as any, t) },
-                          ] },
-                          { titulo: 'Gestión', acciones: [
-                            { id: 'vigencia', texto: 'Editar vigencia', icono: <Calendar size={13} className="text-amber-400" />,
-                              onClick: () => openEditValidity({ stopPropagation: () => {} } as any, t) },
-                            { id: 'lista', texto: 'Generar lista de asistencia', icono: <ClipboardList size={13} className="text-emerald-400" />,
-                              onClick: () => setWizardTraining(t) },
-                            { id: 'duplicar', texto: duplicating === t.id ? 'Duplicando…' : 'Duplicar curso',
-                              icono: duplicating === t.id
-                                ? <Loader2 size={13} className="animate-spin text-violet-400" />
-                                : <Copy size={13} className="text-violet-400" />,
-                              onClick: () => handleDuplicateCourse({ stopPropagation: () => {} } as any, t) },
-                          ] },
-                          { titulo: 'Zona de peligro', acciones: [
-                            { id: 'archivar', texto: isArchived ? 'Restaurar curso' : 'Archivar curso',
-                              icono: isArchived ? <ArchiveRestore size={13} /> : <Archive size={13} />,
-                              peligro: true, onClick: () => setPorArchivar(t) },
-                            { id: 'eliminar', texto: 'Eliminar curso', icono: <Trash2 size={13} />,
-                              peligro: true, onClick: () => setPorEliminar(t) },
-                          ] },
-                        ]} />
-                      )}
-                      {!isArchived && (
-                        <button onClick={e => { e.stopPropagation(); router.push(`/dashboard/trainings/${t.id}`) }}
-                          className="flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-bold transition-colors"
-                          style={{ background: 'rgba(245,158,11,0.12)', border: '1px solid rgba(245,158,11,0.3)', color: '#FCD34D' }}>
-                          Abrir <ChevronRight size={12} />
-                        </button>
-                      )}
-                    </div>
-                  </div>
-                </div>
-              </motion.div>
-            )
-          })}
+          {filtered.map((t, i) => tarjeta(t, i))}
         </div>
-      )}
+      ) : (
+        <div className="space-y-8">
+          {filas.map(fila => (
+            <section key={fila.id}>
+              <div className="flex items-center gap-2 mb-3">
+                <span className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ background: fila.color }} />
+                <h2 className="text-base font-black" style={{ color: 'var(--text)', fontFamily: 'var(--font-display)' }}>
+                  {fila.nombre}
+                </h2>
+                <span className="text-xs" style={{ color: 'var(--text-faint)' }}>{fila.cursos.length}</span>
+                {fila.pista && (
+                  <span className="text-xs hidden sm:inline" style={{ color: 'var(--text-faint)' }}>· {fila.pista}</span>
+                )}
+                {fila.tema && (
+                  <button onClick={() => { setTemaFilter(fila.tema!); cambiarVista('lista') }}
+                    className="ml-auto text-xs font-semibold flex items-center gap-0.5"
+                    style={{ color: fila.color }}>
+                    Ver todos <ChevronRight size={12} />
+                  </button>
+                )}
+              </div>
+              {/* En fila, no en parrilla: una fila por tema se recorre de un
+                  vistazo, y lo que no cabe se arrastra de lado. */}
+              <div className="flex gap-4 overflow-x-auto pb-2 -mx-1 px-1 snap-x">
+                {fila.cursos.map((t, i) => (
+                  <div key={t.id} className="w-[290px] flex-shrink-0 snap-start">{tarjeta(t, i)}</div>
+                ))}
+              </div>
+            </section>
+          ))}
+        </div>
+      ))}
+
 
       {!loading && filtered.length === 0 && (
         <div className="py-16 text-center">
@@ -1411,14 +1559,34 @@ Se alcanzaron a guardar ${r.guardadas} de ${slides.length} diapositivas.`)
                     className="terra-input w-full" placeholder="Nombre de la capacitación" />
                 </div>
 
+                {/* El tema agrupa la biblioteca; la obligación la exige la
+                    ley. Son dos cosas distintas y antes compartían casilla. */}
                 <div>
                   <label className="text-[10px] font-bold uppercase tracking-wider mb-1.5 block" style={{ color: 'var(--text-dim)' }}>
-                    Categoría
+                    Tema
                   </label>
-                  <select value={editForm.category} onChange={e => setEditForm(f => ({ ...f, category: e.target.value }))}
+                  <select value={editForm.tema} onChange={e => setEditForm(f => ({ ...f, tema: e.target.value }))}
                     className="terra-input w-full" style={{ background: 'var(--bg-card)' }}>
-                    {CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
+                    {TEMAS.map(x => <option key={x.id} value={x.id}>{x.nombre}</option>)}
                   </select>
+                  <p className="text-[10px] mt-1" style={{ color: 'var(--text-faint)' }}>
+                    {TEMAS.find(x => x.id === editForm.tema)?.pista}
+                  </p>
+                </div>
+
+                <div>
+                  <label className="text-[10px] font-bold uppercase tracking-wider mb-1.5 block" style={{ color: 'var(--text-dim)' }}>
+                    Obligación
+                  </label>
+                  <label className="terra-input w-full flex items-center gap-2 cursor-pointer"
+                    style={{ background: 'var(--bg-card)' }}>
+                    <input type="checkbox" checked={!!editForm.obligatorio}
+                      onChange={e => setEditForm(f => ({ ...f, obligatorio: e.target.checked }))} />
+                    <span className="text-sm" style={{ color: 'var(--text)' }}>La ley lo exige</span>
+                  </label>
+                  <p className="text-[10px] mt-1" style={{ color: 'var(--text-faint)' }}>
+                    El plan anual avisa si no está programado
+                  </p>
                 </div>
 
                 <div>
@@ -1644,6 +1812,24 @@ Se alcanzaron a guardar ${r.guardadas} de ${slides.length} diapositivas.`)
       )}
 
       {/* ── Attendance Wizard ─────────────────────────────────────────────── */}
+      {organizando && (
+        <OrganizarTemas
+          cursos={trainings.filter(t => t?.title) as any}
+          onCerrar={() => setOrganizando(false)}
+          onGuardado={async () => {
+            // Se relee para que la pantalla quede con lo que de verdad se
+            // guardó, no con lo que se escogió en el modal.
+            const r = await fetch('/api/trainings').catch(() => null)
+            if (r?.ok) {
+              const nuevos = await r.json()
+              setTrainings(prev => prev.map(t => {
+                const n = (nuevos as any[]).find(x => x.id === t.id)
+                return n ? { ...t, tema: n.tema, obligatorio: n.obligatorio } : t
+              }))
+            }
+          }} />
+      )}
+
       {porArchivar && (
         <ConfirmarAccion
           titulo={porArchivar.status === 'archivado' ? 'Restaurar este curso' : 'Archivar este curso'}
