@@ -40,9 +40,16 @@ export async function subirDiapositiva(
   // El sufijo evita que una diapositiva reemplazada quede servida desde la caché.
   const ruta = `slides/${trainingId}/${trainingId}-${String(indice).padStart(3, '0')}-${Date.now()}.${ext}`
 
-  const { error } = await supabase.storage.from(BUCKET)
-    .upload(ruta, buffer, { contentType, upsert: true })
-  if (error) throw new Error(`No se pudo guardar la diapositiva ${indice + 1}: ${error.message}`)
-
-  return supabase.storage.from(BUCKET).getPublicUrl(ruta).data.publicUrl
+  // Subir cuarenta imágenes seguidas hace que de vez en cuando una se caiga
+  // por la red ("fetch failed"). Antes esa sola tumbaba el curso entero y la
+  // persona se quedaba sin material. Se reintenta antes de darla por perdida.
+  let ultimo = ''
+  for (let intento = 1; intento <= 3; intento++) {
+    const { error } = await supabase.storage.from(BUCKET)
+      .upload(ruta, buffer, { contentType, upsert: true })
+    if (!error) return supabase.storage.from(BUCKET).getPublicUrl(ruta).data.publicUrl
+    ultimo = error.message
+    if (intento < 3) await new Promise(r => setTimeout(r, intento * 700))
+  }
+  throw new Error(`No se pudo guardar la diapositiva ${indice + 1}: ${ultimo}`)
 }

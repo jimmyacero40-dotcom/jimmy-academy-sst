@@ -24,17 +24,23 @@ export async function POST(req: NextRequest, { params }: Params) {
   }
 
   const { slides = [] } = body
+  // Las diapositivas llegan por tandas: todas juntas pesaban decenas de megas
+  // y el servidor rechazaba la petición antes de leerla. La primera tanda
+  // reemplaza lo que había, las siguientes agregan, y la última cierra.
+  const reemplazar = body.reemplazar !== false
+  const esFinal = body.final !== false
 
   // Only insert slides that have image data; text-only slides are skipped
   const validSlides = slides.filter((s: any) => s.image_data)
 
-  // Delete all existing slides for this training
-  const { error: delErr } = await supabaseAdmin
-    .from('training_slides')
-    .delete()
-    .eq('training_id', trainingId)
+  if (reemplazar) {
+    const { error: delErr } = await supabaseAdmin
+      .from('training_slides')
+      .delete()
+      .eq('training_id', trainingId)
 
-  if (delErr) return NextResponse.json({ error: delErr.message }, { status: 500 })
+    if (delErr) return NextResponse.json({ error: delErr.message }, { status: 500 })
+  }
 
   let insertedCount = 0
 
@@ -66,12 +72,29 @@ export async function POST(req: NextRequest, { params }: Params) {
     insertedCount = inserted?.length ?? validSlides.length
   }
 
-  // Update training: slides_count = actual stored count, cover = first slide image
-  const firstImage = urls[0] || null
-  await supabaseAdmin
-    .from('trainings')
-    .update({ slides_count: insertedCount, cover_url: firstImage })
-    .eq('id', trainingId)
+  // La cuenta y la portada se dejan al cerrar, contando lo que de verdad
+  // quedó guardado: si una tanda se cayó, el número no puede mentir.
+  if (esFinal) {
+    const { count } = await supabaseAdmin
+      .from('training_slides')
+      .select('id', { count: 'exact', head: true })
+      .eq('training_id', trainingId)
+
+    const { data: primera } = await supabaseAdmin
+      .from('training_slides')
+      .select('image_data')
+      .eq('training_id', trainingId)
+      .order('slide_index')
+      .limit(1)
+      .maybeSingle()
+
+    await supabaseAdmin
+      .from('trainings')
+      .update({ slides_count: count ?? 0, cover_url: primera?.image_data ?? null })
+      .eq('id', trainingId)
+
+    return NextResponse.json({ ok: true, count: count ?? 0 })
+  }
 
   return NextResponse.json({ ok: true, count: insertedCount })
 }

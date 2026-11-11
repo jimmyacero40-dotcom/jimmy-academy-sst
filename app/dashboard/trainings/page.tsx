@@ -5,6 +5,7 @@ import { motion } from 'framer-motion'
 import { useRouter } from 'next/navigation'
 import { useSession } from 'next-auth/react'
 import { extractPPTXSlides, getCourseData, getCustomQuestions } from '@/lib/pptx-extractor'
+import { subirDiapositivasEnLotes } from '@/lib/subir-diapositivas'
 import { QuestionBuilder } from './QuestionBuilder'
 import {
   BookOpen, Plus, Search, Clock, CheckCircle, AlertCircle,
@@ -389,28 +390,27 @@ export default function BibliotecaPage() {
         }
 
         if (slides.length > 0) {
-          setEditProgress(`Subiendo ${slides.length} diapositivas...`)
           const slidesPayload = slides.map((img, i) => ({
             slide_index: i, image_data: img, slide_text: texts[i] || '',
           }))
-          const sRes = await fetch(`/api/trainings/${editCourse.id}/slides`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ slides: slidesPayload, slides_count: slides.length }),
-          })
+          const r = await subirDiapositivasEnLotes(editCourse.id, slidesPayload, setEditProgress)
+          if (!r.ok) {
+            // Antes esto se tragaba el fallo: la persona esperaba un buen rato
+            // y el material se quedaba como estaba, sin un solo aviso.
+            setEditProgress('')
+            alert(`No se pudo reemplazar el material: ${r.error}
 
-          // Verify stored count
-          if (sRes.ok && expectedCount > 0) {
-            const verifyRes = await fetch(`/api/trainings/${editCourse.id}`)
-            const verifyData = await verifyRes.json()
-            const storedCount = verifyData.slideCount || 0
-            if (storedCount === expectedCount) {
-              setEditProgress(`✓ ${storedCount} diapositivas actualizadas`)
-            } else {
-              setEditProgress(`⚠ Se guardaron ${storedCount} de ${expectedCount} diapositivas`)
-            }
-            await new Promise(r => setTimeout(r, 1200))
+Se alcanzaron a guardar ${r.guardadas} de ${slides.length} diapositivas.`)
+            setSavingEdit(false)
+            return
           }
+          setEditProgress(`✓ ${r.guardadas} diapositivas actualizadas`)
+          await new Promise(res => setTimeout(res, 1000))
+        } else if (expectedCount === 0) {
+          setEditProgress('')
+          alert('No se pudo leer ninguna página de ese archivo. Revise que el PDF o el PPTX no esté dañado.')
+          setSavingEdit(false)
+          return
         }
 
         // Upload original PPTX to storage
@@ -596,25 +596,17 @@ export default function BibliotecaPage() {
       let finalCount = 0
 
       if (slides.length > 0) {
-        // Single bulk request — much faster than N individual requests
-        setUploadProgress(`Subiendo ${slides.length} diapositivas...`)
         const slidesPayload = slides.map((img, i) => ({
           slide_index: i, image_data: img, slide_text: texts[i] || '',
         }))
-        const sRes = await fetch(`/api/trainings/${training.id}/slides`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ slides: slidesPayload, slides_count: slides.length }),
-        })
-        if (sRes.ok) {
-          const sData = await sRes.json()
-          finalCount = sData.count || slides.length
-        } else {
-          const sErr = await sRes.json().catch(() => ({}))
-          alert(`Error al subir las diapositivas: ${sErr.error || 'desconocido'}`)
-          // Training was created with slides_count=0; notify admin and bail
+        const r = await subirDiapositivasEnLotes(training.id, slidesPayload, setUploadProgress)
+        if (!r.ok) {
+          alert(`No se pudo subir el material: ${r.error}
+
+Se alcanzaron a guardar ${r.guardadas} de ${slides.length} diapositivas.`)
           setCreating(false); setUploadProgress(''); return
         }
+        finalCount = r.guardadas
       }
 
       // Upload the original PPTX for admin download
