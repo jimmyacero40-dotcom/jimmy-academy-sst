@@ -28,6 +28,36 @@ export interface DiapositivaAEnviar {
 const TOPE_POR_TANDA = 1_500_000
 const MAXIMO_POR_TANDA = 6
 
+/**
+ * Lo máximo que puede pesar una lámina suelta.
+ *
+ * Las tandas no sirven de nada si una sola lámina ya no cabe en un envío: el
+ * servidor la rechaza igual. Si llega una así, se vuelve a comprimir aquí
+ * antes de mandarla, en vez de dejar el curso a medio subir.
+ */
+const TOPE_POR_LAMINA = 900_000
+
+async function aliviar(dataUrl: string, ancho = 1400, calidad = 0.78): Promise<string> {
+  if (!dataUrl || typeof document === 'undefined') return dataUrl
+  return new Promise(resolve => {
+    const img = new Image()
+    img.onload = () => {
+      const escala = img.width > ancho ? ancho / img.width : 1
+      const canvas = document.createElement('canvas')
+      canvas.width = Math.round(img.width * escala)
+      canvas.height = Math.round(img.height * escala)
+      const ctx = canvas.getContext('2d')
+      if (!ctx) { resolve(dataUrl); return }
+      ctx.fillStyle = '#FFFFFF'
+      ctx.fillRect(0, 0, canvas.width, canvas.height)
+      ctx.drawImage(img, 0, 0, canvas.width, canvas.height)
+      resolve(canvas.toDataURL('image/jpeg', calidad))
+    }
+    img.onerror = () => resolve(dataUrl)
+    img.src = dataUrl
+  })
+}
+
 export async function subirDiapositivasEnLotes(
   trainingId: number | string,
   diapositivas: DiapositivaAEnviar[],
@@ -40,6 +70,13 @@ export async function subirDiapositivasEnLotes(
       body: JSON.stringify({ slides: [], reemplazar: true, final: true }),
     })
     return { ok: res.ok, guardadas: 0, error: res.ok ? undefined : 'No se pudo vaciar el material' }
+  }
+
+  // Primero las que vengan pesadas, que solas tampoco pasarían.
+  const pesadas = diapositivas.filter(d => (d.image_data?.length ?? 0) > TOPE_POR_LAMINA)
+  if (pesadas.length) {
+    avisar?.(`Aligerando ${pesadas.length} diapositiva${pesadas.length === 1 ? '' : 's'}…`)
+    for (const d of pesadas) d.image_data = await aliviar(d.image_data)
   }
 
   // Tandas por peso, no por cantidad: una lámina con una foto grande pesa
