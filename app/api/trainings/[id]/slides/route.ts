@@ -92,18 +92,28 @@ export async function POST(req: NextRequest, { params }: Params) {
       .select('id', { count: 'exact', head: true })
       .eq('training_id', trainingId)
 
-    const { data: primera } = await supabaseAdmin
-      .from('training_slides')
-      .select('image_data')
-      .eq('training_id', trainingId)
-      .order('slide_index')
-      .limit(1)
+    // La portada sale de la primera diapositiva solo si nadie la escogió a
+    // mano: una portada puesta a propósito no se pierde por reemplazar el
+    // material.
+    const { data: curso } = await supabaseAdmin
+      .from('trainings')
+      .select('portada_manual')
+      .eq('id', trainingId)
       .maybeSingle()
 
-    await supabaseAdmin
-      .from('trainings')
-      .update({ slides_count: count ?? 0, cover_url: primera?.image_data ?? null })
-      .eq('id', trainingId)
+    const cambios: Record<string, any> = { slides_count: count ?? 0 }
+    if (!curso?.portada_manual) {
+      const { data: primera } = await supabaseAdmin
+        .from('training_slides')
+        .select('image_data')
+        .eq('training_id', trainingId)
+        .order('slide_index')
+        .limit(1)
+        .maybeSingle()
+      cambios.cover_url = primera?.image_data ?? null
+    }
+
+    await supabaseAdmin.from('trainings').update(cambios).eq('id', trainingId)
 
     return NextResponse.json({ ok: true, count: count ?? 0 })
   }
@@ -126,9 +136,16 @@ export async function DELETE(_req: NextRequest, { params }: Params) {
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
 
+  // Si la portada la escogió una persona, borrar el material no se la quita.
+  const { data: curso } = await supabaseAdmin
+    .from('trainings')
+    .select('portada_manual')
+    .eq('id', trainingId)
+    .maybeSingle()
+
   await supabaseAdmin
     .from('trainings')
-    .update({ slides_count: 0, cover_url: null })
+    .update(curso?.portada_manual ? { slides_count: 0 } : { slides_count: 0, cover_url: null })
     .eq('id', trainingId)
 
   return NextResponse.json({ ok: true })

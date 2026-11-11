@@ -37,7 +37,8 @@ export async function GET() {
     .select(`
       id, status, due_date, started_at, completed_at, score, created_at,
       users(id, name, email, cedula, area),
-      trainings(id, title, duration)
+      trainings(id, title, duration),
+      plan_items(estado)
     `)
     .order('due_date', { ascending: true, nullsFirst: false })
 
@@ -45,5 +46,11 @@ export async function GET() {
 
   const { data, error } = await query
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
-  return NextResponse.json(data ?? [])
+
+  // Lo mismo que para el trabajador: una ronda cancelada no le queda
+  // pendiente a nadie, y en trazabilidad seguía contando e inflando los
+  // pendientes del plan.
+  return NextResponse.json((data ?? [])
+    .filter((e: any) => e.plan_items?.estado !== 'cancelada')
+    .map(({ plan_items, ...resto }: any) => resto))
 }

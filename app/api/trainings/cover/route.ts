@@ -40,10 +40,11 @@ export async function POST(req: NextRequest) {
 
   const coverUrl = urlData.publicUrl
 
-  // Save only the URL string (small) in the trainings table
+  // Se guarda solo la dirección (es corta), y se deja dicho que la portada
+  // la escogió una persona: desde aquí ya no se pisa al subir material.
   const { error: updateError } = await supabase
     .from('trainings')
-    .update({ cover_url: coverUrl })
+    .update({ cover_url: coverUrl, portada_manual: true })
     .eq('id', parseInt(trainingId))
 
   if (updateError) {
