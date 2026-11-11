@@ -18,8 +18,15 @@ export interface DiapositivaAEnviar {
  * con medio curso sin que nadie avise.
  */
 
-/** Lo que cabe cómodamente en una petición, con margen. */
-const TOPE_POR_TANDA = 2_500_000
+/**
+ * Lo que cabe en una petición con margen, por peso y por cantidad.
+ *
+ * El peso lo limita el servidor, que rechaza los envíos grandes. La cantidad
+ * la limita el tiempo: cada imagen hay que guardarla en la bodega, y una
+ * función tiene unos segundos contados antes de que la corten.
+ */
+const TOPE_POR_TANDA = 1_500_000
+const MAXIMO_POR_TANDA = 6
 
 export async function subirDiapositivasEnLotes(
   trainingId: number | string,
@@ -42,7 +49,7 @@ export async function subirDiapositivasEnLotes(
   let peso = 0
   for (const d of diapositivas) {
     const suyo = (d.image_data?.length ?? 0) + (d.slide_text?.length ?? 0)
-    if (actual.length && peso + suyo > TOPE_POR_TANDA) {
+    if (actual.length && (peso + suyo > TOPE_POR_TANDA || actual.length >= MAXIMO_POR_TANDA)) {
       tandas.push(actual); actual = []; peso = 0
     }
     actual.push(d); peso += suyo

@@ -6,6 +6,13 @@ import { subirDiapositiva } from '@/lib/subir-diapositiva'
 
 type Params = { params: { id: string } }
 
+/**
+ * Subir diez imágenes a la bodega lleva más de los diez segundos que Vercel
+ * le da a una función por defecto. Al cortarse, el navegador solo ve
+ * "Failed to fetch" y el material no cambia, que es lo que estaba pasando.
+ */
+export const maxDuration = 60
+
 // Replace all slides for a training (delete existing + bulk insert)
 // Atomically: old slides deleted, new ones inserted, training.slides_count updated
 export async function POST(req: NextRequest, { params }: Params) {
@@ -44,12 +51,17 @@ export async function POST(req: NextRequest, { params }: Params) {
 
   let insertedCount = 0
 
-  // Las imágenes se suben una por una: así un fallo señala cuál falló en vez
-  // de tumbar la carga entera del curso.
-  const urls: (string | null)[] = []
-  for (const s of validSlides) {
+  // De a cuatro a la vez: una por una no cabía en el tiempo de la función, y
+  // todas de golpe hace que la bodega empiece a rechazar. El error dice qué
+  // diapositiva falló, no un "algo salió mal".
+  const urls: (string | null)[] = new Array(validSlides.length).fill(null)
+  const A_LA_VEZ = 4
+  for (let i = 0; i < validSlides.length; i += A_LA_VEZ) {
+    const tanda = validSlides.slice(i, i + A_LA_VEZ)
     try {
-      urls.push(await subirDiapositiva(s.image_data, trainingId, s.slide_index))
+      const hechas = await Promise.all(tanda.map((s: any) =>
+        subirDiapositiva(s.image_data, trainingId, s.slide_index)))
+      hechas.forEach((u, k) => { urls[i + k] = u })
     } catch (e: any) {
       return NextResponse.json({ error: e.message }, { status: 500 })
     }
