@@ -12,8 +12,13 @@ import {
   Users, Star, Play, Upload, ChevronRight, X, Award, Zap,
   FileText, Layers, Trash2, Loader2, Calendar, Save, Download,
   ImagePlus, Copy, Archive, ArchiveRestore, Tag, Filter, RotateCcw,
-  Pencil, RefreshCw, FileUp, AlignLeft, HelpCircle, History, FileDown, ClipboardList
+  Pencil, RefreshCw, FileUp, AlignLeft, HelpCircle, History, FileDown, ClipboardList, Check, Sparkles
 } from 'lucide-react'
+import MenuCurso from '@/components/trainings/MenuCurso'
+import ConfirmarAccion from '@/components/trainings/ConfirmarAccion'
+import {
+  getCourseReadiness, COLOR_PREPARACION, NOMBRE_PREPARACION, type EstadoPreparacion,
+} from '@/lib/preparacion-curso'
 import AttendanceWizard from '@/components/AttendanceWizard'
 
 const CARD_ACCENT_COLORS = [
@@ -275,6 +280,12 @@ export default function BibliotecaPage() {
 
   // ── Attendance wizard ─────────────────────────────────────────────────────
   const [wizardTraining, setWizardTraining] = useState<any>(null)
+  // Archivar y eliminar se confirman en un dialogo propio, no en el del
+  // navegador: ahí no se alcanza a leer de qué curso se está hablando.
+  const [porArchivar, setPorArchivar] = useState<any>(null)
+  const [porEliminar, setPorEliminar] = useState<any>(null)
+  const [borrando, setBorrando] = useState(false)
+  const [prepFilter, setPrepFilter] = useState<'todos' | EstadoPreparacion>('todos')
   const [companyInfo, setCompanyInfo] = useState({ name: '', logo: '' })
 
   // ── Registro de Capacitaciones panel ─────────────────────────────────────
@@ -521,10 +532,22 @@ Se alcanzaron a guardar ${r.guardadas} de ${slides.length} diapositivas.`)
       setTrainings(apiTrainings)
       setLoading(false)
 
+      const params = typeof window !== 'undefined'
+        ? new URLSearchParams(window.location.search) : null
+
+      // Texto que viene del buscador global: queda puesto en el filtro de
+      // esta pantalla, con el cursor listo para seguir afinándolo.
+      const buscar = params?.get('buscar')
+      if (buscar) {
+        setSearch(buscar)
+        setTimeout(() => {
+          const caja = document.querySelector<HTMLInputElement>('[data-buscador-pagina]')
+          caja?.focus()
+        }, 300)
+      }
+
       // Scroll to highlighted course from command palette
-      const hid = typeof window !== 'undefined'
-        ? new URLSearchParams(window.location.search).get('highlight')
-        : null
+      const hid = params?.get('highlight') ?? null
       if (hid) {
         setHighlightId(parseInt(hid))
         setTimeout(() => {
@@ -650,11 +673,28 @@ Se alcanzaron a guardar ${r.guardadas} de ${slides.length} diapositivas.`)
   }
 
   const handleDeleteCourse = async (id: number) => {
-    if (!confirm('¿Eliminar este curso de la biblioteca? Esta acción no se puede deshacer.')) return
+    setBorrando(true)
     try {
       await fetch(`/api/trainings?id=${id}`, { method: 'DELETE' })
       setTrainings(prev => prev.filter(t => t.id !== id))
     } catch (_) {}
+    setBorrando(false)
+    setPorEliminar(null)
+  }
+
+  /** Cambiar la portada, que antes vivía suelto dentro del JSX de la tarjeta. */
+  const cambiarPortada = async (id: number, file: File) => {
+    const fd = new FormData()
+    fd.append('file', file)
+    fd.append('training_id', String(id))
+    const res = await fetch('/api/trainings/cover', { method: 'POST', body: fd })
+    if (res.ok) {
+      const d = await res.json()
+      setTrainings(prev => prev.map(tr => tr.id === id ? { ...tr, cover_url: d.cover_url } : tr))
+    } else {
+      const d = await res.json().catch(() => ({}))
+      alert('No se pudo subir la portada: ' + (d.error || res.status))
+    }
   }
 
   const handleDuplicateCourse = async (e: React.MouseEvent, t: any) => {
@@ -752,8 +792,26 @@ Se alcanzaron a guardar ${r.guardadas} de ${slides.length} diapositivas.`)
         : effectiveStatus === statusFilter
 
     const matchCategory = categoryFilter === 'todos' || t.category === categoryFilter
-    return matchSearch && matchStatus && matchCategory
+    const matchPrep = prepFilter === 'todos' || getCourseReadiness(t as any).status === prepFilter
+    return matchSearch && matchStatus && matchCategory && matchPrep
   })
+
+  // Cuántos hay de cada preparación, contando sobre lo que el estado y la
+  // categoría ya dejaron ver: el número del filtro tiene que cuadrar con lo
+  // que va a salir al pulsarlo.
+  const conteoPrep = trainings.reduce((acc, t) => {
+    if (!t?.title) return acc
+    const efectivo = t.valid_until && t.valid_until < now ? 'vencido' : (t.status || 'activo')
+    const porEstado = statusFilter === 'archivados' ? t.status === 'archivado'
+      : statusFilter === 'activos' ? t.status !== 'archivado'
+      : efectivo === statusFilter
+    if (!porEstado) return acc
+    if (categoryFilter !== 'todos' && t.category !== categoryFilter) return acc
+    const e = getCourseReadiness(t as any).status
+    acc[e] = (acc[e] ?? 0) + 1
+    acc.todos = (acc.todos ?? 0) + 1
+    return acc
+  }, {} as Record<string, number>)
 
   const activeTrainings = trainings.filter(t => t.status !== 'archivado')
   const archivedCount = trainings.filter(t => t.status === 'archivado').length
@@ -816,7 +874,8 @@ Se alcanzaron a guardar ${r.guardadas} de ${slides.length} diapositivas.`)
         <div className="relative">
           <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2" style={{ color: 'var(--text-faint)' }} />
           <input value={search} onChange={e => setSearch(e.target.value)}
-            placeholder="Buscar por nombre, categoría, descripción, tipo de riesgo..."
+            data-buscador-pagina
+            placeholder="Buscar por nombre, categoría, descripción, tipo de riesgo…   (⌘K)"
             className="terra-input pl-9" />
           {search && (
             <button onClick={() => setSearch('')} className="absolute right-3 top-1/2 -translate-y-1/2"
@@ -858,8 +917,33 @@ Se alcanzaron a guardar ${r.guardadas} de ${slides.length} diapositivas.`)
             </button>
           ))}
 
-          {(search || statusFilter !== 'activos' || categoryFilter !== 'todos') && (
-            <button onClick={() => { setSearch(''); setStatusFilter('activos'); setCategoryFilter('todos') }}
+          <div className="w-px h-4 mx-1" style={{ background: 'var(--border)' }} />
+
+          {/* Con sesenta cursos, lo útil no es verlos todos sino ver cuáles
+              están a medio armar. El número dice cuántos saldrían. */}
+          <span className="text-xs flex items-center gap-1 mr-1" style={{ color: 'var(--text-faint)' }}>
+            <Check size={11} /> Preparación:
+          </span>
+          {(['todos', 'listo', 'incompleto', 'borrador'] as const).map(e => {
+            const n = conteoPrep[e] ?? 0
+            const puesto = prepFilter === e
+            const col = e === 'todos' ? null : COLOR_PREPARACION[e]
+            return (
+              <button key={e} onClick={() => setPrepFilter(e)}
+                className="px-3 py-1.5 rounded-xl text-xs font-semibold transition-all flex items-center gap-1.5"
+                style={puesto
+                  ? col
+                    ? { background: col.fondo, border: `1px solid ${col.borde}`, color: col.color }
+                    : { background: 'rgba(245,158,11,0.12)', border: '1px solid rgba(245,158,11,0.3)', color: '#FCD34D' }
+                  : { background: 'var(--bg-card)', border: '1px solid var(--border)', color: 'var(--text-dim)' }}>
+                {e === 'todos' ? 'Todos' : NOMBRE_PREPARACION[e]}
+                <span className="opacity-60">{n}</span>
+              </button>
+            )
+          })}
+
+          {(search || statusFilter !== 'activos' || categoryFilter !== 'todos' || prepFilter !== 'todos') && (
+            <button onClick={() => { setSearch(''); setStatusFilter('activos'); setCategoryFilter('todos'); setPrepFilter('todos') }}
               className="px-2.5 py-1.5 rounded-xl text-xs font-semibold flex items-center gap-1 ml-auto transition-all"
               style={{ background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.2)', color: '#FCA5A5' }}>
               <RotateCcw size={11} /> Limpiar
@@ -906,6 +990,8 @@ Se alcanzaron a guardar ${r.guardadas} de ${slides.length} diapositivas.`)
             const progress = (t.enrolled || 0) > 0 ? Math.round(((t.completed || 0) / t.enrolled) * 100) : 0
             const cardAccent = t.color || CARD_ACCENT_COLORS[t.id % CARD_ACCENT_COLORS.length]
             const isArchived = t.status === 'archivado'
+            const prep = getCourseReadiness(t as any)
+            const colorPrep = COLOR_PREPARACION[prep.status]
             return (
               <motion.div key={t.id} id={`course-${t.id}`} initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.06 }}
                 className={`terra-card terra-card-lift overflow-hidden cursor-pointer group ${isArchived ? 'opacity-60' : ''}`}
@@ -943,8 +1029,15 @@ Se alcanzaron a guardar ${r.guardadas} de ${slides.length} diapositivas.`)
                       {st.label}
                     </span>
                   </div>
-                  <div className="absolute top-3 left-3 flex items-center gap-1.5 flex-wrap">
+                  <div className="absolute top-3 left-3 flex items-center gap-1.5 flex-wrap" style={{ maxWidth: 'calc(100% - 110px)' }}>
                     <span className="badge-amber">{t.category}</span>
+                    {/* Dice la tarea concreta: con cincuenta cursos vacíos, un
+                        "Borrador" a secas no le dice a nadie qué hacer. */}
+                    <span className="inline-flex items-center px-2 py-0.5 rounded-lg text-[10px] font-bold backdrop-blur-sm whitespace-nowrap"
+                      title={prep.pendientes ? prep.checks.filter(c => !c.ok).map(c => c.falta).join(' · ') : 'Este curso está listo para dictarse'}
+                      style={{ background: colorPrep.fondo, border: `1px solid ${colorPrep.borde}`, color: colorPrep.color }}>
+                      {prep.etiqueta}
+                    </span>
                     {t.risk_type && (
                       <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg text-[10px] font-semibold backdrop-blur-sm"
                         style={{ background: 'rgba(139,92,246,0.2)', border: '1px solid rgba(139,92,246,0.35)', color: '#C4B5FD' }}>
@@ -980,97 +1073,78 @@ Se alcanzaron a guardar ${r.guardadas} de ${slides.length} diapositivas.`)
                     </div>
                   </div>
 
-                  <div className="mb-3">
-                    <div className="flex justify-between mb-1">
-                      <span className="text-xs" style={{ color: 'var(--text-dim)' }}>Progreso</span>
-                      <span className="text-xs font-bold" style={{ color: 'var(--text)' }}>{progress}%</span>
+                  {/* La barra solo tiene sentido si hay a quien medirle el avance. */}
+                  {(t.enrolled || 0) > 0 && (
+                    <div className="mb-3">
+                      <div className="flex justify-between mb-1">
+                        <span className="text-xs" style={{ color: 'var(--text-dim)' }}>Progreso</span>
+                        <span className="text-xs font-bold" style={{ color: 'var(--text)' }}>{progress}%</span>
+                      </div>
+                      <div className="terra-progress-track">
+                        <motion.div initial={{ width: 0 }} animate={{ width: `${progress}%` }} transition={{ duration: 1, delay: 0.5 }}
+                          style={{ background: cardAccent }} />
+                      </div>
                     </div>
-                    <div className="terra-progress-track">
-                      <motion.div initial={{ width: 0 }} animate={{ width: `${progress}%` }} transition={{ duration: 1, delay: 0.5 }}
-                        style={{ background: cardAccent }} />
-                    </div>
+                  )}
+
+                  <div className="flex items-center gap-2.5 flex-wrap mb-3">
+                    {prep.checks.map(c => (
+                      <span key={c.id} className="inline-flex items-center gap-1 text-[11px]"
+                        title={c.ok ? `${c.nombre}: listo` : c.falta}
+                        style={{ color: c.ok ? 'var(--text-dim)' : '#FCA5A5', cursor: c.ok ? 'default' : 'help' }}>
+                        {c.ok ? <Check size={11} className="text-emerald-400" /> : <X size={11} />}
+                        {c.nombre}
+                      </span>
+                    ))}
                   </div>
 
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-1.5">
-                      <CheckCircle size={13} className="text-emerald-400" />
-                      <span className="text-xs" style={{ color: 'var(--text-dim)' }}>Certificado al completar</span>
-                    </div>
-                    <div className="flex items-center gap-1">
-                      {isAdmin && <>
-                        {/* Upload cover */}
-                        <label onClick={(e) => e.stopPropagation()}
-                          className="p-1.5 rounded-lg hover:bg-blue-500/15 transition-colors cursor-pointer" title="Subir portada">
-                          <ImagePlus size={13} className="text-blue-400" />
-                          <input type="file" accept="image/*" className="hidden" onChange={async (e) => {
-                            const file = e.target.files?.[0]; if (!file) return
-                            const fd = new FormData(); fd.append('file', file); fd.append('training_id', String(t.id))
-                            const res = await fetch('/api/trainings/cover', { method: 'POST', body: fd })
-                            if (res.ok) { const d = await res.json(); setTrainings(prev => prev.map(tr => tr.id === t.id ? { ...tr, cover_url: d.cover_url } : tr)) }
-                            else { const d = await res.json().catch(()=>({})); alert('Error al subir portada: ' + (d.error || res.status)) }
-                          }} />
-                        </label>
+                  <div className="flex items-center gap-2">
+                    {/* Chip de una línea: antes se partía en tres. */}
+                    <span className="inline-flex items-center gap-1 px-2 py-1 rounded-lg text-[10px] font-semibold whitespace-nowrap"
+                      style={{ background: 'rgba(16,185,129,0.1)', border: '1px solid rgba(16,185,129,0.25)', color: '#6EE7B7' }}>
+                      <CheckCircle size={10} /> Certificado
+                    </span>
 
-                        {/* Duplicate */}
-                        <button onClick={(e) => handleDuplicateCourse(e, t)} disabled={duplicating === t.id}
-                          className="p-1.5 rounded-lg hover:bg-violet-500/15 transition-colors" title="Duplicar curso">
-                          {duplicating === t.id
-                            ? <Loader2 size={13} className="animate-spin text-violet-400" />
-                            : <Copy size={13} className="text-violet-400" />}
-                        </button>
-
-                        {/* Generate attendance list wizard */}
-                        <button onClick={(e) => { e.stopPropagation(); setWizardTraining(t) }}
-                          className="p-1.5 rounded-lg hover:bg-emerald-500/15 transition-colors" title="Generar Lista de Asistencia">
-                          <ClipboardList size={13} className="text-emerald-400" />
-                        </button>
-
-
-                        {/* Download original PPTX */}
-                        {t.file_name && (
-                          <button onClick={(e) => downloadPPTX(e, t)}
-                            className="p-1.5 rounded-lg hover:bg-orange-500/15 transition-colors" title="Descargar PowerPoint original">
-                            <FileUp size={13} className="text-orange-400" style={{ transform: 'rotate(180deg)' }} />
-                          </button>
-                        )}
-
-                        {/* Edit training */}
-                        <button onClick={(e) => { e.stopPropagation(); openEditCourse(t) }}
-                          className="p-1.5 rounded-lg hover:bg-blue-500/15 transition-colors" title="Editar capacitación">
-                          <Pencil size={13} className="text-blue-400" />
-                        </button>
-
-                        {/* Experience Designer */}
-                        <button onClick={(e) => { e.stopPropagation(); router.push(`/dashboard/trainings/${t.id}/experience`) }}
-                          className="p-1.5 rounded-lg hover:bg-violet-500/15 transition-colors" title="Diseñar experiencia">
-                          <span style={{ fontSize: 13 }}>✨</span>
-                        </button>
-
-                        {/* Edit validity */}
-                        <button onClick={(e) => openEditValidity(e, t)}
-                          className="p-1.5 rounded-lg hover:bg-amber-500/15 transition-colors" title="Editar vigencia">
-                          <Calendar size={13} className="text-amber-400" />
-                        </button>
-
-                        {/* Archive / restore */}
-                        <button onClick={(e) => handleArchiveCourse(e, t)}
-                          className="p-1.5 rounded-lg transition-colors"
-                          style={{ color: isArchived ? '#6EE7B7' : '#94A3B8' }}
-                          onMouseEnter={e => { e.currentTarget.style.background = isArchived ? 'rgba(16,185,129,0.12)' : 'rgba(148,163,184,0.12)' }}
-                          onMouseLeave={e => { e.currentTarget.style.background = 'transparent' }}
-                          title={isArchived ? 'Restaurar curso' : 'Archivar curso'}>
-                          {isArchived ? <ArchiveRestore size={13} /> : <Archive size={13} />}
-                        </button>
-
-                        {/* Delete */}
-                        <button onClick={(e) => { e.stopPropagation(); handleDeleteCourse(t.id) }}
-                          className="p-1.5 rounded-lg hover:bg-red-500/15 transition-colors" title="Eliminar curso">
-                          <Trash2 size={13} className="text-red-400" />
-                        </button>
-                      </>}
+                    <div className="flex items-center gap-1 ml-auto">
+                      {isAdmin && (
+                        <MenuCurso etiqueta={`Acciones de ${t.title}`} grupos={[
+                          { titulo: 'Contenido', acciones: [
+                            { id: 'editar', texto: 'Editar capacitación', icono: <Pencil size={13} className="text-blue-400" />,
+                              onClick: () => openEditCourse(t) },
+                            { id: 'experiencia', texto: 'Diseñar experiencia', icono: <Sparkles size={13} className="text-violet-400" />,
+                              onClick: () => router.push(`/dashboard/trainings/${t.id}/experience`) },
+                            { id: 'portada', texto: 'Cambiar portada', icono: <ImagePlus size={13} className="text-blue-400" />,
+                              onClick: () => {},
+                              comoArchivo: { accept: 'image/*', onArchivo: (f: File) => cambiarPortada(t.id, f) } },
+                            { id: 'pptx', texto: 'Descargar PowerPoint original', icono: <FileUp size={13} className="text-orange-400" style={{ transform: 'rotate(180deg)' }} />,
+                              oculta: !t.file_name,
+                              onClick: () => downloadPPTX({ stopPropagation: () => {} } as any, t) },
+                          ] },
+                          { titulo: 'Gestión', acciones: [
+                            { id: 'vigencia', texto: 'Editar vigencia', icono: <Calendar size={13} className="text-amber-400" />,
+                              onClick: () => openEditValidity({ stopPropagation: () => {} } as any, t) },
+                            { id: 'lista', texto: 'Generar lista de asistencia', icono: <ClipboardList size={13} className="text-emerald-400" />,
+                              onClick: () => setWizardTraining(t) },
+                            { id: 'duplicar', texto: duplicating === t.id ? 'Duplicando…' : 'Duplicar curso',
+                              icono: duplicating === t.id
+                                ? <Loader2 size={13} className="animate-spin text-violet-400" />
+                                : <Copy size={13} className="text-violet-400" />,
+                              onClick: () => handleDuplicateCourse({ stopPropagation: () => {} } as any, t) },
+                          ] },
+                          { titulo: 'Zona de peligro', acciones: [
+                            { id: 'archivar', texto: isArchived ? 'Restaurar curso' : 'Archivar curso',
+                              icono: isArchived ? <ArchiveRestore size={13} /> : <Archive size={13} />,
+                              peligro: true, onClick: () => setPorArchivar(t) },
+                            { id: 'eliminar', texto: 'Eliminar curso', icono: <Trash2 size={13} />,
+                              peligro: true, onClick: () => setPorEliminar(t) },
+                          ] },
+                        ]} />
+                      )}
                       {!isArchived && (
-                        <button className="flex items-center gap-0.5 text-xs font-bold text-amber-400 hover:text-amber-300 ml-1">
-                          Ver <ChevronRight size={13} />
+                        <button onClick={e => { e.stopPropagation(); router.push(`/dashboard/trainings/${t.id}`) }}
+                          className="flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-bold transition-colors"
+                          style={{ background: 'rgba(245,158,11,0.12)', border: '1px solid rgba(245,158,11,0.3)', color: '#FCD34D' }}>
+                          Abrir <ChevronRight size={12} />
                         </button>
                       )}
                     </div>
@@ -1570,6 +1644,33 @@ Se alcanzaron a guardar ${r.guardadas} de ${slides.length} diapositivas.`)
       )}
 
       {/* ── Attendance Wizard ─────────────────────────────────────────────── */}
+      {porArchivar && (
+        <ConfirmarAccion
+          titulo={porArchivar.status === 'archivado' ? 'Restaurar este curso' : 'Archivar este curso'}
+          nombre={porArchivar.title}
+          mensaje={porArchivar.status === 'archivado'
+            ? 'Vuelve a la biblioteca y se le puede volver a asignar a la gente.'
+            : 'Sale de la biblioteca y deja de poderse asignar. Lo que ya hizo la gente se conserva, y se puede restaurar cuando quiera.'}
+          confirmar={porArchivar.status === 'archivado' ? 'Restaurar' : 'Archivar'}
+          onCerrar={() => setPorArchivar(null)}
+          onConfirmar={() => {
+            handleArchiveCourse({ stopPropagation: () => {} } as any, porArchivar)
+            setPorArchivar(null)
+          }} />
+      )}
+
+      {porEliminar && (
+        <ConfirmarAccion
+          peligro
+          titulo="Eliminar este curso"
+          nombre={porEliminar.title}
+          mensaje="Se borra de la biblioteca con sus diapositivas y sus preguntas. Esto no se puede deshacer. Si solo quiere sacarlo de circulación, archívelo."
+          confirmar={borrando ? 'Eliminando…' : 'Eliminar'}
+          trabajando={borrando}
+          onCerrar={() => setPorEliminar(null)}
+          onConfirmar={() => handleDeleteCourse(porEliminar.id)} />
+      )}
+
       {wizardTraining && (
         <AttendanceWizard
           training={wizardTraining}

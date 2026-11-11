@@ -252,10 +252,17 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   const toggleModule = (id: string) => setExpanded(prev => ({ ...prev, [id]: !prev[id] }))
 
   // Ctrl+K / Cmd+K
+  //
+  // Estando en la Biblioteca, el atajo lleva el cursor a la barra de esa
+  // pantalla en vez de abrir la ventana: ahí lo que se quiere es filtrar las
+  // tarjetas que ya se están viendo, no saltar a otro sitio. La pantalla
+  // marca su barra con data-buscador-pagina.
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
       if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
         e.preventDefault()
+        const dePagina = document.querySelector<HTMLInputElement>('[data-buscador-pagina]')
+        if (dePagina) { dePagina.focus(); dePagina.select(); return }
         setSearchOpen(true)
       }
     }

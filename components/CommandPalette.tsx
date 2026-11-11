@@ -181,6 +181,25 @@ export function CommandPalette({ open, onClose }: Props) {
             </div>
           )}
 
+          {/* Lo primero cuando hay texto: dejar el filtro puesto en la
+              biblioteca, que es lo que uno suele querer —ver todos los que
+              coinciden— en vez de saltar a uno solo. */}
+          {query.trim().length > 1 && (
+            <button
+              onClick={() => { onClose(); router.push(`/dashboard/trainings?buscar=${encodeURIComponent(query.trim())}`) }}
+              className="w-full flex items-center gap-3 px-4 py-3 text-left transition-colors"
+              style={{ borderBottom: '1px solid var(--border)' }}>
+              <span className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0"
+                style={{ background: 'rgba(245,158,11,0.12)', border: '1px solid rgba(245,158,11,0.3)' }}>
+                <Search size={14} style={{ color: '#FCD34D' }} />
+              </span>
+              <span className="text-sm min-w-0" style={{ color: 'var(--text)' }}>
+                Filtrar la biblioteca por{' '}
+                <span className="font-semibold" style={{ color: '#FCD34D' }}>&ldquo;{query.trim()}&rdquo;</span>
+              </span>
+            </button>
+          )}
+
           {!query.trim() && results.length > 0 && (
             <div className="px-4 pt-3 pb-1">
               <span className="text-[10px] font-bold uppercase tracking-widest" style={{ color: 'var(--text-faint)' }}>
