@@ -16,6 +16,7 @@ import {
   LayoutGrid, List, AlertTriangle
 } from 'lucide-react'
 import { TEMAS, nombreTema, colorTema, sugerirTema, TEMA_POR_DEFECTO } from '@/lib/temas'
+import { comprimirImagen } from '@/lib/comprimir-imagen'
 import OrganizarTemas from '@/components/trainings/OrganizarTemas'
 import MenuCurso from '@/components/trainings/MenuCurso'
 import ConfirmarAccion from '@/components/trainings/ConfirmarAccion'
@@ -713,8 +714,11 @@ Se alcanzaron a guardar ${r.guardadas} de ${slides.length} diapositivas.`)
 
   /** Cambiar la portada, que antes vivía suelto dentro del JSX de la tarjeta. */
   const cambiarPortada = async (id: number, file: File) => {
+    // Se aligera antes de subirla: ver más de 1600 px en una caja de 290 no
+    // se puede, y el peso sí se siente al abrir la biblioteca.
+    const liviana = await comprimirImagen(file)
     const fd = new FormData()
-    fd.append('file', file)
+    fd.append('file', liviana)
     fd.append('training_id', String(id))
     const res = await fetch('/api/trainings/cover', { method: 'POST', body: fd })
     if (res.ok) {
@@ -911,7 +915,25 @@ Se alcanzaron a guardar ${r.guardadas} de ${slides.length} diapositivas.`)
 
         <div className="relative h-44 overflow-hidden">
           {t.cover_url && t.cover_url.startsWith('http') ? (
-            <img src={t.cover_url} alt={t.title} className="w-full h-full object-cover" />
+            /* La portada se ve completa, no recortada.
+             *
+             * Las imágenes no vienen todas de la misma forma: las que se
+             * suben a mano son más cuadradas que la caja, y al llenarla se
+             * comían el título por los lados —"Prevención del Riesgo
+             * Cardiovascula—". Ahora la imagen cabe entera y los lados que
+             * sobran los llena ella misma, ampliada y desenfocada, que es
+             * como lo resuelven las plataformas de video. No hay franjas
+             * negras y no se pierde una letra. */
+            <>
+              <div className="absolute inset-0" aria-hidden
+                style={{
+                  backgroundImage: `url(${t.cover_url})`,
+                  backgroundSize: 'cover', backgroundPosition: 'center',
+                  filter: 'blur(18px) saturate(1.3)', transform: 'scale(1.2)',
+                }} />
+              <img src={t.cover_url} alt={t.title} loading="lazy"
+                className="relative w-full h-full object-contain" />
+            </>
           ) : (
             <div className="w-full h-full flex items-center justify-center"
               style={{ background: 'var(--bg-card-hover)' }}>
