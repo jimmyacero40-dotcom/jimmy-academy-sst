@@ -3,6 +3,7 @@ import { supabaseAdmin } from '@/lib/supabase-admin'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { subirDiapositiva } from '@/lib/subir-diapositiva'
+import { borrarDeBodega, imagenesDelCurso } from '@/lib/bodega'
 
 type Params = { params: { id: string } }
 
@@ -41,12 +42,34 @@ export async function POST(req: NextRequest, { params }: Params) {
   const validSlides = slides.filter((s: any) => s.image_data)
 
   if (reemplazar) {
+    // Se anotan las imágenes de antes para borrarlas de la bodega. Si solo se
+    // borraran las filas, los archivos se quedarían guardados para siempre:
+    // así se habían acumulado 138 MB que ya nadie miraba.
+    const viejas = await imagenesDelCurso(trainingId)
+
     const { error: delErr } = await supabaseAdmin
       .from('training_slides')
       .delete()
       .eq('training_id', trainingId)
 
     if (delErr) return NextResponse.json({ error: delErr.message }, { status: 500 })
+
+    // La portada automática sigue nombrando a la primera diapositiva vieja,
+    // y por eso esa una se salvaba de la limpieza. Se suelta ahora; abajo se
+    // vuelve a poner con la primera de las nuevas. La escogida a mano no se
+    // toca: es un archivo aparte y sigue en uso.
+    const { data: antes } = await supabaseAdmin
+      .from('trainings')
+      .select('portada_manual')
+      .eq('id', trainingId)
+      .maybeSingle()
+    if (!antes?.portada_manual) {
+      await supabaseAdmin.from('trainings').update({ cover_url: null }).eq('id', trainingId)
+    }
+
+    // Después de soltarlas, para que `borrarDeBodega` vea que ya nadie las
+    // nombra.
+    await borrarDeBodega(viejas)
   }
 
   let insertedCount = 0
@@ -129,6 +152,8 @@ export async function DELETE(_req: NextRequest, { params }: Params) {
     return NextResponse.json({ error: 'No autorizado' }, { status: 403 })
 
   const trainingId = parseInt(params.id)
+  const viejas = await imagenesDelCurso(trainingId)
+
   const { error } = await supabaseAdmin
     .from('training_slides')
     .delete()
@@ -147,6 +172,8 @@ export async function DELETE(_req: NextRequest, { params }: Params) {
     .from('trainings')
     .update(curso?.portada_manual ? { slides_count: 0 } : { slides_count: 0, cover_url: null })
     .eq('id', trainingId)
+
+  await borrarDeBodega(viejas)
 
   return NextResponse.json({ ok: true })
 }

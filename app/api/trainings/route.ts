@@ -4,6 +4,7 @@ import { authOptions } from '@/lib/auth'
 import { supabaseAdmin as supabase } from '@/lib/supabase-admin'
 import { isAdminOrSuper, getActiveCompanyId } from '@/lib/get-company'
 import { sugerirTema } from '@/lib/temas'
+import { borrarDeBodega, imagenesDelCurso } from '@/lib/bodega'
 
 export async function GET() {
   const companyId = await getActiveCompanyId()
@@ -91,10 +92,16 @@ export async function DELETE(req: NextRequest) {
   const id = req.nextUrl.searchParams.get('id')
   if (!id) return NextResponse.json({ error: 'ID requerido' }, { status: 400 })
 
+  // Las imágenes del curso se anotan antes: una vez borrada la fila, ya no
+  // hay cómo saber cuáles eran, y se quedarían ocupando la bodega.
+  const viejas = await imagenesDelCurso(parseInt(id))
+
   let query = supabase.from('trainings').delete().eq('id', parseInt(id))
   if (companyId) query = query.eq('company_id', companyId)
 
   const { error } = await query
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+
+  await borrarDeBodega(viejas)
   return NextResponse.json({ success: true })
 }

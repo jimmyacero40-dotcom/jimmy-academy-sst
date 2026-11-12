@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { supabaseAdmin as supabase } from '@/lib/supabase-admin'
 import { isAdminOrSuper } from '@/lib/get-company'
+import { borrarDeBodega } from '@/lib/bodega'
 
 export async function POST(req: NextRequest) {
   const { authorized } = await isAdminOrSuper()
@@ -13,6 +14,14 @@ export async function POST(req: NextRequest) {
   if (!file || !trainingId) {
     return NextResponse.json({ error: 'Archivo y training_id requeridos' }, { status: 400 })
   }
+
+  // La portada que había se anota para borrarla: cambiarla cinco veces
+  // dejaba cinco archivos guardados y solo uno se veía.
+  const { data: antes } = await supabase
+    .from('trainings')
+    .select('cover_url')
+    .eq('id', parseInt(trainingId))
+    .maybeSingle()
 
   const ext = file.name.split('.').pop()?.toLowerCase() || 'jpg'
   const fileName = `covers/${trainingId}_${Date.now()}.${ext}`
@@ -50,6 +59,10 @@ export async function POST(req: NextRequest) {
   if (updateError) {
     return NextResponse.json({ error: updateError.message }, { status: 500 })
   }
+
+  // Solo se va si de verdad quedó suelta: si esa misma imagen era una
+  // diapositiva del curso, sigue en uso y no se toca.
+  await borrarDeBodega([antes?.cover_url])
 
   return NextResponse.json({ cover_url: coverUrl })
 }

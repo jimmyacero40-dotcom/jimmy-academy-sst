@@ -44,12 +44,26 @@ export async function POST(req: NextRequest, { params }: Params) {
 
   if (uploadErr) return NextResponse.json({ error: uploadErr.message }, { status: 500 })
 
-  // Delete any previous master resource for this training
+  // El archivo anterior también se va: antes solo se borraba la ficha y el
+  // PowerPoint viejo —que pesa más que todo lo demás— se quedaba guardado.
+  const { data: previos } = await supabaseAdmin
+    .from('training_resources')
+    .select('storage_path')
+    .eq('training_id', trainingId)
+    .eq('is_master', true)
+
   await supabaseAdmin
     .from('training_resources')
     .delete()
     .eq('training_id', trainingId)
     .eq('is_master', true)
+
+  const sobran = (previos ?? [])
+    .map((p: any) => p.storage_path)
+    .filter((p: string) => p && p !== storagePath)
+  if (sobran.length) {
+    await supabaseAdmin.storage.from('training-files').remove(sobran).catch(() => {})
+  }
 
   // Create training_resources record
   const { data: resource, error: resErr } = await supabaseAdmin
