@@ -302,7 +302,18 @@ function Editor({ tarjeta, opciones, onGuardar, onCerrar }: {
     }
   }
 
-  const cerrarSinGuardar = () => { descartar(sueltas); onCerrar() }
+  // Lo que había al abrir, para saber si hay algo que perder al cerrar. La
+  // audiencia va aparte de `f`, así que entra también: cambiar solo las sedes
+  // y cerrar perdía el cambio sin avisar.
+  const retrato = () => JSON.stringify([f, paraTodos, centros, areas])
+  const [inicial] = useState(retrato)
+
+  const cerrarSinGuardar = () => {
+    const cambiado = retrato() !== inicial || sueltas.length > 0
+    if (cambiado && !confirm('Hay cambios sin guardar. ¿Cerrar y perderlos?')) return
+    descartar(sueltas)
+    onCerrar()
+  }
 
   const subir = async (archivo: File) => {
     setError(null)
@@ -370,7 +381,7 @@ function Editor({ tarjeta, opciones, onGuardar, onCerrar }: {
   const dias = tiene('desde_contador') ? diasDesde(f.desde_contador) : null
 
   return (
-    <Telon onCerrar={cerrarSinGuardar} titulo={meta.nombre} ayuda={meta.ayuda}>
+    <Telon onCerrar={cerrarSinGuardar} titulo={meta.nombre} ayuda={meta.ayuda} descartable={false}>
       <div className="space-y-4">
         <Campo etiqueta={meta.automatica ? 'Rótulo de la tarjeta' : 'Título'}>
           <input value={f.titulo} onChange={e => set('titulo', e.target.value)} style={estiloCampo} />
@@ -610,20 +621,30 @@ function Casillas({ titulo, lista, marcadas, onAlternar }: {
   )
 }
 
-function Telon({ titulo, ayuda, children, onCerrar }: {
-  titulo: string; ayuda?: string; children: React.ReactNode; onCerrar: () => void
+/**
+ * El fondo oscuro con la ventana encima.
+ *
+ * `descartable` dice si un clic por fuera o la tecla Esc alcanzan para
+ * cerrarla. En el editor van en falso: escribir un anuncio toma minutos, y
+ * picar por fuera sin querer borraba todo lo escrito sin preguntar. Ahí solo
+ * se sale por Guardar, por Cancelar o por la equis. En la lista de tipos sí,
+ * porque no hay nada que perder.
+ */
+function Telon({ titulo, ayuda, children, onCerrar, descartable = true }: {
+  titulo: string; ayuda?: string; children: React.ReactNode
+  onCerrar: () => void; descartable?: boolean
 }) {
-  // Esc cierra: con el teclado es lo que la gente intenta primero.
   useEffect(() => {
+    if (!descartable) return
     const salir = (e: KeyboardEvent) => { if (e.key === 'Escape') onCerrar() }
     window.addEventListener('keydown', salir)
     return () => window.removeEventListener('keydown', salir)
-  }, [onCerrar])
+  }, [onCerrar, descartable])
 
   return (
     <div className="fixed inset-0 z-50 flex items-start justify-center p-4 overflow-y-auto"
       style={{ background: 'rgba(11,23,54,0.55)' }}
-      onClick={e => { if (e.target === e.currentTarget) onCerrar() }}>
+      onClick={e => { if (descartable && e.target === e.currentTarget) onCerrar() }}>
       <div role="dialog" aria-modal="true" aria-label={titulo}
         className="w-full max-w-2xl rounded-2xl my-8"
         style={{ background: 'var(--bg-surface)', boxShadow: '0 24px 60px rgba(11,23,54,0.3)' }}>
