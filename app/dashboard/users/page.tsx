@@ -90,15 +90,15 @@ const EMPTY_FORM = {
   status: 'activo' as UserStatus, emailManual: false, passwordManual: false, selectedGroups: [] as string[],
 }
 
-function generateEmail(name: string): string {
-  if (!name.trim()) return ''
-  const parts = name.trim().toLowerCase()
-    .normalize('NFD').replace(/[̀-ͯ]/g, '')
-    .split(/\s+/).filter(Boolean)
-  if (parts.length === 0) return ''
-  if (parts.length === 1) return `${parts[0]}@jimmyacademy.com`
-  return `${parts[0]}.${parts[parts.length - 1]}@jimmyacademy.com`
-}
+/*
+ * Aquí había una función que le inventaba un correo a cada trabajador —
+ * apellido.nombre@jimmyacademy.com— cuando no tenía uno. Ese dominio no
+ * existe: no le llega nada a nadie, y en las consultas aparecía como si la
+ * persona tuviera correo. Ya no se usaba, pero dejó 32 escritos en la base.
+ *
+ * El correo se queda vacío hasta que alguien escriba uno de verdad. Para
+ * entrar a la plataforma el trabajador usa su documento, no el correo.
+ */
 
 /** Una fila del Excel, con las mismas columnas que muestra la tabla. */
 interface FilaImportada {

@@ -27,6 +27,11 @@ export async function exportToExcel(profiles: WP[], analytics: Analytics, compan
     'NOMBRE COMPLETO':            p.users?.name || `${p.nombres ?? ''} ${p.apellidos ?? ''}`.trim(),
     'CÉDULA':                     p.users?.cedula ?? '',
     'TIPO DOCUMENTO':             p.doc_type ?? '',
+    // El cargo y el área van de primeras, en D y E: es por lo que se filtra
+    // y se agrupa al revisar la encuesta, y estaban a cincuenta columnas de
+    // distancia, donde tocaba desplazarse para verlos.
+    'CARGO':                      p.cargo_confirmado ?? '',
+    'ÁREA':                       p.area_confirmada ?? p.users?.area ?? '',
     'USUARIO / EMAIL DE INGRESO': p.users?.email ?? '',
     'CORREO PERSONAL':            p.email_personal ?? '',
     'TELÉFONO':                   p.telefono ?? '',
@@ -76,8 +81,6 @@ export async function exportToExcel(profiles: WP[], analytics: Analytics, compan
     'ESPECIALIZACIÓN':            p.especializacion ?? '',
     'OTROS ESTUDIOS':             p.otros_estudios ?? '',
     'CURSOS Y CERTIFICADOS':      p.cursos_certificados ?? '',
-    'CARGO':                      p.cargo_confirmado ?? '',
-    'ÁREA':                       p.area_confirmada ?? p.users?.area ?? '',
     'CENTRO TRABAJO / SEDE':      p.centro_trabajo ?? '',
     'JEFE INMEDIATO':             p.jefe_inmediato ?? '',
     'TIPO CONTRATO':              p.tipo_contrato ?? '',
@@ -161,7 +164,8 @@ export async function exportToExcel(profiles: WP[], analytics: Analytics, compan
   const nCols = Object.keys(base[0] ?? {}).length || 1
   ws1['!autofilter'] = { ref: `A1:${XLSX.utils.encode_col(nCols - 1)}1` }
   ws1['!cols'] = [
-    { wch: 28 },{ wch: 14 },{ wch: 16 },{ wch: 28 },{ wch: 26 },
+    // Nombre, cédula, tipo de documento, cargo y área.
+    { wch: 28 },{ wch: 14 },{ wch: 16 },{ wch: 26 },{ wch: 22 },
     ...Array(Math.max(nCols - 5, 0)).fill({ wch: 18 }),
   ]
 
