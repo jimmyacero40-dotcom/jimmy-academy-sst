@@ -70,6 +70,13 @@ export default withAuth(
       if (!isAdmin && !isConsulta) return NextResponse.redirect(new URL('/dashboard', req.url))
     }
 
+    // El tablero lo ve todo el mundo; editarlo no. El API ya lo comprueba por
+    // su cuenta, pero sin esto la pantalla de edición se abría igual y el
+    // trabajador veía la lista de lo que está apagado o programado.
+    if (path.startsWith('/dashboard/inicio/editar')) {
+      if (!isAdmin) return NextResponse.redirect(new URL('/dashboard/inicio', req.url))
+    }
+
     // Admin-only routes: retired workers
     if (path.startsWith('/dashboard/users/retirados')) {
       if (!isAdmin) return NextResponse.redirect(new URL('/dashboard', req.url))

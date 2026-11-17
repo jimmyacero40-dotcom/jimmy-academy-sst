@@ -67,7 +67,25 @@ export async function GET(req: NextRequest) {
     }
   }
 
-  return NextResponse.json({ tarjetas: visibles, esAdmin, persona })
+  // El editor necesita saber a qué sedes y áreas se puede dirigir una tarjeta.
+  // Salen de los datos reales y no de una lista escrita a mano: si mañana
+  // abren una finca nueva, aparece sola.
+  const opciones = todas ? await opcionesDeAudiencia(companyId) : undefined
+
+  return NextResponse.json({ tarjetas: visibles, esAdmin, persona, opciones })
+}
+
+async function opcionesDeAudiencia(companyId: string) {
+  const [{ data: fichas }, { data: areas }] = await Promise.all([
+    supabaseAdmin.from('worker_profiles').select('centro_trabajo').eq('company_id', companyId),
+    supabaseAdmin.from('areas').select('name').eq('company_id', companyId).order('name'),
+  ])
+
+  const centros = Array.from(
+    new Set((fichas ?? []).map((f: any) => (f.centro_trabajo ?? '').trim().toUpperCase()).filter(Boolean)),
+  ).sort()
+
+  return { centros, areas: (areas ?? []).map((a: any) => a.name) }
 }
 
 /** Contenido de las tarjetas que se llenan solas. */
