@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase-admin'
 import { isAdminOrSuper } from '@/lib/get-company'
-import { BODEGA } from '@/lib/tablero-bodega'
+import { BODEGA, borrarImagenDelTablero } from '@/lib/tablero-bodega'
 
 export const dynamic = 'force-dynamic'
 
@@ -45,4 +45,23 @@ export async function POST(req: NextRequest) {
 
   const { data } = supabaseAdmin.storage.from(BODEGA).getPublicUrl(ruta)
   return NextResponse.json({ imagen_url: data.publicUrl })
+}
+
+/**
+ * Descarta una imagen que se subió pero nunca se guardó.
+ *
+ * Subir y después cerrar el editor sin guardar dejaba el archivo en la bodega
+ * sin que ninguna tarjeta lo nombrara: basura invisible, imposible de
+ * encontrar después. `borrarImagenDelTablero` se encarga de no tocarla si
+ * alguna tarjeta sí terminó usándola.
+ */
+export async function DELETE(req: NextRequest) {
+  const { authorized } = await isAdminOrSuper()
+  if (!authorized) return NextResponse.json({ error: 'No autorizado' }, { status: 403 })
+
+  const url = req.nextUrl.searchParams.get('url')
+  if (!url) return NextResponse.json({ error: 'Falta la dirección' }, { status: 400 })
+
+  await borrarImagenDelTablero(url)
+  return NextResponse.json({ ok: true })
 }

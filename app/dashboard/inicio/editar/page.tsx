@@ -7,7 +7,7 @@ import {
   Loader2, X, Upload, AlertCircle, Check,
 } from 'lucide-react'
 import {
-  TIPOS, TIPO, COLORES, COLOR, estadoDe, diasDesde,
+  TIPOS, TIPO, COLORES, COLOR, estadoDe, diasDesde, anchoDe,
   type Tarjeta, type TipoTarjeta, type ColorTarjeta,
 } from '@/lib/tablero'
 import { comprimirImagen } from '@/lib/comprimir-imagen'
@@ -268,6 +268,7 @@ function Editor({ tarjeta, opciones, onGuardar, onCerrar }: {
     items: Array.isArray(tarjeta.datos?.items) ? tarjeta.datos.items.join(', ') : '',
     desde_contador: tarjeta.datos?.desde_contador ?? '',
     meta: tarjeta.datos?.meta ?? '',
+    ancho: anchoDe(tarjeta),
     activa: tarjeta.activa,
     desde: (tarjeta.desde ?? '').slice(0, 10),
     hasta: (tarjeta.hasta ?? '').slice(0, 10),
@@ -287,6 +288,22 @@ function Editor({ tarjeta, opciones, onGuardar, onCerrar }: {
   const alternar = (lista: string[], poner: (v: string[]) => void, v: string) =>
     poner(lista.includes(v) ? lista.filter(x => x !== v) : [...lista, v])
 
+  // Lo que se subió en esta sesión de edición y todavía no se ha guardado. Si
+  // el administrador cierra sin guardar, esos archivos se borran: si no,
+  // quedarían en la bodega sin que ninguna tarjeta los nombre, y ya no habría
+  // forma de saber que sobran.
+  const [sueltas, setSueltas] = useState<string[]>([])
+
+  const descartar = (urls: string[]) => {
+    for (const u of urls) {
+      if (u && u !== tarjeta.imagen_url) {
+        fetch(`/api/tablero/imagen?url=${encodeURIComponent(u)}`, { method: 'DELETE' }).catch(() => {})
+      }
+    }
+  }
+
+  const cerrarSinGuardar = () => { descartar(sueltas); onCerrar() }
+
   const subir = async (archivo: File) => {
     setError(null)
     const antes = archivo.size
@@ -300,7 +317,16 @@ function Editor({ tarjeta, opciones, onGuardar, onCerrar }: {
     const d = await r.json().catch(() => ({}))
     setSubiendo(null)
     if (!r.ok) { setError(d.error ?? 'No se pudo subir la imagen'); return }
+    // La que estaba a medio poner tampoco se queda: solo sobrevive la última.
+    descartar([f.imagen_url])
+    setSueltas(s => [...s.filter(u => u !== f.imagen_url), d.imagen_url])
     set('imagen_url', d.imagen_url)
+  }
+
+  const quitarImagen = () => {
+    descartar([f.imagen_url])
+    setSueltas(s => s.filter(u => u !== f.imagen_url))
+    set('imagen_url', '')
   }
 
   const enviar = async () => {
@@ -321,6 +347,7 @@ function Editor({ tarjeta, opciones, onGuardar, onCerrar }: {
       datos.desde_contador = f.desde_contador || null
       datos.meta = Number(f.meta) || null
     }
+    if (meta.anchoLibre) datos.ancho = f.ancho
 
     setGuardando(true)
     await onGuardar({
@@ -343,7 +370,7 @@ function Editor({ tarjeta, opciones, onGuardar, onCerrar }: {
   const dias = tiene('desde_contador') ? diasDesde(f.desde_contador) : null
 
   return (
-    <Telon onCerrar={onCerrar} titulo={meta.nombre} ayuda={meta.ayuda}>
+    <Telon onCerrar={cerrarSinGuardar} titulo={meta.nombre} ayuda={meta.ayuda}>
       <div className="space-y-4">
         <Campo etiqueta={meta.automatica ? 'Rótulo de la tarjeta' : 'Título'}>
           <input value={f.titulo} onChange={e => set('titulo', e.target.value)} style={estiloCampo} />
@@ -422,7 +449,7 @@ function Editor({ tarjeta, opciones, onGuardar, onCerrar }: {
                   onChange={e => { const a = e.target.files?.[0]; if (a) subir(a) }} />
               </label>
               {f.imagen_url && (
-                <button onClick={() => set('imagen_url', '')} className="text-[13px] font-semibold"
+                <button onClick={quitarImagen} className="text-[13px] font-semibold"
                   style={{ color: '#DC2626' }}>Quitar</button>
               )}
               {subiendo && (
@@ -430,6 +457,24 @@ function Editor({ tarjeta, opciones, onGuardar, onCerrar }: {
                   <Loader2 size={13} className="animate-spin" /> {subiendo}
                 </span>
               )}
+            </div>
+          </Campo>
+        )}
+
+        {meta.anchoLibre && (
+          <Campo etiqueta="Qué tan ancha" nota="En celular todas ocupan el ancho completo.">
+            <div className="flex gap-2">
+              {([1, 2, 3] as const).map(n => (
+                <button key={n} onClick={() => set('ancho', n)}
+                  className="px-3 py-1.5 rounded-lg text-[12.5px] font-bold"
+                  style={{
+                    background: f.ancho === n ? 'var(--primary-dim)' : 'var(--bg-card-hover)',
+                    color: f.ancho === n ? 'var(--primary-dark)' : 'var(--text-dim)',
+                    border: `1px solid ${f.ancho === n ? 'var(--primary-border)' : 'var(--border)'}`,
+                  }}>
+                  {n === 1 ? 'Angosta' : n === 2 ? 'Mediana' : 'Todo el ancho'}
+                </button>
+              ))}
             </div>
           </Campo>
         )}
@@ -505,7 +550,7 @@ function Editor({ tarjeta, opciones, onGuardar, onCerrar }: {
         )}
 
         <div className="flex gap-2 justify-end pt-1">
-          <button onClick={onCerrar} className="px-4 py-2.5 rounded-xl text-sm font-semibold"
+          <button onClick={cerrarSinGuardar} className="px-4 py-2.5 rounded-xl text-sm font-semibold"
             style={{ color: 'var(--text-dim)' }}>Cancelar</button>
           <button onClick={enviar} disabled={guardando || !!subiendo}
             className="px-5 py-2.5 rounded-xl text-sm font-bold inline-flex items-center gap-2 disabled:opacity-60"

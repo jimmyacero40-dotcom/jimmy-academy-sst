@@ -11,7 +11,7 @@
  */
 
 export type TipoTarjeta =
-  | 'anuncio' | 'alerta' | 'contador' | 'pausa' | 'epp'
+  | 'anuncio' | 'poster' | 'alerta' | 'contador' | 'pausa' | 'epp'
   | 'reconocimiento' | 'copasst' | 'nota'
   | 'capacitaciones' | 'formacion'
 
@@ -97,17 +97,24 @@ export interface TipoMeta {
   ayuda: string
   /** Se calcula sola; el administrador solo la prende, la apaga y la ordena. */
   automatica: boolean
-  /** Cuántas columnas ocupa en la rejilla de tres. */
+  /** Cuántas columnas ocupa en la rejilla de tres, si no se dice otra cosa. */
   ancho: 1 | 2 | 3
+  /** El administrador puede elegir cuánto ocupa. */
+  anchoLibre?: boolean
   /** Campos que el administrador llena, además de título y texto. */
   campos: string[]
 }
 
 export const TIPOS: TipoMeta[] = [
   {
-    id: 'anuncio', nombre: 'Anuncio principal', ancho: 2, automatica: false,
+    id: 'anuncio', nombre: 'Anuncio principal', ancho: 2, automatica: false, anchoLibre: true,
     ayuda: 'La tarjeta grande de arriba. Para lo más importante de la semana.',
     campos: ['destacado', 'cta', 'imagen'],
+  },
+  {
+    id: 'poster', nombre: 'Póster', ancho: 1, automatica: false, anchoLibre: true,
+    ayuda: 'La imagen y nada más: una cartelera, una infografía, una foto de campaña.',
+    campos: ['imagen', 'cta'],
   },
   {
     id: 'contador', nombre: 'Días sin accidentes', ancho: 1, automatica: false,
@@ -117,7 +124,7 @@ export const TIPOS: TipoMeta[] = [
   {
     id: 'alerta', nombre: 'Alerta', ancho: 1, automatica: false,
     ayuda: 'Un aviso con fecha de vencimiento: helada, lluvia, vía cerrada.',
-    campos: [],
+    campos: ['imagen'],
   },
   {
     id: 'capacitaciones', nombre: 'Próximas capacitaciones', ancho: 1, automatica: true,
@@ -127,7 +134,7 @@ export const TIPOS: TipoMeta[] = [
   {
     id: 'pausa', nombre: 'Pausa activa', ancho: 1, automatica: false,
     ayuda: 'La hora y el ejercicio del día.',
-    campos: ['hora'],
+    campos: ['hora', 'imagen'],
   },
   {
     id: 'formacion', nombre: 'Mi formación', ancho: 1, automatica: true,
@@ -136,28 +143,42 @@ export const TIPOS: TipoMeta[] = [
   },
   {
     id: 'reconocimiento', nombre: 'Reconocimiento', ancho: 1, automatica: false,
-    ayuda: 'A quién se le reconoce algo bien hecho este mes.',
-    campos: [],
+    ayuda: 'A quién se le reconoce algo bien hecho este mes. Queda mejor con la foto.',
+    campos: ['imagen'],
   },
   {
     id: 'epp', nombre: 'EPP de hoy', ancho: 1, automatica: false,
     ayuda: 'Los elementos de protección que toca usar en la labor del día.',
-    campos: ['items'],
+    campos: ['items', 'imagen'],
   },
   {
-    id: 'copasst', nombre: 'COPASST', ancho: 3, automatica: false,
+    id: 'copasst', nombre: 'COPASST', ancho: 3, automatica: false, anchoLibre: true,
     ayuda: 'Franja ancha para la próxima reunión del comité.',
-    campos: ['cta'],
+    campos: ['cta', 'imagen'],
   },
   {
-    id: 'nota', nombre: 'Nota libre', ancho: 1, automatica: false,
-    ayuda: 'Un título y un texto. Para lo que no encaje en los demás.',
-    campos: [],
+    id: 'nota', nombre: 'Nota libre', ancho: 1, automatica: false, anchoLibre: true,
+    ayuda: 'Un título, un texto y una imagen si quiere. Para lo que no encaje en los demás.',
+    campos: ['imagen'],
   },
 ]
 
 export const TIPO = (id: string) =>
   TIPOS.find(t => t.id === id) ?? TIPOS[TIPOS.length - 1]
+
+/**
+ * Cuántas columnas ocupa una tarjeta en el tablero.
+ *
+ * Cada tipo trae un ancho de fábrica, y los que lo permiten dejan que el
+ * administrador lo cambie: un póster vertical pide una columna, uno horizontal
+ * pide tres, y el tipo de tarjeta no alcanza a saber cuál subieron.
+ */
+export function anchoDe(t: Pick<Tarjeta, 'tipo' | 'datos'>): 1 | 2 | 3 {
+  const meta = TIPO(t.tipo)
+  if (!meta.anchoLibre) return meta.ancho
+  const elegido = Number(t.datos?.ancho)
+  return elegido === 1 || elegido === 2 || elegido === 3 ? elegido : meta.ancho
+}
 
 export const TIPOS_AUTOMATICOS = new Set(TIPOS.filter(t => t.automatica).map(t => t.id))
 

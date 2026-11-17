@@ -6,8 +6,9 @@ import { motion } from 'framer-motion'
 import {
   AlertTriangle, CalendarDays, GraduationCap, HeartPulse, HardHat,
   Award, Users, ArrowRight, Megaphone, ShieldCheck, Loader2, PenLine,
+  Image as ImageIcon,
 } from 'lucide-react'
-import { COLOR, TIPO, type Tarjeta } from '@/lib/tablero'
+import { COLOR, TIPO, anchoDe, type Tarjeta } from '@/lib/tablero'
 import { useRol } from '@/lib/usar-rol'
 
 const fecha = (d?: string | null) =>
@@ -79,7 +80,7 @@ export default function InicioPage() {
               initial={{ opacity: 0, y: 10 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: Math.min(i, 8) * 0.04, duration: 0.3 }}
-              className={`tablero-ancho-${TIPO(t.tipo).ancho}`}>
+              className={`tablero-ancho-${anchoDe(t)}`}>
               <Pintar t={t} />
             </motion.div>
           ))}
@@ -140,6 +141,7 @@ function Vacio({ esAdmin }: { esAdmin: boolean }) {
 function Pintar({ t }: { t: Tarjeta }) {
   switch (t.tipo) {
     case 'anuncio':        return <Anuncio t={t} />
+    case 'poster':         return <Poster t={t} />
     case 'contador':       return <Contador t={t} />
     case 'alerta':         return <Alerta t={t} />
     case 'capacitaciones': return <Capacitaciones t={t} />
@@ -152,19 +154,79 @@ function Pintar({ t }: { t: Tarjeta }) {
   }
 }
 
-/** Caja blanca estándar: todas las tarjetas chicas comparten esta forma. */
-function Caja({ children, color, franja }: { children: React.ReactNode; color?: string; franja?: boolean }) {
+/**
+ * La imagen de una tarjeta chica: una banda arriba.
+ *
+ * Va recortada al centro y no completa, porque aquí la imagen acompaña al
+ * texto; la que hay que ver entera es la del póster, que tiene su propio
+ * trato. Mientras carga se muestra el color de la tarjeta, para que no
+ * aparezca un hueco blanco y el texto no salte al terminar.
+ */
+function Banda({ url, color }: { url: string; color: string }) {
   return (
-    <div className="h-full rounded-2xl p-5"
+    <div className="h-[132px] w-full overflow-hidden" style={{ background: color }}>
+      <img src={url} alt="" loading="lazy" className="w-full h-full object-cover" />
+    </div>
+  )
+}
+
+/** Caja blanca estándar: todas las tarjetas chicas comparten esta forma. */
+function Caja({ children, color, franja, imagen }: {
+  children: React.ReactNode; color?: string; franja?: boolean; imagen?: string | null
+}) {
+  return (
+    <div className="h-full rounded-2xl overflow-hidden"
       style={{
         background: 'var(--bg-card)',
         border: '1px solid var(--border)',
         boxShadow: 'var(--shadow-card)',
         borderLeft: franja && color ? `3px solid ${color}` : undefined,
       }}>
-      {children}
+      {imagen && <Banda url={imagen} color={color ?? 'var(--bg-card-hover)'} />}
+      <div className="p-5">{children}</div>
     </div>
   )
+}
+
+/**
+ * El póster: la imagen es el contenido, así que se ve entera.
+ *
+ * Una cartelera vertical y una infografía horizontal no caben en la misma
+ * caja. Recortarlas al centro parte los títulos y las caras, así que la
+ * imagen va completa y el hueco que sobra se rellena con una copia suya
+ * desenfocada —lo que hacen YouTube y Netflix con los videos que no encajan.
+ */
+function Poster({ t }: { t: Tarjeta }) {
+  const c = COLOR(t.color)
+  if (!t.imagen_url) {
+    return (
+      <Caja>
+        <Rotulo icono={ImageIcon} texto={t.titulo || 'Póster'} color="var(--text-label)" />
+        <p className="text-[13px]" style={{ color: 'var(--text-label)' }}>Sin imagen todavía.</p>
+      </Caja>
+    )
+  }
+  // Altura fija, no la que traiga la imagen: una cartelera vertical de 1350
+  // píxeles estiraba su fila hasta ocupar media pantalla y empujaba el resto
+  // del tablero fuera de la vista.
+  const cuerpo = (
+    <div className="rounded-2xl relative overflow-hidden" style={{ background: c.degradado, height: 320 }}>
+      <div className="absolute inset-0" aria-hidden style={{
+        backgroundImage: `url(${t.imagen_url})`, backgroundSize: 'cover', backgroundPosition: 'center',
+        filter: 'blur(18px) saturate(1.3)', transform: 'scale(1.2)',
+      }} />
+      <img src={t.imagen_url} alt={t.titulo ?? ''} loading="lazy"
+        className="relative w-full h-full object-contain" />
+      {(t.titulo || t.texto) && (
+        <div className="absolute inset-x-0 bottom-0 p-4"
+          style={{ background: 'linear-gradient(to top, rgba(8,16,36,0.88), rgba(8,16,36,0))' }}>
+          {t.titulo && <p className="text-white font-bold text-[15px] leading-snug">{t.titulo}</p>}
+          {t.texto && <p className="text-[12.5px] mt-0.5" style={{ color: 'rgba(255,255,255,0.8)' }}>{t.texto}</p>}
+        </div>
+      )}
+    </div>
+  )
+  return t.cta_url ? <Link href={t.cta_url} className="block h-full">{cuerpo}</Link> : cuerpo
 }
 
 function Rotulo({ icono: Icono, texto, color }: { icono: any; texto: string; color: string }) {
@@ -250,14 +312,27 @@ function Contador({ t }: { t: Tarjeta }) {
   )
 }
 
+/** Caja de color: misma forma que la blanca, pero teñida del color elegido. */
+function CajaColor({ color, imagen, children }: {
+  color: ReturnType<typeof COLOR>; imagen?: string | null; children: React.ReactNode
+}) {
+  return (
+    <div className="h-full rounded-2xl overflow-hidden"
+      style={{ background: color.suave, border: `1px solid ${color.borde}` }}>
+      {imagen && <Banda url={imagen} color={color.fuerte} />}
+      <div className="p-5">{children}</div>
+    </div>
+  )
+}
+
 function Alerta({ t }: { t: Tarjeta }) {
   const c = COLOR(t.color ?? 'rojo')
   return (
-    <div className="h-full rounded-2xl p-5" style={{ background: c.suave, border: `1px solid ${c.borde}` }}>
+    <CajaColor color={c} imagen={t.imagen_url}>
       <Rotulo icono={AlertTriangle} texto="Alerta" color={c.fuerte} />
       <p className="font-bold text-[15px] leading-snug" style={{ color: 'var(--text)' }}>{t.titulo}</p>
       {t.texto && <p className="text-[13px] mt-1.5 leading-relaxed" style={{ color: 'var(--text-dim)' }}>{t.texto}</p>}
-    </div>
+    </CajaColor>
   )
 }
 
@@ -321,7 +396,7 @@ function Formacion({ t }: { t: Tarjeta }) {
 function Pausa({ t }: { t: Tarjeta }) {
   const c = COLOR(t.color)
   return (
-    <Caja>
+    <Caja imagen={t.imagen_url} color={c.fuerte}>
       <Rotulo icono={HeartPulse} texto={t.titulo || 'Pausa activa'} color="var(--text-label)" />
       {t.datos?.hora && (
         <p className="text-xl font-extrabold tabular-nums" style={{ color: c.fuerte }}>{t.datos.hora}</p>
@@ -334,7 +409,7 @@ function Pausa({ t }: { t: Tarjeta }) {
 function Epp({ t }: { t: Tarjeta }) {
   const items: string[] = Array.isArray(t.datos?.items) ? t.datos.items : []
   return (
-    <Caja>
+    <Caja imagen={t.imagen_url} color={COLOR(t.color).fuerte}>
       <Rotulo icono={HardHat} texto={t.titulo || 'EPP de hoy'} color="var(--text-label)" />
       {items.length > 0 && (
         <div className="flex flex-wrap gap-1.5 mb-2">
@@ -354,11 +429,11 @@ function Epp({ t }: { t: Tarjeta }) {
 function Reconocimiento({ t }: { t: Tarjeta }) {
   const c = COLOR(t.color ?? 'verde')
   return (
-    <div className="h-full rounded-2xl p-5" style={{ background: c.suave, border: `1px solid ${c.borde}` }}>
+    <CajaColor color={c} imagen={t.imagen_url}>
       <Rotulo icono={Award} texto="Reconocimiento" color={c.fuerte} />
       <p className="font-bold text-[15px] leading-snug" style={{ color: 'var(--text)' }}>{t.titulo}</p>
       {t.texto && <p className="text-[13px] mt-1.5 leading-relaxed" style={{ color: 'var(--text-dim)' }}>{t.texto}</p>}
-    </div>
+    </CajaColor>
   )
 }
 
@@ -367,10 +442,17 @@ function Copasst({ t }: { t: Tarjeta }) {
   return (
     <div className="rounded-2xl p-5 flex items-center gap-4 flex-wrap"
       style={{ background: c.suave, border: `1px solid ${c.borde}` }}>
-      <div className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0"
-        style={{ background: c.fuerte }}>
-        <Users size={19} color="#fff" />
-      </div>
+      {/* En una franja horizontal una banda de imagen la partiría en dos, así
+          que aquí la imagen reemplaza al icono y queda del mismo tamaño. */}
+      {t.imagen_url ? (
+        <img src={t.imagen_url} alt="" loading="lazy"
+          className="w-12 h-12 rounded-xl object-cover flex-shrink-0" style={{ background: c.fuerte }} />
+      ) : (
+        <div className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0"
+          style={{ background: c.fuerte }}>
+          <Users size={19} color="#fff" />
+        </div>
+      )}
       <div className="flex-1 min-w-[200px]">
         <p className="text-[11px] font-bold tracking-wider uppercase" style={{ color: c.fuerte }}>
           {t.titulo || 'COPASST'}
@@ -391,7 +473,7 @@ function Copasst({ t }: { t: Tarjeta }) {
 function Nota({ t }: { t: Tarjeta }) {
   const c = COLOR(t.color)
   return (
-    <Caja color={c.fuerte} franja>
+    <Caja color={c.fuerte} franja imagen={t.imagen_url}>
       <Rotulo icono={ShieldCheck} texto={t.titulo || 'Nota'} color="var(--text-label)" />
       {t.texto && <p className="text-[13px] leading-relaxed" style={{ color: 'var(--text-dim)' }}>{t.texto}</p>}
     </Caja>
