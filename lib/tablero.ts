@@ -166,6 +166,45 @@ export const TIPOS: TipoMeta[] = [
 export const TIPO = (id: string) =>
   TIPOS.find(t => t.id === id) ?? TIPOS[TIPOS.length - 1]
 
+// ── Cómo se muestra la imagen ──────────────────────────────────────────────
+
+export type Ajuste = 'completa' | 'recortada'
+export type Alto = 'auto' | 'baja' | 'media' | 'alta'
+
+export const ALTOS: { id: Alto; nombre: string; px: number | null }[] = [
+  { id: 'auto',  nombre: 'La imagen manda', px: null },
+  { id: 'baja',  nombre: 'Baja',   px: 150 },
+  { id: 'media', nombre: 'Media',  px: 230 },
+  { id: 'alta',  nombre: 'Alta',   px: 330 },
+]
+
+export const AJUSTES: { id: Ajuste; nombre: string; ayuda: string }[] = [
+  { id: 'completa',  nombre: 'Completa',  ayuda: 'Se ve toda. Lo que sobre se rellena.' },
+  { id: 'recortada', nombre: 'Recortada', ayuda: 'Llena la caja. Puede cortar los bordes.' },
+]
+
+/**
+ * Por omisión la imagen se ve entera y con la altura que ella misma pida.
+ *
+ * Antes iba siempre recortada a una banda fija, y una tira de pictogramas
+ * quedaba partida por la mitad: se veía medio dibujo y medio texto. Recortar
+ * solo tiene sentido cuando la imagen es fondo, y eso lo sabe quien la sube,
+ * no el tipo de tarjeta.
+ */
+export function ajusteDe(t: Pick<Tarjeta, 'datos'>): Ajuste {
+  return t.datos?.ajuste === 'recortada' ? 'recortada' : 'completa'
+}
+
+export function altoDe(t: Pick<Tarjeta, 'datos'>): number | null {
+  const id = t.datos?.alto
+  const encontrado = ALTOS.find(a => a.id === id)
+  // Recortar sin una altura fija no significa nada: no habría de dónde recortar.
+  if (!encontrado || encontrado.px === null) {
+    return ajusteDe(t) === 'recortada' ? 230 : null
+  }
+  return encontrado.px
+}
+
 /**
  * Cuántas columnas ocupa una tarjeta en el tablero.
  *
@@ -181,6 +220,49 @@ export function anchoDe(t: Pick<Tarjeta, 'tipo' | 'datos'>): 1 | 2 | 3 {
 }
 
 export const TIPOS_AUTOMATICOS = new Set(TIPOS.filter(t => t.automatica).map(t => t.id))
+
+// ── Pictogramas ────────────────────────────────────────────────────────────
+
+/**
+ * Señales que se pueden colgar en cualquier tarjeta, en una fila bajo el texto.
+ *
+ * Son los nombres de los iconos de la librería que ya usa toda la plataforma;
+ * aquí solo se escoge cuáles tienen sentido en SST y cómo se llaman en
+ * español, para que el administrador no tenga que buscar entre dos mil.
+ */
+export const PICTOGRAMAS: { id: string; nombre: string }[] = [
+  { id: 'HardHat',        nombre: 'Casco' },
+  { id: 'Glasses',        nombre: 'Gafas' },
+  { id: 'Hand',           nombre: 'Guantes' },
+  { id: 'Footprints',     nombre: 'Botas' },
+  { id: 'Ear',            nombre: 'Oídos' },
+  { id: 'Wind',           nombre: 'Respirador' },
+  { id: 'Shirt',          nombre: 'Chaleco' },
+  { id: 'Anchor',         nombre: 'Arnés' },
+  { id: 'AlertTriangle',  nombre: 'Peligro' },
+  { id: 'Flame',          nombre: 'Fuego' },
+  { id: 'Zap',            nombre: 'Eléctrico' },
+  { id: 'Biohazard',      nombre: 'Biológico' },
+  { id: 'FlaskConical',   nombre: 'Químico' },
+  { id: 'Volume2',        nombre: 'Ruido' },
+  { id: 'Sun',            nombre: 'Sol' },
+  { id: 'Droplets',       nombre: 'Agua' },
+  { id: 'Truck',          nombre: 'Vehículos' },
+  { id: 'Ban',            nombre: 'Prohibido' },
+  { id: 'HeartPulse',     nombre: 'Salud' },
+  { id: 'Stethoscope',    nombre: 'Médico' },
+  { id: 'Siren',          nombre: 'Emergencia' },
+  { id: 'DoorOpen',       nombre: 'Evacuación' },
+  { id: 'Phone',          nombre: 'Teléfono' },
+  { id: 'Users',          nombre: 'Personas' },
+  { id: 'GraduationCap',  nombre: 'Formación' },
+  { id: 'Recycle',        nombre: 'Ambiental' },
+  { id: 'Leaf',           nombre: 'Campo' },
+  { id: 'ShieldCheck',    nombre: 'Protección' },
+]
+
+export const pictogramasDe = (t: Pick<Tarjeta, 'datos'>): string[] =>
+  Array.isArray(t.datos?.iconos) ? t.datos.iconos.filter((i: any) => typeof i === 'string') : []
 
 // ── Visibilidad ────────────────────────────────────────────────────────────
 
