@@ -16,6 +16,7 @@ import {
 } from 'lucide-react'
 import { CommandPalette } from '@/components/CommandPalette'
 import { useTheme, THEMES, type ThemeId } from '@/components/ThemeProvider'
+import { useRol } from '@/lib/usar-rol'
 
 // All navigable hrefs — order matters: MORE SPECIFIC paths must come first so
 // the most-specific match wins when finding the active nav item.
@@ -205,14 +206,11 @@ const MODULE_HREFS: Record<string, string[]> = {
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname()
   const { data: session, status } = useSession()
-  // Mientras la sesión carga no se conoce el rol. Sin esto se pinta el menú de
-  // trabajador y luego salta al del rol real, que es el parpadeo al entrar.
-  const sessionLoading = status === 'loading'
-  const userRole = (session?.user as any)?.role || 'worker'
-  const isAdmin = userRole === 'admin' || userRole === 'superadmin'
-  const isSuperAdmin = userRole === 'superadmin'
-  const isPortero = userRole === 'portero'
-  const isConsulta = userRole === 'consulta'
+  // Mientras no se sepa el rol no se pinta ningún menú. Antes se caía en
+  // 'worker' por omisión y al administrador le desaparecían las opciones sin
+  // haberse salido.
+  const { rol: userRole, cargando: sessionLoading, esAdmin: isAdmin,
+    esSuperAdmin: isSuperAdmin, esPortero: isPortero, esConsulta: isConsulta } = useRol()
 
   const [activeCompany, setActiveCompany] = useState<{ name: string; logo_url?: string } | null>(null)
   const [workerDisplayName, setWorkerDisplayName] = useState<string | null>(null)

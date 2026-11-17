@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react'
 import { useAnchosColumnas, ManijaColumna, type ColumnaAncho } from '@/components/anchos-columnas'
 import { useSession } from 'next-auth/react'
+import { useRol } from '@/lib/usar-rol'
 import { UserX, Search, RefreshCw, RotateCcw, Calendar, ArrowLeft, Trash2, AlertTriangle } from 'lucide-react'
 import Link from 'next/link'
 
@@ -46,7 +47,7 @@ const COLUMNAS_RETIRADOS: ColumnaAncho[] = [
 export default function RetiradosPage() {
   const columnas = useAnchosColumnas('retirados', COLUMNAS_RETIRADOS)
   const { data: session } = useSession()
-  const isSuperAdmin = (session?.user as any)?.role === 'superadmin'
+  const { esSuperAdmin: isSuperAdmin } = useRol()
 
   const [workers, setWorkers] = useState<RetiredUser[]>([])
   const [loading, setLoading] = useState(true)

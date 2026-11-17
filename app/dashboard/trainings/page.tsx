@@ -17,6 +17,7 @@ import {
 } from 'lucide-react'
 import { TEMAS, nombreTema, colorTema, sugerirTema, TEMA_POR_DEFECTO } from '@/lib/temas'
 import { comprimirImagen } from '@/lib/comprimir-imagen'
+import { useRol } from '@/lib/usar-rol'
 import OrganizarTemas from '@/components/trainings/OrganizarTemas'
 import MenuCurso from '@/components/trainings/MenuCurso'
 import ConfirmarAccion from '@/components/trainings/ConfirmarAccion'
@@ -233,8 +234,9 @@ async function downloadAttendanceList(training: any) {
 export default function BibliotecaPage() {
   const router = useRouter()
   const { data: session } = useSession()
-  const userRole = (session?.user as any)?.role || 'worker'
-  const isAdmin = userRole === 'superadmin' || userRole === 'admin'
+  // Nunca 'worker' por omisión: eso le quitaba los botones de administración
+  // al administrador mientras la sesión se volvía a confirmar.
+  const { rol: userRole, esAdmin: isAdmin } = useRol()
   const [trainings, setTrainings] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')

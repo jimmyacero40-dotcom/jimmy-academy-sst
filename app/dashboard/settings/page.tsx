@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { useSession } from 'next-auth/react'
+import { useRol } from '@/lib/usar-rol'
 import { motion } from 'framer-motion'
 import {
   Settings, Building2, Bell, Shield, Globe, Palette,
@@ -79,10 +80,10 @@ function PermisosGrid({ seleccionados, bloqueado, onToggle }: {
 
 export default function SettingsPage() {
   const { data: session } = useSession()
-  const userRole = (session?.user as any)?.role || 'worker'
-  const isWorker = userRole === 'worker'
-  const isSuperAdmin = userRole === 'superadmin'
-  const SECTIONS = isWorker
+  // Mientras no se sepa el rol no se muestran las secciones de trabajador:
+  // al administrador le desaparecía media Configuración sin haberse salido.
+  const { rol: userRole, cargando: rolCargando, esTrabajador: isWorker, esSuperAdmin: isSuperAdmin } = useRol()
+  const SECTIONS = rolCargando ? [] : isWorker
     ? WORKER_SECTIONS
     : ADMIN_SECTIONS.filter(s => !s.superadminOnly || isSuperAdmin)
 

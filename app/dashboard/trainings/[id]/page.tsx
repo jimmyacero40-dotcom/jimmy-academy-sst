@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef } from 'react'
 import { useSession } from 'next-auth/react'
+import { useRol } from '@/lib/usar-rol'
 import { useParams, useRouter } from 'next/navigation'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
@@ -268,14 +269,13 @@ function generateQuestionsFromContent(texts: string[], title: string): Question[
 
 export default function TrainingDetailPage() {
   const { data: session } = useSession()
-  const rolActual = (session?.user as any)?.role
-  const puedeEditarCurso = rolActual === 'admin' || rolActual === 'superadmin'
+  const { rol: rolActual, esAdmin: puedeEditarCurso, esTrabajador } = useRol()
   const params = useParams()
   const router = useRouter()
   const courseId = parseInt(params.id as string)
 
-  const userRole = (session?.user as any)?.role
-  const isWorker = userRole === 'worker'
+  const userRole = rolActual
+  const isWorker = esTrabajador
   // Workers always go back to Mi Formación; admins to the library
   const backPath = isWorker ? '/dashboard/my-plan' : '/dashboard/trainings'
 

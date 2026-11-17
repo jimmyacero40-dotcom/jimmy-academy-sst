@@ -6,6 +6,7 @@ import CorreccionRapida from '@/components/CorreccionRapida'
 import { useAnchosColumnas, ManijaColumna, type ColumnaAncho } from '@/components/anchos-columnas'
 import { useRouter } from 'next/navigation'
 import { useSession } from 'next-auth/react'
+import { useRol } from '@/lib/usar-rol'
 import { motion, AnimatePresence } from 'framer-motion'
 import * as XLSX from 'xlsx'
 import {
@@ -567,7 +568,9 @@ export default function UsersPage() {
 
   const [cellSaving, setCellSaving] = useState<string | null>(null)
   const { data: session } = useSession()
-  const isSuperadmin = (session?.user as any)?.role === 'superadmin'
+  // Del hook, no de la sesión cruda: un tropiezo de red no le quita al
+  // superadmin sus acciones.
+  const { esSuperAdmin: isSuperadmin } = useRol()
   const [groupPopover, setGroupPopover] = useState<string | null>(null)
   const [corrigiendo, setCorrigiendo] = useState(false)
   const columnas = useAnchosColumnas('personas', COLUMNAS_PERSONAS)
