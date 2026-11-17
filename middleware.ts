@@ -95,7 +95,7 @@ export default withAuth(
     }
 
     const RUTAS_TRABAJADOR = [
-      '/dashboard', '/dashboard/my-profile', '/dashboard/my-plan',
+      '/dashboard', '/dashboard/inicio', '/dashboard/my-profile', '/dashboard/my-plan',
       '/dashboard/tu-cuentas', '/dashboard/reportal',
       '/dashboard/my-signature', '/dashboard/certificates',
       '/dashboard/settings', '/dashboard/configuracion',
@@ -111,9 +111,9 @@ export default withAuth(
     if (role === 'worker' && !permite(RUTAS_TRABAJADOR)) {
       return NextResponse.redirect(new URL('/dashboard/my-profile', req.url))
     }
-    // Sin "Inicio" en el menú, el tablero general no es su sitio: entra a su perfil.
+    // El tablero general es de gestión; lo del trabajador es la cartelera.
     if (role === 'worker' && path === '/dashboard') {
-      return NextResponse.redirect(new URL('/dashboard/my-profile', req.url))
+      return NextResponse.redirect(new URL('/dashboard/inicio', req.url))
     }
 
     if (isConsulta && !permite(RUTAS_CONSULTA)) {

@@ -47,6 +47,7 @@ const ALL_NAV_HREFS = [
   '/dashboard/reportal/nuevo',
   '/dashboard/tu-cuentas',
   '/dashboard/reportal',
+  '/dashboard/inicio',
   '/dashboard',
 ]
 
@@ -88,6 +89,14 @@ const ADMIN_NAV: NavEntry[] = [
     href: '/dashboard',
     icon: LayoutDashboard,
     label: 'Dashboard',
+  },
+  // La cartelera que ve el trabajador. El administrador entra a la misma
+  // pantalla y la edita ahí mismo, así que no hay una ruta aparte en el menú.
+  {
+    kind: 'link',
+    href: '/dashboard/inicio',
+    icon: Home,
+    label: 'Tablero',
   },
   {
     kind: 'module',
@@ -180,6 +189,7 @@ const CONSULTA_NAV = [
 // Cuatro módulos y nada más. La firma vive dentro de Mi Perfil y los
 // certificados dentro de SSTudio, así que ya no necesitan botón propio.
 const WORKER_NAV = [
+  { href: '/dashboard/inicio',     icon: Home,           label: 'Inicio' },
   { href: '/dashboard/my-profile', icon: Briefcase,      label: 'Mi Perfil' },
   { href: '/dashboard/my-plan',    icon: GraduationCap,  label: 'SSTudio' },
   { href: '/dashboard/tu-cuentas', icon: MessageSquare,  label: 'Tú Cuentas' },
