@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { createContext, useContext, useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
 import { motion } from 'framer-motion'
 import {
@@ -10,7 +10,8 @@ import {
   ChevronLeft, ChevronRight, List,
 } from 'lucide-react'
 import {
-  COLOR, TIPO, TIPOS, anchoDe, ajusteDe, altoDe, pictogramasDe,
+  COLOR, TIPO, anchoDe, ajusteDe, altoDe, pictogramasDe,
+  ALTO_MINIMO, ALTO_MAXIMO,
   type Tarjeta, type TipoTarjeta,
 } from '@/lib/tablero'
 import { Pictograma } from '@/components/tablero/Pictograma'
@@ -27,6 +28,17 @@ const fecha = (d?: string | null) =>
  * y dejaría "Martes 17 De Noviembre De 2026".
  */
 const conMayuscula = (t: string) => (t ? t[0].toUpperCase() + t.slice(1) : '')
+
+/**
+ * El modo diseño, disponible para cualquier tarjeta sin pasarlo de mano en
+ * mano. Las tarjetas están anidadas tres niveles —rejilla, caja, imagen— y
+ * llevar dos propiedades por toda esa cadena ensuciaba diez componentes que
+ * no tienen nada que ver con editar.
+ */
+const Diseno = createContext<{
+  activo: boolean
+  guardarAlto: (t: Tarjeta, px: number | null) => void
+}>({ activo: false, guardarAlto: () => {} })
 
 export default function InicioPage() {
   const { esAdmin } = useRol()
@@ -129,6 +141,13 @@ export default function InicioPage() {
     guardarOrden(nuevo)
   }
 
+  /** Guarda el alto que quedó tras estirar la imagen con el mouse. */
+  const guardarAlto = (t: Tarjeta, px: number | null) => {
+    const datos = { ...t.datos, altoPx: px }
+    setTarjetas(ts => ts.map(x => x.id === t.id ? { ...x, datos } : x))
+    guardar({ id: t.id, datos } as any)
+  }
+
   const cambiarAncho = (t: Tarjeta, hacia: -1 | 1) => {
     const actual = anchoDe(t)
     const nuevo = Math.min(3, Math.max(1, actual + hacia))
@@ -138,6 +157,7 @@ export default function InicioPage() {
   }
 
   return (
+    <Diseno.Provider value={{ activo: diseñando, guardarAlto }}>
     <div className="space-y-5 pb-10">
       <div className="flex items-end justify-between gap-4 flex-wrap">
         <div>
@@ -252,6 +272,7 @@ export default function InicioPage() {
         }
       `}</style>
     </div>
+    </Diseno.Provider>
   )
 }
 
@@ -351,20 +372,80 @@ function Pintar({ t }: { t: Tarjeta }) {
  * una copia suya desenfocada en vez de una franja blanca.
  */
 function Imagen({ t, color }: { t: Tarjeta; color: string }) {
+  const { activo, guardarAlto } = useContext(Diseno)
+  const caja = useRef<HTMLDivElement>(null)
+  // Mientras se arrastra, la altura vive aquí: así la imagen sigue al mouse sin
+  // escribir en la base en cada píxel.
+  const [estirando, setEstirando] = useState<number | null>(null)
+
   if (!t.imagen_url) return null
   const recorta = ajusteDe(t) === 'recortada'
-  const alto = altoDe(t)
+  const alto = estirando ?? altoDe(t)
 
-  if (!alto) {
+  const agarrar = (e: React.PointerEvent) => {
+    e.preventDefault()
+    e.stopPropagation()
+    const inicioY = e.clientY
+    // Si venía en "la imagen manda" no hay número de dónde partir: se toma el
+    // alto que tiene puesto en pantalla en este momento.
+    const inicioAlto = alto ?? caja.current?.getBoundingClientRect().height ?? 240
+
+    // Las escuchas van en la ventana y no en la manija: el mouse se sale de
+    // esos veinte píxeles de alto apenas se empieza a arrastrar, y entonces el
+    // soltar caía en otro elemento y el alto quedaba a medio camino, sin
+    // guardarse.
+    let ultimo = inicioAlto
+    const mover = (ev: PointerEvent) => {
+      ultimo = Math.min(ALTO_MAXIMO, Math.max(ALTO_MINIMO, inicioAlto + (ev.clientY - inicioY)))
+      setEstirando(ultimo)
+    }
+    const soltar = () => {
+      window.removeEventListener('pointermove', mover)
+      window.removeEventListener('pointerup', soltar)
+      window.removeEventListener('pointercancel', soltar)
+      setEstirando(null)
+      guardarAlto(t, Math.round(ultimo))
+    }
+    window.addEventListener('pointermove', mover)
+    window.addEventListener('pointerup', soltar)
+    window.addEventListener('pointercancel', soltar)
+  }
+
+  const manija = activo && (
+    <>
+      <div
+        onPointerDown={agarrar}
+        // La tarjeta entera es arrastrable para reordenar; sin esto, agarrar
+        // la manija la arrancaba de su sitio en vez de estirar la imagen.
+        draggable={false} onDragStart={e => { e.preventDefault(); e.stopPropagation() }}
+        title="Arrastre para estirar o achicar la imagen"
+        className="absolute inset-x-0 bottom-0 h-5 z-10 flex items-center justify-center"
+        style={{ cursor: 'ns-resize', background: 'linear-gradient(to top, rgba(11,23,54,0.55), transparent)' }}>
+        <span className="w-10 h-1 rounded-full" style={{ background: 'rgba(255,255,255,0.85)' }} />
+      </div>
+      {alto != null && (
+        <button
+          onClick={e => { e.stopPropagation(); guardarAlto(t, null) }}
+          title="Volver al alto natural de la imagen"
+          className="absolute right-1.5 bottom-6 z-10 px-2 py-0.5 rounded text-[10.5px] font-bold"
+          style={{ background: 'rgba(11,23,54,0.8)', color: '#fff' }}>
+          {estirando != null ? `${Math.round(estirando)} px` : 'alto natural'}
+        </button>
+      )}
+    </>
+  )
+
+  if (alto == null) {
     return (
-      <div className="w-full" style={{ background: color }}>
+      <div ref={caja} className="w-full relative" style={{ background: color }}>
         <img src={t.imagen_url} alt="" loading="lazy" className="w-full h-auto block" />
+        {manija}
       </div>
     )
   }
 
   return (
-    <div className="w-full relative overflow-hidden" style={{ height: alto, background: color }}>
+    <div ref={caja} className="w-full relative overflow-hidden" style={{ height: alto, background: color }}>
       {!recorta && (
         <div className="absolute inset-0" aria-hidden style={{
           backgroundImage: `url(${t.imagen_url})`, backgroundSize: 'cover', backgroundPosition: 'center',
@@ -373,6 +454,7 @@ function Imagen({ t, color }: { t: Tarjeta; color: string }) {
       )}
       <img src={t.imagen_url} alt="" loading="lazy"
         className={`relative w-full h-full ${recorta ? 'object-cover' : 'object-contain'}`} />
+      {manija}
     </div>
   )
 }

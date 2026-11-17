@@ -195,9 +195,23 @@ export function ajusteDe(t: Pick<Tarjeta, 'datos'>): Ajuste {
   return t.datos?.ajuste === 'recortada' ? 'recortada' : 'completa'
 }
 
+export const ALTO_MINIMO = 80
+export const ALTO_MAXIMO = 900
+
+/**
+ * Qué tan alta se dibuja la imagen, en píxeles. `null` significa que manda la
+ * imagen y la tarjeta crece lo que haga falta.
+ *
+ * `altoPx` gana sobre el preajuste: es lo que queda cuando se estira la imagen
+ * con el mouse desde el tablero, y sería raro que arrastrar no mandara sobre
+ * una lista de tres opciones.
+ */
 export function altoDe(t: Pick<Tarjeta, 'datos'>): number | null {
-  const id = t.datos?.alto
-  const encontrado = ALTOS.find(a => a.id === id)
+  const suelto = Number(t.datos?.altoPx)
+  if (Number.isFinite(suelto) && suelto > 0) {
+    return Math.min(ALTO_MAXIMO, Math.max(ALTO_MINIMO, Math.round(suelto)))
+  }
+  const encontrado = ALTOS.find(a => a.id === t.datos?.alto)
   // Recortar sin una altura fija no significa nada: no habría de dónde recortar.
   if (!encontrado || encontrado.px === null) {
     return ajusteDe(t) === 'recortada' ? 230 : null
