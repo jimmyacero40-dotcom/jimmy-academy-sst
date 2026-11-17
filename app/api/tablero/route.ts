@@ -69,7 +69,7 @@ export async function GET(req: NextRequest) {
 
   // El editor necesita saber a qué sedes y áreas se puede dirigir una tarjeta.
   // Salen de los datos reales y no de una lista escrita a mano: si mañana
-  // abren una finca nueva, aparece sola.
+  // abren una sede nueva, aparece sola.
   const opciones = todas ? await opcionesDeAudiencia(companyId) : undefined
 
   return NextResponse.json({ tarjetas: visibles, esAdmin, persona, opciones })

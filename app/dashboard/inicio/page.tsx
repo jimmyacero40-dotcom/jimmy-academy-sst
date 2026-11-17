@@ -15,21 +15,22 @@ const fecha = (d?: string | null) =>
   d ? new Date(d + 'T12:00:00').toLocaleDateString('es-CO', { weekday: 'short', day: 'numeric', month: 'short' }) : ''
 
 /**
- * Con qué nombre se saluda.
+ * "martes, 17 de noviembre de 2026" → "Martes, 17 de noviembre de 2026".
  *
- * `users.name` viene como "APELLIDO APELLIDO NOMBRE NOMBRE", así que su primera
- * palabra es un apellido: saludar con ella suena a citación. La ficha sí tiene
- * los nombres aparte, y de ahí se toma el primero. Si la persona todavía no
- * tiene ficha, no se adivina: se saluda sin nombre.
+ * Solo la primera letra. La regla de CSS `capitalize` toca todas las palabras
+ * y dejaría "Martes 17 De Noviembre De 2026".
  */
-const primeroDe = (nombres?: string | null) =>
-  (nombres ?? '').trim().split(/\s+/)[0] ?? ''
+const conMayuscula = (t: string) => (t ? t[0].toUpperCase() + t.slice(1) : '')
 
 export default function InicioPage() {
   const { esAdmin } = useRol()
   const [tarjetas, setTarjetas] = useState<Tarjeta[]>([])
   const [cargando, setCargando] = useState(true)
-  const [nombre, setNombre] = useState('')
+  // La fecha se arma en el navegador y no en el servidor: el servidor corre en
+  // UTC, así que entre las 7 de la noche y la medianoche escribía el día
+  // siguiente. Queda vacía en el primer pintado y se llena al montar, que es
+  // lo que evita que el servidor y el navegador rindan textos distintos.
+  const [hoy, setHoy] = useState('')
 
   useEffect(() => {
     fetch('/api/tablero')
@@ -40,10 +41,9 @@ export default function InicioPage() {
   }, [])
 
   useEffect(() => {
-    fetch('/api/profile')
-      .then(r => (r.ok ? r.json() : {}))
-      .then((d: any) => setNombre(primeroDe(d?.nombres)))
-      .catch(() => {})
+    setHoy(new Date().toLocaleDateString('es-CO', {
+      weekday: 'long', day: 'numeric', month: 'long', year: 'numeric',
+    }))
   }, [])
 
   return (
@@ -51,10 +51,10 @@ export default function InicioPage() {
       <div className="flex items-end justify-between gap-4 flex-wrap">
         <div>
           <h1 className="text-2xl font-bold" style={{ color: 'var(--text)' }}>
-            {nombre ? `Hola, ${nombre}` : 'Bienvenido'}
+            {conMayuscula(hoy) || ' '}
           </h1>
           <p className="text-sm mt-0.5" style={{ color: 'var(--text-label)' }}>
-            Lo que hay que saber hoy en la finca
+            Lo destacado en seguridad y salud en el trabajo
           </p>
         </div>
         {esAdmin && (
