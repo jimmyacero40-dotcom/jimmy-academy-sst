@@ -13,6 +13,7 @@ import {
   COLOR, TIPO, anchoDe, ajusteDe, altoDe, pictogramasDe,
   ordenDe, alineacionDe, tamanoDe, aireDe,
   disposicionDe, proporcionDe, colorTextoDe,
+  posicionIconosDe, tamanoIconosDe,
   ALTO_MINIMO, ALTO_MAXIMO,
   type Tarjeta, type TipoTarjeta,
 } from '@/lib/tablero'
@@ -40,7 +41,17 @@ const conMayuscula = (t: string) => (t ? t[0].toUpperCase() + t.slice(1) : '')
 const Diseno = createContext<{
   activo: boolean
   guardarAlto: (t: Tarjeta, px: number | null) => void
-}>({ activo: false, guardarAlto: () => {} })
+  guardarIconos: (t: Tarjeta, pos: { x: number; y: number } | null) => void
+  /**
+   * Suelta el arrastre de la tarjeta mientras se usa una manija.
+   *
+   * La tarjeta entera es arrastrable para reordenarla. Al mover el mouse sobre
+   * una manija, el navegador arrancaba ese arrastre nativo, y con él se llevaba
+   * el control del puntero: la manija se quedaba sin recibir el movimiento y
+   * sin enterarse de que se había soltado, así que no guardaba nada.
+   */
+  bloquear: (b: boolean) => void
+}>({ activo: false, guardarAlto: () => {}, guardarIconos: () => {}, bloquear: () => {} })
 
 export default function InicioPage() {
   const { esAdmin } = useRol()
@@ -60,6 +71,7 @@ export default function InicioPage() {
   const [eligiendoTipo, setEligiendoTipo] = useState(false)
   const [arrastrando, setArrastrando] = useState<string | null>(null)
   const [separacion, setSeparacion] = useState(16)
+  const [bloqueado, setBloqueado] = useState(false)
 
   const cargar = (conTodas = diseñando) =>
     fetch(`/api/tablero${conTodas ? '?todas=1' : ''}`)
@@ -159,6 +171,13 @@ export default function InicioPage() {
     guardar({ id: t.id, datos } as any)
   }
 
+  /** Dónde quedaron los pictogramas tras arrastrarlos. */
+  const guardarIconos = (t: Tarjeta, pos: { x: number; y: number } | null) => {
+    const datos = { ...t.datos, iconosPos: pos }
+    setTarjetas(ts => ts.map(x => x.id === t.id ? { ...x, datos } : x))
+    guardar({ id: t.id, datos } as any)
+  }
+
   /** El ancho que quedó tras arrastrar el borde derecho. */
   const ponerAncho = (t: Tarjeta, n: 1 | 2 | 3) => {
     const datos = { ...t.datos, ancho: n }
@@ -182,7 +201,7 @@ export default function InicioPage() {
   }
 
   return (
-    <Diseno.Provider value={{ activo: diseñando, guardarAlto }}>
+    <Diseno.Provider value={{ activo: diseñando, guardarAlto, guardarIconos, bloquear: setBloqueado }}>
     <div className="space-y-5 pb-10">
       <div className="flex items-end justify-between gap-4 flex-wrap">
         <div>
@@ -249,7 +268,7 @@ export default function InicioPage() {
           {tarjetas.map((t, i) => (
             <EnElTablero
               key={t.id} t={t} indice={i} total={tarjetas.length}
-              diseñando={diseñando} arrastrando={arrastrando}
+              diseñando={diseñando} arrastrando={arrastrando} bloqueado={bloqueado}
               onArrastrar={setArrastrando} onSoltar={soltarSobre}
               onMover={h => mover(t.id, h)}
               onAncho={h => cambiarAncho(t, h)}
@@ -281,6 +300,10 @@ export default function InicioPage() {
           grid-template-columns: repeat(3, minmax(0, 1fr));
           align-items: start;
         }
+        /* Una tarjeta a la que se le dio alto estira su caja y reparte el
+           contenido en vertical, en lugar de dejarlo pegado arriba. */
+        .tablero-estirar { display: flex; flex-direction: column; }
+        .tablero-estirar > * { flex: 1; display: flex; flex-direction: column; justify-content: center; }
         .tablero-ancho-1 { grid-column: span 1; }
         .tablero-ancho-2 { grid-column: span 2; }
         .tablero-ancho-3 { grid-column: span 3; }
@@ -304,12 +327,12 @@ export default function InicioPage() {
 
 /** Una tarjeta en su sitio del tablero, con sus controles si se está diseñando. */
 function EnElTablero({
-  t, indice, total, diseñando, arrastrando,
+  t, indice, total, diseñando, arrastrando, bloqueado,
   onArrastrar, onSoltar, onMover, onAncho, onAnchoExacto, onAltoTarjeta,
   onEditar, onBorrar, onPrender,
 }: {
   t: Tarjeta; indice: number; total: number
-  diseñando: boolean; arrastrando: string | null
+  diseñando: boolean; arrastrando: string | null; bloqueado: boolean
   onArrastrar: (id: string | null) => void
   onSoltar: (id: string) => void
   onMover: (h: -1 | 1) => void
@@ -329,7 +352,7 @@ function EnElTablero({
       animate={{ opacity: 1, y: 0 }}
       transition={{ delay: diseñando ? 0 : Math.min(indice, 8) * 0.04, duration: 0.3 }}
       className={`tablero-ancho-${anchoDe(t)} relative group`}
-      draggable={diseñando}
+      draggable={diseñando && !bloqueado}
       onDragStart={() => onArrastrar(t.id)}
       onDragEnd={() => onArrastrar(null)}
       onDragOver={e => { if (diseñando) e.preventDefault() }}
@@ -348,18 +371,13 @@ function EnElTablero({
           <ManijasTarjeta t={t} columna={caja} onAncho={onAnchoExacto} onAlto={onAltoTarjeta} />
         </>
       )}
-      <div style={{
-        opacity: diseñando && !t.activa ? 0.45 : undefined,
-        minHeight: alto ?? undefined,
-        // El alto mínimo tiene que llegarle a la caja de adentro, que es la
-        // que pinta el fondo; si se queda aquí, la tarjeta crece pero su color
-        // no, y debajo aparece una franja vacía.
-        display: alto ? 'flex' : undefined,
-        flexDirection: alto ? 'column' : undefined,
-      }}>
-        <div style={alto ? { flex: 1, display: 'flex', flexDirection: 'column' } : undefined}>
-          <Pintar t={t} />
-        </div>
+      {/* El alto no se queda en esta envoltura: baja hasta la caja que pinta
+          el fondo y hasta su contenido. Si se quedara aquí, la tarjeta crecía
+          pero su color no, y el texto se apelotonaba arriba dejando media
+          tarjeta vacía debajo. */}
+      <div className={alto ? 'tablero-estirar' : undefined}
+        style={{ opacity: diseñando && !t.activa ? 0.45 : undefined, minHeight: alto ?? undefined }}>
+        <Pintar t={t} />
       </div>
     </motion.div>
   )
@@ -379,12 +397,14 @@ function ManijasTarjeta({ t, onAncho, onAlto, columna }: {
   onAlto: (px: number | null) => void
   columna: React.RefObject<HTMLDivElement>
 }) {
+  const { bloquear } = useContext(Diseno)
   const [fantasma, setFantasma] = useState<{ ancho?: number; alto?: number } | null>(null)
   const libre = TIPO(t.tipo).anchoLibre
   const ancho = anchoDe(t)
 
   const estirarAncho = (e: React.PointerEvent) => {
     e.preventDefault(); e.stopPropagation()
+    bloquear(true)
     const caja = columna.current?.getBoundingClientRect()
     if (!caja) return
     // Una columna mide, más o menos, lo que mide la tarjeta entre el número de
@@ -399,6 +419,7 @@ function ManijasTarjeta({ t, onAncho, onAlto, columna }: {
     const soltar = () => {
       window.removeEventListener('pointermove', mover)
       window.removeEventListener('pointerup', soltar)
+      bloquear(false)
       setFantasma(null)
       if (destino !== ancho) onAncho(destino)
     }
@@ -408,6 +429,7 @@ function ManijasTarjeta({ t, onAncho, onAlto, columna }: {
 
   const estirarAlto = (e: React.PointerEvent) => {
     e.preventDefault(); e.stopPropagation()
+    bloquear(true)
     const inicioY = e.clientY
     const inicio = columna.current?.getBoundingClientRect().height ?? 200
     let ultimo = inicio
@@ -418,6 +440,7 @@ function ManijasTarjeta({ t, onAncho, onAlto, columna }: {
     const soltar = () => {
       window.removeEventListener('pointermove', mover)
       window.removeEventListener('pointerup', soltar)
+      bloquear(false)
       setFantasma(null)
       onAlto(Math.round(ultimo))
     }
@@ -425,7 +448,11 @@ function ManijasTarjeta({ t, onAncho, onAlto, columna }: {
     window.addEventListener('pointerup', soltar)
   }
 
-  const comun = 'absolute z-20 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center'
+  // `pointer-events-none` mientras no se pasa el mouse: transparente no es lo
+  // mismo que ausente, y una manija invisible pegada al borde derecho seguía
+  // atrapando los clics de lo que tuviera debajo —los pictogramas, entre otros.
+  const comun = 'absolute z-20 opacity-0 pointer-events-none group-hover:opacity-100'
+    + ' group-hover:pointer-events-auto transition-opacity flex items-center justify-center'
   const barra = { background: 'rgba(11,23,54,0.75)' }
 
   return (
@@ -558,7 +585,7 @@ function Pintar({ t }: { t: Tarjeta }) {
  * una copia suya desenfocada en vez de una franja blanca.
  */
 function Imagen({ t, color }: { t: Tarjeta; color: string }) {
-  const { activo, guardarAlto } = useContext(Diseno)
+  const { activo, guardarAlto, bloquear } = useContext(Diseno)
   const caja = useRef<HTMLDivElement>(null)
   // Mientras se arrastra, la altura vive aquí: así la imagen sigue al mouse sin
   // escribir en la base en cada píxel.
@@ -571,6 +598,7 @@ function Imagen({ t, color }: { t: Tarjeta; color: string }) {
   const agarrar = (e: React.PointerEvent) => {
     e.preventDefault()
     e.stopPropagation()
+    bloquear(true)
     const inicioY = e.clientY
     // Si venía en "la imagen manda" no hay número de dónde partir: se toma el
     // alto que tiene puesto en pantalla en este momento.
@@ -588,6 +616,7 @@ function Imagen({ t, color }: { t: Tarjeta; color: string }) {
     const soltar = () => {
       window.removeEventListener('pointermove', mover)
       window.removeEventListener('pointerup', soltar)
+      bloquear(false)
       window.removeEventListener('pointercancel', soltar)
       setEstirando(null)
       guardarAlto(t, Math.round(ultimo))
@@ -645,18 +674,90 @@ function Imagen({ t, color }: { t: Tarjeta; color: string }) {
   )
 }
 
-/** La fila de pictogramas, si la tarjeta tiene alguno. */
-function Iconos({ t, color }: { t: Tarjeta; color: string }) {
+/**
+ * La fila de pictogramas.
+ *
+ * Vive en el flujo de la tarjeta, debajo del texto, hasta que alguien la
+ * arrastra: desde ahí queda suelta en el punto donde se soltó, guardado en
+ * porcentaje del alto y el ancho de la tarjeta para que no se salga de ella
+ * al cambiar de pantalla.
+ */
+function Iconos({ t, color, sobreOscuro }: { t: Tarjeta; color: string; sobreOscuro?: boolean }) {
+  const { activo, guardarIconos, bloquear } = useContext(Diseno)
+  const [fantasma, setFantasma] = useState<{ x: number; y: number } | null>(null)
+
   const ids = pictogramasDe(t)
+  const tam = tamanoIconosDe(t)
+  const pos = fantasma ?? posicionIconosDe(t)
   if (!ids.length) return null
-  return (
-    <div className="flex flex-wrap items-center gap-2 mt-3">
+
+  const agarrar = (e: React.PointerEvent) => {
+    if (!activo) return
+    e.preventDefault(); e.stopPropagation()
+    bloquear(true)
+    // El ancestro posicionado es la caja de la tarjeta: es contra ella que se
+    // mide el porcentaje, no contra la ventana.
+    const tarjeta = (e.currentTarget as HTMLElement).offsetParent as HTMLElement | null
+    const caja = tarjeta?.getBoundingClientRect()
+    if (!caja) return
+
+    let ultimo = { x: 50, y: 50 }
+    const mover = (ev: PointerEvent) => {
+      ultimo = {
+        x: Math.min(100, Math.max(0, ((ev.clientX - caja.left) / caja.width) * 100)),
+        y: Math.min(100, Math.max(0, ((ev.clientY - caja.top) / caja.height) * 100)),
+      }
+      setFantasma(ultimo)
+    }
+    const soltar = () => {
+      window.removeEventListener('pointermove', mover)
+      window.removeEventListener('pointerup', soltar)
+      bloquear(false)
+      setFantasma(null)
+      guardarIconos(t, { x: Math.round(ultimo.x), y: Math.round(ultimo.y) })
+    }
+    window.addEventListener('pointermove', mover)
+    window.addEventListener('pointerup', soltar)
+  }
+
+  const fila = (
+    <div
+      onPointerDown={agarrar}
+      draggable={false}
+      onDragStart={e => { e.preventDefault(); e.stopPropagation() }}
+      title={activo ? 'Arrastre los pictogramas a donde los quiera' : undefined}
+      className={`flex flex-wrap items-center gap-2 ${pos ? '' : 'mt-3'}`}
+      style={{
+        cursor: activo ? 'move' : undefined,
+        // Un recuadro punteado mientras se diseña, para que se vea que esto se
+        // puede agarrar aunque esté sobre una imagen.
+        outline: activo ? '1px dashed rgba(255,255,255,0.55)' : undefined,
+        outlineOffset: activo ? 4 : undefined,
+        borderRadius: 10,
+      }}>
       {ids.map((id, i) => (
-        <span key={`${id}-${i}`} className="w-8 h-8 rounded-lg flex items-center justify-center"
-          style={{ background: 'var(--bg-card-hover)', border: '1px solid var(--border)', color }}>
-          <Pictograma id={id} size={17} />
+        <span key={`${id}-${i}`} className="rounded-lg flex items-center justify-center flex-shrink-0"
+          style={{
+            width: tam.caja, height: tam.caja,
+            background: sobreOscuro ? 'rgba(255,255,255,0.14)' : 'var(--bg-card-hover)',
+            border: sobreOscuro ? 'none' : '1px solid var(--border)',
+            color: sobreOscuro ? '#fff' : color,
+          }}>
+          <Pictograma id={id} size={tam.dibujo} />
         </span>
       ))}
+    </div>
+  )
+
+  if (!pos) return fila
+
+  return (
+    // Por encima de las manijas del borde mientras se diseña: si no, agarrar
+    // los pictogramas que caen cerca del borde agarraba la manija.
+    <div className={`absolute ${activo ? 'z-30' : 'z-10'}`} style={{
+      left: `${pos.x}%`, top: `${pos.y}%`, transform: 'translate(-50%, -50%)',
+    }}>
+      {fila}
     </div>
   )
 }
@@ -666,7 +767,7 @@ function Caja({ children, color, franja, t }: {
   children: React.ReactNode; color?: string; franja?: boolean; t?: Tarjeta
 }) {
   return (
-    <div className="rounded-2xl overflow-hidden"
+    <div className="rounded-2xl overflow-hidden relative"
       style={{
         background: 'var(--bg-card)',
         border: '1px solid var(--border)',
@@ -687,7 +788,7 @@ function CajaColor({ color, t, children }: {
   color: ReturnType<typeof COLOR>; t: Tarjeta; children: React.ReactNode
 }) {
   return (
-    <div className="rounded-2xl overflow-hidden"
+    <div className="rounded-2xl overflow-hidden relative"
       style={{ background: color.suave, border: `1px solid ${color.borde}` }}>
       <Imagen t={t} color={color.fuerte} />
       <div className="p-5">
@@ -750,16 +851,11 @@ function Anuncio({ t }: { t: Tarjeta }) {
         maxWidth: alLado ? undefined : centro ? '46rem' : '36rem',
       }}>{t.texto}</p>
     ) : null,
-    iconos: pictogramasDe(t).length > 0 ? (
-      <div className={`flex flex-wrap items-center gap-2 ${centro ? 'justify-center' : alinear === 'derecha' ? 'justify-end' : ''}`}>
-        {pictogramasDe(t).map((id, i) => (
-          <span key={`${id}-${i}`} className="w-9 h-9 rounded-lg flex items-center justify-center"
-            style={{ background: 'rgba(255,255,255,0.14)', color: '#fff' }}>
-            <Pictograma id={id} size={18} />
-          </span>
-        ))}
+    iconos: (
+      <div className={`flex ${centro ? 'justify-center' : alinear === 'derecha' ? 'justify-end' : ''}`}>
+        <Iconos t={t} color="#fff" sobreOscuro />
       </div>
-    ) : null,
+    ),
     boton: t.cta_texto && t.cta_url ? (
       <Link href={t.cta_url}
         className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-bold bg-white"
@@ -772,7 +868,12 @@ function Anuncio({ t }: { t: Tarjeta }) {
   // La imagen de fondo, la superpuesta y la de al lado no entran en la
   // columna: cada una va en su propia capa o su propia columna.
   const imagenSuelta = fondo || superpuesto || alLado
-  const orden = ordenDe(t).filter(p => !(p === 'imagen' && imagenSuelta))
+  // Los pictogramas, cuando están sueltos, flotan sobre toda la tarjeta y no
+  // dentro de la columna: si se quedaran en la columna, el porcentaje se
+  // mediría contra ella y no contra la tarjeta.
+  const iconosSueltos = !!posicionIconosDe(t)
+  const orden = ordenDe(t).filter(p =>
+    !(p === 'imagen' && imagenSuelta) && !(p === 'iconos' && iconosSueltos))
 
   const columna = (
     <div className={`relative flex flex-col ${clasesAlineacion}`}
@@ -804,6 +905,7 @@ function Anuncio({ t }: { t: Tarjeta }) {
           <div className="tablero-lado flex-1 flex flex-col justify-center">{columna}</div>
           {disposicion === 'derecha' && imagen}
         </div>
+        {iconosSueltos && <Iconos t={t} color="#fff" sobreOscuro />}
       </div>
     )
   }
@@ -832,6 +934,7 @@ function Anuncio({ t }: { t: Tarjeta }) {
           <div className="absolute inset-0 flex flex-col justify-end">{columna}</div>
         </div>
       ) : columna}
+      {iconosSueltos && <Iconos t={t} color="#fff" sobreOscuro />}
     </div>
   )
 }
@@ -943,7 +1046,7 @@ function Contador({ t }: { t: Tarjeta }) {
   const avance = dias != null && meta ? Math.min(100, Math.round((dias / meta) * 100)) : null
 
   return (
-    <div className="rounded-2xl p-5 flex flex-col items-center justify-center text-center"
+    <div className="rounded-2xl p-5 flex flex-col items-center justify-center text-center relative"
       style={{ background: c.suave, border: `1px solid ${c.borde}` }}>
       <span className="text-[11px] font-bold tracking-wider uppercase" style={{ color: c.fuerte }}>
         {t.titulo || 'Récord del equipo'}
@@ -1086,7 +1189,7 @@ function Reconocimiento({ t }: { t: Tarjeta }) {
 function Copasst({ t }: { t: Tarjeta }) {
   const c = COLOR(t.color ?? 'azul')
   return (
-    <div className="rounded-2xl overflow-hidden" style={{ background: c.suave, border: `1px solid ${c.borde}` }}>
+    <div className="rounded-2xl overflow-hidden relative" style={{ background: c.suave, border: `1px solid ${c.borde}` }}>
       <Imagen t={t} color={c.fuerte} />
       <div className="p-5 flex items-center gap-4 flex-wrap">
         <div className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0"

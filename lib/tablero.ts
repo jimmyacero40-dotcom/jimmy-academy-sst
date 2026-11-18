@@ -423,6 +423,35 @@ export const PICTOGRAMAS: { id: string; nombre: string }[] = [
 export const pictogramasDe = (t: Pick<Tarjeta, 'datos'>): string[] =>
   Array.isArray(t.datos?.iconos) ? t.datos.iconos.filter((i: any) => typeof i === 'string') : []
 
+export const TAMANOS_ICONO: { id: string; nombre: string; caja: number; dibujo: number }[] = [
+  { id: 'chico',  nombre: 'Chicos',  caja: 26, dibujo: 14 },
+  { id: 'normal', nombre: 'Normales', caja: 34, dibujo: 18 },
+  { id: 'grande', nombre: 'Grandes', caja: 46, dibujo: 24 },
+  { id: 'enorme', nombre: 'Enormes', caja: 62, dibujo: 32 },
+]
+
+export const tamanoIconosDe = (t: Pick<Tarjeta, 'datos'>) =>
+  TAMANOS_ICONO.find(x => x.id === t.datos?.tamanoIconos) ?? TAMANOS_ICONO[1]
+
+/**
+ * Dónde se posa la fila de pictogramas.
+ *
+ * `null` los deja en el flujo de la tarjeta, debajo del texto, que es donde
+ * estaban. Un par de porcentajes los suelta en cualquier punto de la tarjeta.
+ *
+ * Se guardan en porcentaje y no en píxeles a propósito: la misma tarjeta mide
+ * distinto en el escritorio y en el celular, y un punto fijo en píxeles que en
+ * el escritorio cae sobre la esquina de la imagen, en el celular cae fuera de
+ * la tarjeta.
+ */
+export function posicionIconosDe(t: Pick<Tarjeta, 'datos'>): { x: number; y: number } | null {
+  const p = t.datos?.iconosPos
+  if (!p || typeof p !== 'object') return null
+  const x = Number(p.x), y = Number(p.y)
+  if (!Number.isFinite(x) || !Number.isFinite(y)) return null
+  return { x: Math.min(100, Math.max(0, x)), y: Math.min(100, Math.max(0, y)) }
+}
+
 // ── Visibilidad ────────────────────────────────────────────────────────────
 
 export interface Persona {

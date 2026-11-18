@@ -4,9 +4,10 @@ import { useEffect, useState } from 'react'
 import { X, Upload, AlertCircle, Loader2, ArrowUp, ArrowDown } from 'lucide-react'
 import {
   TIPOS, TIPO, COLORES, ALTOS, AJUSTES, PICTOGRAMAS, PIEZAS, TAMANOS, AIRES,
-  DISPOSICIONES, PROPORCIONES, COLORES_TEXTO,
+  DISPOSICIONES, PROPORCIONES, COLORES_TEXTO, TAMANOS_ICONO,
   diasDesde, anchoDe, ajusteDe, pictogramasDe,
   ordenDe, alineacionDe, disposicionDe, proporcionDe,
+  tamanoIconosDe, posicionIconosDe,
   type Tarjeta, type TipoTarjeta, type ColorTarjeta, type Ajuste, type Alto,
   type Pieza, type Alineacion, type Tamano, type Aire,
   type Disposicion, type Proporcion,
@@ -15,6 +16,15 @@ import { comprimirImagen } from '@/lib/comprimir-imagen'
 import { Pictograma } from '@/components/tablero/Pictograma'
 
 export interface Opciones { centros: string[]; areas: string[] }
+
+/** Cambia de puesto un elemento de la lista con su vecino. */
+const intercambiar = <T,>(lista: T[], i: number, hacia: -1 | 1): T[] => {
+  const j = i + hacia
+  if (j < 0 || j >= lista.length) return lista
+  const copia = [...lista]
+  ;[copia[i], copia[j]] = [copia[j], copia[i]]
+  return copia
+}
 
 /**
  * El formulario de una tarjeta.
@@ -49,6 +59,8 @@ export function EditorTarjeta({ tarjeta, opciones, onGuardar, onCerrar }: {
     ajuste: ajusteDe(tarjeta) as Ajuste,
     alto: (tarjeta.datos?.alto ?? 'auto') as Alto,
     iconos: pictogramasDe(tarjeta),
+    tamanoIconos: tamanoIconosDe(tarjeta).id,
+    iconosPos: posicionIconosDe(tarjeta),
     orden: ordenDe(tarjeta),
     alineacion: alineacionDe(tarjeta) as Alineacion,
     disposicion: disposicionDe(tarjeta) as Disposicion,
@@ -145,6 +157,8 @@ export function EditorTarjeta({ tarjeta, opciones, onGuardar, onCerrar }: {
     if (meta.anchoLibre) datos.ancho = f.ancho
     if (tiene('imagen')) { datos.ajuste = f.ajuste; datos.alto = f.alto }
     datos.iconos = f.iconos
+    datos.tamanoIconos = f.tamanoIconos
+    datos.iconosPos = f.iconosPos
     datos.orden = f.orden
     datos.alineacion = f.alineacion
     datos.disposicion = f.disposicion
@@ -280,7 +294,43 @@ export function EditorTarjeta({ tarjeta, opciones, onGuardar, onCerrar }: {
           </>
         )}
 
-        <Campo etiqueta="Pictogramas" nota="Opcional. Salen en una fila dentro de la tarjeta.">
+        {f.iconos.length > 0 && (
+          <Campo etiqueta="Los que eligió" nota="En este orden salen. Use las flechas para cambiarlo.">
+            <div className="flex flex-wrap items-center gap-1 p-2 rounded-xl"
+              style={{ background: 'var(--bg-card-hover)' }}>
+              {f.iconos.map((id: string, i: number) => (
+                <div key={`${id}-${i}`} className="flex items-center gap-0.5 px-1.5 py-1 rounded-lg"
+                  style={{ background: 'var(--bg-surface)', border: '1px solid var(--border)' }}>
+                  <button onClick={() => set('iconos', intercambiar(f.iconos, i, -1))} disabled={i === 0}
+                    aria-label="Mover antes" className="p-0.5 disabled:opacity-20"
+                    style={{ color: 'var(--text-faint)' }}>‹</button>
+                  <span style={{ color: 'var(--text-dim)' }}><Pictograma id={id} size={18} /></span>
+                  <button onClick={() => set('iconos', intercambiar(f.iconos, i, 1))}
+                    disabled={i === f.iconos.length - 1} aria-label="Mover después"
+                    className="p-0.5 disabled:opacity-20" style={{ color: 'var(--text-faint)' }}>›</button>
+                </div>
+              ))}
+            </div>
+          </Campo>
+        )}
+
+        {f.iconos.length > 0 && (
+          <div className="flex gap-3 flex-wrap">
+            <Campo etiqueta="Tamaño de los pictogramas">
+              <Botones valor={f.tamanoIconos} onElegir={v => set('tamanoIconos', v)}
+                opciones={TAMANOS_ICONO.map(x => ({ id: x.id, texto: x.nombre }))} />
+            </Campo>
+            <Campo etiqueta="Dónde van" nota="Arrástrelos sobre el tablero para soltarlos en otro punto.">
+              <Botones valor={!f.iconosPos} onElegir={v => set('iconosPos', v ? null : { x: 50, y: 50 })}
+                opciones={[
+                  { id: true, texto: 'Debajo del texto' },
+                  { id: false, texto: 'Sueltos en la tarjeta' },
+                ]} />
+            </Campo>
+          </div>
+        )}
+
+        <Campo etiqueta="Pictogramas" nota="Opcional. Toque uno para ponerlo o quitarlo.">
           <div className="flex flex-wrap gap-1.5 p-2.5 rounded-xl max-h-[168px] overflow-y-auto"
             style={{ background: 'var(--bg-card-hover)' }}>
             {PICTOGRAMAS.map(p => {
