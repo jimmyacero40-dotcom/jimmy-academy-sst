@@ -8,6 +8,7 @@ import {
   diasDesde, anchoDe, ajusteDe, pictogramasDe,
   ordenDe, alineacionDe, disposicionDe, proporcionDe,
   tamanoIconosDe, posicionIconosDe, ocultosDe,
+  PX_MINIMO, PX_MAXIMO,
   type Tarjeta, type TipoTarjeta, type ColorTarjeta, type Ajuste, type Alto,
   type Pieza, type Alineacion, type Tamano, type Aire,
   type Disposicion, type Proporcion,
@@ -70,6 +71,10 @@ export function EditorTarjeta({ tarjeta, opciones, onGuardar, onCerrar }: {
     colorTexto: (tarjeta.datos?.colorTexto ?? null) as string | null,
     tintas: (tarjeta.datos?.tintas ?? {}) as Record<string, string | null>,
     tamanos: (tarjeta.datos?.tamanos ?? {}) as Record<string, string | null>,
+    px: (tarjeta.datos?.px ?? {}) as Record<string, number | null>,
+    negritas: (tarjeta.datos?.negritas ?? {}) as Record<string, boolean | null>,
+    grosorLinea: (Number(tarjeta.datos?.grosorLinea) || 2) as number,
+    estiloLinea: (tarjeta.datos?.estiloLinea ?? 'solida') as string,
     tamano: (tarjeta.datos?.tamano ?? 'normal') as Tamano,
     aire: (tarjeta.datos?.aire ?? 'normal') as Aire,
     activa: tarjeta.activa,
@@ -170,6 +175,12 @@ export function EditorTarjeta({ tarjeta, opciones, onGuardar, onCerrar }: {
     datos.colorTexto = f.colorTexto
     datos.tintas = f.tintas
     datos.tamanos = f.tamanos
+    datos.px = f.px
+    datos.negritas = f.negritas
+    if (tarjeta.tipo === 'separador') {
+      datos.grosorLinea = f.grosorLinea
+      datos.estiloLinea = f.estiloLinea
+    }
     datos.nombre = f.nombre.trim() || null
     datos.ocultos = f.ocultos
     datos.tamano = f.tamano
@@ -392,23 +403,72 @@ export function EditorTarjeta({ tarjeta, opciones, onGuardar, onCerrar }: {
           </Campo>
         </div>
 
-        <Campo etiqueta="Tamaño de cada texto"
-          nota="«Auto» sigue el de arriba. Cada pieza tiene su propia escala.">
+        <Campo etiqueta="Tamaño y grosor de cada texto"
+          nota="Escriba los píxeles, o deje vacío para seguir el tamaño de arriba.">
           <div className="rounded-xl p-2.5 space-y-1.5" style={{ background: 'var(--bg-card-hover)' }}>
-            {PIEZAS_TEXTO.map(pt => (
-              <div key={pt.id} className="flex items-center gap-2 flex-wrap">
-                <span className="text-[11.5px] font-bold w-[86px] flex-shrink-0"
-                  style={{ color: 'var(--text-dim)' }}>{pt.nombre}</span>
-                <Botones valor={f.tamanos[pt.id] ?? null}
-                  onElegir={v => set('tamanos', { ...f.tamanos, [pt.id]: v })}
-                  opciones={[
-                    { id: null, texto: 'Auto' },
-                    ...TAMANOS.map(x => ({ id: x.id as string | null, texto: x.nombre })),
-                  ]} />
-              </div>
-            ))}
+            {PIEZAS_TEXTO.map(pt => {
+              const negrita = f.negritas[pt.id]
+              return (
+                <div key={pt.id} className="flex items-center gap-2 flex-wrap">
+                  <span className="text-[11.5px] font-bold w-[86px] flex-shrink-0"
+                    style={{ color: 'var(--text-dim)' }}>{pt.nombre}</span>
+                  <input type="number" min={PX_MINIMO} max={PX_MAXIMO} placeholder="auto"
+                    value={f.px[pt.id] ?? ''}
+                    onChange={e => {
+                      const v = e.target.value.trim()
+                      set('px', { ...f.px, [pt.id]: v === '' ? null : Number(v) })
+                    }}
+                    style={{ ...estiloCampo, width: 76, padding: '5px 8px', fontSize: 13 }} />
+                  <span className="text-[11px]" style={{ color: 'var(--text-faint)' }}>px</span>
+                  <div className="flex gap-1">
+                    {[
+                      { id: null, texto: 'Auto' },
+                      { id: true, texto: 'Negrilla' },
+                      { id: false, texto: 'Normal' },
+                    ].map(o => {
+                      const on = negrita === o.id
+                      return (
+                        <button key={String(o.id)}
+                          onClick={() => set('negritas', { ...f.negritas, [pt.id]: o.id })}
+                          className="px-2 py-1 rounded-md text-[11.5px]"
+                          style={{
+                            fontWeight: o.id === true ? 800 : 600,
+                            background: on ? 'var(--primary-dim)' : 'var(--bg-surface)',
+                            color: on ? 'var(--primary-dark)' : 'var(--text-faint)',
+                            border: `1px solid ${on ? 'var(--primary-border)' : 'var(--border)'}`,
+                          }}>
+                          {o.texto}
+                        </button>
+                      )
+                    })}
+                  </div>
+                </div>
+              )
+            })}
           </div>
         </Campo>
+
+        {tarjeta.tipo === 'separador' && (
+          <div className="flex gap-3 flex-wrap">
+            <Campo etiqueta="Grosor de la línea">
+              <div className="flex items-center gap-2">
+                <input type="range" min={1} max={12} step={1} value={f.grosorLinea}
+                  onChange={e => set('grosorLinea', Number(e.target.value))} className="w-28" />
+                <span className="text-[11.5px] font-bold tabular-nums w-10"
+                  style={{ color: 'var(--text-label)' }}>{f.grosorLinea} px</span>
+              </div>
+            </Campo>
+            <Campo etiqueta="Estilo de la línea">
+              <Botones valor={f.estiloLinea} onElegir={v => set('estiloLinea', v)}
+                opciones={[
+                  { id: 'solida', texto: 'Sólida' },
+                  { id: 'punteada', texto: 'Rayas' },
+                  { id: 'puntos', texto: 'Puntos' },
+                  { id: 'doble', texto: 'Doble' },
+                ]} />
+            </Campo>
+          </div>
+        )}
 
         <Campo etiqueta="Aire por dentro" nota="Cuánto espacio deja alrededor del texto.">
           <Botones valor={f.aire} onElegir={v => set('aire', v)}

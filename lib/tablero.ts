@@ -452,9 +452,56 @@ export const tamanoDe = (t: Pick<Tarjeta, 'datos'>) =>
  * y «Grande» en el rótulo no son el mismo número de píxeles: un rótulo del
  * tamaño de un número dejaría de ser un rótulo.
  */
-export function medidaDe(t: Pick<Tarjeta, 'datos'>, pieza: PiezaTexto): string {
+export const PX_MINIMO = 8
+export const PX_MAXIMO = 200
+
+/**
+ * La medida de una pieza, leyendo la columna que se le indique.
+ *
+ * Hace falta porque un mismo nombre de pieza no pesa igual en cada tarjeta: el
+ * título del anuncio es un titular, y el «días sin accidentes» del contador es
+ * un pie del número. Los dos los manda el control «Título», pero con la
+ * columna que le corresponda a cada uno; si no, poner el contador en normal
+ * le ponía el pie en treinta y dos píxeles.
+ *
+ * El número escrito a mano manda sobre todo: es lo más concreto que puede
+ * pedir quien diseña, y las escalas solo están para no tener que pensar en
+ * píxeles cuando no hace falta.
+ */
+export function medidaComo(
+  t: Pick<Tarjeta, 'datos'>, pieza: PiezaTexto, columna: PiezaTexto,
+): string {
+  const px = Number(t.datos?.px?.[pieza])
+  if (Number.isFinite(px) && px >= PX_MINIMO && px <= PX_MAXIMO) return `${Math.round(px)}px`
+
   const propio = TAMANOS.find(x => x.id === t.datos?.tamanos?.[pieza])
-  return (propio ?? tamanoDe(t))[pieza]
+  return (propio ?? tamanoDe(t))[columna]
+}
+
+export const medidaDe = (t: Pick<Tarjeta, 'datos'>, pieza: PiezaTexto): string =>
+  medidaComo(t, pieza, pieza)
+
+/**
+ * El grosor de un texto, si se pidió uno.
+ *
+ * `undefined` deja el que trae la pieza: el título ya nace grueso y la
+ * descripción delgada, y forzar un valor a todas las igualaría.
+ */
+export function grosorDe(t: Pick<Tarjeta, 'datos'>, pieza: PiezaTexto): number | undefined {
+  const v = t.datos?.negritas?.[pieza]
+  if (v === true) return 800
+  if (v === false) return 400
+  return undefined
+}
+
+/**
+ * Los píxeles que de verdad está usando una pieza, para mostrarlos en el
+ * casillero del editor aunque nadie haya escrito un número todavía.
+ */
+export function pxDe(t: Pick<Tarjeta, 'datos'>, pieza: PiezaTexto): number | null {
+  const px = Number(t.datos?.px?.[pieza])
+  if (Number.isFinite(px) && px >= PX_MINIMO && px <= PX_MAXIMO) return Math.round(px)
+  return null
 }
 
 export type Aire = 'pegado' | 'normal' | 'suelto' | 'amplio'
