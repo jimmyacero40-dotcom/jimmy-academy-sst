@@ -4,10 +4,12 @@ import { useEffect, useState } from 'react'
 import { X, Upload, AlertCircle, Loader2, ArrowUp, ArrowDown } from 'lucide-react'
 import {
   TIPOS, TIPO, COLORES, ALTOS, AJUSTES, PICTOGRAMAS, PIEZAS, TAMANOS, AIRES,
+  DISPOSICIONES, PROPORCIONES, COLORES_TEXTO,
   diasDesde, anchoDe, ajusteDe, pictogramasDe,
-  ordenDe, alineacionDe, superpuestoDe,
+  ordenDe, alineacionDe, disposicionDe, proporcionDe,
   type Tarjeta, type TipoTarjeta, type ColorTarjeta, type Ajuste, type Alto,
   type Pieza, type Alineacion, type Tamano, type Aire,
+  type Disposicion, type Proporcion,
 } from '@/lib/tablero'
 import { comprimirImagen } from '@/lib/comprimir-imagen'
 import { Pictograma } from '@/components/tablero/Pictograma'
@@ -49,7 +51,9 @@ export function EditorTarjeta({ tarjeta, opciones, onGuardar, onCerrar }: {
     iconos: pictogramasDe(tarjeta),
     orden: ordenDe(tarjeta),
     alineacion: alineacionDe(tarjeta) as Alineacion,
-    superpuesto: superpuestoDe(tarjeta),
+    disposicion: disposicionDe(tarjeta) as Disposicion,
+    proporcion: proporcionDe(tarjeta).id as Proporcion,
+    colorTexto: (tarjeta.datos?.colorTexto ?? 'auto') as string,
     tamano: (tarjeta.datos?.tamano ?? 'normal') as Tamano,
     aire: (tarjeta.datos?.aire ?? 'normal') as Aire,
     activa: tarjeta.activa,
@@ -143,7 +147,9 @@ export function EditorTarjeta({ tarjeta, opciones, onGuardar, onCerrar }: {
     datos.iconos = f.iconos
     datos.orden = f.orden
     datos.alineacion = f.alineacion
-    datos.superpuesto = f.superpuesto
+    datos.disposicion = f.disposicion
+    datos.proporcion = f.proporcion
+    datos.colorTexto = f.colorTexto
     datos.tamano = f.tamano
     datos.aire = f.aire
 
@@ -326,16 +332,44 @@ export function EditorTarjeta({ tarjeta, opciones, onGuardar, onCerrar }: {
             opciones={AIRES.map(a => ({ id: a.id, texto: a.nombre }))} />
         </Campo>
 
+        <Campo etiqueta="Color del texto" nota="«Automático» usa el que le va al fondo de la tarjeta.">
+          <div className="flex gap-1.5 flex-wrap">
+            {COLORES_TEXTO.map(ct => {
+              const on = f.colorTexto === ct.id
+              return (
+                <button key={ct.id} onClick={() => set('colorTexto', ct.id)} title={ct.nombre}
+                  className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[12px] font-bold"
+                  style={{
+                    background: on ? 'var(--primary-dim)' : 'var(--bg-card-hover)',
+                    color: on ? 'var(--primary-dark)' : 'var(--text-dim)',
+                    border: `1px solid ${on ? 'var(--primary-border)' : 'var(--border)'}`,
+                  }}>
+                  <span className="w-3.5 h-3.5 rounded-full flex-shrink-0" style={{
+                    background: ct.hex ?? 'linear-gradient(135deg,#fff 50%,#0B1736 50%)',
+                    border: '1px solid var(--border-strong)',
+                  }} />
+                  {ct.nombre}
+                </button>
+              )
+            })}
+          </div>
+        </Campo>
+
         {tarjeta.tipo === 'anuncio' && (
           <>
             {f.imagen_url && (
-              <label className="flex items-center gap-2.5 cursor-pointer">
-                <input type="checkbox" checked={f.superpuesto}
-                  onChange={e => set('superpuesto', e.target.checked)} className="w-4 h-4" />
-                <span className="text-[13.5px] font-semibold" style={{ color: 'var(--text)' }}>
-                  Texto encima de la imagen
-                </span>
-              </label>
+              <div className="flex gap-3 flex-wrap">
+                <Campo etiqueta="Dónde va la imagen">
+                  <Botones valor={f.disposicion} onElegir={v => set('disposicion', v)}
+                    opciones={DISPOSICIONES.map(d => ({ id: d.id, texto: d.nombre }))} />
+                </Campo>
+                {(f.disposicion === 'izquierda' || f.disposicion === 'derecha') && (
+                  <Campo etiqueta="Cuánto ocupa la imagen">
+                    <Botones valor={f.proporcion} onElegir={v => set('proporcion', v)}
+                      opciones={PROPORCIONES.map(p => ({ id: p.id, texto: p.nombre }))} />
+                  </Campo>
+                )}
+              </div>
             )}
             <Campo etiqueta="Orden de los elementos" nota="Suba o baje cada pieza.">
               <OrdenPiezas orden={f.orden} onCambiar={v => set('orden', v)} />

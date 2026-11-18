@@ -11,7 +11,8 @@ import {
 } from 'lucide-react'
 import {
   COLOR, TIPO, anchoDe, ajusteDe, altoDe, pictogramasDe,
-  ordenDe, alineacionDe, superpuestoDe, tamanoDe, aireDe,
+  ordenDe, alineacionDe, tamanoDe, aireDe,
+  disposicionDe, proporcionDe, colorTextoDe,
   ALTO_MINIMO, ALTO_MAXIMO,
   type Tarjeta, type TipoTarjeta,
 } from '@/lib/tablero'
@@ -158,6 +159,20 @@ export default function InicioPage() {
     guardar({ id: t.id, datos } as any)
   }
 
+  /** El ancho que quedó tras arrastrar el borde derecho. */
+  const ponerAncho = (t: Tarjeta, n: 1 | 2 | 3) => {
+    const datos = { ...t.datos, ancho: n }
+    setTarjetas(ts => ts.map(x => x.id === t.id ? { ...x, datos } : x))
+    guardar({ id: t.id, datos } as any)
+  }
+
+  /** El alto mínimo que quedó tras arrastrar el borde de abajo. */
+  const ponerAltoTarjeta = (t: Tarjeta, px: number | null) => {
+    const datos = { ...t.datos, altoTarjeta: px }
+    setTarjetas(ts => ts.map(x => x.id === t.id ? { ...x, datos } : x))
+    guardar({ id: t.id, datos } as any)
+  }
+
   const cambiarAncho = (t: Tarjeta, hacia: -1 | 1) => {
     const actual = anchoDe(t)
     const nuevo = Math.min(3, Math.max(1, actual + hacia))
@@ -232,34 +247,16 @@ export default function InicioPage() {
       ) : (
         <div className="tablero-rejilla" style={{ '--tablero-aire': `${separacion}px` } as any}>
           {tarjetas.map((t, i) => (
-            <motion.div
-              key={t.id}
-              layout={diseñando}
-              initial={diseñando ? false : { opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: diseñando ? 0 : Math.min(i, 8) * 0.04, duration: 0.3 }}
-              className={`tablero-ancho-${anchoDe(t)} relative`}
-              draggable={diseñando}
-              onDragStart={() => setArrastrando(t.id)}
-              onDragEnd={() => setArrastrando(null)}
-              onDragOver={e => { if (diseñando) e.preventDefault() }}
-              onDrop={e => { e.preventDefault(); soltarSobre(t.id) }}
-              // En modo diseño la tarjeta baja para hacerle sitio a su barra de
-              // controles. Antes la barra iba encima y le tapaba el rótulo: no
-              // se alcanzaba a leer qué tarjeta se estaba moviendo.
-              style={diseñando
-                ? { cursor: 'grab', paddingTop: 34, opacity: arrastrando === t.id ? 0.4 : 1 }
-                : undefined}>
-              {diseñando && (
-                <Controles t={t} primera={i === 0} ultima={i === tarjetas.length - 1}
-                  onMover={h => mover(t.id, h)} onAncho={h => cambiarAncho(t, h)}
-                  onEditar={() => setEditando(t)} onBorrar={() => borrar(t)}
-                  onPrender={() => guardar({ id: t.id, activa: !t.activa })} />
-              )}
-              <div style={diseñando && !t.activa ? { opacity: 0.45 } : undefined}>
-                <Pintar t={t} />
-              </div>
-            </motion.div>
+            <EnElTablero
+              key={t.id} t={t} indice={i} total={tarjetas.length}
+              diseñando={diseñando} arrastrando={arrastrando}
+              onArrastrar={setArrastrando} onSoltar={soltarSobre}
+              onMover={h => mover(t.id, h)}
+              onAncho={h => cambiarAncho(t, h)}
+              onAnchoExacto={n => ponerAncho(t, n)}
+              onAltoTarjeta={px => ponerAltoTarjeta(t, px)}
+              onEditar={() => setEditando(t)} onBorrar={() => borrar(t)}
+              onPrender={() => guardar({ id: t.id, activa: !t.activa })} />
           ))}
         </div>
       )}
@@ -294,10 +291,171 @@ export default function InicioPage() {
         @media (max-width: 720px) {
           .tablero-rejilla { grid-template-columns: minmax(0, 1fr); }
           .tablero-ancho-2, .tablero-ancho-3 { grid-column: span 1; }
+          /* Dos columnas en un celular dejan el texto en una tira de letras
+             sueltas, así que lado a lado pasa a uno debajo del otro. */
+          .tablero-fila { flex-direction: column; }
+          .tablero-lado { flex-basis: auto !important; width: 100%; }
         }
       `}</style>
     </div>
     </Diseno.Provider>
+  )
+}
+
+/** Una tarjeta en su sitio del tablero, con sus controles si se está diseñando. */
+function EnElTablero({
+  t, indice, total, diseñando, arrastrando,
+  onArrastrar, onSoltar, onMover, onAncho, onAnchoExacto, onAltoTarjeta,
+  onEditar, onBorrar, onPrender,
+}: {
+  t: Tarjeta; indice: number; total: number
+  diseñando: boolean; arrastrando: string | null
+  onArrastrar: (id: string | null) => void
+  onSoltar: (id: string) => void
+  onMover: (h: -1 | 1) => void
+  onAncho: (h: -1 | 1) => void
+  onAnchoExacto: (n: 1 | 2 | 3) => void
+  onAltoTarjeta: (px: number | null) => void
+  onEditar: () => void; onBorrar: () => void; onPrender: () => void
+}) {
+  const caja = useRef<HTMLDivElement>(null)
+  const alto = Number(t.datos?.altoTarjeta) || null
+
+  return (
+    <motion.div
+      ref={caja}
+      layout={diseñando}
+      initial={diseñando ? false : { opacity: 0, y: 10 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ delay: diseñando ? 0 : Math.min(indice, 8) * 0.04, duration: 0.3 }}
+      className={`tablero-ancho-${anchoDe(t)} relative group`}
+      draggable={diseñando}
+      onDragStart={() => onArrastrar(t.id)}
+      onDragEnd={() => onArrastrar(null)}
+      onDragOver={e => { if (diseñando) e.preventDefault() }}
+      onDrop={e => { e.preventDefault(); onSoltar(t.id) }}
+      // En modo diseño la tarjeta baja para hacerle sitio a su barra de
+      // controles. Antes la barra iba encima y le tapaba el rótulo: no se
+      // alcanzaba a leer qué tarjeta se estaba moviendo.
+      style={diseñando
+        ? { cursor: 'grab', paddingTop: 34, opacity: arrastrando === t.id ? 0.4 : 1 }
+        : undefined}>
+      {diseñando && (
+        <>
+          <Controles t={t} primera={indice === 0} ultima={indice === total - 1}
+            onMover={onMover} onAncho={onAncho}
+            onEditar={onEditar} onBorrar={onBorrar} onPrender={onPrender} />
+          <ManijasTarjeta t={t} columna={caja} onAncho={onAnchoExacto} onAlto={onAltoTarjeta} />
+        </>
+      )}
+      <div style={{
+        opacity: diseñando && !t.activa ? 0.45 : undefined,
+        minHeight: alto ?? undefined,
+        // El alto mínimo tiene que llegarle a la caja de adentro, que es la
+        // que pinta el fondo; si se queda aquí, la tarjeta crece pero su color
+        // no, y debajo aparece una franja vacía.
+        display: alto ? 'flex' : undefined,
+        flexDirection: alto ? 'column' : undefined,
+      }}>
+        <div style={alto ? { flex: 1, display: 'flex', flexDirection: 'column' } : undefined}>
+          <Pintar t={t} />
+        </div>
+      </div>
+    </motion.div>
+  )
+}
+
+/**
+ * Las manijas del borde de la tarjeta.
+ *
+ * Aparecen al pasar el mouse por encima: la del lado derecho la ensancha o la
+ * angosta, y la de abajo le pone un alto mínimo. Los botones de la barra
+ * siguen estando —son los que sirven con el teclado y en pantalla táctil—,
+ * pero agarrar el borde es lo que uno intenta primero.
+ */
+function ManijasTarjeta({ t, onAncho, onAlto, columna }: {
+  t: Tarjeta
+  onAncho: (n: 1 | 2 | 3) => void
+  onAlto: (px: number | null) => void
+  columna: React.RefObject<HTMLDivElement>
+}) {
+  const [fantasma, setFantasma] = useState<{ ancho?: number; alto?: number } | null>(null)
+  const libre = TIPO(t.tipo).anchoLibre
+  const ancho = anchoDe(t)
+
+  const estirarAncho = (e: React.PointerEvent) => {
+    e.preventDefault(); e.stopPropagation()
+    const caja = columna.current?.getBoundingClientRect()
+    if (!caja) return
+    // Una columna mide, más o menos, lo que mide la tarjeta entre el número de
+    // columnas que ocupa. Con eso se sabe en cuál cae el mouse.
+    const unaColumna = caja.width / ancho
+    let destino: 1 | 2 | 3 = ancho
+    const mover = (ev: PointerEvent) => {
+      const n = Math.round((ev.clientX - caja.left) / unaColumna)
+      destino = Math.min(3, Math.max(1, n || 1)) as 1 | 2 | 3
+      setFantasma({ ancho: destino })
+    }
+    const soltar = () => {
+      window.removeEventListener('pointermove', mover)
+      window.removeEventListener('pointerup', soltar)
+      setFantasma(null)
+      if (destino !== ancho) onAncho(destino)
+    }
+    window.addEventListener('pointermove', mover)
+    window.addEventListener('pointerup', soltar)
+  }
+
+  const estirarAlto = (e: React.PointerEvent) => {
+    e.preventDefault(); e.stopPropagation()
+    const inicioY = e.clientY
+    const inicio = columna.current?.getBoundingClientRect().height ?? 200
+    let ultimo = inicio
+    const mover = (ev: PointerEvent) => {
+      ultimo = Math.min(1200, Math.max(60, inicio + (ev.clientY - inicioY)))
+      setFantasma({ alto: ultimo })
+    }
+    const soltar = () => {
+      window.removeEventListener('pointermove', mover)
+      window.removeEventListener('pointerup', soltar)
+      setFantasma(null)
+      onAlto(Math.round(ultimo))
+    }
+    window.addEventListener('pointermove', mover)
+    window.addEventListener('pointerup', soltar)
+  }
+
+  const comun = 'absolute z-20 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center'
+  const barra = { background: 'rgba(11,23,54,0.75)' }
+
+  return (
+    <>
+      {libre && (
+        <div onPointerDown={estirarAncho} draggable={false}
+          onDragStart={e => { e.preventDefault(); e.stopPropagation() }}
+          title="Arrastre para ensanchar o angostar la tarjeta"
+          className={`${comun} top-9 bottom-0 right-0 w-2.5 rounded-l`}
+          style={{ ...barra, cursor: 'ew-resize' }}>
+          <span className="w-0.5 h-8 rounded-full" style={{ background: 'rgba(255,255,255,0.85)' }} />
+        </div>
+      )}
+      <div onPointerDown={estirarAlto} draggable={false}
+        onDragStart={e => { e.preventDefault(); e.stopPropagation() }}
+        title="Arrastre para dar más alto a la tarjeta"
+        className={`${comun} left-0 right-0 bottom-0 h-2.5 rounded-t`}
+        style={{ ...barra, cursor: 'ns-resize' }}>
+        <span className="h-0.5 w-10 rounded-full" style={{ background: 'rgba(255,255,255,0.85)' }} />
+      </div>
+
+      {fantasma && (
+        <span className="absolute right-2 bottom-5 z-30 px-2 py-0.5 rounded text-[11px] font-bold"
+          style={{ background: '#0B1736', color: '#fff' }}>
+          {fantasma.ancho
+            ? `${fantasma.ancho} ${fantasma.ancho === 1 ? 'columna' : 'columnas'}`
+            : `${Math.round(fantasma.alto ?? 0)} px de alto`}
+        </span>
+      )}
+    </>
   )
 }
 
@@ -560,10 +718,13 @@ function Rotulo({ icono: Icono, texto, color }: { icono: any; texto: string; col
 function Anuncio({ t }: { t: Tarjeta }) {
   const c = COLOR(t.color)
   const fondo = ajusteDe(t) === 'recortada'
-  const superpuesto = superpuestoDe(t)
+  const disposicion = disposicionDe(t)
+  const superpuesto = disposicion === 'superpuesto'
+  const alLado = disposicion === 'izquierda' || disposicion === 'derecha'
   const alinear = alineacionDe(t)
   const tam = tamanoDe(t)
   const aire = aireDe(t)
+  const tinta = colorTextoDe(t)
 
   const centro = alinear === 'centro'
   const clasesAlineacion = centro ? 'items-center text-center'
@@ -577,12 +738,16 @@ function Anuncio({ t }: { t: Tarjeta }) {
       </span>
     ),
     titulo: t.titulo ? (
-      <h2 className="font-extrabold text-white leading-tight" style={{ fontSize: tam.titulo }}>{t.titulo}</h2>
+      <h2 className="font-extrabold leading-tight"
+        style={{ fontSize: tam.titulo, color: tinta ?? '#FFFFFF' }}>{t.titulo}</h2>
     ) : null,
     texto: t.texto ? (
       <p className="leading-relaxed" style={{
-        color: 'rgba(255,255,255,0.84)', fontSize: tam.texto,
-        maxWidth: centro ? '46rem' : '36rem',
+        // Sin color propio, el cuerpo va un punto más tenue que el título:
+        // ayuda a que se lea primero el título y después el resto.
+        color: tinta ?? 'rgba(255,255,255,0.84)', opacity: tinta ? 0.88 : 1,
+        fontSize: tam.texto,
+        maxWidth: alLado ? undefined : centro ? '46rem' : '36rem',
       }}>{t.texto}</p>
     ) : null,
     iconos: pictogramasDe(t).length > 0 ? (
@@ -604,9 +769,9 @@ function Anuncio({ t }: { t: Tarjeta }) {
     ) : null,
   }
 
-  // La imagen de fondo y la superpuesta no entran en la columna: una va detrás
-  // de todo y la otra debajo del texto, las dos en capas aparte.
-  const imagenSuelta = fondo || superpuesto
+  // La imagen de fondo, la superpuesta y la de al lado no entran en la
+  // columna: cada una va en su propia capa o su propia columna.
+  const imagenSuelta = fondo || superpuesto || alLado
   const orden = ordenDe(t).filter(p => !(p === 'imagen' && imagenSuelta))
 
   const columna = (
@@ -622,6 +787,26 @@ function Anuncio({ t }: { t: Tarjeta }) {
       })}
     </div>
   )
+
+  // Lado a lado. En celular se apilan: dos columnas en 360 píxeles de ancho
+  // dejan el texto en una tira de letras sueltas.
+  if (alLado && t.imagen_url) {
+    const prop = proporcionDe(t)
+    const imagen = (
+      <div className="tablero-lado" style={{ flexBasis: prop.parte }}>
+        <Imagen t={t} color={c.fuerte} />
+      </div>
+    )
+    return (
+      <div className="rounded-2xl relative overflow-hidden" style={{ background: c.degradado }}>
+        <div className="tablero-fila flex items-stretch">
+          {disposicion === 'izquierda' && imagen}
+          <div className="tablero-lado flex-1 flex flex-col justify-center">{columna}</div>
+          {disposicion === 'derecha' && imagen}
+        </div>
+      </div>
+    )
+  }
 
   return (
     <div className="rounded-2xl relative overflow-hidden" style={{ background: c.degradado }}>
@@ -664,10 +849,12 @@ function Banner({ t }: { t: Tarjeta }) {
           textAlign: alinear === 'centro' ? 'center' : alinear === 'derecha' ? 'right' : 'left',
         }}>
           {t.titulo && (
-            <p className="font-extrabold leading-tight" style={{ color: c.fuerte, fontSize: tam.titulo }}>{t.titulo}</p>
+            <p className="font-extrabold leading-tight"
+              style={{ color: colorTextoDe(t) ?? c.fuerte, fontSize: tam.titulo }}>{t.titulo}</p>
           )}
           {t.texto && (
-            <p className="mt-1 leading-relaxed" style={{ color: 'var(--text-dim)', fontSize: tam.texto }}>{t.texto}</p>
+            <p className="mt-1 leading-relaxed"
+              style={{ color: colorTextoDe(t) ?? 'var(--text-dim)', fontSize: tam.texto }}>{t.texto}</p>
           )}
           <Iconos t={t} color={c.fuerte} />
         </div>
@@ -692,11 +879,13 @@ function Texto({ t }: { t: Tarjeta }) {
         textAlign: alinear === 'centro' ? 'center' : alinear === 'derecha' ? 'right' : 'left',
       }}>
         {t.titulo && (
-          <p className="font-extrabold leading-tight" style={{ color: c.fuerte, fontSize: tam.titulo }}>{t.titulo}</p>
+          <p className="font-extrabold leading-tight"
+            style={{ color: colorTextoDe(t) ?? c.fuerte, fontSize: tam.titulo }}>{t.titulo}</p>
         )}
         {t.texto && (
           <p className="leading-relaxed" style={{
-            color: 'var(--text-strong)', fontSize: tam.texto, marginTop: t.titulo ? 8 : 0,
+            color: colorTextoDe(t) ?? 'var(--text-strong)',
+            fontSize: tam.texto, marginTop: t.titulo ? 8 : 0,
           }}>{t.texto}</p>
         )}
         <Iconos t={t} color={c.fuerte} />

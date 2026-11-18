@@ -295,8 +295,65 @@ export const alineacionDe = (t: Pick<Tarjeta, 'datos'>): Alineacion =>
   t.datos?.alineacion === 'centro' || t.datos?.alineacion === 'derecha'
     ? t.datos.alineacion : 'izquierda'
 
-/** Texto encima de la imagen, en vez de debajo. */
-export const superpuestoDe = (t: Pick<Tarjeta, 'datos'>): boolean => !!t.datos?.superpuesto
+/**
+ * Cómo se reparten el espacio la imagen y el texto.
+ *
+ * Apilado es lo de siempre: uno debajo del otro, en el orden que diga la
+ * tarjeta. Al lado los pone en dos columnas, y superpuesto manda el texto
+ * sobre la imagen.
+ */
+export type Disposicion = 'apilado' | 'izquierda' | 'derecha' | 'superpuesto'
+
+export const DISPOSICIONES: { id: Disposicion; nombre: string }[] = [
+  { id: 'apilado',     nombre: 'Uno debajo del otro' },
+  { id: 'izquierda',   nombre: 'Imagen a la izquierda' },
+  { id: 'derecha',     nombre: 'Imagen a la derecha' },
+  { id: 'superpuesto', nombre: 'Texto sobre la imagen' },
+]
+
+export function disposicionDe(t: Pick<Tarjeta, 'datos'>): Disposicion {
+  const d = t.datos?.disposicion
+  if (d === 'izquierda' || d === 'derecha' || d === 'superpuesto' || d === 'apilado') return d
+  // Antes solo había una casilla de "texto encima"; las tarjetas que la tengan
+  // marcada siguen viéndose igual sin que nadie las vuelva a tocar.
+  return t.datos?.superpuesto ? 'superpuesto' : 'apilado'
+}
+
+/** Cuánto del ancho se lleva la imagen cuando van lado a lado. */
+export type Proporcion = 'tercio' | 'mitad' | 'dos_tercios'
+
+export const PROPORCIONES: { id: Proporcion; nombre: string; parte: string }[] = [
+  { id: 'tercio',      nombre: 'Un tercio',  parte: '33%' },
+  { id: 'mitad',       nombre: 'La mitad',   parte: '50%' },
+  { id: 'dos_tercios', nombre: 'Dos tercios', parte: '66%' },
+]
+
+export const proporcionDe = (t: Pick<Tarjeta, 'datos'>) =>
+  PROPORCIONES.find(p => p.id === t.datos?.proporcion) ?? PROPORCIONES[1]
+
+/**
+ * El color del texto.
+ *
+ * `auto` deja el que le corresponda a la tarjeta —blanco sobre el degradado
+ * del anuncio, oscuro sobre una caja clara—, que es lo que casi siempre se
+ * quiere. Los demás están para cuando el fondo lo pide: con la imagen al lado,
+ * media tarjeta puede quedar clara y el blanco ahí no se lee.
+ */
+export const COLORES_TEXTO: { id: string; nombre: string; hex: string | null }[] = [
+  { id: 'auto',   nombre: 'Automático', hex: null },
+  { id: 'blanco', nombre: 'Blanco',     hex: '#FFFFFF' },
+  { id: 'oscuro', nombre: 'Oscuro',     hex: '#0B1736' },
+  { id: 'cian',   nombre: 'Cian',       hex: '#22D3EE' },
+  { id: 'verde',  nombre: 'Verde',      hex: '#34D399' },
+  { id: 'ambar',  nombre: 'Ámbar',      hex: '#FBBF24' },
+  { id: 'rojo',   nombre: 'Rojo',       hex: '#F87171' },
+  { id: 'azul',   nombre: 'Azul',       hex: '#60A5FA' },
+]
+
+/** El color elegido, o `null` para que mande el de la tarjeta. */
+export function colorTextoDe(t: Pick<Tarjeta, 'datos'>): string | null {
+  return COLORES_TEXTO.find(c => c.id === t.datos?.colorTexto)?.hex ?? null
+}
 
 export type Tamano = 'chico' | 'normal' | 'grande' | 'enorme'
 
