@@ -133,9 +133,9 @@ export const TIPOS: TipoMeta[] = [
     campos: [],
   },
   {
-    id: 'contador', nombre: 'Días sin accidentes', ancho: 1, automatica: false,
+    id: 'contador', nombre: 'Días sin accidentes', ancho: 1, automatica: false, anchoLibre: true,
     ayuda: 'Usted pone la fecha del último accidente y la meta. Los días se cuentan solos.',
-    campos: ['desde_contador', 'meta'],
+    campos: ['desde_contador', 'meta', 'leyenda', 'imagen'],
   },
   {
     id: 'alerta', nombre: 'Alerta', ancho: 1, automatica: false,
@@ -397,6 +397,51 @@ export const PIEZAS_TEXTO: { id: PiezaTexto; nombre: string }[] = [
   { id: 'numero', nombre: 'Número' },
   { id: 'texto',  nombre: 'Descripción' },
 ]
+
+/**
+ * Cómo se llama cada pieza en cada tarjeta.
+ *
+ * «Título» en el contador no es el título de arriba: es la frase que va pegada
+ * al número. Llamarlas a todas igual obligaba a adivinar cuál se iba a mover
+ * al tocar un control, y se tocaba el que no era.
+ */
+const PIEZAS_RENOMBRADAS: Partial<Record<TipoTarjeta, Partial<Record<PiezaTexto, string>>>> = {
+  contador: {
+    rotulo: 'Rótulo de arriba',
+    numero: 'El número',
+    titulo: 'Frase bajo el número',
+    texto: 'Meta y nota',
+  },
+  separador: {
+    rotulo: 'Texto de la línea',
+    titulo: 'Texto de la línea',
+    texto: 'Nota al final',
+  },
+}
+
+export const nombrePieza = (tipo: string, pieza: PiezaTexto): string =>
+  PIEZAS_RENOMBRADAS[tipo as TipoTarjeta]?.[pieza]
+  ?? PIEZAS_TEXTO.find(p => p.id === pieza)!.nombre
+
+/** Dónde va el texto respecto del número, en la tarjeta del contador. */
+export type DondeTexto = 'abajo' | 'arriba' | 'izquierda' | 'derecha'
+
+export const DONDE_TEXTO: { id: DondeTexto; nombre: string }[] = [
+  { id: 'abajo',     nombre: 'Bajo el número' },
+  { id: 'arriba',    nombre: 'Sobre el número' },
+  { id: 'izquierda', nombre: 'A la izquierda' },
+  { id: 'derecha',   nombre: 'A la derecha' },
+]
+
+export const dondeTextoDe = (t: Pick<Tarjeta, 'datos'>): DondeTexto =>
+  (DONDE_TEXTO.find(d => d.id === t.datos?.dondeTexto)?.id) ?? 'abajo'
+
+/** La frase pegada al número. Vacía a propósito es vacía; sin poner, la de siempre. */
+export function leyendaDe(t: Pick<Tarjeta, 'datos'>, dias: number | null): string {
+  const propia = t.datos?.leyenda
+  if (typeof propia === 'string') return propia
+  return dias === 1 ? 'día sin accidentes' : 'días sin accidentes'
+}
 
 const esHex = (v: any): v is string => typeof v === 'string' && /^#[0-9a-fA-F]{6}$/.test(v)
 

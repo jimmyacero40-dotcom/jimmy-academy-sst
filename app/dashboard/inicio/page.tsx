@@ -13,7 +13,7 @@ import {
   COLOR, TIPO, anchoDe, ajusteDe, altoDe, pictogramasDe,
   ordenDe, alineacionDe, tamanoDe, aireDe,
   disposicionDe, proporcionDe, colorTextoDe, tintaDe, nombreDe, seVe,
-  medidaDe, medidaComo, grosorDe,
+  medidaDe, medidaComo, grosorDe, dondeTextoDe, leyendaDe,
   posicionIconosDe, tamanoIconosDe,
   ALTO_MINIMO, ALTO_MAXIMO,
   type Tarjeta, type TipoTarjeta,
@@ -1033,16 +1033,30 @@ function Separador({ t }: { t: Tarjeta }) {
       </div>
     )
   }
+
+  // La alineación mueve el texto de verdad: a la izquierda la línea va detrás,
+  // a la derecha delante, y al centro queda partida en dos con el texto en
+  // medio. Antes el control estaba y no hacía nada.
+  const alinear = alineacionDe(t)
+  const rotulo = (
+    <span className="font-bold tracking-wider uppercase whitespace-nowrap"
+      style={{ fontSize: medidaDe(t, 'rotulo'), fontWeight: grosorDe(t, 'rotulo') ?? 800, color: tinta }}>
+      {t.titulo}
+    </span>
+  )
+  const nota = t.texto && (
+    <span className="whitespace-nowrap" style={{
+      fontSize: medidaDe(t, 'rotulo'), fontWeight: grosorDe(t, 'rotulo'),
+      color: tintaDe(t, 'texto') ?? 'var(--text-label)',
+    }}>{t.texto}</span>
+  )
+
   return (
     <div className="flex items-center gap-3" style={{ paddingTop: aire / 2, paddingBottom: aire / 2 }}>
-      <span className="font-bold tracking-wider uppercase whitespace-nowrap"
-        style={{ fontSize: medidaDe(t, 'rotulo'), fontWeight: grosorDe(t, 'rotulo') ?? 800, color: tinta }}>
-        {t.titulo}
-      </span>
-      <span className="flex-1" style={linea} />
-      {t.texto && (
-        <span style={{ fontSize: medidaDe(t, 'rotulo'), fontWeight: grosorDe(t, 'rotulo'), color: tintaDe(t, 'texto') ?? 'var(--text-label)' }}>{t.texto}</span>
-      )}
+      {alinear !== 'izquierda' && <span className="flex-1" style={linea} />}
+      {rotulo}
+      {nota}
+      {alinear !== 'derecha' && <span className="flex-1" style={linea} />}
     </div>
   )
 }
@@ -1080,55 +1094,133 @@ function Poster({ t }: { t: Tarjeta }) {
   return t.cta_url ? <Link href={t.cta_url} className="block">{cuerpo}</Link> : cuerpo
 }
 
+/**
+ * El contador de días.
+ *
+ * Con imagen se vuelve otra cosa: la foto va de fondo, desenfocada y bajo un
+ * velo oscuro, y el número encima en blanco. Sin imagen se queda en la caja
+ * de color de siempre. Esa es la diferencia entre una cifra en una caja lisa y
+ * algo que la gente mira al pasar.
+ */
 function Contador({ t }: { t: Tarjeta }) {
   const c = COLOR(t.color ?? 'verde')
   const dias: number | null = t.datos?.dias ?? null
   const meta = Number(t.datos?.meta) || null
   const avance = dias != null && meta ? Math.min(100, Math.round((dias / meta) * 100)) : null
-  const tam = tamanoDe(t)
   const aire = aireDe(t)
+  const conFoto = !!t.imagen_url && seVe(t, 'imagen')
+  const donde = dondeTextoDe(t)
+  const leyenda = leyendaDe(t, dias)
+  const alinear = alineacionDe(t)
 
-  return (
-    <div className="rounded-2xl flex flex-col items-center justify-center text-center relative"
-      style={{ background: c.suave, border: `1px solid ${c.borde}`, padding: aire }}>
+  // Sobre una foto el texto va claro por omisión; sobre la caja de color, con
+  // los colores de la tarjeta. Lo que se elija a mano manda sobre los dos.
+  const tinta = (p: Parameters<typeof tintaDe>[1], claro: string, oscuro: string) =>
+    tintaDe(t, p) ?? (conFoto ? claro : oscuro)
+
+  const numero = (
+    <span className="font-black leading-none tabular-nums block"
+      style={{
+        fontSize: medidaDe(t, 'numero'), fontWeight: grosorDe(t, 'numero'),
+        color: tinta('numero', '#FFFFFF', c.fuerte),
+        textShadow: conFoto ? '0 2px 18px rgba(0,0,0,0.45)' : undefined,
+      }}>
+      {dias ?? '—'}
+    </span>
+  )
+
+  const textos = (
+    <>
       {seVe(t, 'rotulo') && t.titulo && (
-        <span className="font-bold tracking-wider uppercase"
-          style={{ fontSize: medidaDe(t, 'rotulo'), fontWeight: grosorDe(t, 'rotulo'), color: tintaDe(t, 'rotulo') ?? c.fuerte }}>
+        <span className="font-bold tracking-wider uppercase block"
+          style={{
+            fontSize: medidaDe(t, 'rotulo'), fontWeight: grosorDe(t, 'rotulo'),
+            color: tinta('rotulo', 'rgba(255,255,255,0.85)', c.fuerte),
+          }}>
           {t.titulo}
         </span>
       )}
-      {/* El número sigue el tamaño elegido, en una escala aparte: con la misma
-          del título se perdería, porque aquí el número es el mensaje. */}
-      <span className="font-black my-1.5 leading-none tabular-nums"
-        style={{ fontSize: medidaDe(t, 'numero'), fontWeight: grosorDe(t, 'numero'), color: tintaDe(t, 'numero') ?? c.fuerte }}>
-        {dias ?? '—'}
-      </span>
-      {/* Este renglón es el título de la tarjeta, así que lee la medida y el
-          color del título. Antes tomaba el color de uno y el tamaño de otro, y
-          cambiar «Título» en el editor no lo movía. */}
-      <span className="font-semibold"
-        style={{
-          fontSize: medidaComo(t, 'titulo', 'texto'), fontWeight: grosorDe(t, 'titulo') ?? 600,
-          color: tintaDe(t, 'titulo') ?? 'var(--text-strong)',
-        }}>
-        {dias === 1 ? 'día sin accidentes' : 'días sin accidentes'}
-      </span>
+      {seVe(t, 'titulo') && leyenda && (
+        <span className="font-semibold block"
+          style={{
+            fontSize: medidaComo(t, 'titulo', 'texto'), fontWeight: grosorDe(t, 'titulo') ?? 600,
+            color: tinta('titulo', '#FFFFFF', 'var(--text-strong)'),
+          }}>
+          {leyenda}
+        </span>
+      )}
+    </>
+  )
+
+  const pie = seVe(t, 'texto') && (
+    <>
       {avance != null && (
         <div className="w-full mt-3">
-          <p className="mb-1.5" style={{ fontSize: medidaDe(t, 'rotulo'), fontWeight: grosorDe(t, 'rotulo'), color: tintaDe(t, 'texto') ?? 'var(--text-label)' }}>
+          <p className="mb-1.5" style={{
+            fontSize: medidaDe(t, 'rotulo'), fontWeight: grosorDe(t, 'rotulo'),
+            color: tinta('texto', 'rgba(255,255,255,0.8)', 'var(--text-label)'),
+          }}>
             Meta: {meta} días{avance >= 100 ? ' · ¡cumplida!' : ''}
           </p>
-          <div className="h-1.5 rounded-full overflow-hidden" style={{ background: 'rgba(0,0,0,0.07)' }}>
-            <div className="h-full rounded-full" style={{ width: `${avance}%`, background: c.fuerte }} />
+          <div className="h-1.5 rounded-full overflow-hidden"
+            style={{ background: conFoto ? 'rgba(255,255,255,0.25)' : 'rgba(0,0,0,0.07)' }}>
+            <div className="h-full rounded-full"
+              style={{ width: `${avance}%`, background: conFoto ? '#FFFFFF' : c.fuerte }} />
           </div>
         </div>
       )}
       {t.texto && (
-        <p className="mt-2" style={{ fontSize: medidaDe(t, 'rotulo'), fontWeight: grosorDe(t, 'rotulo'), color: tintaDe(t, 'texto') ?? 'var(--text-label)' }}>
+        <p className="mt-2" style={{
+          fontSize: medidaDe(t, 'rotulo'), fontWeight: grosorDe(t, 'rotulo'),
+          color: tinta('texto', 'rgba(255,255,255,0.8)', 'var(--text-label)'),
+        }}>
           {t.texto}
         </p>
       )}
-      <Iconos t={t} color={c.fuerte} />
+    </>
+  )
+
+  // Con el texto al lado, número y palabras van en fila; si no, uno sobre otro
+  // y en el orden que se pida.
+  const alLado = donde === 'izquierda' || donde === 'derecha'
+  const cuerpo = alLado ? (
+    <div className="flex items-center justify-center gap-4 flex-wrap">
+      {donde === 'izquierda' && <div className="text-right">{textos}</div>}
+      {numero}
+      {donde === 'derecha' && <div className="text-left">{textos}</div>}
+    </div>
+  ) : donde === 'arriba' ? (
+    <><div className="mb-1.5">{textos}</div>{numero}</>
+  ) : (
+    <>{numero}<div className="mt-1.5">{textos}</div></>
+  )
+
+  const alineado = alinear === 'izquierda' ? 'text-left items-start'
+    : alinear === 'derecha' ? 'text-right items-end' : 'text-center items-center'
+
+  return (
+    <div className="rounded-2xl relative overflow-hidden"
+      style={conFoto
+        ? { background: c.degradado }
+        : { background: c.suave, border: `1px solid ${c.borde}` }}>
+      {conFoto && (
+        <>
+          <div className="absolute inset-0" aria-hidden style={{
+            backgroundImage: `url(${t.imagen_url})`, backgroundSize: 'cover', backgroundPosition: 'center',
+          }} />
+          {/* El velo no es decoración: sin él, el número blanco desaparece
+              sobre las partes claras de la foto. */}
+          <div className="absolute inset-0" aria-hidden style={{
+            background: 'linear-gradient(to top, rgba(8,16,36,0.85), rgba(8,16,36,0.45))',
+            backdropFilter: 'blur(2px)',
+          }} />
+        </>
+      )}
+      <div className={`relative flex flex-col justify-center ${alineado}`} style={{ padding: aire }}>
+        {cuerpo}
+        {pie}
+        <Iconos t={t} color={conFoto ? '#fff' : c.fuerte} sobreOscuro={conFoto} />
+      </div>
     </div>
   )
 }

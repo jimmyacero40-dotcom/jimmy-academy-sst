@@ -4,10 +4,10 @@ import { useEffect, useState } from 'react'
 import { X, Upload, AlertCircle, Loader2, ArrowUp, ArrowDown, Eye, EyeOff } from 'lucide-react'
 import {
   TIPOS, TIPO, COLORES, ALTOS, AJUSTES, PICTOGRAMAS, PIEZAS, TAMANOS, AIRES,
-  DISPOSICIONES, PROPORCIONES, PALETA_TEXTO, PIEZAS_TEXTO, TAMANOS_ICONO,
+  DISPOSICIONES, PROPORCIONES, PALETA_TEXTO, PIEZAS_TEXTO, TAMANOS_ICONO, DONDE_TEXTO,
   diasDesde, anchoDe, ajusteDe, pictogramasDe,
   ordenDe, alineacionDe, disposicionDe, proporcionDe,
-  tamanoIconosDe, posicionIconosDe, ocultosDe,
+  tamanoIconosDe, posicionIconosDe, ocultosDe, dondeTextoDe, nombrePieza,
   PX_MINIMO, PX_MAXIMO,
   type Tarjeta, type TipoTarjeta, type ColorTarjeta, type Ajuste, type Alto,
   type Pieza, type Alineacion, type Tamano, type Aire,
@@ -73,6 +73,8 @@ export function EditorTarjeta({ tarjeta, opciones, onGuardar, onCerrar }: {
     tamanos: (tarjeta.datos?.tamanos ?? {}) as Record<string, string | null>,
     px: (tarjeta.datos?.px ?? {}) as Record<string, number | null>,
     negritas: (tarjeta.datos?.negritas ?? {}) as Record<string, boolean | null>,
+    leyenda: (tarjeta.datos?.leyenda ?? '') as string,
+    dondeTexto: dondeTextoDe(tarjeta) as string,
     grosorLinea: (Number(tarjeta.datos?.grosorLinea) || 2) as number,
     estiloLinea: (tarjeta.datos?.estiloLinea ?? 'solida') as string,
     tamano: (tarjeta.datos?.tamano ?? 'normal') as Tamano,
@@ -176,6 +178,8 @@ export function EditorTarjeta({ tarjeta, opciones, onGuardar, onCerrar }: {
     datos.tintas = f.tintas
     datos.tamanos = f.tamanos
     datos.px = f.px
+    if (tiene('leyenda')) datos.leyenda = f.leyenda
+    if (tarjeta.tipo === 'contador') datos.dondeTexto = f.dondeTexto
     datos.negritas = f.negritas
     if (tarjeta.tipo === 'separador') {
       datos.grosorLinea = f.grosorLinea
@@ -245,6 +249,14 @@ export function EditorTarjeta({ tarjeta, opciones, onGuardar, onCerrar }: {
           <Campo etiqueta="Elementos" nota="Separados por coma. Salen como etiquetas.">
             <input value={f.items} onChange={e => set('items', e.target.value)}
               placeholder="Botas, Guantes, Gorra, Gafas UV" style={estiloCampo} />
+          </Campo>
+        )}
+
+        {tiene('leyenda') && (
+          <Campo etiqueta="Frase bajo el número"
+            nota="Lo que va pegado a la cifra. Déjelo vacío para dejar el número solo.">
+            <input value={f.leyenda} onChange={e => set('leyenda', e.target.value)}
+              placeholder="días sin accidentes" style={estiloCampo} />
           </Campo>
         )}
 
@@ -411,7 +423,7 @@ export function EditorTarjeta({ tarjeta, opciones, onGuardar, onCerrar }: {
               return (
                 <div key={pt.id} className="flex items-center gap-2 flex-wrap">
                   <span className="text-[11.5px] font-bold w-[86px] flex-shrink-0"
-                    style={{ color: 'var(--text-dim)' }}>{pt.nombre}</span>
+                    style={{ color: 'var(--text-dim)' }}>{nombrePieza(tarjeta.tipo, pt.id)}</span>
                   <input type="number" min={PX_MINIMO} max={PX_MAXIMO} placeholder="auto"
                     value={f.px[pt.id] ?? ''}
                     onChange={e => {
@@ -475,6 +487,13 @@ export function EditorTarjeta({ tarjeta, opciones, onGuardar, onCerrar }: {
             opciones={AIRES.map(a => ({ id: a.id, texto: a.nombre }))} />
         </Campo>
 
+        {tarjeta.tipo === 'contador' && (
+          <Campo etiqueta="Dónde va el texto" nota="Respecto del número.">
+            <Botones valor={f.dondeTexto} onElegir={v => set('dondeTexto', v)}
+              opciones={DONDE_TEXTO.map(d => ({ id: d.id, texto: d.nombre }))} />
+          </Campo>
+        )}
+
         <Campo etiqueta="Qué se ve" nota="Lo que apague desaparece de la tarjeta, y su espacio también.">
           <div className="flex gap-1.5 flex-wrap">
             {(['rotulo', 'etiqueta', 'titulo', 'texto', 'imagen', 'iconos', 'boton'] as const).map(pz => {
@@ -509,7 +528,7 @@ export function EditorTarjeta({ tarjeta, opciones, onGuardar, onCerrar }: {
             <Paleta nombre="Todo el texto" valor={f.colorTexto}
               onElegir={v => set('colorTexto', v)} />
             {PIEZAS_TEXTO.map(pt => (
-              <Paleta key={pt.id} nombre={pt.nombre} valor={f.tintas[pt.id] ?? null}
+              <Paleta key={pt.id} nombre={nombrePieza(tarjeta.tipo, pt.id)} valor={f.tintas[pt.id] ?? null}
                 onElegir={v => set('tintas', { ...f.tintas, [pt.id]: v })} />
             ))}
           </div>
