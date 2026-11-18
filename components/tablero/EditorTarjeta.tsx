@@ -1,13 +1,13 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { X, Upload, AlertCircle, Loader2, ArrowUp, ArrowDown } from 'lucide-react'
+import { X, Upload, AlertCircle, Loader2, ArrowUp, ArrowDown, Eye, EyeOff } from 'lucide-react'
 import {
   TIPOS, TIPO, COLORES, ALTOS, AJUSTES, PICTOGRAMAS, PIEZAS, TAMANOS, AIRES,
   DISPOSICIONES, PROPORCIONES, PALETA_TEXTO, PIEZAS_TEXTO, TAMANOS_ICONO,
   diasDesde, anchoDe, ajusteDe, pictogramasDe,
   ordenDe, alineacionDe, disposicionDe, proporcionDe,
-  tamanoIconosDe, posicionIconosDe,
+  tamanoIconosDe, posicionIconosDe, ocultosDe,
   type Tarjeta, type TipoTarjeta, type ColorTarjeta, type Ajuste, type Alto,
   type Pieza, type Alineacion, type Tamano, type Aire,
   type Disposicion, type Proporcion,
@@ -44,6 +44,8 @@ export function EditorTarjeta({ tarjeta, opciones, onGuardar, onCerrar }: {
   const tiene = (campo: string) => meta.campos.includes(campo)
 
   const [f, setF] = useState({
+    nombre: (tarjeta.datos?.nombre ?? '') as string,
+    ocultos: ocultosDe(tarjeta),
     titulo: tarjeta.titulo ?? '',
     texto: tarjeta.texto ?? '',
     destacado: tarjeta.destacado ?? '',
@@ -166,6 +168,8 @@ export function EditorTarjeta({ tarjeta, opciones, onGuardar, onCerrar }: {
     datos.proporcion = f.proporcion
     datos.colorTexto = f.colorTexto
     datos.tintas = f.tintas
+    datos.nombre = f.nombre.trim() || null
+    datos.ocultos = f.ocultos
     datos.tamano = f.tamano
     datos.aire = f.aire
 
@@ -192,7 +196,14 @@ export function EditorTarjeta({ tarjeta, opciones, onGuardar, onCerrar }: {
   return (
     <Telon onCerrar={cerrarSinGuardar} titulo={meta.nombre} ayuda={meta.ayuda} descartable={false}>
       <div className="space-y-4">
-        <Campo etiqueta={meta.automatica ? 'Rótulo de la tarjeta' : 'Título'}>
+        <Campo etiqueta="Nombre de la tarjeta"
+          nota="Solo para usted. No se ve en el tablero.">
+          <input value={f.nombre} onChange={e => set('nombre', e.target.value)}
+            placeholder={meta.nombre} style={estiloCampo} />
+        </Campo>
+
+        <Campo etiqueta={meta.automatica ? 'Rótulo de la tarjeta' : 'Título'}
+          nota="Esto sí lo lee el trabajador. Déjelo vacío si no quiere que salga.">
           <input value={f.titulo} onChange={e => set('titulo', e.target.value)} style={estiloCampo} />
         </Campo>
 
@@ -382,6 +393,34 @@ export function EditorTarjeta({ tarjeta, opciones, onGuardar, onCerrar }: {
         <Campo etiqueta="Aire por dentro" nota="Cuánto espacio deja alrededor del texto.">
           <Botones valor={f.aire} onElegir={v => set('aire', v)}
             opciones={AIRES.map(a => ({ id: a.id, texto: a.nombre }))} />
+        </Campo>
+
+        <Campo etiqueta="Qué se ve" nota="Lo que apague desaparece de la tarjeta, y su espacio también.">
+          <div className="flex gap-1.5 flex-wrap">
+            {(['rotulo', 'etiqueta', 'titulo', 'texto', 'imagen', 'iconos', 'boton'] as const).map(pz => {
+              const on = !f.ocultos.includes(pz)
+              const nombres: Record<string, string> = {
+                rotulo: 'Rótulo', etiqueta: 'Etiqueta', titulo: 'Título', texto: 'Descripción',
+                imagen: 'Imagen', iconos: 'Pictogramas', boton: 'Botón',
+              }
+              return (
+                <button key={pz} aria-pressed={on}
+                  onClick={() => set('ocultos', on
+                    ? [...f.ocultos, pz]
+                    : f.ocultos.filter((x: string) => x !== pz))}
+                  className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[12px] font-bold"
+                  style={{
+                    background: on ? 'var(--primary-dim)' : 'var(--bg-card-hover)',
+                    color: on ? 'var(--primary-dark)' : 'var(--text-faint)',
+                    border: `1px solid ${on ? 'var(--primary-border)' : 'var(--border)'}`,
+                    textDecoration: on ? undefined : 'line-through',
+                  }}>
+                  {on ? <Eye size={13} /> : <EyeOff size={13} />}
+                  {nombres[pz]}
+                </button>
+              )
+            })}
+          </div>
         </Campo>
 
         <Campo etiqueta="Colores del texto"

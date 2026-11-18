@@ -275,6 +275,31 @@ export const PIEZAS: Record<Pieza, string> = {
 const ORDEN_POR_DEFECTO: Pieza[] = ['imagen', 'etiqueta', 'titulo', 'texto', 'iconos', 'boton']
 
 /**
+ * Cómo se llama la tarjeta para quien la administra.
+ *
+ * No se ve en el tablero. Hace falta porque el título es texto que lee el
+ * trabajador, y ponerle «Banner» a un recuadro para reconocerlo en la lista
+ * terminaba con la palabra «Banner» escrita en la pantalla de todos.
+ */
+export const nombreDe = (t: Pick<Tarjeta, 'tipo' | 'titulo' | 'datos'>): string => {
+  const propio = typeof t.datos?.nombre === 'string' ? t.datos.nombre.trim() : ''
+  return propio || (t.titulo ?? '').trim() || TIPO(t.tipo).nombre
+}
+
+/**
+ * Las piezas que el administrador apagó.
+ *
+ * Apagar no es lo mismo que borrar el texto: la etiqueta «ANUNCIO» no es un
+ * campo que se pueda vaciar, y el rótulo «PRÓXIMAS CAPACITACIONES» se escribe
+ * solo. Para que no se vean hace falta decirlo aparte.
+ */
+export const ocultosDe = (t: Pick<Tarjeta, 'datos'>): string[] =>
+  Array.isArray(t.datos?.ocultos) ? t.datos.ocultos.filter((p: any) => typeof p === 'string') : []
+
+export const seVe = (t: Pick<Tarjeta, 'datos'>, pieza: string): boolean =>
+  !ocultosDe(t).includes(pieza)
+
+/**
  * El orden guardado, completado con lo que falte.
  *
  * Se vuelve a agregar cualquier pieza que no esté en la lista: si mañana se

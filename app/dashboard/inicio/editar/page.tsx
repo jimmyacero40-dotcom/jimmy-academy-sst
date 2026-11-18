@@ -6,7 +6,7 @@ import {
   ArrowLeft, ArrowUp, ArrowDown, Eye, EyeOff, Pencil, Trash2, Plus,
   Loader2, AlertCircle, Check, LayoutGrid,
 } from 'lucide-react'
-import { TIPO, COLOR, estadoDe, type Tarjeta, type TipoTarjeta } from '@/lib/tablero'
+import { TIPO, COLOR, estadoDe, nombreDe, type Tarjeta, type TipoTarjeta } from '@/lib/tablero'
 import { EditorTarjeta, ElegirTipo, type Opciones } from '@/components/tablero/EditorTarjeta'
 
 const ESTADOS: Record<string, { texto: string; color: string }> = {
@@ -71,7 +71,7 @@ export default function EditarTableroPage() {
   }
 
   const borrar = async (t: Tarjeta) => {
-    const nombre = t.titulo || TIPO(t.tipo).nombre
+    const nombre = nombreDe(t)
     if (!confirm(`¿Borrar «${nombre}»?\n\nNo se puede deshacer. Si solo quiere que deje de verse, apáguela.`)) return
     const r = await fetch(`/api/tablero/tarjetas?id=${t.id}`, { method: 'DELETE' })
     if (!r.ok) { setAviso({ tono: 'mal', texto: 'No se pudo borrar' }); return }
@@ -84,7 +84,10 @@ export default function EditarTableroPage() {
     const r = await fetch('/api/tablero/tarjetas', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ tipo, titulo: TIPO(tipo).nombre, color: 'cian', activa: false }),
+      // El nombre del tipo va al nombre interno, no al título visible.
+      body: JSON.stringify({
+        tipo, color: 'cian', activa: false, datos: { nombre: TIPO(tipo).nombre },
+      }),
     })
     const d = await r.json().catch(() => ({}))
     if (!r.ok) { setAviso({ tono: 'mal', texto: d.error ?? 'No se pudo crear' }); return }
@@ -206,7 +209,7 @@ function Fila({ t, primera, ultima, onSubir, onBajar, onPrender, onEditar, onBor
           )}
         </div>
         <p className="font-semibold text-[14px] mt-1 leading-snug" style={{ color: 'var(--text)' }}>
-          {t.titulo || <span style={{ color: 'var(--text-faint)' }}>Sin título</span>}
+          {nombreDe(t)}
         </p>
         <p className="text-[11.5px] mt-0.5" style={{ color: 'var(--text-label)' }}>
           Para: {dirigida}

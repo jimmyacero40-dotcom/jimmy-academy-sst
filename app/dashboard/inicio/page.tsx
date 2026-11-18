@@ -12,7 +12,7 @@ import {
 import {
   COLOR, TIPO, anchoDe, ajusteDe, altoDe, pictogramasDe,
   ordenDe, alineacionDe, tamanoDe, aireDe,
-  disposicionDe, proporcionDe, colorTextoDe, tintaDe,
+  disposicionDe, proporcionDe, colorTextoDe, tintaDe, nombreDe, seVe,
   posicionIconosDe, tamanoIconosDe,
   ALTO_MINIMO, ALTO_MAXIMO,
   type Tarjeta, type TipoTarjeta,
@@ -24,13 +24,6 @@ import { useRol } from '@/lib/usar-rol'
 const fecha = (d?: string | null) =>
   d ? new Date(d + 'T12:00:00').toLocaleDateString('es-CO', { weekday: 'short', day: 'numeric', month: 'short' }) : ''
 
-/**
- * "martes, 17 de noviembre de 2026" → "Martes, 17 de noviembre de 2026".
- *
- * Solo la primera letra. La regla de CSS `capitalize` toca todas las palabras
- * y dejaría "Martes 17 De Noviembre De 2026".
- */
-const conMayuscula = (t: string) => (t ? t[0].toUpperCase() + t.slice(1) : '')
 
 /**
  * El modo diseño, disponible para cualquier tarjeta sin pasarlo de mano en
@@ -58,10 +51,6 @@ export default function InicioPage() {
   const [tarjetas, setTarjetas] = useState<Tarjeta[]>([])
   const [opciones, setOpciones] = useState<Opciones>({ centros: [], areas: [] })
   const [cargando, setCargando] = useState(true)
-  // La fecha se arma en el navegador y no en el servidor: el servidor corre en
-  // UTC, así que entre las 7 de la noche y la medianoche escribía el día
-  // siguiente.
-  const [hoy, setHoy] = useState('')
 
   // Modo diseño: se ve el tablero tal cual, pero cada tarjeta trae sus
   // controles encima. Es lo contrario de una vista previa —no hay dos
@@ -86,12 +75,6 @@ export default function InicioPage() {
 
   useEffect(() => { cargar(false) }, [])
 
-  useEffect(() => {
-    setHoy(new Date().toLocaleDateString('es-CO', {
-      weekday: 'long', day: 'numeric', month: 'long', year: 'numeric',
-    }))
-  }, [])
-
   const entrarADiseñar = async () => { setDiseñando(true); await cargar(true) }
   const salirDeDiseñar = async () => { setDiseñando(false); setArrastrando(null); await cargar(false) }
 
@@ -109,7 +92,11 @@ export default function InicioPage() {
     setEligiendoTipo(false)
     const r = await fetch('/api/tablero/tarjetas', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ tipo, titulo: TIPO(tipo).nombre, color: 'cian', activa: true }),
+      // El nombre del tipo va al nombre interno, no al título: como título se
+      // veía la palabra «Banner» escrita en la pantalla de todo el personal.
+      body: JSON.stringify({
+        tipo, color: 'cian', activa: true, datos: { nombre: TIPO(tipo).nombre },
+      }),
     })
     const d = await r.json().catch(() => ({}))
     if (!r.ok) { alert(d.error ?? 'No se pudo crear'); return }
@@ -118,7 +105,7 @@ export default function InicioPage() {
   }
 
   const borrar = async (t: Tarjeta) => {
-    const nombre = t.titulo || TIPO(t.tipo).nombre
+    const nombre = nombreDe(t)
     if (!confirm(`¿Borrar «${nombre}»?\n\nNo se puede deshacer. Si solo quiere que deje de verse, apáguela.`)) return
     await fetch(`/api/tablero/tarjetas?id=${t.id}`, { method: 'DELETE' })
     await cargar(true)
@@ -203,17 +190,15 @@ export default function InicioPage() {
   return (
     <Diseno.Provider value={{ activo: diseñando, guardarAlto, guardarIconos, bloquear: setBloqueado }}>
     <div className="space-y-5 pb-10">
-      <div className="flex items-end justify-between gap-4 flex-wrap">
-        <div>
-          <h1 className="text-2xl font-bold" style={{ color: 'var(--text)' }}>
-            {conMayuscula(hoy) || ' '}
-          </h1>
-          <p className="text-sm mt-0.5" style={{ color: 'var(--text-label)' }}>
-            {diseñando
-              ? 'Modo diseño — arrastre para mover, use los controles de cada tarjeta'
-              : 'Lo destacado en seguridad y salud en el trabajo'}
-          </p>
-        </div>
+      {/* Sin encabezado: la fecha y el subtítulo ocupaban dos renglones que no
+          decían nada que el tablero no dijera mejor. El espacio es del
+          contenido. Al diseñar sí aparece una línea, porque ahí hace falta
+          saber en qué modo se está. */}
+      {esAdmin && (
+      <div className="flex items-center justify-between gap-4 flex-wrap">
+        <p className="text-sm font-semibold" style={{ color: 'var(--text-label)' }}>
+          {diseñando ? 'Modo diseño — arrastre para mover, use los controles de cada tarjeta' : ' '}
+        </p>
 
         {esAdmin && (
           <div className="flex items-center gap-2 flex-wrap">
@@ -256,6 +241,7 @@ export default function InicioPage() {
           </div>
         )}
       </div>
+      )}
 
       {cargando ? (
         <div className="flex items-center gap-2 py-16 justify-center text-sm" style={{ color: 'var(--text-label)' }}>
@@ -503,6 +489,8 @@ function Controles({ t, primera, ultima, onMover, onAncho, onEditar, onBorrar, o
       // Arrastrar desde la barra movería el botón, no la tarjeta.
       draggable={false} onDragStart={e => e.preventDefault()}>
       <GripVertical size={15} style={{ color: 'rgba(255,255,255,0.4)' }} />
+      <span className="text-[11px] font-bold truncate max-w-[180px] mr-1"
+        style={{ color: 'rgba(255,255,255,0.72)' }} title={nombreDe(t)}>{nombreDe(t)}</span>
       <button onClick={() => onMover(-1)} disabled={primera} title="Mover antes"
         className={`${boton} disabled:opacity-25`} style={estilo}><ChevronLeft size={15} /></button>
       <button onClick={() => onMover(1)} disabled={ultima} title="Mover después"
@@ -799,9 +787,12 @@ function CajaColor({ color, t, children }: {
   )
 }
 
-function Rotulo({ icono: Icono, texto, color, tam }: {
-  icono: any; texto: string; color: string; tam?: string
+function Rotulo({ icono: Icono, texto, color, tam, t }: {
+  icono: any; texto: string; color: string; tam?: string; t?: Tarjeta
 }) {
+  // El rótulo se puede apagar: en una tarjeta con imagen propia, el letrero
+  // «PRÓXIMAS CAPACITACIONES» a veces sobra.
+  if (t && !seVe(t, 'rotulo')) return null
   return (
     <div className="flex items-center gap-1.5 mb-2.5">
       <Icono size={13} style={{ color }} />
@@ -876,7 +867,7 @@ function Anuncio({ t }: { t: Tarjeta }) {
   // mediría contra ella y no contra la tarjeta.
   const iconosSueltos = !!posicionIconosDe(t)
   const orden = ordenDe(t).filter(p =>
-    !(p === 'imagen' && imagenSuelta) && !(p === 'iconos' && iconosSueltos))
+    seVe(t, p) && !(p === 'imagen' && imagenSuelta) && !(p === 'iconos' && iconosSueltos))
 
   const columna = (
     <div className={`relative flex flex-col ${clasesAlineacion}`}
@@ -950,17 +941,19 @@ function Banner({ t }: { t: Tarjeta }) {
   const cuerpo = (
     <div className="rounded-2xl overflow-hidden relative" style={{ background: c.suave }}>
       <Imagen t={t} color={c.suave} />
-      {(t.titulo || t.texto) && (
+      {/* Sin texto visible, ni el recuadro: antes la franja de relleno se
+          quedaba igual y robaba un renglón entero debajo de la imagen. */}
+      {((t.titulo && seVe(t, 'titulo')) || (t.texto && seVe(t, 'texto'))) && (
         <div className="p-4" style={{
           textAlign: alinear === 'centro' ? 'center' : alinear === 'derecha' ? 'right' : 'left',
         }}>
-          {t.titulo && (
+          {t.titulo && seVe(t, 'titulo') && (
             <p className="font-extrabold leading-tight"
-              style={{ color: colorTextoDe(t) ?? c.fuerte, fontSize: tam.titulo }}>{t.titulo}</p>
+              style={{ color: tintaDe(t, 'titulo') ?? c.fuerte, fontSize: tam.titulo }}>{t.titulo}</p>
           )}
-          {t.texto && (
+          {t.texto && seVe(t, 'texto') && (
             <p className="mt-1 leading-relaxed"
-              style={{ color: colorTextoDe(t) ?? 'var(--text-dim)', fontSize: tam.texto }}>{t.texto}</p>
+              style={{ color: tintaDe(t, 'texto') ?? 'var(--text-dim)', fontSize: tam.texto }}>{t.texto}</p>
           )}
           <Iconos t={t} color={c.fuerte} />
         </div>
@@ -984,9 +977,9 @@ function Texto({ t }: { t: Tarjeta }) {
         padding: aire,
         textAlign: alinear === 'centro' ? 'center' : alinear === 'derecha' ? 'right' : 'left',
       }}>
-        {t.titulo && (
+        {t.titulo && seVe(t, 'titulo') && (
           <p className="font-extrabold leading-tight"
-            style={{ color: colorTextoDe(t) ?? c.fuerte, fontSize: tam.titulo }}>{t.titulo}</p>
+            style={{ color: tintaDe(t, 'titulo') ?? c.fuerte, fontSize: tam.titulo }}>{t.titulo}</p>
         )}
         {t.texto && (
           <p className="leading-relaxed" style={{
@@ -1022,7 +1015,7 @@ function Poster({ t }: { t: Tarjeta }) {
   if (!t.imagen_url) {
     return (
       <Caja>
-        <Rotulo icono={ImageIcon} texto={t.titulo || 'Póster'} color="var(--text-label)" />
+        <Rotulo t={t} icono={ImageIcon} texto={t.titulo || 'Póster'} color="var(--text-label)" />
         <p className="text-[13px]" style={{ color: 'var(--text-label)' }}>Sin imagen todavía.</p>
       </Caja>
     )
@@ -1053,10 +1046,12 @@ function Contador({ t }: { t: Tarjeta }) {
   return (
     <div className="rounded-2xl flex flex-col items-center justify-center text-center relative"
       style={{ background: c.suave, border: `1px solid ${c.borde}`, padding: aire }}>
-      <span className="font-bold tracking-wider uppercase"
-        style={{ fontSize: tam.rotulo, color: tintaDe(t, 'rotulo') ?? c.fuerte }}>
-        {t.titulo || 'Récord del equipo'}
-      </span>
+      {seVe(t, 'rotulo') && t.titulo && (
+        <span className="font-bold tracking-wider uppercase"
+          style={{ fontSize: tam.rotulo, color: tintaDe(t, 'rotulo') ?? c.fuerte }}>
+          {t.titulo}
+        </span>
+      )}
       {/* El número sigue el tamaño elegido, en una escala aparte: con la misma
           del título se perdería, porque aquí el número es el mensaje. */}
       <span className="font-black my-1.5 leading-none tabular-nums"
@@ -1091,7 +1086,7 @@ function Alerta({ t }: { t: Tarjeta }) {
   const c = COLOR(t.color ?? 'rojo')
   return (
     <CajaColor color={c} t={t}>
-      <Rotulo icono={AlertTriangle} texto="Alerta" color={tintaDe(t, 'rotulo') ?? c.fuerte} tam={tamanoDe(t).rotulo} />
+      <Rotulo t={t} icono={AlertTriangle} texto="Alerta" color={tintaDe(t, 'rotulo') ?? c.fuerte} tam={tamanoDe(t).rotulo} />
       <p className="font-bold leading-snug"
         style={{ fontSize: tamanoDe(t).texto, color: tintaDe(t, 'titulo') ?? 'var(--text)' }}>{t.titulo}</p>
       {t.texto && (
@@ -1107,7 +1102,7 @@ function Capacitaciones({ t }: { t: Tarjeta }) {
   const proximas: any[] = t.datos?.capacitaciones?.proximas ?? []
   return (
     <Caja t={t} color={c.fuerte}>
-      <Rotulo icono={CalendarDays} texto={t.titulo || 'Próximas capacitaciones'} color="var(--text-label)" />
+      <Rotulo t={t} icono={CalendarDays} texto={t.titulo || 'Próximas capacitaciones'} color="var(--text-label)" />
       {proximas.length === 0 ? (
         <p className="text-[13px]" style={{ color: 'var(--text-label)' }}>No hay ninguna programada.</p>
       ) : (
@@ -1135,7 +1130,7 @@ function Formacion({ t }: { t: Tarjeta }) {
   const pct: number | null = d.porcentaje ?? null
   return (
     <Caja t={t} color={c.fuerte}>
-      <Rotulo icono={GraduationCap} texto={t.titulo || 'Mi formación'} color="var(--text-label)" />
+      <Rotulo t={t} icono={GraduationCap} texto={t.titulo || 'Mi formación'} color="var(--text-label)" />
       {pct == null ? (
         <p className="text-[13px]" style={{ color: 'var(--text-label)' }}>Todavía no tiene cursos asignados.</p>
       ) : (
@@ -1164,7 +1159,7 @@ function Pausa({ t }: { t: Tarjeta }) {
   const tam = tamanoDe(t)
   return (
     <Caja t={t} color={c.fuerte}>
-      <Rotulo icono={HeartPulse} texto={t.titulo || 'Pausa activa'}
+      <Rotulo t={t} icono={HeartPulse} texto={t.titulo || 'Pausa activa'}
         color={tintaDe(t, 'rotulo') ?? 'var(--text-label)'} tam={tam.rotulo} />
       {t.datos?.hora && (
         // La hora es el número de esta tarjeta, pero escrita: a escala plena
@@ -1186,7 +1181,7 @@ function Epp({ t }: { t: Tarjeta }) {
   const items: string[] = Array.isArray(t.datos?.items) ? t.datos.items : []
   return (
     <Caja t={t} color={COLOR(t.color).fuerte}>
-      <Rotulo icono={HardHat} texto={t.titulo || 'EPP de hoy'} color="var(--text-label)" />
+      <Rotulo t={t} icono={HardHat} texto={t.titulo || 'EPP de hoy'} color="var(--text-label)" />
       {items.length > 0 && (
         <div className="flex flex-wrap gap-1.5 mb-2">
           {items.map((it, i) => (
@@ -1209,7 +1204,7 @@ function Reconocimiento({ t }: { t: Tarjeta }) {
   const c = COLOR(t.color ?? 'verde')
   return (
     <CajaColor color={c} t={t}>
-      <Rotulo icono={Award} texto="Reconocimiento" color={tintaDe(t, 'rotulo') ?? c.fuerte} tam={tamanoDe(t).rotulo} />
+      <Rotulo t={t} icono={Award} texto="Reconocimiento" color={tintaDe(t, 'rotulo') ?? c.fuerte} tam={tamanoDe(t).rotulo} />
       <p className="font-bold leading-snug"
         style={{ fontSize: tamanoDe(t).texto, color: tintaDe(t, 'titulo') ?? 'var(--text)' }}>{t.titulo}</p>
       {t.texto && (
@@ -1255,7 +1250,7 @@ function Nota({ t }: { t: Tarjeta }) {
   const c = COLOR(t.color)
   return (
     <Caja color={c.fuerte} franja t={t}>
-      <Rotulo icono={ShieldCheck} texto={t.titulo || 'Nota'} color="var(--text-label)" />
+      <Rotulo t={t} icono={ShieldCheck} texto={t.titulo || 'Nota'} color="var(--text-label)" />
       {t.texto && (
         <p className="leading-relaxed"
           style={{ fontSize: tamanoDe(t).texto, color: tintaDe(t, 'texto') ?? 'var(--text-dim)' }}>{t.texto}</p>
