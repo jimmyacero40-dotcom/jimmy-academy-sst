@@ -50,6 +50,7 @@ export function EditorTarjeta({ tarjeta, opciones, onGuardar, onCerrar }: {
   // no movían nada.
   const textos = textosDe(tarjeta.tipo)
   const [pieza, setPieza] = useState<PiezaTexto>(textos[0].pieza)
+  const [seccion, setSeccion] = useState<'contenido' | 'diseno' | 'publico'>('contenido')
 
   const [f, setF] = useState({
     nombre: (tarjeta.datos?.nombre ?? '') as string,
@@ -226,7 +227,28 @@ export function EditorTarjeta({ tarjeta, opciones, onGuardar, onCerrar }: {
 
   return (
     <Telon onCerrar={cerrarSinGuardar} titulo={meta.nombre} ayuda={meta.ayuda} descartable={false}>
+      {/* Tres pestañas en vez de una sola lista larguísima: lo que se dice,
+          cómo se ve y quién lo ve. Todo seguido obligaba a desplazarse por
+          medio formulario para cambiar un color. */}
+      <div className="flex gap-1 mb-4 p-1 rounded-xl" style={{ background: 'var(--bg-card-hover)' }}>
+        {([['contenido', 'Contenido'], ['diseno', 'Diseño'], ['publico', 'Quién la ve']] as const).map(([id, nom]) => {
+          const on = seccion === id
+          return (
+            <button key={id} onClick={() => setSeccion(id)}
+              className="flex-1 px-3 py-2 rounded-lg text-[12.5px] font-bold"
+              style={{
+                background: on ? 'var(--bg-surface)' : 'transparent',
+                color: on ? 'var(--primary-dark)' : 'var(--text-dim)',
+                boxShadow: on ? '0 1px 2px rgba(15,23,42,.08)' : undefined,
+              }}>
+              {nom}
+            </button>
+          )
+        })}
+      </div>
+
       <div className="space-y-4">
+        {seccion === 'contenido' && (<div className="space-y-4">
         <Campo etiqueta="Nombre de la tarjeta"
           nota="Solo para usted. No se ve en el tablero.">
           <input value={f.nombre} onChange={e => set('nombre', e.target.value)}
@@ -405,6 +427,9 @@ export function EditorTarjeta({ tarjeta, opciones, onGuardar, onCerrar }: {
           </div>
         </Campo>
 
+        </div>)}
+
+        {seccion === 'diseno' && (<div className="space-y-4">
         {meta.anchoLibre && (
           <div className="flex gap-3 flex-wrap">
             <Campo etiqueta="Qué tan ancha" nota="En celular todas ocupan el ancho completo.">
@@ -658,6 +683,9 @@ export function EditorTarjeta({ tarjeta, opciones, onGuardar, onCerrar }: {
 
         <div className="pt-1" style={{ borderTop: '1px solid var(--border)' }} />
 
+        </div>)}
+
+        {seccion === 'publico' && (<div className="space-y-4">
         <Campo etiqueta="¿Quién la ve?">
           <div className="mb-2">
             <Botones valor={paraTodos} onElegir={v => setParaTodos(v)}
@@ -694,6 +722,8 @@ export function EditorTarjeta({ tarjeta, opciones, onGuardar, onCerrar }: {
             Publicada — el personal la ve
           </span>
         </label>
+
+        </div>)}
 
         {error && (
           <div className="flex items-center gap-2 px-3.5 py-2.5 rounded-xl text-[13px] font-semibold"
