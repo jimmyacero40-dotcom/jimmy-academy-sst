@@ -7,7 +7,10 @@
 // trabajadores y 40 %, aunque entre todos hayan marcado 300 opciones.
 // ──────────────────────────────────────────────────────────────────────
 
-import { PELIGROS, GRUPO_DE_PELIGRO, GRUPOS_PELIGROS, FRECUENCIAS, SUFICIENCIA_CONTROLES, CAMBIOS_ULTIMO_ANO, type Participacion } from './peligros'
+import {
+  PELIGROS, GRUPO_DE_PELIGRO, GRUPOS_PELIGROS, FRECUENCIAS, SUFICIENCIA_CONTROLES,
+  CAMBIOS_ULTIMO_ANO, PREGUNTAS, CAMPO_MEJORAS, type Participacion, type Pregunta,
+} from './peligros'
 
 export interface Fila {
   user_id: string
@@ -74,6 +77,94 @@ function opcionUnica(parts: Participacion[], campo: keyof Participacion, opcione
   // Se listan las opciones del catálogo en su orden, más las que ya no estén.
   const extras = [...cuenta.keys()].filter(k => !opciones.includes(k))
   return [...opciones, ...extras].map(o => ({ etiqueta: o, n: cuenta.get(o) ?? 0, pct: porParticipantes(cuenta.get(o) ?? 0, n) }))
+}
+
+/**
+ * Lo que respondieron, pregunta por pregunta.
+ *
+ * Hasta ahora la pantalla solo tabulaba cuatro de las doce preguntas —las de
+ * marcar— y las otras ocho, que son las que la gente escribe con sus palabras,
+ * no se veían por ninguna parte salvo abriendo el formulario de cada
+ * trabajador uno por uno. Ahí está lo que de verdad cuenta para la matriz de
+ * peligros.
+ */
+export interface RespuestasDePregunta {
+  pregunta: Pregunta
+  conteos: Conteo[]
+  textos: { texto: string; nombre: string }[]
+  respondieron: number
+}
+
+function limpio(v: unknown): string {
+  return typeof v === 'string' ? v.trim() : ''
+}
+
+export function porPregunta(filas: Fila[]): RespuestasDePregunta[] {
+  const participadas = filas.filter(f => f.estado === 'Participó' && f.participacion)
+  const participantes = participadas.length
+
+  return PREGUNTAS.map(pregunta => {
+    const conteos: Conteo[] = []
+    const textos: { texto: string; nombre: string }[] = []
+    let respondieron = 0
+
+    if (pregunta.tipo === 'peligros') {
+      const cuenta = new Map<string, number>()
+      for (const f of participadas) {
+        const unicos = [...new Set(f.participacion!.peligros ?? [])]
+        if (unicos.length) respondieron++
+        for (const x of unicos) cuenta.set(x, (cuenta.get(x) ?? 0) + 1)
+        // Lo que escribieron en «otro» no es un peligro del catálogo: va
+        // aparte, como texto, porque es justo lo que el catálogo no previó.
+        const otro = limpio(f.participacion!.peligros_otro)
+        if (otro) textos.push({ texto: otro, nombre: f.nombre ?? 'Sin nombre' })
+      }
+      const extras = [...cuenta.keys()].filter(k => !PELIGROS.includes(k))
+      conteos.push(...[...PELIGROS, ...extras]
+        .map(x => ({
+          etiqueta: x, grupo: GRUPO_DE_PELIGRO[x] ?? 'Otros',
+          n: cuenta.get(x) ?? 0, pct: porParticipantes(cuenta.get(x) ?? 0, participantes),
+        }))
+        .filter(c => c.n > 0)
+        .sort((a, b) => b.n - a.n || a.etiqueta.localeCompare(b.etiqueta)))
+    } else if (pregunta.tipo === 'opcion') {
+      const opciones = pregunta.opciones ?? []
+      const cuenta = new Map<string, number>()
+      for (const f of participadas) {
+        const v = limpio(f.participacion![pregunta.campo])
+        if (!v) continue
+        respondieron++
+        cuenta.set(v, (cuenta.get(v) ?? 0) + 1)
+      }
+      conteos.push(...opciones.map(o => ({
+        etiqueta: o, n: cuenta.get(o) ?? 0, pct: porParticipantes(cuenta.get(o) ?? 0, participantes),
+      })))
+    } else if (pregunta.tipo === 'confirmacion') {
+      const si = participadas.filter(f => !!f.participacion!.confirma_participacion).length
+      respondieron = si
+      conteos.push(
+        { etiqueta: 'Confirmó', n: si, pct: porParticipantes(si, participantes) },
+        { etiqueta: 'Sin confirmar', n: participantes - si, pct: porParticipantes(participantes - si, participantes) },
+      )
+    } else {
+      for (const f of participadas) {
+        const v = limpio(f.participacion![pregunta.campo])
+        if (!v) continue
+        respondieron++
+        textos.push({ texto: v, nombre: f.nombre ?? 'Sin nombre' })
+      }
+    }
+
+    return { pregunta, conteos, textos, respondieron }
+  })
+}
+
+/** Lo que escribieron en «qué se podría mejorar», pegado a la pregunta 8. */
+export function mejoras(filas: Fila[]): { texto: string; nombre: string }[] {
+  return filas
+    .filter(f => f.estado === 'Participó' && f.participacion)
+    .map(f => ({ texto: limpio(f.participacion![CAMPO_MEJORAS.campo]), nombre: f.nombre ?? 'Sin nombre' }))
+    .filter(x => !!x.texto)
 }
 
 export function tabular(filas: Fila[]): Resumen {

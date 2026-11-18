@@ -3,17 +3,22 @@
 import { useState, useEffect, useMemo } from 'react'
 import { useSession } from 'next-auth/react'
 import { motion } from 'framer-motion'
+import Link from 'next/link'
 import {
   ShieldAlert, Loader2, Search, Download, FileText, Eye, X,
   CheckCircle, Clock, BarChart2, Users, Table2, Trash2, AlertTriangle,
-  Lock, Unlock,
+  Lock, Unlock, ArrowLeft, HelpCircle,
 } from 'lucide-react'
 import { tienePermiso } from '@/lib/permisos'
 import { RespuestasPeligros } from '@/components/RespuestasPeligros'
-import { tabular, type Fila, type Conteo } from '@/lib/peligros-tabulacion'
-import { GRUPOS_PELIGROS } from '@/lib/peligros'
+import {
+  tabular, porPregunta, mejoras,
+  type Fila, type Conteo, type RespuestasDePregunta,
+} from '@/lib/peligros-tabulacion'
+import { GRUPOS_PELIGROS, CAMPO_MEJORAS } from '@/lib/peligros'
 import { exportarFormularioPDF } from './export-pdf'
 import { exportarResultadosExcel } from './export-excel'
+import { exportarResultadosPDF } from './export-resultados-pdf'
 
 const COLOR_GRUPO = Object.fromEntries(GRUPOS_PELIGROS.map(g => [g.grupo, g.color]))
 interface EstadoPeriodo {
@@ -30,7 +35,7 @@ export default function ParticipacionAdminPage() {
   const [periodo, setPeriodo] = useState(new Date().getFullYear())
   const [cargando, setCargando] = useState(true)
   const [error, setError] = useState<string | null>(null)
-  const [vista, setVista] = useState<'resumen' | 'trabajadores' | 'resultados'>('resumen')
+  const [vista, setVista] = useState<'resumen' | 'trabajadores' | 'preguntas' | 'resultados'>('resumen')
   const [detalle, setDetalle] = useState<Fila | null>(null)
   const [empresa, setEmpresa] = useState('Empresa')
   const [porBorrar, setPorBorrar] = useState<Fila[] | null>(null)
@@ -135,6 +140,10 @@ export default function ParticipacionAdminPage() {
 
   // La tabulación se calcula sobre lo filtrado: así se analiza por área o finca.
   const t = useMemo(() => tabular(visibles), [visibles])
+  // Se calcula sobre lo filtrado, igual que los indicadores: si se filtra por
+  // una finca, las respuestas que se leen son las de esa finca.
+  const preguntas = useMemo(() => porPregunta(visibles), [visibles])
+  const listaMejoras = useMemo(() => mejoras(visibles), [visibles])
   const hayFiltro = !!(busqueda || fArea || fCargo || fCentro || fEstado || fDesde || fHasta)
 
   if (cargando) return (
@@ -154,6 +163,14 @@ export default function ParticipacionAdminPage() {
 
   return (
     <div className="p-4 pb-24 max-w-[1400px] mx-auto">
+
+      {/* Sin esto, de aquí solo se salía por el menú lateral: la pantalla de
+          módulos sí tenía su camino de vuelta y esta no. */}
+      <Link href="/dashboard/gestion-sst/tu-cuentas"
+        className="inline-flex items-center gap-1.5 text-xs font-bold mb-3"
+        style={{ color: 'var(--text-dim)' }}>
+        <ArrowLeft size={13} /> Todos los módulos
+      </Link>
 
       {/* ── Encabezado ── */}
       <div className="flex items-start justify-between gap-3 flex-wrap mb-5">
@@ -186,6 +203,12 @@ export default function ParticipacionAdminPage() {
           <button onClick={() => exportarResultadosExcel(visibles, periodo, empresa)}
             className="terra-btn-outline flex items-center gap-1.5" style={{ padding: '8px 14px', fontSize: 12 }}>
             <Download size={13} /> Excel
+          </button>
+          {/* El Excel sirve para seguir calculando; el PDF, para firmar y
+              archivar. Un auditor pide el documento, no la hoja de cálculo. */}
+          <button onClick={() => exportarResultadosPDF(t, preguntas, listaMejoras, periodo, empresa)}
+            className="terra-btn-outline flex items-center gap-1.5" style={{ padding: '8px 14px', fontSize: 12 }}>
+            <FileText size={13} /> PDF
           </button>
           {puedeAdministrar && (
             cerrado
@@ -343,7 +366,8 @@ export default function ParticipacionAdminPage() {
         {([
           ['resumen', 'Resumen', BarChart2],
           ['trabajadores', 'Trabajadores', Users],
-          ['resultados', 'Resultados', Table2],
+          ['preguntas', 'Preguntas', HelpCircle],
+          ['resultados', 'Peligros', Table2],
         ] as const).map(([id, label, Icono]) => (
           <button key={id} onClick={() => setVista(id)}
             className="flex items-center gap-1.5 px-3.5 py-2.5 rounded-xl text-xs font-bold transition-all"
@@ -361,6 +385,29 @@ export default function ParticipacionAdminPage() {
           <Bloque titulo="Participación por finca / centro" filas={t.porCentro} sufijo="participaron" />
           <Bloque titulo="Participación por cargo" filas={t.porCargo} sufijo="participaron" />
         </div>
+      )}
+
+      {/* Las doce preguntas, cada una con lo que respondieron. Antes solo se
+          tabulaban las cuatro de marcar, y las ocho que la gente escribe con
+          sus palabras —donde está lo que sirve para la matriz— había que
+          leerlas abriendo el formulario de cada trabajador, uno por uno. */}
+      {vista === 'preguntas' && (
+        t.participantes === 0 ? (
+          <div className="terra-card p-10 text-center">
+            <p className="text-sm font-bold" style={{ color: 'var(--text)' }}>Todavía no hay respuestas</p>
+            <p className="text-xs mt-1.5" style={{ color: 'var(--text-dim)' }}>
+              Cuando los trabajadores empiecen a participar, aquí sale el consolidado de cada pregunta.
+            </p>
+          </div>
+        ) : (
+          <div className="space-y-3">
+            {preguntas.map(r => (
+              <PreguntaResuelta key={r.pregunta.n} r={r} participantes={t.participantes}
+                extra={r.pregunta.campo === 'controles_suficientes' ? listaMejoras : []}
+                extraTitulo={CAMPO_MEJORAS.titulo} />
+            ))}
+          </div>
+        )
       )}
 
       {vista === 'trabajadores' && (
@@ -542,6 +589,95 @@ export default function ParticipacionAdminPage() {
 }
 
 /** Barras horizontales con el conteo de trabajadores y su porcentaje. */
+/** Una pregunta con lo que respondieron: barras si es de marcar, texto si no. */
+function PreguntaResuelta({ r, participantes, extra, extraTitulo }: {
+  r: RespuestasDePregunta
+  participantes: number
+  extra: { texto: string; nombre: string }[]
+  extraTitulo: string
+}) {
+  const TIPO: Record<string, string> = {
+    texto: 'Respuesta escrita', peligros: 'Escoger varias',
+    opcion: 'Una sola opción', confirmacion: 'Confirmación',
+  }
+  const max = Math.max(1, ...r.conteos.map(c => c.n))
+
+  return (
+    <div className="terra-card p-4">
+      <div className="flex items-start justify-between gap-3 mb-2.5">
+        <p className="text-sm font-bold" style={{ color: 'var(--text)' }}>
+          {r.pregunta.n}. {r.pregunta.titulo}
+        </p>
+        <span className="text-[10px] font-bold px-2 py-0.5 rounded-full flex-shrink-0 whitespace-nowrap"
+          style={{ background: 'var(--bg-card)', color: 'var(--text-faint)' }}>
+          {TIPO[r.pregunta.tipo]}
+        </span>
+      </div>
+
+      {r.conteos.length > 0 && (
+        <div className="space-y-2">
+          {r.conteos.map(c => {
+            const color = c.grupo ? (COLOR_GRUPO[c.grupo] ?? '#8B5CF6') : '#10B981'
+            return (
+              <div key={c.etiqueta}>
+                <div className="flex items-baseline justify-between gap-2 mb-0.5">
+                  <span className="text-xs" style={{ color: 'var(--text)' }}>{c.etiqueta}</span>
+                  <span className="text-[11px] font-bold whitespace-nowrap"
+                    style={{ color, fontVariantNumeric: 'tabular-nums' }}>{c.n} · {c.pct}%</span>
+                </div>
+                <div className="h-1.5 rounded-full overflow-hidden" style={{ background: 'var(--bg-surface)' }}>
+                  <div className="h-full rounded-full" style={{ width: `${(c.n / max) * 100}%`, background: color }} />
+                </div>
+              </div>
+            )
+          })}
+        </div>
+      )}
+
+      {r.textos.length > 0 && (
+        <div className={r.conteos.length ? 'mt-3' : ''}>
+          {r.conteos.length > 0 && (
+            <p className="text-[10px] font-bold uppercase tracking-wider mb-1.5"
+              style={{ color: 'var(--text-faint)' }}>Los que escribieron «otro»</p>
+          )}
+          <Escritas lista={r.textos} />
+        </div>
+      )}
+
+      {!r.conteos.length && !r.textos.length && (
+        <p className="text-[11px]" style={{ color: 'var(--text-faint)' }}>Nadie la respondió.</p>
+      )}
+
+      {extra.length > 0 && (
+        <div className="mt-3">
+          <p className="text-[10px] font-bold uppercase tracking-wider mb-1.5"
+            style={{ color: 'var(--text-faint)' }}>{extraTitulo}</p>
+          <Escritas lista={extra} />
+        </div>
+      )}
+
+      <p className="text-[10px] mt-2" style={{ color: 'var(--text-faint)' }}>
+        {r.respondieron} de {participantes} la respondieron
+      </p>
+    </div>
+  )
+}
+
+/** Las respuestas escritas, con el nombre de quien las escribió. */
+function Escritas({ lista }: { lista: { texto: string; nombre: string }[] }) {
+  return (
+    <div className="space-y-1.5 max-h-72 overflow-y-auto">
+      {lista.map((x, k) => (
+        <div key={k} className="rounded-lg px-2.5 py-2"
+          style={{ background: 'var(--bg-card)', border: '1px solid var(--border)' }}>
+          <p className="text-xs whitespace-pre-wrap" style={{ color: 'var(--text)' }}>{x.texto}</p>
+          <p className="text-[10px] mt-0.5" style={{ color: 'var(--text-faint)' }}>{x.nombre}</p>
+        </div>
+      ))}
+    </div>
+  )
+}
+
 function Bloque({ titulo, filas, base, sufijo, colorPorGrupo, limite = 100 }: {
   titulo: string
   filas: Conteo[]
