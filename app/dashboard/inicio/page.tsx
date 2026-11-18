@@ -12,7 +12,7 @@ import {
 import {
   COLOR, TIPO, anchoDe, ajusteDe, altoDe, pictogramasDe,
   ordenDe, alineacionDe, tamanoDe, aireDe,
-  disposicionDe, proporcionDe, colorTextoDe, tintaDe, nombreDe, seVe,
+  disposicionDe, proporcionDe, colorTextoDe, tintaDe, nombreDe, seVe, medidaDe,
   posicionIconosDe, tamanoIconosDe,
   ALTO_MINIMO, ALTO_MAXIMO,
   type Tarjeta, type TipoTarjeta,
@@ -834,14 +834,14 @@ function Anuncio({ t }: { t: Tarjeta }) {
     ),
     titulo: t.titulo ? (
       <h2 className="font-extrabold leading-tight"
-        style={{ fontSize: tam.titulo, color: tinta ?? '#FFFFFF' }}>{t.titulo}</h2>
+        style={{ fontSize: medidaDe(t, 'titulo'), color: tinta ?? '#FFFFFF' }}>{t.titulo}</h2>
     ) : null,
     texto: t.texto ? (
       <p className="leading-relaxed" style={{
         // Sin color propio, el cuerpo va un punto más tenue que el título:
         // ayuda a que se lea primero el título y después el resto.
         color: tinta ?? 'rgba(255,255,255,0.84)', opacity: tinta ? 0.88 : 1,
-        fontSize: tam.texto,
+        fontSize: medidaDe(t, 'texto'),
         maxWidth: alLado ? undefined : centro ? '46rem' : '36rem',
       }}>{t.texto}</p>
     ) : null,
@@ -949,11 +949,11 @@ function Banner({ t }: { t: Tarjeta }) {
         }}>
           {t.titulo && seVe(t, 'titulo') && (
             <p className="font-extrabold leading-tight"
-              style={{ color: tintaDe(t, 'titulo') ?? c.fuerte, fontSize: tam.titulo }}>{t.titulo}</p>
+              style={{ color: tintaDe(t, 'titulo') ?? c.fuerte, fontSize: medidaDe(t, 'titulo') }}>{t.titulo}</p>
           )}
           {t.texto && seVe(t, 'texto') && (
             <p className="mt-1 leading-relaxed"
-              style={{ color: tintaDe(t, 'texto') ?? 'var(--text-dim)', fontSize: tam.texto }}>{t.texto}</p>
+              style={{ color: tintaDe(t, 'texto') ?? 'var(--text-dim)', fontSize: medidaDe(t, 'texto') }}>{t.texto}</p>
           )}
           <Iconos t={t} color={c.fuerte} />
         </div>
@@ -979,12 +979,12 @@ function Texto({ t }: { t: Tarjeta }) {
       }}>
         {t.titulo && seVe(t, 'titulo') && (
           <p className="font-extrabold leading-tight"
-            style={{ color: tintaDe(t, 'titulo') ?? c.fuerte, fontSize: tam.titulo }}>{t.titulo}</p>
+            style={{ color: tintaDe(t, 'titulo') ?? c.fuerte, fontSize: medidaDe(t, 'titulo') }}>{t.titulo}</p>
         )}
         {t.texto && (
           <p className="leading-relaxed" style={{
             color: colorTextoDe(t) ?? 'var(--text-strong)',
-            fontSize: tam.texto, marginTop: t.titulo ? 8 : 0,
+            fontSize: medidaDe(t, 'texto'), marginTop: t.titulo ? 8 : 0,
           }}>{t.texto}</p>
         )}
         <Iconos t={t} color={c.fuerte} />
@@ -1000,11 +1000,14 @@ function Separador({ t }: { t: Tarjeta }) {
   if (!t.titulo) return <div style={{ height: aire }} aria-hidden />
   return (
     <div className="flex items-center gap-3" style={{ paddingTop: aire / 2, paddingBottom: aire / 2 }}>
-      <span className="text-[12px] font-bold tracking-wider uppercase whitespace-nowrap" style={{ color: c.fuerte }}>
+      <span className="font-bold tracking-wider uppercase whitespace-nowrap"
+        style={{ fontSize: medidaDe(t, 'rotulo'), color: tintaDe(t, 'titulo') ?? c.fuerte }}>
         {t.titulo}
       </span>
       <span className="flex-1 h-px" style={{ background: c.borde }} />
-      {t.texto && <span className="text-[12px]" style={{ color: 'var(--text-label)' }}>{t.texto}</span>}
+      {t.texto && (
+        <span style={{ fontSize: medidaDe(t, 'rotulo'), color: tintaDe(t, 'texto') ?? 'var(--text-label)' }}>{t.texto}</span>
+      )}
     </div>
   )
 }
@@ -1015,7 +1018,8 @@ function Poster({ t }: { t: Tarjeta }) {
   if (!t.imagen_url) {
     return (
       <Caja>
-        <Rotulo t={t} icono={ImageIcon} texto={t.titulo || 'Póster'} color="var(--text-label)" />
+        <Rotulo t={t} icono={ImageIcon} texto={t.titulo || 'Póster'}
+        color={tintaDe(t, 'rotulo') ?? 'var(--text-label)'} tam={medidaDe(t, 'rotulo')} />
         <p className="text-[13px]" style={{ color: 'var(--text-label)' }}>Sin imagen todavía.</p>
       </Caja>
     )
@@ -1026,8 +1030,14 @@ function Poster({ t }: { t: Tarjeta }) {
       {(t.titulo || t.texto) && (
         <div className="absolute inset-x-0 bottom-0 p-4"
           style={{ background: 'linear-gradient(to top, rgba(8,16,36,0.88), rgba(8,16,36,0))' }}>
-          {t.titulo && <p className="text-white font-bold text-[15px] leading-snug">{t.titulo}</p>}
-          {t.texto && <p className="text-[12.5px] mt-0.5" style={{ color: 'rgba(255,255,255,0.8)' }}>{t.texto}</p>}
+          {t.titulo && seVe(t, 'titulo') && (
+            <p className="font-bold leading-snug"
+              style={{ fontSize: medidaDe(t, 'texto'), color: tintaDe(t, 'titulo') ?? '#fff' }}>{t.titulo}</p>
+          )}
+          {t.texto && seVe(t, 'texto') && (
+            <p className="mt-0.5"
+              style={{ fontSize: medidaDe(t, 'rotulo'), color: tintaDe(t, 'texto') ?? 'rgba(255,255,255,0.8)' }}>{t.texto}</p>
+          )}
         </div>
       )}
     </div>
@@ -1048,23 +1058,23 @@ function Contador({ t }: { t: Tarjeta }) {
       style={{ background: c.suave, border: `1px solid ${c.borde}`, padding: aire }}>
       {seVe(t, 'rotulo') && t.titulo && (
         <span className="font-bold tracking-wider uppercase"
-          style={{ fontSize: tam.rotulo, color: tintaDe(t, 'rotulo') ?? c.fuerte }}>
+          style={{ fontSize: medidaDe(t, 'rotulo'), color: tintaDe(t, 'rotulo') ?? c.fuerte }}>
           {t.titulo}
         </span>
       )}
       {/* El número sigue el tamaño elegido, en una escala aparte: con la misma
           del título se perdería, porque aquí el número es el mensaje. */}
       <span className="font-black my-1.5 leading-none tabular-nums"
-        style={{ fontSize: tam.numero, color: tintaDe(t, 'numero') ?? c.fuerte }}>
+        style={{ fontSize: medidaDe(t, 'numero'), color: tintaDe(t, 'numero') ?? c.fuerte }}>
         {dias ?? '—'}
       </span>
       <span className="font-semibold"
-        style={{ fontSize: tam.texto, color: tintaDe(t, 'titulo') ?? 'var(--text-strong)' }}>
+        style={{ fontSize: medidaDe(t, 'texto'), color: tintaDe(t, 'titulo') ?? 'var(--text-strong)' }}>
         {dias === 1 ? 'día sin accidentes' : 'días sin accidentes'}
       </span>
       {avance != null && (
         <div className="w-full mt-3">
-          <p className="mb-1.5" style={{ fontSize: tam.rotulo, color: tintaDe(t, 'texto') ?? 'var(--text-label)' }}>
+          <p className="mb-1.5" style={{ fontSize: medidaDe(t, 'rotulo'), color: tintaDe(t, 'texto') ?? 'var(--text-label)' }}>
             Meta: {meta} días{avance >= 100 ? ' · ¡cumplida!' : ''}
           </p>
           <div className="h-1.5 rounded-full overflow-hidden" style={{ background: 'rgba(0,0,0,0.07)' }}>
@@ -1073,7 +1083,7 @@ function Contador({ t }: { t: Tarjeta }) {
         </div>
       )}
       {t.texto && (
-        <p className="mt-2" style={{ fontSize: tam.rotulo, color: tintaDe(t, 'texto') ?? 'var(--text-label)' }}>
+        <p className="mt-2" style={{ fontSize: medidaDe(t, 'rotulo'), color: tintaDe(t, 'texto') ?? 'var(--text-label)' }}>
           {t.texto}
         </p>
       )}
@@ -1086,12 +1096,12 @@ function Alerta({ t }: { t: Tarjeta }) {
   const c = COLOR(t.color ?? 'rojo')
   return (
     <CajaColor color={c} t={t}>
-      <Rotulo t={t} icono={AlertTriangle} texto="Alerta" color={tintaDe(t, 'rotulo') ?? c.fuerte} tam={tamanoDe(t).rotulo} />
+      <Rotulo t={t} icono={AlertTriangle} texto="Alerta" color={tintaDe(t, 'rotulo') ?? c.fuerte} tam={medidaDe(t, 'rotulo')} />
       <p className="font-bold leading-snug"
-        style={{ fontSize: tamanoDe(t).texto, color: tintaDe(t, 'titulo') ?? 'var(--text)' }}>{t.titulo}</p>
+        style={{ fontSize: medidaDe(t, 'texto'), color: tintaDe(t, 'titulo') ?? 'var(--text)' }}>{t.titulo}</p>
       {t.texto && (
         <p className="mt-1.5 leading-relaxed"
-          style={{ fontSize: tamanoDe(t).texto, color: tintaDe(t, 'texto') ?? 'var(--text-dim)' }}>{t.texto}</p>
+          style={{ fontSize: medidaDe(t, 'texto'), color: tintaDe(t, 'texto') ?? 'var(--text-dim)' }}>{t.texto}</p>
       )}
     </CajaColor>
   )
@@ -1102,17 +1112,22 @@ function Capacitaciones({ t }: { t: Tarjeta }) {
   const proximas: any[] = t.datos?.capacitaciones?.proximas ?? []
   return (
     <Caja t={t} color={c.fuerte}>
-      <Rotulo t={t} icono={CalendarDays} texto={t.titulo || 'Próximas capacitaciones'} color="var(--text-label)" />
+      <Rotulo t={t} icono={CalendarDays} texto={t.titulo || 'Próximas capacitaciones'}
+        color={tintaDe(t, 'rotulo') ?? 'var(--text-label)'} tam={medidaDe(t, 'rotulo')} />
       {proximas.length === 0 ? (
-        <p className="text-[13px]" style={{ color: 'var(--text-label)' }}>No hay ninguna programada.</p>
+        <p style={{ fontSize: medidaDe(t, 'texto'), color: tintaDe(t, 'texto') ?? 'var(--text-label)' }}>
+          No hay ninguna programada.
+        </p>
       ) : (
         <div className="space-y-2.5">
           {proximas.map((p, i) => (
             <div key={i} className="flex gap-2.5">
               <div className="w-1 rounded-full flex-shrink-0" style={{ background: c.fuerte, opacity: 0.45 }} />
               <div className="min-w-0">
-                <p className="text-[13px] font-semibold leading-snug" style={{ color: 'var(--text)' }}>{p.titulo}</p>
-                <p className="text-[11.5px] mt-0.5" style={{ color: 'var(--text-label)' }}>
+                <p className="font-semibold leading-snug"
+                  style={{ fontSize: medidaDe(t, 'texto'), color: tintaDe(t, 'titulo') ?? 'var(--text)' }}>{p.titulo}</p>
+                <p className="mt-0.5"
+                  style={{ fontSize: medidaDe(t, 'rotulo'), color: tintaDe(t, 'texto') ?? 'var(--text-label)' }}>
                   {fecha(p.fecha)}{p.modalidad ? ` · ${p.modalidad}` : ''}{p.obligatoria ? ' · obligatoria' : ''}
                 </p>
               </div>
@@ -1130,13 +1145,19 @@ function Formacion({ t }: { t: Tarjeta }) {
   const pct: number | null = d.porcentaje ?? null
   return (
     <Caja t={t} color={c.fuerte}>
-      <Rotulo t={t} icono={GraduationCap} texto={t.titulo || 'Mi formación'} color="var(--text-label)" />
+      <Rotulo t={t} icono={GraduationCap} texto={t.titulo || 'Mi formación'}
+        color={tintaDe(t, 'rotulo') ?? 'var(--text-label)'} tam={medidaDe(t, 'rotulo')} />
       {pct == null ? (
-        <p className="text-[13px]" style={{ color: 'var(--text-label)' }}>Todavía no tiene cursos asignados.</p>
+        <p style={{ fontSize: medidaDe(t, 'texto'), color: tintaDe(t, 'texto') ?? 'var(--text-label)' }}>
+          Todavía no tiene cursos asignados.
+        </p>
       ) : (
         <>
-          <p className="text-2xl font-extrabold tabular-nums" style={{ color: 'var(--text)' }}>{pct}% al día</p>
-          <p className="text-[12.5px] mt-0.5" style={{ color: 'var(--text-label)' }}>
+          <p className="font-extrabold tabular-nums leading-none"
+            style={{ fontSize: `calc(${medidaDe(t, 'numero')} * 0.42)`, color: tintaDe(t, 'numero') ?? 'var(--text)' }}>
+            {pct}% al día
+          </p>
+          <p className="mt-1" style={{ fontSize: medidaDe(t, 'texto'), color: tintaDe(t, 'texto') ?? 'var(--text-label)' }}>
             {d.pendientes === 0
               ? 'No tiene nada pendiente'
               : `${d.pendientes} ${d.pendientes === 1 ? 'curso pendiente' : 'cursos pendientes'} en SSTudio`}
@@ -1144,8 +1165,8 @@ function Formacion({ t }: { t: Tarjeta }) {
           <div className="h-1.5 rounded-full overflow-hidden mt-3" style={{ background: 'rgba(0,0,0,0.07)' }}>
             <div className="h-full rounded-full" style={{ width: `${pct}%`, background: c.fuerte }} />
           </div>
-          <Link href="/dashboard/my-plan" className="inline-flex items-center gap-1 text-[12.5px] font-semibold mt-3"
-            style={{ color: c.fuerte }}>
+          <Link href="/dashboard/my-plan" className="inline-flex items-center gap-1 font-semibold mt-3"
+            style={{ fontSize: medidaDe(t, 'rotulo'), color: c.fuerte }}>
             Ver mis cursos <ArrowRight size={13} />
           </Link>
         </>
@@ -1160,18 +1181,18 @@ function Pausa({ t }: { t: Tarjeta }) {
   return (
     <Caja t={t} color={c.fuerte}>
       <Rotulo t={t} icono={HeartPulse} texto={t.titulo || 'Pausa activa'}
-        color={tintaDe(t, 'rotulo') ?? 'var(--text-label)'} tam={tam.rotulo} />
+        color={tintaDe(t, 'rotulo') ?? 'var(--text-label)'} tam={medidaDe(t, 'rotulo')} />
       {t.datos?.hora && (
         // La hora es el número de esta tarjeta, pero escrita: a escala plena
         // se desborda de la caja, así que va a poco menos de la mitad.
         <p className="font-extrabold tabular-nums leading-none"
-          style={{ fontSize: `calc(${tam.numero} * 0.42)`, color: tintaDe(t, 'numero') ?? c.fuerte }}>
+          style={{ fontSize: `calc(${medidaDe(t, 'numero')} * 0.42)`, color: tintaDe(t, 'numero') ?? c.fuerte }}>
           {t.datos.hora}
         </p>
       )}
       {t.texto && (
         <p className="mt-1.5 leading-relaxed"
-          style={{ fontSize: tamanoDe(t).texto, color: tintaDe(t, 'texto') ?? 'var(--text-dim)' }}>{t.texto}</p>
+          style={{ fontSize: medidaDe(t, 'texto'), color: tintaDe(t, 'texto') ?? 'var(--text-dim)' }}>{t.texto}</p>
       )}
     </Caja>
   )
@@ -1181,12 +1202,14 @@ function Epp({ t }: { t: Tarjeta }) {
   const items: string[] = Array.isArray(t.datos?.items) ? t.datos.items : []
   return (
     <Caja t={t} color={COLOR(t.color).fuerte}>
-      <Rotulo t={t} icono={HardHat} texto={t.titulo || 'EPP de hoy'} color="var(--text-label)" />
+      <Rotulo t={t} icono={HardHat} texto={t.titulo || 'EPP de hoy'}
+        color={tintaDe(t, 'rotulo') ?? 'var(--text-label)'} tam={medidaDe(t, 'rotulo')} />
       {items.length > 0 && (
         <div className="flex flex-wrap gap-1.5 mb-2">
           {items.map((it, i) => (
-            <span key={i} className="px-2.5 py-1 rounded-lg text-[12px] font-semibold"
-              style={{ background: 'var(--bg-card-hover)', color: 'var(--text-strong)', border: '1px solid var(--border)' }}>
+            <span key={i} className="px-2.5 py-1 rounded-lg font-semibold"
+              style={{ fontSize: medidaDe(t, 'texto'), background: 'var(--bg-card-hover)',
+                color: tintaDe(t, 'texto') ?? 'var(--text-strong)', border: '1px solid var(--border)' }}>
               {it}
             </span>
           ))}
@@ -1194,7 +1217,7 @@ function Epp({ t }: { t: Tarjeta }) {
       )}
       {t.texto && (
         <p className="leading-relaxed"
-          style={{ fontSize: tamanoDe(t).texto, color: tintaDe(t, 'texto') ?? 'var(--text-dim)' }}>{t.texto}</p>
+          style={{ fontSize: medidaDe(t, 'texto'), color: tintaDe(t, 'texto') ?? 'var(--text-dim)' }}>{t.texto}</p>
       )}
     </Caja>
   )
@@ -1204,12 +1227,12 @@ function Reconocimiento({ t }: { t: Tarjeta }) {
   const c = COLOR(t.color ?? 'verde')
   return (
     <CajaColor color={c} t={t}>
-      <Rotulo t={t} icono={Award} texto="Reconocimiento" color={tintaDe(t, 'rotulo') ?? c.fuerte} tam={tamanoDe(t).rotulo} />
+      <Rotulo t={t} icono={Award} texto="Reconocimiento" color={tintaDe(t, 'rotulo') ?? c.fuerte} tam={medidaDe(t, 'rotulo')} />
       <p className="font-bold leading-snug"
-        style={{ fontSize: tamanoDe(t).texto, color: tintaDe(t, 'titulo') ?? 'var(--text)' }}>{t.titulo}</p>
+        style={{ fontSize: medidaDe(t, 'texto'), color: tintaDe(t, 'titulo') ?? 'var(--text)' }}>{t.titulo}</p>
       {t.texto && (
         <p className="mt-1.5 leading-relaxed"
-          style={{ fontSize: tamanoDe(t).texto, color: tintaDe(t, 'texto') ?? 'var(--text-dim)' }}>{t.texto}</p>
+          style={{ fontSize: medidaDe(t, 'texto'), color: tintaDe(t, 'texto') ?? 'var(--text-dim)' }}>{t.texto}</p>
       )}
     </CajaColor>
   )
@@ -1227,11 +1250,11 @@ function Copasst({ t }: { t: Tarjeta }) {
         </div>
         <div className="flex-1 min-w-[200px]">
           <p className="font-bold tracking-wider uppercase"
-            style={{ fontSize: tamanoDe(t).rotulo, color: tintaDe(t, 'rotulo') ?? c.fuerte }}>
+            style={{ fontSize: medidaDe(t, 'rotulo'), color: tintaDe(t, 'rotulo') ?? c.fuerte }}>
             {t.titulo || 'COPASST'}
           </p>
           <p className="font-bold mt-0.5 leading-snug"
-            style={{ fontSize: tamanoDe(t).texto, color: tintaDe(t, 'texto') ?? 'var(--text)' }}>{t.texto}</p>
+            style={{ fontSize: medidaDe(t, 'texto'), color: tintaDe(t, 'texto') ?? 'var(--text)' }}>{t.texto}</p>
           <Iconos t={t} color={c.fuerte} />
         </div>
         {t.cta_texto && t.cta_url && (
@@ -1250,10 +1273,11 @@ function Nota({ t }: { t: Tarjeta }) {
   const c = COLOR(t.color)
   return (
     <Caja color={c.fuerte} franja t={t}>
-      <Rotulo t={t} icono={ShieldCheck} texto={t.titulo || 'Nota'} color="var(--text-label)" />
+      <Rotulo t={t} icono={ShieldCheck} texto={t.titulo || 'Nota'}
+        color={tintaDe(t, 'rotulo') ?? 'var(--text-label)'} tam={medidaDe(t, 'rotulo')} />
       {t.texto && (
         <p className="leading-relaxed"
-          style={{ fontSize: tamanoDe(t).texto, color: tintaDe(t, 'texto') ?? 'var(--text-dim)' }}>{t.texto}</p>
+          style={{ fontSize: medidaDe(t, 'texto'), color: tintaDe(t, 'texto') ?? 'var(--text-dim)' }}>{t.texto}</p>
       )}
     </Caja>
   )

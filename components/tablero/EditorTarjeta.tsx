@@ -69,6 +69,7 @@ export function EditorTarjeta({ tarjeta, opciones, onGuardar, onCerrar }: {
     proporcion: proporcionDe(tarjeta).id as Proporcion,
     colorTexto: (tarjeta.datos?.colorTexto ?? null) as string | null,
     tintas: (tarjeta.datos?.tintas ?? {}) as Record<string, string | null>,
+    tamanos: (tarjeta.datos?.tamanos ?? {}) as Record<string, string | null>,
     tamano: (tarjeta.datos?.tamano ?? 'normal') as Tamano,
     aire: (tarjeta.datos?.aire ?? 'normal') as Aire,
     activa: tarjeta.activa,
@@ -168,6 +169,7 @@ export function EditorTarjeta({ tarjeta, opciones, onGuardar, onCerrar }: {
     datos.proporcion = f.proporcion
     datos.colorTexto = f.colorTexto
     datos.tintas = f.tintas
+    datos.tamanos = f.tamanos
     datos.nombre = f.nombre.trim() || null
     datos.ocultos = f.ocultos
     datos.tamano = f.tamano
@@ -384,11 +386,29 @@ export function EditorTarjeta({ tarjeta, opciones, onGuardar, onCerrar }: {
               { id: 'izquierda', texto: 'Izquierda' }, { id: 'centro', texto: 'Centro' }, { id: 'derecha', texto: 'Derecha' },
             ]} />
           </Campo>
-          <Campo etiqueta="Tamaño del texto">
+          <Campo etiqueta="Tamaño de todo el texto">
             <Botones valor={f.tamano} onElegir={v => set('tamano', v)}
               opciones={TAMANOS.map(t => ({ id: t.id, texto: t.nombre }))} />
           </Campo>
         </div>
+
+        <Campo etiqueta="Tamaño de cada texto"
+          nota="«Auto» sigue el de arriba. Cada pieza tiene su propia escala.">
+          <div className="rounded-xl p-2.5 space-y-1.5" style={{ background: 'var(--bg-card-hover)' }}>
+            {PIEZAS_TEXTO.map(pt => (
+              <div key={pt.id} className="flex items-center gap-2 flex-wrap">
+                <span className="text-[11.5px] font-bold w-[86px] flex-shrink-0"
+                  style={{ color: 'var(--text-dim)' }}>{pt.nombre}</span>
+                <Botones valor={f.tamanos[pt.id] ?? null}
+                  onElegir={v => set('tamanos', { ...f.tamanos, [pt.id]: v })}
+                  opciones={[
+                    { id: null, texto: 'Auto' },
+                    ...TAMANOS.map(x => ({ id: x.id as string | null, texto: x.nombre })),
+                  ]} />
+              </div>
+            ))}
+          </div>
+        </Campo>
 
         <Campo etiqueta="Aire por dentro" nota="Cuánto espacio deja alrededor del texto.">
           <Botones valor={f.aire} onElegir={v => set('aire', v)}

@@ -441,6 +441,22 @@ export const TAMANOS: {
 export const tamanoDe = (t: Pick<Tarjeta, 'datos'>) =>
   TAMANOS.find(x => x.id === t.datos?.tamano) ?? TAMANOS[1]
 
+/**
+ * El tamaño de un texto concreto.
+ *
+ * Primero el que se le haya puesto a esa pieza, y si no, el general de la
+ * tarjeta. Igual que con los colores: subir todo sigue siendo un solo gesto, y
+ * agrandar solo el número no obliga a tocar lo demás.
+ *
+ * Cada pieza lee su propia columna de la escala, así que «Grande» en el número
+ * y «Grande» en el rótulo no son el mismo número de píxeles: un rótulo del
+ * tamaño de un número dejaría de ser un rótulo.
+ */
+export function medidaDe(t: Pick<Tarjeta, 'datos'>, pieza: PiezaTexto): string {
+  const propio = TAMANOS.find(x => x.id === t.datos?.tamanos?.[pieza])
+  return (propio ?? tamanoDe(t))[pieza]
+}
+
 export type Aire = 'pegado' | 'normal' | 'suelto' | 'amplio'
 
 export const AIRES: { id: Aire; nombre: string; px: number }[] = [
