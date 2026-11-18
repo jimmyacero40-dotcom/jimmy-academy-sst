@@ -73,11 +73,12 @@ export async function GET(req: NextRequest) {
   const opciones = todas ? await opcionesDeAudiencia(companyId) : undefined
 
   const { data: ajustes } = await supabaseAdmin
-    .from('tablero_ajustes').select('separacion').eq('company_id', companyId).maybeSingle()
+    .from('tablero_ajustes').select('separacion, igualar').eq('company_id', companyId).maybeSingle()
 
   return NextResponse.json({
     tarjetas: visibles, esAdmin, persona, opciones,
     separacion: ajustes?.separacion ?? 16,
+    igualar: ajustes?.igualar ?? true,
   })
 }
 
@@ -87,8 +88,8 @@ export async function PATCH(req: NextRequest) {
   if (!authorized) return NextResponse.json({ error: 'No autorizado' }, { status: 403 })
   if (!companyId) return NextResponse.json({ error: 'Sin empresa activa' }, { status: 400 })
 
-  const { separacion } = await req.json().catch(() => ({ separacion: null }))
-  const n = Number(separacion)
+  const cuerpo = await req.json().catch(() => ({}))
+  const n = Number(cuerpo.separacion)
   if (!Number.isFinite(n) || n < 0 || n > 64) {
     return NextResponse.json({ error: 'La separación va de 0 a 64 píxeles' }, { status: 400 })
   }
@@ -98,12 +99,13 @@ export async function PATCH(req: NextRequest) {
     .upsert({
       company_id: companyId,
       separacion: Math.round(n),
+      igualar: cuerpo.igualar !== false,
       updated_by: user?.id ?? null,
       updated_at: new Date().toISOString(),
     })
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
-  return NextResponse.json({ ok: true, separacion: Math.round(n) })
+  return NextResponse.json({ ok: true, separacion: Math.round(n), igualar: cuerpo.igualar !== false })
 }
 
 async function opcionesDeAudiencia(companyId: string) {

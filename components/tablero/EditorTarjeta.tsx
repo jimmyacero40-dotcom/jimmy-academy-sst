@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { X, Upload, AlertCircle, Loader2, ArrowUp, ArrowDown, Eye, EyeOff } from 'lucide-react'
 import {
   TIPOS, TIPO, COLORES, ALTOS, AJUSTES, PICTOGRAMAS, PIEZAS, TAMANOS, AIRES,
@@ -235,13 +235,12 @@ export function EditorTarjeta({ tarjeta, opciones, onGuardar, onCerrar }: {
 
         <Campo etiqueta={nombreCampoTitulo(tarjeta.tipo)}
           nota="Esto sí lo lee el trabajador. Déjelo vacío si no quiere que salga.">
-          <input value={f.titulo} onChange={e => set('titulo', e.target.value)} style={estiloCampo} />
+          <ConEmojis valor={f.titulo} onCambiar={v => set('titulo', v)} />
         </Campo>
 
         {!meta.automatica && (
           <Campo etiqueta="Texto">
-            <textarea value={f.texto} onChange={e => set('texto', e.target.value)} rows={3}
-              style={{ ...estiloCampo, resize: 'vertical' }} />
+            <ConEmojis valor={f.texto} onCambiar={v => set('texto', v)} filas={3} />
           </Campo>
         )}
 
@@ -852,6 +851,73 @@ function Paleta({ nombre, valor, onElegir }: {
         <input type="color" value={valor ?? '#3B82F6'} onChange={e => onElegir(e.target.value)}
           className="opacity-0 absolute inset-0 w-full h-full cursor-pointer" />
       </label>
+    </div>
+  )
+}
+
+/**
+ * Emojis para el título y el texto.
+ *
+ * Son los que vienen en el sistema, así que no se descarga nada y se ven igual
+ * en el celular del trabajador. Se insertan donde esté el cursor y no al
+ * final: quien quiere un emoji delante del título no debería tener que
+ * recortarlo y pegarlo.
+ */
+const EMOJIS = [
+  '⚠️', '🚨', '🦺', '⛑️', '🧤', '🥽', '😷', '🩺', '🚑', '🔥', '⚡', '☢️', '☣️', '🧪',
+  '🔊', '☀️', '💧', '🚜', '🚧', '🚫', '✅', '❌', '📋', '📌', '📣', '🗓️', '⏰', '🎯',
+  '🏆', '👏', '💪', '🙌', '👍', '❤️', '⭐', '🎉', '🌱', '🌿', '🍃', '💡', '📸', '📝',
+]
+
+function ConEmojis({ valor, onCambiar, filas }: {
+  valor: string; onCambiar: (v: string) => void; filas?: number
+}) {
+  const campo = useRef<HTMLInputElement & HTMLTextAreaElement>(null)
+  const [abierto, setAbierto] = useState(false)
+
+  const meter = (e: string) => {
+    const el = campo.current
+    const i = el?.selectionStart ?? valor.length
+    onCambiar(valor.slice(0, i) + e + valor.slice(el?.selectionEnd ?? i))
+    setAbierto(false)
+    // El cursor se queda detrás del emoji, listo para seguir escribiendo.
+    requestAnimationFrame(() => {
+      el?.focus()
+      const p = i + e.length
+      el?.setSelectionRange(p, p)
+    })
+  }
+
+  return (
+    <div className="relative">
+      <div className="flex gap-1.5 items-start">
+        {filas
+          ? <textarea ref={campo} value={valor} rows={filas}
+              onChange={e => onCambiar(e.target.value)} style={{ ...estiloCampo, resize: 'vertical' }} />
+          : <input ref={campo} value={valor}
+              onChange={e => onCambiar(e.target.value)} style={estiloCampo} />}
+        <button onClick={() => setAbierto(a => !a)} title="Poner un emoji" aria-label="Poner un emoji"
+          className="flex-shrink-0 rounded-lg text-[16px] leading-none"
+          style={{
+            padding: '9px 10px', border: '1px solid var(--border-strong)',
+            background: abierto ? 'var(--primary-dim)' : 'var(--bg-surface)',
+          }}>
+          🙂
+        </button>
+      </div>
+      {abierto && (
+        <div className="absolute right-0 z-30 mt-1 p-2 rounded-xl grid gap-1"
+          style={{
+            gridTemplateColumns: 'repeat(10, 1fr)', width: 300,
+            background: 'var(--bg-surface)', border: '1px solid var(--border)',
+            boxShadow: '0 12px 30px rgba(11,23,54,0.18)',
+          }}>
+          {EMOJIS.map(e => (
+            <button key={e} onClick={() => meter(e)} className="text-[17px] rounded hover:bg-[var(--bg-card-hover)]"
+              style={{ lineHeight: 1.4 }}>{e}</button>
+          ))}
+        </div>
+      )}
     </div>
   )
 }

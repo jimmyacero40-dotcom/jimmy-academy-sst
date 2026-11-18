@@ -7,7 +7,7 @@ import {
   AlertTriangle, CalendarDays, GraduationCap, HeartPulse, HardHat,
   Award, Users, ArrowRight, Megaphone, ShieldCheck, Loader2, PenLine,
   Image as ImageIcon, GripVertical, Eye, EyeOff, Trash2, Plus, Check,
-  ChevronLeft, ChevronRight, List,
+  ChevronLeft, ChevronRight, List, Rows3, Type, Bold, AlignLeft, AlignCenter, AlignRight, Smile,
 } from 'lucide-react'
 import {
   COLOR, TIPO, anchoDe, ajusteDe, altoDe, pictogramasDe,
@@ -69,6 +69,10 @@ export default function InicioPage() {
   const [eligiendoTipo, setEligiendoTipo] = useState(false)
   const [arrastrando, setArrastrando] = useState<string | null>(null)
   const [separacion, setSeparacion] = useState(16)
+  // Las tarjetas de una fila comparten el alto de la más alta. Sin esto cada
+  // una medía lo que midiera su contenido y dos avisos lado a lado quedaban
+  // desparejos, sin forma de cuadrarlos.
+  const [igualar, setIgualar] = useState(true)
   const [bloqueado, setBloqueado] = useState(false)
   const [guiando, setGuiando] = useState(false)
   const [rayasAlto, setRayasAlto] = useState<{ desde: number; altos: number[]; pegada: number | null } | null>(null)
@@ -80,6 +84,7 @@ export default function InicioPage() {
         setTarjetas(d.tarjetas ?? [])
         if (d.opciones) setOpciones(d.opciones)
         if (typeof d.separacion === 'number') setSeparacion(d.separacion)
+        if (typeof d.igualar === 'boolean') setIgualar(d.igualar)
       })
       .catch(() => setTarjetas([]))
       .finally(() => setCargando(false))
@@ -155,10 +160,10 @@ export default function InicioPage() {
     guardarOrden(nuevo)
   }
 
-  const guardarSeparacion = (px: number) => {
+  const guardarAjustes = (cambios: { separacion?: number; igualar?: boolean }) => {
     fetch('/api/tablero', {
       method: 'PATCH', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ separacion: px }),
+      body: JSON.stringify({ separacion, igualar, ...cambios }),
     }).catch(() => {})
   }
 
@@ -179,6 +184,13 @@ export default function InicioPage() {
   /** El ancho que quedó tras arrastrar el borde derecho. */
   const ponerAncho = (t: Tarjeta, n: 1 | 2 | 3) => {
     const datos = { ...t.datos, ancho: n }
+    setTarjetas(ts => ts.map(x => x.id === t.id ? { ...x, datos } : x))
+    guardar({ id: t.id, datos } as any)
+  }
+
+  /** En qué columna abre la tarjeta. Sin columna, se acomoda sola. */
+  const ponerColumna = (t: Tarjeta, c: 1 | 2 | 3 | null) => {
+    const datos = { ...t.datos, col: c }
     setTarjetas(ts => ts.map(x => x.id === t.id ? { ...x, datos } : x))
     guardar({ id: t.id, datos } as any)
   }
@@ -223,13 +235,22 @@ export default function InicioPage() {
                     onChange={e => setSeparacion(Number(e.target.value))}
                     // Se guarda al soltar y no en cada píxel: arrastrar la
                     // barra dispararía sesenta escrituras seguidas.
-                    onPointerUp={() => guardarSeparacion(separacion)}
-                    onKeyUp={() => guardarSeparacion(separacion)}
+                    onPointerUp={() => guardarAjustes({ separacion })}
+                    onKeyUp={() => guardarAjustes({ separacion })}
                     className="w-24" />
                   <span className="text-[11px] font-bold tabular-nums w-7" style={{ color: 'var(--text-label)' }}>
                     {separacion}
                   </span>
                 </div>
+
+                <button onClick={() => { const v = !igualar; setIgualar(v); guardarAjustes({ igualar: v }) }}
+                  title="Las tarjetas de una misma fila quedan del mismo alto"
+                  className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg text-[12px] font-bold"
+                  style={igualar
+                    ? { background: 'var(--primary-dim)', color: 'var(--primary-dark)', border: '1px solid var(--primary-border)' }
+                    : { background: 'var(--bg-card)', color: 'var(--text-dim)', border: '1px solid var(--border)' }}>
+                  <Rows3 size={14} /> Filas parejas
+                </button>
                 <button onClick={() => setEligiendoTipo(true)}
                   className="inline-flex items-center gap-2 px-3.5 py-2 rounded-lg text-sm font-bold"
                   style={{ background: 'var(--primary)', color: '#fff' }}>
@@ -261,7 +282,7 @@ export default function InicioPage() {
       ) : tarjetas.length === 0 ? (
         <Vacio esAdmin={esAdmin} onDiseñar={entrarADiseñar} />
       ) : (
-        <div className="tablero-rejilla relative" style={{ '--tablero-aire': `${separacion}px` } as any}>
+        <div className={`tablero-rejilla relative ${igualar ? 'parejas' : ''}`} style={{ '--tablero-aire': `${separacion}px` } as any}>
           {guiando && <Guias />}
           {rayasAlto && <GuiasAlto g={rayasAlto} />}
           {tarjetas.map((t, i) => (
@@ -272,6 +293,7 @@ export default function InicioPage() {
               onMover={h => mover(t.id, h)}
               onAncho={h => cambiarAncho(t, h)}
               onAnchoExacto={n => ponerAncho(t, n)}
+              onColumna={cl => ponerColumna(t, cl)}
               onAltoTarjeta={px => ponerAltoTarjeta(t, px)}
               onEditar={() => setEditando(t)} onBorrar={() => borrar(t)}
               onPrender={() => guardar({ id: t.id, activa: !t.activa })} />
@@ -299,6 +321,13 @@ export default function InicioPage() {
           grid-template-columns: repeat(3, minmax(0, 1fr));
           align-items: start;
         }
+        /* Con filas parejas, cada tarjeta se estira hasta el alto de la más
+           alta de su fila, y su caja de adentro con ella: si solo creciera la
+           envoltura, el color se quedaría corto y abajo saldría una franja. */
+        .tablero-rejilla.parejas { align-items: stretch; }
+        .tablero-rejilla.parejas > * { display: flex; flex-direction: column; }
+        .tablero-rejilla.parejas > * > *:last-child { flex: 1; display: flex; flex-direction: column; }
+        .tablero-rejilla.parejas > * > *:last-child > * { flex: 1; }
         /* Una tarjeta a la que se le dio alto estira su caja y reparte el
            contenido en vertical, en lugar de dejarlo pegado arriba. */
         .tablero-estirar { display: flex; flex-direction: column; }
@@ -383,7 +412,7 @@ function GuiasAlto({ g }: { g: { desde: number; altos: number[]; pegada: number 
 /** Una tarjeta en su sitio del tablero, con sus controles si se está diseñando. */
 function EnElTablero({
   t, indice, total, diseñando, arrastrando, bloqueado,
-  onArrastrar, onSoltar, onMover, onAncho, onAnchoExacto, onAltoTarjeta,
+  onArrastrar, onSoltar, onMover, onAncho, onAnchoExacto, onColumna, onAltoTarjeta,
   onEditar, onBorrar, onPrender,
 }: {
   t: Tarjeta; indice: number; total: number
@@ -393,6 +422,7 @@ function EnElTablero({
   onMover: (h: -1 | 1) => void
   onAncho: (h: -1 | 1) => void
   onAnchoExacto: (n: 1 | 2 | 3) => void
+  onColumna: (c: 1 | 2 | 3 | null) => void
   onAltoTarjeta: (px: number | null) => void
   onEditar: () => void; onBorrar: () => void; onPrender: () => void
 }) {
@@ -425,7 +455,7 @@ function EnElTablero({
       {diseñando && (
         <>
           <Controles t={t} primera={indice === 0} ultima={indice === total - 1}
-            onMover={onMover} onAncho={onAncho}
+            onMover={onMover} onAncho={onAncho} onColumna={onColumna}
             onEditar={onEditar} onBorrar={onBorrar} onPrender={onPrender} />
           <ManijasTarjeta t={t} columna={caja} onAncho={onAnchoExacto} onAlto={onAltoTarjeta} />
         </>
@@ -600,9 +630,10 @@ function ManijasTarjeta({ t, onAncho, onAlto, columna }: {
 }
 
 /** La barra de controles que aparece sobre cada tarjeta en modo diseño. */
-function Controles({ t, primera, ultima, onMover, onAncho, onEditar, onBorrar, onPrender }: {
+function Controles({ t, primera, ultima, onMover, onAncho, onColumna, onEditar, onBorrar, onPrender }: {
   t: Tarjeta; primera: boolean; ultima: boolean
   onMover: (h: -1 | 1) => void; onAncho: (h: -1 | 1) => void
+  onColumna: (c: 1 | 2 | 3 | null) => void
   onEditar: () => void; onBorrar: () => void; onPrender: () => void
 }) {
   const ancho = anchoDe(t)
@@ -631,6 +662,28 @@ function Controles({ t, primera, ultima, onMover, onAncho, onEditar, onBorrar, o
           <span className="text-[11px] font-bold tabular-nums px-0.5" style={estilo}>{ancho}</span>
           <button onClick={() => onAncho(1)} disabled={ancho === 3} title="Más ancha"
             className={`${boton} disabled:opacity-25 text-[13px] font-bold leading-none px-2`} style={estilo}>+</button>
+
+          {/* Fijar la columna es lo que hace que una tarjeta abra fila en vez
+              de acomodarse al lado de la anterior. Estaba solo en el editor,
+              así que no había cómo dar con ello cuando es justo lo que se
+              necesita para armar una fila de tres debajo de un título. */}
+          <span className="w-px h-4 mx-0.5" style={{ background: 'rgba(255,255,255,0.18)' }} />
+          {([
+            [null, 'Suelta', '~'], [1, 'Abre fila a la izquierda', '1'],
+            [2, 'Empieza en el centro', '2'], [3, 'Empieza a la derecha', '3'],
+          ] as const).map(([v, titulo, etiqueta]) => {
+            const on = columnaInicial(t) === v
+            return (
+              <button key={String(v)} onClick={() => onColumna(v)} title={titulo}
+                className={`${boton} text-[11px] font-bold leading-none px-1.5`}
+                style={{
+                  color: on ? '#0B1736' : 'rgba(255,255,255,0.8)',
+                  background: on ? 'rgba(255,255,255,0.9)' : 'transparent',
+                }}>
+                {etiqueta}
+              </button>
+            )
+          })}
         </>
       )}
 
