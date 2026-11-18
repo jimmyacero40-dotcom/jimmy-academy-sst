@@ -11,7 +11,8 @@
  */
 
 export type TipoTarjeta =
-  | 'anuncio' | 'poster' | 'alerta' | 'contador' | 'pausa' | 'epp'
+  | 'anuncio' | 'poster' | 'banner' | 'texto' | 'separador'
+  | 'alerta' | 'contador' | 'pausa' | 'epp'
   | 'reconocimiento' | 'copasst' | 'nota'
   | 'capacitaciones' | 'formacion'
 
@@ -115,6 +116,21 @@ export const TIPOS: TipoMeta[] = [
     id: 'poster', nombre: 'Póster', ancho: 1, automatica: false, anchoLibre: true,
     ayuda: 'La imagen y nada más: una cartelera, una infografía, una foto de campaña.',
     campos: ['imagen', 'cta'],
+  },
+  {
+    id: 'banner', nombre: 'Banner', ancho: 3, automatica: false, anchoLibre: true,
+    ayuda: 'Una franja de imagen sin caja ni marco. Para logos y cabeceras.',
+    campos: ['imagen', 'cta'],
+  },
+  {
+    id: 'texto', nombre: 'Bloque de texto', ancho: 1, automatica: false, anchoLibre: true,
+    ayuda: 'Solo palabras: un mensaje destacado, una frase, un recordatorio.',
+    campos: ['imagen'],
+  },
+  {
+    id: 'separador', nombre: 'Separador', ancho: 3, automatica: false, anchoLibre: true,
+    ayuda: 'Una línea con título, o un espacio en blanco, para dividir el tablero en secciones.',
+    campos: [],
   },
   {
     id: 'contador', nombre: 'Días sin accidentes', ancho: 1, automatica: false,
@@ -234,6 +250,78 @@ export function anchoDe(t: Pick<Tarjeta, 'tipo' | 'datos'>): 1 | 2 | 3 {
 }
 
 export const TIPOS_AUTOMATICOS = new Set(TIPOS.filter(t => t.automatica).map(t => t.id))
+
+// ── Composición de la tarjeta ──────────────────────────────────────────────
+
+/**
+ * Las piezas sueltas de una tarjeta y en qué orden van.
+ *
+ * Hasta ahora el diseño de cada tarjeta estaba cosido en el código: la imagen
+ * siempre arriba, el título siempre después. Eso alcanza para publicar, no
+ * para diseñar. Guardar el orden como dato deja mover cada pieza sin tocar el
+ * programa, y cada tipo de tarjeta solo tiene que decir qué piezas tiene.
+ */
+export type Pieza = 'imagen' | 'etiqueta' | 'titulo' | 'texto' | 'iconos' | 'boton'
+
+export const PIEZAS: Record<Pieza, string> = {
+  imagen:   'Imagen',
+  etiqueta: 'Etiqueta',
+  titulo:   'Título',
+  texto:    'Descripción',
+  iconos:   'Pictogramas',
+  boton:    'Botón',
+}
+
+const ORDEN_POR_DEFECTO: Pieza[] = ['imagen', 'etiqueta', 'titulo', 'texto', 'iconos', 'boton']
+
+/**
+ * El orden guardado, completado con lo que falte.
+ *
+ * Se vuelve a agregar cualquier pieza que no esté en la lista: si mañana se
+ * añade una pieza nueva, las tarjetas de hoy la muestran al final en vez de
+ * perderla por no estar nombrada.
+ */
+export function ordenDe(t: Pick<Tarjeta, 'datos'>): Pieza[] {
+  const guardado: Pieza[] = Array.isArray(t.datos?.orden)
+    ? t.datos.orden.filter((p: any) => p in PIEZAS)
+    : []
+  const faltan = ORDEN_POR_DEFECTO.filter(p => !guardado.includes(p))
+  return [...guardado, ...faltan]
+}
+
+export type Alineacion = 'izquierda' | 'centro' | 'derecha'
+
+export const alineacionDe = (t: Pick<Tarjeta, 'datos'>): Alineacion =>
+  t.datos?.alineacion === 'centro' || t.datos?.alineacion === 'derecha'
+    ? t.datos.alineacion : 'izquierda'
+
+/** Texto encima de la imagen, en vez de debajo. */
+export const superpuestoDe = (t: Pick<Tarjeta, 'datos'>): boolean => !!t.datos?.superpuesto
+
+export type Tamano = 'chico' | 'normal' | 'grande' | 'enorme'
+
+export const TAMANOS: { id: Tamano; nombre: string; titulo: string; texto: string }[] = [
+  { id: 'chico',  nombre: 'Chico',  titulo: 'clamp(17px, 1.6vw, 21px)', texto: '13px' },
+  { id: 'normal', nombre: 'Normal', titulo: 'clamp(22px, 2.6vw, 32px)', texto: '15px' },
+  { id: 'grande', nombre: 'Grande', titulo: 'clamp(28px, 3.4vw, 42px)', texto: '17px' },
+  { id: 'enorme', nombre: 'Enorme', titulo: 'clamp(34px, 4.6vw, 58px)', texto: '19px' },
+]
+
+export const tamanoDe = (t: Pick<Tarjeta, 'datos'>) =>
+  TAMANOS.find(x => x.id === t.datos?.tamano) ?? TAMANOS[1]
+
+export type Aire = 'pegado' | 'normal' | 'suelto' | 'amplio'
+
+export const AIRES: { id: Aire; nombre: string; px: number }[] = [
+  { id: 'pegado', nombre: 'Pegado', px: 12 },
+  { id: 'normal', nombre: 'Normal', px: 20 },
+  { id: 'suelto', nombre: 'Suelto', px: 32 },
+  { id: 'amplio', nombre: 'Amplio', px: 48 },
+]
+
+/** Cuánto aire lleva la tarjeta por dentro. */
+export const aireDe = (t: Pick<Tarjeta, 'datos'>) =>
+  (AIRES.find(a => a.id === t.datos?.aire) ?? AIRES[1]).px
 
 // ── Pictogramas ────────────────────────────────────────────────────────────
 

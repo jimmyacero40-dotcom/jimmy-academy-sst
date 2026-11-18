@@ -1,11 +1,13 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { X, Upload, AlertCircle, Loader2 } from 'lucide-react'
+import { X, Upload, AlertCircle, Loader2, ArrowUp, ArrowDown } from 'lucide-react'
 import {
-  TIPOS, TIPO, COLORES, ALTOS, AJUSTES, PICTOGRAMAS,
+  TIPOS, TIPO, COLORES, ALTOS, AJUSTES, PICTOGRAMAS, PIEZAS, TAMANOS, AIRES,
   diasDesde, anchoDe, ajusteDe, pictogramasDe,
+  ordenDe, alineacionDe, superpuestoDe,
   type Tarjeta, type TipoTarjeta, type ColorTarjeta, type Ajuste, type Alto,
+  type Pieza, type Alineacion, type Tamano, type Aire,
 } from '@/lib/tablero'
 import { comprimirImagen } from '@/lib/comprimir-imagen'
 import { Pictograma } from '@/components/tablero/Pictograma'
@@ -45,6 +47,11 @@ export function EditorTarjeta({ tarjeta, opciones, onGuardar, onCerrar }: {
     ajuste: ajusteDe(tarjeta) as Ajuste,
     alto: (tarjeta.datos?.alto ?? 'auto') as Alto,
     iconos: pictogramasDe(tarjeta),
+    orden: ordenDe(tarjeta),
+    alineacion: alineacionDe(tarjeta) as Alineacion,
+    superpuesto: superpuestoDe(tarjeta),
+    tamano: (tarjeta.datos?.tamano ?? 'normal') as Tamano,
+    aire: (tarjeta.datos?.aire ?? 'normal') as Aire,
     activa: tarjeta.activa,
     desde: (tarjeta.desde ?? '').slice(0, 10),
     hasta: (tarjeta.hasta ?? '').slice(0, 10),
@@ -134,6 +141,11 @@ export function EditorTarjeta({ tarjeta, opciones, onGuardar, onCerrar }: {
     if (meta.anchoLibre) datos.ancho = f.ancho
     if (tiene('imagen')) { datos.ajuste = f.ajuste; datos.alto = f.alto }
     datos.iconos = f.iconos
+    datos.orden = f.orden
+    datos.alineacion = f.alineacion
+    datos.superpuesto = f.superpuesto
+    datos.tamano = f.tamano
+    datos.aire = f.aire
 
     setGuardando(true)
     await onGuardar({
@@ -294,6 +306,43 @@ export function EditorTarjeta({ tarjeta, opciones, onGuardar, onCerrar }: {
           </Campo>
         )}
 
+        <div className="pt-1" style={{ borderTop: '1px solid var(--border)' }} />
+        <p className="text-[12px] font-bold -mb-1" style={{ color: 'var(--text-dim)' }}>Composición</p>
+
+        <div className="flex gap-3 flex-wrap">
+          <Campo etiqueta="Alineación">
+            <Botones valor={f.alineacion} onElegir={v => set('alineacion', v)} opciones={[
+              { id: 'izquierda', texto: 'Izquierda' }, { id: 'centro', texto: 'Centro' }, { id: 'derecha', texto: 'Derecha' },
+            ]} />
+          </Campo>
+          <Campo etiqueta="Tamaño del texto">
+            <Botones valor={f.tamano} onElegir={v => set('tamano', v)}
+              opciones={TAMANOS.map(t => ({ id: t.id, texto: t.nombre }))} />
+          </Campo>
+        </div>
+
+        <Campo etiqueta="Aire por dentro" nota="Cuánto espacio deja alrededor del texto.">
+          <Botones valor={f.aire} onElegir={v => set('aire', v)}
+            opciones={AIRES.map(a => ({ id: a.id, texto: a.nombre }))} />
+        </Campo>
+
+        {tarjeta.tipo === 'anuncio' && (
+          <>
+            {f.imagen_url && (
+              <label className="flex items-center gap-2.5 cursor-pointer">
+                <input type="checkbox" checked={f.superpuesto}
+                  onChange={e => set('superpuesto', e.target.checked)} className="w-4 h-4" />
+                <span className="text-[13.5px] font-semibold" style={{ color: 'var(--text)' }}>
+                  Texto encima de la imagen
+                </span>
+              </label>
+            )}
+            <Campo etiqueta="Orden de los elementos" nota="Suba o baje cada pieza.">
+              <OrdenPiezas orden={f.orden} onCambiar={v => set('orden', v)} />
+            </Campo>
+          </>
+        )}
+
         <Campo etiqueta="Color">
           <div className="flex gap-2 flex-wrap">
             {(Object.keys(COLORES) as ColorTarjeta[]).map(id => (
@@ -419,6 +468,41 @@ function Botones<T>({ opciones, valor, onElegir }: {
           </button>
         )
       })}
+    </div>
+  )
+}
+
+/**
+ * La lista de piezas de la tarjeta, para subirlas y bajarlas.
+ *
+ * Con flechas y no arrastrando: son seis renglones cortos, y arrastrar dentro
+ * de una ventana que ya se desplaza sola termina peleando con el desplazamiento
+ * justo cuando se quiere mover la última pieza hacia arriba.
+ */
+function OrdenPiezas({ orden, onCambiar }: { orden: Pieza[]; onCambiar: (v: Pieza[]) => void }) {
+  const mover = (i: number, hacia: -1 | 1) => {
+    const j = i + hacia
+    if (j < 0 || j >= orden.length) return
+    const nuevo = [...orden]
+    ;[nuevo[i], nuevo[j]] = [nuevo[j], nuevo[i]]
+    onCambiar(nuevo)
+  }
+  return (
+    <div className="rounded-xl overflow-hidden" style={{ border: '1px solid var(--border)' }}>
+      {orden.map((p, i) => (
+        <div key={p} className="flex items-center gap-2 px-3 py-1.5"
+          style={{
+            background: i % 2 ? 'var(--bg-card-hover)' : 'var(--bg-surface)',
+            borderTop: i ? '1px solid var(--border)' : undefined,
+          }}>
+          <span className="text-[11px] font-bold tabular-nums w-4" style={{ color: 'var(--text-faint)' }}>{i + 1}</span>
+          <span className="flex-1 text-[13px] font-semibold" style={{ color: 'var(--text)' }}>{PIEZAS[p]}</span>
+          <button onClick={() => mover(i, -1)} disabled={i === 0} aria-label={`Subir ${PIEZAS[p]}`}
+            className="p-1 rounded disabled:opacity-25" style={{ color: 'var(--text-dim)' }}><ArrowUp size={14} /></button>
+          <button onClick={() => mover(i, 1)} disabled={i === orden.length - 1} aria-label={`Bajar ${PIEZAS[p]}`}
+            className="p-1 rounded disabled:opacity-25" style={{ color: 'var(--text-dim)' }}><ArrowDown size={14} /></button>
+        </div>
+      ))}
     </div>
   )
 }

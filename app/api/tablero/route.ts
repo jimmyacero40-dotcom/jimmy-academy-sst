@@ -72,7 +72,38 @@ export async function GET(req: NextRequest) {
   // abren una sede nueva, aparece sola.
   const opciones = todas ? await opcionesDeAudiencia(companyId) : undefined
 
-  return NextResponse.json({ tarjetas: visibles, esAdmin, persona, opciones })
+  const { data: ajustes } = await supabaseAdmin
+    .from('tablero_ajustes').select('separacion').eq('company_id', companyId).maybeSingle()
+
+  return NextResponse.json({
+    tarjetas: visibles, esAdmin, persona, opciones,
+    separacion: ajustes?.separacion ?? 16,
+  })
+}
+
+/** Guarda los ajustes de todo el tablero. */
+export async function PATCH(req: NextRequest) {
+  const { authorized, companyId, user } = await isAdminOrSuper()
+  if (!authorized) return NextResponse.json({ error: 'No autorizado' }, { status: 403 })
+  if (!companyId) return NextResponse.json({ error: 'Sin empresa activa' }, { status: 400 })
+
+  const { separacion } = await req.json().catch(() => ({ separacion: null }))
+  const n = Number(separacion)
+  if (!Number.isFinite(n) || n < 0 || n > 64) {
+    return NextResponse.json({ error: 'La separación va de 0 a 64 píxeles' }, { status: 400 })
+  }
+
+  const { error } = await supabaseAdmin
+    .from('tablero_ajustes')
+    .upsert({
+      company_id: companyId,
+      separacion: Math.round(n),
+      updated_by: user?.id ?? null,
+      updated_at: new Date().toISOString(),
+    })
+
+  if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+  return NextResponse.json({ ok: true, separacion: Math.round(n) })
 }
 
 async function opcionesDeAudiencia(companyId: string) {

@@ -11,6 +11,7 @@ import {
 } from 'lucide-react'
 import {
   COLOR, TIPO, anchoDe, ajusteDe, altoDe, pictogramasDe,
+  ordenDe, alineacionDe, superpuestoDe, tamanoDe, aireDe,
   ALTO_MINIMO, ALTO_MAXIMO,
   type Tarjeta, type TipoTarjeta,
 } from '@/lib/tablero'
@@ -57,6 +58,7 @@ export default function InicioPage() {
   const [editando, setEditando] = useState<Tarjeta | null>(null)
   const [eligiendoTipo, setEligiendoTipo] = useState(false)
   const [arrastrando, setArrastrando] = useState<string | null>(null)
+  const [separacion, setSeparacion] = useState(16)
 
   const cargar = (conTodas = diseñando) =>
     fetch(`/api/tablero${conTodas ? '?todas=1' : ''}`)
@@ -64,6 +66,7 @@ export default function InicioPage() {
       .then(d => {
         setTarjetas(d.tarjetas ?? [])
         if (d.opciones) setOpciones(d.opciones)
+        if (typeof d.separacion === 'number') setSeparacion(d.separacion)
       })
       .catch(() => setTarjetas([]))
       .finally(() => setCargando(false))
@@ -141,6 +144,13 @@ export default function InicioPage() {
     guardarOrden(nuevo)
   }
 
+  const guardarSeparacion = (px: number) => {
+    fetch('/api/tablero', {
+      method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ separacion: px }),
+    }).catch(() => {})
+  }
+
   /** Guarda el alto que quedó tras estirar la imagen con el mouse. */
   const guardarAlto = (t: Tarjeta, px: number | null) => {
     const datos = { ...t.datos, altoPx: px }
@@ -175,6 +185,21 @@ export default function InicioPage() {
           <div className="flex items-center gap-2 flex-wrap">
             {diseñando && (
               <>
+                <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg"
+                  style={{ background: 'var(--bg-card)', border: '1px solid var(--border)' }}>
+                  <label htmlFor="separacion" className="text-[12px] font-bold whitespace-nowrap"
+                    style={{ color: 'var(--text-dim)' }}>Separación</label>
+                  <input id="separacion" type="range" min={0} max={64} step={4} value={separacion}
+                    onChange={e => setSeparacion(Number(e.target.value))}
+                    // Se guarda al soltar y no en cada píxel: arrastrar la
+                    // barra dispararía sesenta escrituras seguidas.
+                    onPointerUp={() => guardarSeparacion(separacion)}
+                    onKeyUp={() => guardarSeparacion(separacion)}
+                    className="w-24" />
+                  <span className="text-[11px] font-bold tabular-nums w-7" style={{ color: 'var(--text-label)' }}>
+                    {separacion}
+                  </span>
+                </div>
                 <button onClick={() => setEligiendoTipo(true)}
                   className="inline-flex items-center gap-2 px-3.5 py-2 rounded-lg text-sm font-bold"
                   style={{ background: 'var(--primary)', color: '#fff' }}>
@@ -205,7 +230,7 @@ export default function InicioPage() {
       ) : tarjetas.length === 0 ? (
         <Vacio esAdmin={esAdmin} onDiseñar={entrarADiseñar} />
       ) : (
-        <div className="tablero-rejilla">
+        <div className="tablero-rejilla" style={{ '--tablero-aire': `${separacion}px` } as any}>
           {tarjetas.map((t, i) => (
             <motion.div
               key={t.id}
@@ -255,7 +280,7 @@ export default function InicioPage() {
       <style jsx global>{`
         .tablero-rejilla {
           display: grid;
-          gap: 16px;
+          gap: var(--tablero-aire, 16px);
           grid-template-columns: repeat(3, minmax(0, 1fr));
           align-items: start;
         }
@@ -348,6 +373,9 @@ function Pintar({ t }: { t: Tarjeta }) {
   switch (t.tipo) {
     case 'anuncio':        return <Anuncio t={t} />
     case 'poster':         return <Poster t={t} />
+    case 'banner':         return <Banner t={t} />
+    case 'texto':          return <Texto t={t} />
+    case 'separador':      return <Separador t={t} />
     case 'contador':       return <Contador t={t} />
     case 'alerta':         return <Alerta t={t} />
     case 'capacitaciones': return <Capacitaciones t={t} />
@@ -521,13 +549,82 @@ function Rotulo({ icono: Icono, texto, color }: { icono: any; texto: string; col
   )
 }
 
+/**
+ * El anuncio, armado por piezas.
+ *
+ * El orden de título, texto, imagen, etiqueta, pictogramas y botón sale de la
+ * tarjeta, no del código: así el mismo tipo de tarjeta sirve para poner el
+ * título encima de la imagen, debajo o superpuesto, sin un tipo nuevo por cada
+ * arreglo posible.
+ */
 function Anuncio({ t }: { t: Tarjeta }) {
   const c = COLOR(t.color)
   const fondo = ajusteDe(t) === 'recortada'
+  const superpuesto = superpuestoDe(t)
+  const alinear = alineacionDe(t)
+  const tam = tamanoDe(t)
+  const aire = aireDe(t)
+
+  const centro = alinear === 'centro'
+  const clasesAlineacion = centro ? 'items-center text-center'
+    : alinear === 'derecha' ? 'items-end text-right' : 'items-start text-left'
+
+  const piezas: Record<string, React.ReactNode> = {
+    etiqueta: (
+      <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-bold tracking-wide uppercase"
+        style={{ background: 'rgba(255,255,255,0.16)', color: '#fff' }}>
+        <Megaphone size={12} /> Anuncio
+      </span>
+    ),
+    titulo: t.titulo ? (
+      <h2 className="font-extrabold text-white leading-tight" style={{ fontSize: tam.titulo }}>{t.titulo}</h2>
+    ) : null,
+    texto: t.texto ? (
+      <p className="leading-relaxed" style={{
+        color: 'rgba(255,255,255,0.84)', fontSize: tam.texto,
+        maxWidth: centro ? '46rem' : '36rem',
+      }}>{t.texto}</p>
+    ) : null,
+    iconos: pictogramasDe(t).length > 0 ? (
+      <div className={`flex flex-wrap items-center gap-2 ${centro ? 'justify-center' : alinear === 'derecha' ? 'justify-end' : ''}`}>
+        {pictogramasDe(t).map((id, i) => (
+          <span key={`${id}-${i}`} className="w-9 h-9 rounded-lg flex items-center justify-center"
+            style={{ background: 'rgba(255,255,255,0.14)', color: '#fff' }}>
+            <Pictograma id={id} size={18} />
+          </span>
+        ))}
+      </div>
+    ) : null,
+    boton: t.cta_texto && t.cta_url ? (
+      <Link href={t.cta_url}
+        className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-bold bg-white"
+        style={{ color: '#0B1736' }}>
+        {t.cta_texto} <ArrowRight size={15} />
+      </Link>
+    ) : null,
+  }
+
+  // La imagen de fondo y la superpuesta no entran en la columna: una va detrás
+  // de todo y la otra debajo del texto, las dos en capas aparte.
+  const imagenSuelta = fondo || superpuesto
+  const orden = ordenDe(t).filter(p => !(p === 'imagen' && imagenSuelta))
+
+  const columna = (
+    <div className={`relative flex flex-col ${clasesAlineacion}`}
+      style={{ gap: Math.round(aire * 0.6), padding: aire }}>
+      {orden.map(p => {
+        if (p === 'imagen') {
+          return t.imagen_url ? (
+            <div key="imagen" className="w-full rounded-xl overflow-hidden"><Imagen t={t} color={c.fuerte} /></div>
+          ) : null
+        }
+        return piezas[p] ? <div key={p}>{piezas[p]}</div> : null
+      })}
+    </div>
+  )
+
   return (
     <div className="rounded-2xl relative overflow-hidden" style={{ background: c.degradado }}>
-      {/* Recortada, la imagen es fondo y el texto va encima; completa, se ve
-          toda y el texto va debajo para no taparla. */}
       {t.imagen_url && fondo && (
         <img src={t.imagen_url} alt="" aria-hidden
           className="absolute inset-0 w-full h-full object-cover" style={{ opacity: 0.35 }} />
@@ -539,38 +636,87 @@ function Anuncio({ t }: { t: Tarjeta }) {
           {t.destacado}
         </span>
       )}
-      {t.imagen_url && !fondo && <Imagen t={t} color={c.fuerte} />}
-      <div className="relative p-6 md:p-7">
-        <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-bold tracking-wide uppercase"
-          style={{ background: 'rgba(255,255,255,0.16)', color: '#fff' }}>
-          <Megaphone size={12} /> Anuncio
-        </span>
-        <h2 className="font-extrabold text-white mt-3 leading-tight" style={{ fontSize: 'clamp(22px, 2.6vw, 32px)' }}>
-          {t.titulo}
-        </h2>
+
+      {superpuesto && t.imagen_url ? (
+        <div className="relative">
+          <Imagen t={t} color={c.fuerte} />
+          {/* Un velo oscuro: sin él, el texto blanco desaparece sobre las
+              partes claras de la imagen. */}
+          <div className="absolute inset-0" aria-hidden
+            style={{ background: 'linear-gradient(to top, rgba(8,16,36,0.85), rgba(8,16,36,0.15))' }} />
+          <div className="absolute inset-0 flex flex-col justify-end">{columna}</div>
+        </div>
+      ) : columna}
+    </div>
+  )
+}
+
+/** Una franja de imagen sin caja: para logos y cabeceras. */
+function Banner({ t }: { t: Tarjeta }) {
+  const c = COLOR(t.color)
+  const alinear = alineacionDe(t)
+  const tam = tamanoDe(t)
+  const cuerpo = (
+    <div className="rounded-2xl overflow-hidden relative" style={{ background: c.suave }}>
+      <Imagen t={t} color={c.suave} />
+      {(t.titulo || t.texto) && (
+        <div className="p-4" style={{
+          textAlign: alinear === 'centro' ? 'center' : alinear === 'derecha' ? 'right' : 'left',
+        }}>
+          {t.titulo && (
+            <p className="font-extrabold leading-tight" style={{ color: c.fuerte, fontSize: tam.titulo }}>{t.titulo}</p>
+          )}
+          {t.texto && (
+            <p className="mt-1 leading-relaxed" style={{ color: 'var(--text-dim)', fontSize: tam.texto }}>{t.texto}</p>
+          )}
+          <Iconos t={t} color={c.fuerte} />
+        </div>
+      )}
+    </div>
+  )
+  return t.cta_url ? <Link href={t.cta_url} className="block">{cuerpo}</Link> : cuerpo
+}
+
+/** Solo palabras: un mensaje destacado, una frase, un recordatorio. */
+function Texto({ t }: { t: Tarjeta }) {
+  const c = COLOR(t.color)
+  const alinear = alineacionDe(t)
+  const tam = tamanoDe(t)
+  const aire = aireDe(t)
+  return (
+    <div className="rounded-2xl overflow-hidden"
+      style={{ background: c.suave, border: `1px solid ${c.borde}` }}>
+      <Imagen t={t} color={c.fuerte} />
+      <div style={{
+        padding: aire,
+        textAlign: alinear === 'centro' ? 'center' : alinear === 'derecha' ? 'right' : 'left',
+      }}>
+        {t.titulo && (
+          <p className="font-extrabold leading-tight" style={{ color: c.fuerte, fontSize: tam.titulo }}>{t.titulo}</p>
+        )}
         {t.texto && (
-          <p className="mt-2.5 text-sm md:text-[15px] leading-relaxed max-w-xl" style={{ color: 'rgba(255,255,255,0.84)' }}>
-            {t.texto}
-          </p>
+          <p className="leading-relaxed" style={{
+            color: 'var(--text-strong)', fontSize: tam.texto, marginTop: t.titulo ? 8 : 0,
+          }}>{t.texto}</p>
         )}
-        {pictogramasDe(t).length > 0 && (
-          <div className="flex flex-wrap items-center gap-2 mt-4">
-            {pictogramasDe(t).map((id, i) => (
-              <span key={`${id}-${i}`} className="w-9 h-9 rounded-lg flex items-center justify-center"
-                style={{ background: 'rgba(255,255,255,0.14)', color: '#fff' }}>
-                <Pictograma id={id} size={18} />
-              </span>
-            ))}
-          </div>
-        )}
-        {t.cta_texto && t.cta_url && (
-          <Link href={t.cta_url}
-            className="inline-flex items-center gap-2 mt-4 px-4 py-2.5 rounded-xl text-sm font-bold bg-white"
-            style={{ color: '#0B1736' }}>
-            {t.cta_texto} <ArrowRight size={15} />
-          </Link>
-        )}
+        <Iconos t={t} color={c.fuerte} />
       </div>
+    </div>
+  )
+}
+
+/** Una línea con título, o puro espacio, para partir el tablero en secciones. */
+function Separador({ t }: { t: Tarjeta }) {
+  const c = COLOR(t.color)
+  const aire = aireDe(t)
+  if (!t.titulo) return <div style={{ height: aire }} aria-hidden />
+  return (
+    <div className="flex items-center gap-3" style={{ paddingTop: aire / 2, paddingBottom: aire / 2 }}>
+      <span className="text-[12px] font-bold tracking-wider uppercase whitespace-nowrap" style={{ color: c.fuerte }}>
+        {t.titulo}
+      </span>
+      <span className="flex-1 h-px" style={{ background: c.borde }} />
+      {t.texto && <span className="text-[12px]" style={{ color: 'var(--text-label)' }}>{t.texto}</span>}
     </div>
   )
 }
