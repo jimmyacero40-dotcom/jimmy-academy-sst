@@ -71,6 +71,34 @@ function conexion(): Transporter {
   return transporte
 }
 
+/**
+ * Comprueba que la cuenta de correo sirve, sin mandarle nada a nadie.
+ *
+ * Abre la sesión con Google y la cierra. Hace falta porque hasta ahora la
+ * única forma de saber si el envío estaba bien configurado era asignarle una
+ * capacitación a alguien y ver si le llegaba: un aviso de verdad, a una
+ * persona de verdad, para averiguar algo del servidor.
+ */
+export async function probarCorreo(): Promise<{ sirve: boolean; motivo?: string }> {
+  if (!correoConfigurado()) {
+    return { sirve: false, motivo: 'No hay credenciales de correo en este servidor' }
+  }
+  if (!porGmail()) return { sirve: true }
+  try {
+    await conexion().verify()
+    return { sirve: true }
+  } catch (e) {
+    return { sirve: false, motivo: motivoLegible(e) }
+  }
+}
+
+/** El remitente, con el buzón tapado: sirve para reconocerlo, no para copiarlo. */
+export function remitenteTapado(): string {
+  const dir = (process.env.CORREO_USUARIO || '').trim()
+  if (!dir) return '—'
+  return dir.replace(/^(.{2}).*(@.*)$/, '$1•••$2')
+}
+
 /** Traduce al español lo que Google contesta cuando algo sale mal. */
 function motivoLegible(e: any): string {
   const texto = String(e?.response || e?.message || '')

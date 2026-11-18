@@ -510,8 +510,9 @@ export default function SettingsPage() {
           )}
 
           {/* ── NOTIFICACIONES ──────────────────────────────────────────── */}
+          {effectiveActive === 'notificaciones' && <EstadoDelCorreo />}
           {effectiveActive === 'notificaciones' && (
-            <div className="bg-[var(--bg-surface)] border border-[var(--border)] rounded-2xl p-5">
+            <div className="bg-[var(--bg-surface)] border border-[var(--border)] rounded-2xl p-5 mt-4">
               <h2 className="text-[var(--text)] font-bold mb-4 flex items-center gap-2"><Bell size={16} className="text-amber-400" /> Preferencias de Notificación</h2>
               <div className="space-y-4">
                 {[
@@ -1000,6 +1001,82 @@ export default function SettingsPage() {
           )}
 
         </motion.div>
+      </div>
+    </div>
+  )
+}
+
+/**
+ * Si este servidor puede mandar correos.
+ *
+ * Las credenciales viven en variables de entorno, y las del computador donde
+ * se programa no son las del sitio publicado: se puede tener el correo andando
+ * en pruebas y el sitio de verdad sin mandar nada. Antes la única forma de
+ * averiguarlo era asignarle una capacitación a una persona de verdad y
+ * esperar a ver si le llegaba.
+ */
+function EstadoDelCorreo() {
+  const [e, setE] = useState<{
+    configurado: boolean; sirve: boolean; motivo: string | null
+    remitente: string | null; entorno: string
+  } | null>(null)
+  const [cargando, setCargando] = useState(true)
+
+  const mirar = () => {
+    setCargando(true)
+    fetch('/api/correo/estado')
+      .then(r => (r.ok ? r.json() : null))
+      .then(setE)
+      .catch(() => setE(null))
+      .finally(() => setCargando(false))
+  }
+  useEffect(() => { mirar() }, [])
+
+  const bien = !!e?.sirve
+  const color = cargando ? 'var(--text-faint)' : bien ? '#10B981' : '#EF4444'
+
+  return (
+    <div className="bg-[var(--bg-surface)] border border-[var(--border)] rounded-2xl p-5">
+      <div className="flex items-start justify-between gap-3 flex-wrap">
+        <div>
+          <h2 className="text-[var(--text)] font-bold flex items-center gap-2">
+            <Mail size={16} style={{ color }} /> Envío de correo
+          </h2>
+          <p className="text-[var(--text-faint)] text-xs mt-1">
+            De aquí salen los avisos de capacitación asignada, cancelada o con fecha nueva.
+          </p>
+        </div>
+        <button onClick={mirar} disabled={cargando}
+          className="px-3 py-2 rounded-lg text-xs font-bold"
+          style={{ border: '1px solid var(--border)', color: 'var(--text-dim)' }}>
+          {cargando ? 'Probando…' : 'Probar de nuevo'}
+        </button>
+      </div>
+
+      <div className="mt-4 rounded-xl p-3.5"
+        style={{ background: 'var(--bg-card)', border: `1px solid ${color}33` }}>
+        <p className="text-sm font-bold" style={{ color }}>
+          {cargando ? 'Probando la conexión…'
+            : bien ? 'Funcionando'
+              : e?.configurado ? 'Configurado, pero no conecta' : 'Sin configurar'}
+        </p>
+        <p className="text-xs mt-1.5 leading-relaxed" style={{ color: 'var(--text-dim)' }}>
+          {cargando ? 'Se abre la sesión con el proveedor y se cierra. No se le escribe a nadie.'
+            : bien ? <>Los avisos salen desde <b>{e?.remitente}</b>.</>
+              : e?.motivo ?? 'No se pudo comprobar.'}
+        </p>
+        {!cargando && !bien && !e?.configurado && (
+          <p className="text-xs mt-2 leading-relaxed" style={{ color: 'var(--text-faint)' }}>
+            Este servidor no tiene las claves del correo. Hay que ponerlas donde está publicada
+            la plataforma —no basta con tenerlas en el computador donde se programa—, en las
+            variables <code>CORREO_USUARIO</code> y <code>CORREO_CLAVE</code>, y volver a publicar.
+          </p>
+        )}
+        {!cargando && e && (
+          <p className="text-[10px] mt-2 uppercase tracking-wider" style={{ color: 'var(--text-faint)' }}>
+            Servidor: {e.entorno}
+          </p>
+        )}
       </div>
     </div>
   )
