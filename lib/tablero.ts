@@ -168,8 +168,11 @@ export const TIPOS: TipoMeta[] = [
     campos: ['items', 'imagen'],
   },
   {
-    id: 'copasst', nombre: 'COPASST', ancho: 3, automatica: false, anchoLibre: true,
-    ayuda: 'Franja ancha para la próxima reunión del comité.',
+    // Se llamaba COPASST, pero la franja sirve igual para mandar al RePortal o
+    // a cualquier otro sitio, y el nombre del comité confundía sobre a dónde
+    // lleva el botón.
+    id: 'copasst', nombre: 'Franja con botón', ancho: 3, automatica: false, anchoLibre: true,
+    ayuda: 'Una franja ancha con un llamado y un botón: reunión del COPASST, RePortal, lo que sea.',
     campos: ['cta', 'imagen'],
   },
   {
@@ -405,23 +408,69 @@ export const PIEZAS_TEXTO: { id: PiezaTexto; nombre: string }[] = [
  * al número. Llamarlas a todas igual obligaba a adivinar cuál se iba a mover
  * al tocar un control, y se tocaba el que no era.
  */
-const PIEZAS_RENOMBRADAS: Partial<Record<TipoTarjeta, Partial<Record<PiezaTexto, string>>>> = {
-  contador: {
-    rotulo: 'Rótulo de arriba',
-    numero: 'El número',
-    titulo: 'Frase bajo el número',
-    texto: 'Meta y nota',
-  },
-  separador: {
-    rotulo: 'Texto de la línea',
-    titulo: 'Texto de la línea',
-    texto: 'Nota al final',
-  },
+/**
+ * Qué textos tiene cada tarjeta, cómo se llaman y con qué escala se miden.
+ *
+ * Esta tabla es la que evita el enredo de siempre: en la franja del COPASST no
+ * hay más que un rótulo y una frase, pero el editor mostraba también «Título»
+ * y «Número», que no movían nada —y la frase se movía desde «Descripción», que
+ * es el último sitio donde uno la buscaría.
+ *
+ * `columna` dice de qué escala se saca el tamaño: el título de un anuncio es un
+ * titular y el de una franja es una etiqueta, aunque los dos se llamen título.
+ */
+export interface TextoDeTarjeta { pieza: PiezaTexto; nombre: string; columna: PiezaTexto }
+
+const T = (pieza: PiezaTexto, nombre: string, columna: PiezaTexto = pieza): TextoDeTarjeta =>
+  ({ pieza, nombre, columna })
+
+export const TEXTOS_POR_TIPO: Partial<Record<TipoTarjeta, TextoDeTarjeta[]>> = {
+  anuncio: [T('titulo', 'Título'), T('texto', 'Descripción')],
+  contador: [
+    T('rotulo', 'Rótulo de arriba'),
+    T('numero', 'El número'),
+    T('titulo', 'Frase junto al número', 'texto'),
+    T('texto', 'Meta y nota', 'rotulo'),
+  ],
+  poster:    [T('titulo', 'Título sobre la foto', 'texto'), T('texto', 'Pie de foto', 'rotulo')],
+  banner:    [T('titulo', 'Título'), T('texto', 'Descripción')],
+  texto:     [T('titulo', 'Título'), T('texto', 'Descripción')],
+  separador: [T('titulo', 'Texto de la línea', 'rotulo'), T('texto', 'Nota al final', 'rotulo')],
+  alerta:    [T('rotulo', 'La palabra «Alerta»'), T('titulo', 'Título', 'texto'), T('texto', 'Descripción')],
+  reconocimiento: [T('rotulo', 'La palabra «Reconocimiento»'), T('titulo', 'Título', 'texto'), T('texto', 'Descripción')],
+  pausa:     [T('titulo', 'Rótulo', 'rotulo'), T('numero', 'La hora'), T('texto', 'Descripción')],
+  epp:       [T('titulo', 'Rótulo', 'rotulo'), T('texto', 'Elementos y nota')],
+  copasst:   [T('titulo', 'Rótulo', 'rotulo'), T('texto', 'La frase', 'texto')],
+  nota:      [T('titulo', 'Rótulo', 'rotulo'), T('texto', 'Descripción')],
+  capacitaciones: [T('titulo', 'Rótulo', 'rotulo'), T('texto', 'Las capacitaciones')],
+  formacion: [T('titulo', 'Rótulo', 'rotulo'), T('numero', 'El porcentaje'), T('texto', 'Descripción')],
 }
 
+const TEXTOS_GENERICOS: TextoDeTarjeta[] = PIEZAS_TEXTO.map(p => T(p.id, p.nombre))
+
+export const textosDe = (tipo: string): TextoDeTarjeta[] =>
+  TEXTOS_POR_TIPO[tipo as TipoTarjeta] ?? TEXTOS_GENERICOS
+
+export const columnaDe = (tipo: string, pieza: PiezaTexto): PiezaTexto =>
+  textosDe(tipo).find(x => x.pieza === pieza)?.columna ?? pieza
+
 export const nombrePieza = (tipo: string, pieza: PiezaTexto): string =>
-  PIEZAS_RENOMBRADAS[tipo as TipoTarjeta]?.[pieza]
+  textosDe(tipo).find(x => x.pieza === pieza)?.nombre
   ?? PIEZAS_TEXTO.find(p => p.id === pieza)!.nombre
+
+/** Cómo se llama el campo del título en cada tarjeta. */
+export const nombreCampoTitulo = (tipo: string): string =>
+  tipo === 'contador' ? 'Rótulo de arriba'
+    : tipo === 'separador' ? 'Texto de la línea'
+      : nombrePieza(tipo, 'titulo')
+
+/**
+ * La medida de un texto, con la escala que le toque en su tarjeta.
+ * Esto es lo que se usa en las tarjetas: `medidaDe` sigue valiendo cuando
+ * pieza y escala son la misma cosa.
+ */
+export const medida = (t: Pick<Tarjeta, 'tipo' | 'datos'>, pieza: PiezaTexto): string =>
+  medidaComo(t, pieza, columnaDe(t.tipo, pieza))
 
 /** Dónde va el texto respecto del número, en la tarjeta del contador. */
 export type DondeTexto = 'abajo' | 'arriba' | 'izquierda' | 'derecha'

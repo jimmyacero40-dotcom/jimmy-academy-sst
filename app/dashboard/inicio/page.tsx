@@ -13,7 +13,7 @@ import {
   COLOR, TIPO, anchoDe, ajusteDe, altoDe, pictogramasDe,
   ordenDe, alineacionDe, tamanoDe, aireDe,
   disposicionDe, proporcionDe, colorTextoDe, tintaDe, nombreDe, seVe,
-  medidaDe, medidaComo, grosorDe, dondeTextoDe, leyendaDe,
+  medidaDe, medidaComo, medida, grosorDe, dondeTextoDe, leyendaDe,
   posicionIconosDe, tamanoIconosDe,
   ALTO_MINIMO, ALTO_MAXIMO,
   type Tarjeta, type TipoTarjeta,
@@ -45,7 +45,9 @@ const Diseno = createContext<{
    * sin enterarse de que se había soltado, así que no guardaba nada.
    */
   bloquear: (b: boolean) => void
-}>({ activo: false, guardarAlto: () => {}, guardarIconos: () => {}, bloquear: () => {} })
+  /** Enciende las rayas de las columnas mientras se ensancha una tarjeta. */
+  guias: (b: boolean) => void
+}>({ activo: false, guardarAlto: () => {}, guardarIconos: () => {}, bloquear: () => {}, guias: () => {} })
 
 export default function InicioPage() {
   const { esAdmin } = useRol()
@@ -62,6 +64,7 @@ export default function InicioPage() {
   const [arrastrando, setArrastrando] = useState<string | null>(null)
   const [separacion, setSeparacion] = useState(16)
   const [bloqueado, setBloqueado] = useState(false)
+  const [guiando, setGuiando] = useState(false)
 
   const cargar = (conTodas = diseñando) =>
     fetch(`/api/tablero${conTodas ? '?todas=1' : ''}`)
@@ -189,7 +192,7 @@ export default function InicioPage() {
   }
 
   return (
-    <Diseno.Provider value={{ activo: diseñando, guardarAlto, guardarIconos, bloquear: setBloqueado }}>
+    <Diseno.Provider value={{ activo: diseñando, guardarAlto, guardarIconos, bloquear: setBloqueado, guias: setGuiando }}>
     <div className="space-y-5 pb-10">
       {/* Sin encabezado: la fecha y el subtítulo ocupaban dos renglones que no
           decían nada que el tablero no dijera mejor. El espacio es del
@@ -251,7 +254,8 @@ export default function InicioPage() {
       ) : tarjetas.length === 0 ? (
         <Vacio esAdmin={esAdmin} onDiseñar={entrarADiseñar} />
       ) : (
-        <div className="tablero-rejilla" style={{ '--tablero-aire': `${separacion}px` } as any}>
+        <div className="tablero-rejilla relative" style={{ '--tablero-aire': `${separacion}px` } as any}>
+          {guiando && <Guias />}
           {tarjetas.map((t, i) => (
             <EnElTablero
               key={t.id} t={t} indice={i} total={tarjetas.length}
@@ -309,6 +313,24 @@ export default function InicioPage() {
       `}</style>
     </div>
     </Diseno.Provider>
+  )
+}
+
+/**
+ * Las rayas de las columnas, mientras se ensancha una tarjeta.
+ *
+ * Son las dos divisiones de la rejilla de tres. Verlas al arrastrar es la
+ * diferencia entre saber dónde va a caer la tarjeta y tener que soltar para
+ * averiguarlo.
+ */
+function Guias() {
+  return (
+    <div className="absolute inset-0 z-40 pointer-events-none" aria-hidden>
+      {[1, 2].map(i => (
+        <div key={i} className="absolute top-0 bottom-0 w-px"
+          style={{ left: `${(i / 3) * 100}%`, background: 'var(--primary)', opacity: 0.4 }} />
+      ))}
+    </div>
   )
 }
 
@@ -384,14 +406,14 @@ function ManijasTarjeta({ t, onAncho, onAlto, columna }: {
   onAlto: (px: number | null) => void
   columna: React.RefObject<HTMLDivElement>
 }) {
-  const { bloquear } = useContext(Diseno)
+  const { bloquear, guias } = useContext(Diseno)
   const [fantasma, setFantasma] = useState<{ ancho?: number; alto?: number } | null>(null)
   const libre = TIPO(t.tipo).anchoLibre
   const ancho = anchoDe(t)
 
   const estirarAncho = (e: React.PointerEvent) => {
     e.preventDefault(); e.stopPropagation()
-    bloquear(true)
+    bloquear(true); guias(true)
     const caja = columna.current?.getBoundingClientRect()
     if (!caja) return
     // Una columna mide, más o menos, lo que mide la tarjeta entre el número de
@@ -406,7 +428,7 @@ function ManijasTarjeta({ t, onAncho, onAlto, columna }: {
     const soltar = () => {
       window.removeEventListener('pointermove', mover)
       window.removeEventListener('pointerup', soltar)
-      bloquear(false)
+      bloquear(false); guias(false)
       setFantasma(null)
       if (destino !== ancho) onAncho(destino)
     }
@@ -465,6 +487,20 @@ function ManijasTarjeta({ t, onAncho, onAlto, columna }: {
           className={`${comun} left-0 right-0 bottom-0 h-2.5 rounded-t`}
           style={{ ...barra, cursor: 'ns-resize' }}>
           <span className="h-0.5 w-10 rounded-full" style={{ background: 'rgba(255,255,255,0.85)' }} />
+        </div>
+      )}
+
+      {/* La guía: mientras se ensancha, se dibuja la raya de la columna donde
+          va a caer la tarjeta. Sin ella hay que soltar para saber si quedó
+          alineada con la de al lado, y volver a intentar si no. */}
+      {fantasma?.ancho && (
+        <div className="absolute inset-0 z-30 pointer-events-none" aria-hidden>
+          <div className="absolute top-0 bottom-0 w-px"
+            style={{
+              left: `${(fantasma.ancho / anchoDe(t)) * 100}%`,
+              background: 'var(--primary)',
+              boxShadow: '0 0 0 1px rgba(6,182,212,0.35)',
+            }} />
         </div>
       )}
 
@@ -795,12 +831,13 @@ function CajaColor({ color, t, children }: {
   )
 }
 
-function Rotulo({ icono: Icono, texto, color, tam, t }: {
-  icono: any; texto: string; color: string; tam?: string; t?: Tarjeta
+function Rotulo({ icono: Icono, texto, color, tam, t, pieza = 'rotulo' }: {
+  icono: any; texto: string; color: string; tam?: string; t?: Tarjeta; pieza?: 'rotulo' | 'titulo'
 }) {
   // El rótulo se puede apagar: en una tarjeta con imagen propia, el letrero
-  // «PRÓXIMAS CAPACITACIONES» a veces sobra.
-  if (t && !seVe(t, 'rotulo')) return null
+  // «PRÓXIMAS CAPACITACIONES» a veces sobra. Y en las tarjetas donde ese
+  // letrero ES el título, se apaga desde «Título», no desde «Rótulo».
+  if (t && !seVe(t, pieza)) return null
   return (
     <div className="flex items-center gap-1.5 mb-2.5">
       <Icono size={13} style={{ color }} />
@@ -842,14 +879,14 @@ function Anuncio({ t }: { t: Tarjeta }) {
     ),
     titulo: t.titulo ? (
       <h2 className="font-extrabold leading-tight"
-        style={{ fontSize: medidaDe(t, 'titulo'), fontWeight: grosorDe(t, 'titulo'), color: tinta ?? '#FFFFFF' }}>{t.titulo}</h2>
+        style={{ fontSize: medida(t, 'titulo'), fontWeight: grosorDe(t, 'titulo'), color: tinta ?? '#FFFFFF' }}>{t.titulo}</h2>
     ) : null,
     texto: t.texto ? (
       <p className="leading-relaxed" style={{
         // Sin color propio, el cuerpo va un punto más tenue que el título:
         // ayuda a que se lea primero el título y después el resto.
         color: tinta ?? 'rgba(255,255,255,0.84)', opacity: tinta ? 0.88 : 1,
-        fontSize: medidaDe(t, 'texto'), fontWeight: grosorDe(t, 'texto'),
+        fontSize: medida(t, 'texto'), fontWeight: grosorDe(t, 'texto'),
         maxWidth: alLado ? undefined : centro ? '46rem' : '36rem',
       }}>{t.texto}</p>
     ) : null,
@@ -957,11 +994,11 @@ function Banner({ t }: { t: Tarjeta }) {
         }}>
           {t.titulo && seVe(t, 'titulo') && (
             <p className="font-extrabold leading-tight"
-              style={{ color: tintaDe(t, 'titulo') ?? c.fuerte, fontSize: medidaDe(t, 'titulo'), fontWeight: grosorDe(t, 'titulo') }}>{t.titulo}</p>
+              style={{ color: tintaDe(t, 'titulo') ?? c.fuerte, fontSize: medida(t, 'titulo'), fontWeight: grosorDe(t, 'titulo') }}>{t.titulo}</p>
           )}
           {t.texto && seVe(t, 'texto') && (
             <p className="mt-1 leading-relaxed"
-              style={{ color: tintaDe(t, 'texto') ?? 'var(--text-dim)', fontSize: medidaDe(t, 'texto'), fontWeight: grosorDe(t, 'texto') }}>{t.texto}</p>
+              style={{ color: tintaDe(t, 'texto') ?? 'var(--text-dim)', fontSize: medida(t, 'texto'), fontWeight: grosorDe(t, 'texto') }}>{t.texto}</p>
           )}
           <Iconos t={t} color={c.fuerte} />
         </div>
@@ -987,12 +1024,12 @@ function Texto({ t }: { t: Tarjeta }) {
       }}>
         {t.titulo && seVe(t, 'titulo') && (
           <p className="font-extrabold leading-tight"
-            style={{ color: tintaDe(t, 'titulo') ?? c.fuerte, fontSize: medidaDe(t, 'titulo'), fontWeight: grosorDe(t, 'titulo') }}>{t.titulo}</p>
+            style={{ color: tintaDe(t, 'titulo') ?? c.fuerte, fontSize: medida(t, 'titulo'), fontWeight: grosorDe(t, 'titulo') }}>{t.titulo}</p>
         )}
         {t.texto && (
           <p className="leading-relaxed" style={{
             color: colorTextoDe(t) ?? 'var(--text-strong)',
-            fontSize: medidaDe(t, 'texto'), fontWeight: grosorDe(t, 'texto'), marginTop: t.titulo ? 8 : 0,
+            fontSize: medida(t, 'texto'), fontWeight: grosorDe(t, 'texto'), marginTop: t.titulo ? 8 : 0,
           }}>{t.texto}</p>
         )}
         <Iconos t={t} color={c.fuerte} />
@@ -1040,13 +1077,13 @@ function Separador({ t }: { t: Tarjeta }) {
   const alinear = alineacionDe(t)
   const rotulo = (
     <span className="font-bold tracking-wider uppercase whitespace-nowrap"
-      style={{ fontSize: medidaDe(t, 'rotulo'), fontWeight: grosorDe(t, 'rotulo') ?? 800, color: tinta }}>
+      style={{ fontSize: medida(t, 'rotulo'), fontWeight: grosorDe(t, 'rotulo') ?? 800, color: tinta }}>
       {t.titulo}
     </span>
   )
   const nota = t.texto && (
     <span className="whitespace-nowrap" style={{
-      fontSize: medidaDe(t, 'rotulo'), fontWeight: grosorDe(t, 'rotulo'),
+      fontSize: medida(t, 'rotulo'), fontWeight: grosorDe(t, 'rotulo'),
       color: tintaDe(t, 'texto') ?? 'var(--text-label)',
     }}>{t.texto}</span>
   )
@@ -1067,8 +1104,8 @@ function Poster({ t }: { t: Tarjeta }) {
   if (!t.imagen_url) {
     return (
       <Caja>
-        <Rotulo t={t} icono={ImageIcon} texto={t.titulo || 'Póster'}
-        color={tintaDe(t, 'rotulo') ?? 'var(--text-label)'} tam={medidaDe(t, 'rotulo')} />
+        <Rotulo t={t} pieza="titulo" icono={ImageIcon} texto={t.titulo || 'Póster'}
+        color={tintaDe(t, 'titulo') ?? 'var(--text-label)'} tam={medida(t, 'titulo')} />
         <p className="text-[13px]" style={{ color: 'var(--text-label)' }}>Sin imagen todavía.</p>
       </Caja>
     )
@@ -1081,11 +1118,11 @@ function Poster({ t }: { t: Tarjeta }) {
           style={{ background: 'linear-gradient(to top, rgba(8,16,36,0.88), rgba(8,16,36,0))' }}>
           {t.titulo && seVe(t, 'titulo') && (
             <p className="font-bold leading-snug"
-              style={{ fontSize: medidaDe(t, 'texto'), fontWeight: grosorDe(t, 'texto'), color: tintaDe(t, 'titulo') ?? '#fff' }}>{t.titulo}</p>
+              style={{ fontSize: medida(t, 'texto'), fontWeight: grosorDe(t, 'texto'), color: tintaDe(t, 'titulo') ?? '#fff' }}>{t.titulo}</p>
           )}
           {t.texto && seVe(t, 'texto') && (
             <p className="mt-0.5"
-              style={{ fontSize: medidaDe(t, 'rotulo'), fontWeight: grosorDe(t, 'rotulo'), color: tintaDe(t, 'texto') ?? 'rgba(255,255,255,0.8)' }}>{t.texto}</p>
+              style={{ fontSize: medida(t, 'rotulo'), fontWeight: grosorDe(t, 'rotulo'), color: tintaDe(t, 'texto') ?? 'rgba(255,255,255,0.8)' }}>{t.texto}</p>
           )}
         </div>
       )}
@@ -1112,6 +1149,10 @@ function Contador({ t }: { t: Tarjeta }) {
   const donde = dondeTextoDe(t)
   const leyenda = leyendaDe(t, dias)
   const alinear = alineacionDe(t)
+  const alineado = alinear === 'izquierda' ? 'text-left items-start'
+    : alinear === 'derecha' ? 'text-right items-end' : 'text-center items-center'
+  const centrado = alinear === 'izquierda' ? 'justify-start'
+    : alinear === 'derecha' ? 'justify-end' : 'justify-center'
 
   // Sobre una foto el texto va claro por omisión; sobre la caja de color, con
   // los colores de la tarjeta. Lo que se elija a mano manda sobre los dos.
@@ -1121,7 +1162,7 @@ function Contador({ t }: { t: Tarjeta }) {
   const numero = (
     <span className="font-black leading-none tabular-nums block"
       style={{
-        fontSize: medidaDe(t, 'numero'), fontWeight: grosorDe(t, 'numero'),
+        fontSize: medida(t, 'numero'), fontWeight: grosorDe(t, 'numero'),
         color: tinta('numero', '#FFFFFF', c.fuerte),
         textShadow: conFoto ? '0 2px 18px rgba(0,0,0,0.45)' : undefined,
       }}>
@@ -1134,7 +1175,7 @@ function Contador({ t }: { t: Tarjeta }) {
       {seVe(t, 'rotulo') && t.titulo && (
         <span className="font-bold tracking-wider uppercase block"
           style={{
-            fontSize: medidaDe(t, 'rotulo'), fontWeight: grosorDe(t, 'rotulo'),
+            fontSize: medida(t, 'rotulo'), fontWeight: grosorDe(t, 'rotulo'),
             color: tinta('rotulo', 'rgba(255,255,255,0.85)', c.fuerte),
           }}>
           {t.titulo}
@@ -1143,7 +1184,7 @@ function Contador({ t }: { t: Tarjeta }) {
       {seVe(t, 'titulo') && leyenda && (
         <span className="font-semibold block"
           style={{
-            fontSize: medidaComo(t, 'titulo', 'texto'), fontWeight: grosorDe(t, 'titulo') ?? 600,
+            fontSize: medida(t, 'titulo'), fontWeight: grosorDe(t, 'titulo') ?? 600,
             color: tinta('titulo', '#FFFFFF', 'var(--text-strong)'),
           }}>
           {leyenda}
@@ -1157,7 +1198,7 @@ function Contador({ t }: { t: Tarjeta }) {
       {avance != null && (
         <div className="w-full mt-3">
           <p className="mb-1.5" style={{
-            fontSize: medidaDe(t, 'rotulo'), fontWeight: grosorDe(t, 'rotulo'),
+            fontSize: medida(t, 'rotulo'), fontWeight: grosorDe(t, 'rotulo'),
             color: tinta('texto', 'rgba(255,255,255,0.8)', 'var(--text-label)'),
           }}>
             Meta: {meta} días{avance >= 100 ? ' · ¡cumplida!' : ''}
@@ -1171,7 +1212,7 @@ function Contador({ t }: { t: Tarjeta }) {
       )}
       {t.texto && (
         <p className="mt-2" style={{
-          fontSize: medidaDe(t, 'rotulo'), fontWeight: grosorDe(t, 'rotulo'),
+          fontSize: medida(t, 'rotulo'), fontWeight: grosorDe(t, 'rotulo'),
           color: tinta('texto', 'rgba(255,255,255,0.8)', 'var(--text-label)'),
         }}>
           {t.texto}
@@ -1184,7 +1225,7 @@ function Contador({ t }: { t: Tarjeta }) {
   // y en el orden que se pida.
   const alLado = donde === 'izquierda' || donde === 'derecha'
   const cuerpo = alLado ? (
-    <div className="flex items-center justify-center gap-4 flex-wrap">
+    <div className={`flex items-center gap-4 flex-wrap ${centrado}`}>
       {donde === 'izquierda' && <div className="text-right">{textos}</div>}
       {numero}
       {donde === 'derecha' && <div className="text-left">{textos}</div>}
@@ -1195,8 +1236,11 @@ function Contador({ t }: { t: Tarjeta }) {
     <>{numero}<div className="mt-1.5">{textos}</div></>
   )
 
-  const alineado = alinear === 'izquierda' ? 'text-left items-start'
-    : alinear === 'derecha' ? 'text-right items-end' : 'text-center items-center'
+  // El pie —la meta y la nota— puede ir arriba de todo o abajo, porque con el
+  // número a la izquierda la barra de la meta encima se leía antes que la
+  // cifra, que es justo al revés de lo que se quiere contar.
+  const pieArriba = t.datos?.pieArriba === true
+
 
   return (
     <div className="rounded-2xl relative overflow-hidden"
@@ -1217,8 +1261,9 @@ function Contador({ t }: { t: Tarjeta }) {
         </>
       )}
       <div className={`relative flex flex-col justify-center ${alineado}`} style={{ padding: aire }}>
+        {pieArriba && <div className="w-full mb-2">{pie}</div>}
         {cuerpo}
-        {pie}
+        {!pieArriba && pie}
         <Iconos t={t} color={conFoto ? '#fff' : c.fuerte} sobreOscuro={conFoto} />
       </div>
     </div>
@@ -1229,12 +1274,12 @@ function Alerta({ t }: { t: Tarjeta }) {
   const c = COLOR(t.color ?? 'rojo')
   return (
     <CajaColor color={c} t={t}>
-      <Rotulo t={t} icono={AlertTriangle} texto="Alerta" color={tintaDe(t, 'rotulo') ?? c.fuerte} tam={medidaDe(t, 'rotulo')} />
+      <Rotulo t={t} icono={AlertTriangle} texto="Alerta" color={tintaDe(t, 'rotulo') ?? c.fuerte} tam={medida(t, 'rotulo')} />
       <p className="font-bold leading-snug"
-        style={{ fontSize: medidaDe(t, 'texto'), fontWeight: grosorDe(t, 'texto'), color: tintaDe(t, 'titulo') ?? 'var(--text)' }}>{t.titulo}</p>
+        style={{ fontSize: medida(t, 'texto'), fontWeight: grosorDe(t, 'texto'), color: tintaDe(t, 'titulo') ?? 'var(--text)' }}>{t.titulo}</p>
       {t.texto && (
         <p className="mt-1.5 leading-relaxed"
-          style={{ fontSize: medidaDe(t, 'texto'), fontWeight: grosorDe(t, 'texto'), color: tintaDe(t, 'texto') ?? 'var(--text-dim)' }}>{t.texto}</p>
+          style={{ fontSize: medida(t, 'texto'), fontWeight: grosorDe(t, 'texto'), color: tintaDe(t, 'texto') ?? 'var(--text-dim)' }}>{t.texto}</p>
       )}
     </CajaColor>
   )
@@ -1245,10 +1290,10 @@ function Capacitaciones({ t }: { t: Tarjeta }) {
   const proximas: any[] = t.datos?.capacitaciones?.proximas ?? []
   return (
     <Caja t={t} color={c.fuerte}>
-      <Rotulo t={t} icono={CalendarDays} texto={t.titulo || 'Próximas capacitaciones'}
-        color={tintaDe(t, 'rotulo') ?? 'var(--text-label)'} tam={medidaDe(t, 'rotulo')} />
+      <Rotulo t={t} pieza="titulo" icono={CalendarDays} texto={t.titulo || 'Próximas capacitaciones'}
+        color={tintaDe(t, 'titulo') ?? 'var(--text-label)'} tam={medida(t, 'titulo')} />
       {proximas.length === 0 ? (
-        <p style={{ fontSize: medidaDe(t, 'texto'), fontWeight: grosorDe(t, 'texto'), color: tintaDe(t, 'texto') ?? 'var(--text-label)' }}>
+        <p style={{ fontSize: medida(t, 'texto'), fontWeight: grosorDe(t, 'texto'), color: tintaDe(t, 'texto') ?? 'var(--text-label)' }}>
           No hay ninguna programada.
         </p>
       ) : (
@@ -1258,9 +1303,9 @@ function Capacitaciones({ t }: { t: Tarjeta }) {
               <div className="w-1 rounded-full flex-shrink-0" style={{ background: c.fuerte, opacity: 0.45 }} />
               <div className="min-w-0">
                 <p className="font-semibold leading-snug"
-                  style={{ fontSize: medidaDe(t, 'texto'), fontWeight: grosorDe(t, 'texto'), color: tintaDe(t, 'titulo') ?? 'var(--text)' }}>{p.titulo}</p>
+                  style={{ fontSize: medida(t, 'texto'), fontWeight: grosorDe(t, 'texto'), color: tintaDe(t, 'titulo') ?? 'var(--text)' }}>{p.titulo}</p>
                 <p className="mt-0.5"
-                  style={{ fontSize: medidaDe(t, 'rotulo'), fontWeight: grosorDe(t, 'rotulo'), color: tintaDe(t, 'texto') ?? 'var(--text-label)' }}>
+                  style={{ fontSize: medida(t, 'rotulo'), fontWeight: grosorDe(t, 'rotulo'), color: tintaDe(t, 'texto') ?? 'var(--text-label)' }}>
                   {fecha(p.fecha)}{p.modalidad ? ` · ${p.modalidad}` : ''}{p.obligatoria ? ' · obligatoria' : ''}
                 </p>
               </div>
@@ -1278,19 +1323,19 @@ function Formacion({ t }: { t: Tarjeta }) {
   const pct: number | null = d.porcentaje ?? null
   return (
     <Caja t={t} color={c.fuerte}>
-      <Rotulo t={t} icono={GraduationCap} texto={t.titulo || 'Mi formación'}
-        color={tintaDe(t, 'rotulo') ?? 'var(--text-label)'} tam={medidaDe(t, 'rotulo')} />
+      <Rotulo t={t} pieza="titulo" icono={GraduationCap} texto={t.titulo || 'Mi formación'}
+        color={tintaDe(t, 'titulo') ?? 'var(--text-label)'} tam={medida(t, 'titulo')} />
       {pct == null ? (
-        <p style={{ fontSize: medidaDe(t, 'texto'), fontWeight: grosorDe(t, 'texto'), color: tintaDe(t, 'texto') ?? 'var(--text-label)' }}>
+        <p style={{ fontSize: medida(t, 'texto'), fontWeight: grosorDe(t, 'texto'), color: tintaDe(t, 'texto') ?? 'var(--text-label)' }}>
           Todavía no tiene cursos asignados.
         </p>
       ) : (
         <>
           <p className="font-extrabold tabular-nums leading-none"
-            style={{ fontSize: `calc(${medidaDe(t, 'numero')} * 0.42)`, fontWeight: grosorDe(t, 'numero'), color: tintaDe(t, 'numero') ?? 'var(--text)' }}>
+            style={{ fontSize: `calc(${medida(t, 'numero')} * 0.42)`, fontWeight: grosorDe(t, 'numero'), color: tintaDe(t, 'numero') ?? 'var(--text)' }}>
             {pct}% al día
           </p>
-          <p className="mt-1" style={{ fontSize: medidaDe(t, 'texto'), fontWeight: grosorDe(t, 'texto'), color: tintaDe(t, 'texto') ?? 'var(--text-label)' }}>
+          <p className="mt-1" style={{ fontSize: medida(t, 'texto'), fontWeight: grosorDe(t, 'texto'), color: tintaDe(t, 'texto') ?? 'var(--text-label)' }}>
             {d.pendientes === 0
               ? 'No tiene nada pendiente'
               : `${d.pendientes} ${d.pendientes === 1 ? 'curso pendiente' : 'cursos pendientes'} en SSTudio`}
@@ -1299,7 +1344,7 @@ function Formacion({ t }: { t: Tarjeta }) {
             <div className="h-full rounded-full" style={{ width: `${pct}%`, background: c.fuerte }} />
           </div>
           <Link href="/dashboard/my-plan" className="inline-flex items-center gap-1 font-semibold mt-3"
-            style={{ fontSize: medidaDe(t, 'rotulo'), fontWeight: grosorDe(t, 'rotulo'), color: c.fuerte }}>
+            style={{ fontSize: medida(t, 'rotulo'), fontWeight: grosorDe(t, 'rotulo'), color: c.fuerte }}>
             Ver mis cursos <ArrowRight size={13} />
           </Link>
         </>
@@ -1313,19 +1358,19 @@ function Pausa({ t }: { t: Tarjeta }) {
   const tam = tamanoDe(t)
   return (
     <Caja t={t} color={c.fuerte}>
-      <Rotulo t={t} icono={HeartPulse} texto={t.titulo || 'Pausa activa'}
-        color={tintaDe(t, 'rotulo') ?? 'var(--text-label)'} tam={medidaDe(t, 'rotulo')} />
+      <Rotulo t={t} pieza="titulo" icono={HeartPulse} texto={t.titulo || 'Pausa activa'}
+        color={tintaDe(t, 'titulo') ?? 'var(--text-label)'} tam={medida(t, 'titulo')} />
       {t.datos?.hora && (
         // La hora es el número de esta tarjeta, pero escrita: a escala plena
         // se desborda de la caja, así que va a poco menos de la mitad.
         <p className="font-extrabold tabular-nums leading-none"
-          style={{ fontSize: `calc(${medidaDe(t, 'numero')} * 0.42)`, fontWeight: grosorDe(t, 'numero'), color: tintaDe(t, 'numero') ?? c.fuerte }}>
+          style={{ fontSize: `calc(${medida(t, 'numero')} * 0.42)`, fontWeight: grosorDe(t, 'numero'), color: tintaDe(t, 'numero') ?? c.fuerte }}>
           {t.datos.hora}
         </p>
       )}
       {t.texto && (
         <p className="mt-1.5 leading-relaxed"
-          style={{ fontSize: medidaDe(t, 'texto'), fontWeight: grosorDe(t, 'texto'), color: tintaDe(t, 'texto') ?? 'var(--text-dim)' }}>{t.texto}</p>
+          style={{ fontSize: medida(t, 'texto'), fontWeight: grosorDe(t, 'texto'), color: tintaDe(t, 'texto') ?? 'var(--text-dim)' }}>{t.texto}</p>
       )}
     </Caja>
   )
@@ -1335,13 +1380,13 @@ function Epp({ t }: { t: Tarjeta }) {
   const items: string[] = Array.isArray(t.datos?.items) ? t.datos.items : []
   return (
     <Caja t={t} color={COLOR(t.color).fuerte}>
-      <Rotulo t={t} icono={HardHat} texto={t.titulo || 'EPP de hoy'}
-        color={tintaDe(t, 'rotulo') ?? 'var(--text-label)'} tam={medidaDe(t, 'rotulo')} />
+      <Rotulo t={t} pieza="titulo" icono={HardHat} texto={t.titulo || 'EPP de hoy'}
+        color={tintaDe(t, 'titulo') ?? 'var(--text-label)'} tam={medida(t, 'titulo')} />
       {items.length > 0 && (
         <div className="flex flex-wrap gap-1.5 mb-2">
           {items.map((it, i) => (
             <span key={i} className="px-2.5 py-1 rounded-lg font-semibold"
-              style={{ fontSize: medidaDe(t, 'texto'), fontWeight: grosorDe(t, 'texto'), background: 'var(--bg-card-hover)',
+              style={{ fontSize: medida(t, 'texto'), fontWeight: grosorDe(t, 'texto'), background: 'var(--bg-card-hover)',
                 color: tintaDe(t, 'texto') ?? 'var(--text-strong)', border: '1px solid var(--border)' }}>
               {it}
             </span>
@@ -1350,7 +1395,7 @@ function Epp({ t }: { t: Tarjeta }) {
       )}
       {t.texto && (
         <p className="leading-relaxed"
-          style={{ fontSize: medidaDe(t, 'texto'), fontWeight: grosorDe(t, 'texto'), color: tintaDe(t, 'texto') ?? 'var(--text-dim)' }}>{t.texto}</p>
+          style={{ fontSize: medida(t, 'texto'), fontWeight: grosorDe(t, 'texto'), color: tintaDe(t, 'texto') ?? 'var(--text-dim)' }}>{t.texto}</p>
       )}
     </Caja>
   )
@@ -1360,12 +1405,12 @@ function Reconocimiento({ t }: { t: Tarjeta }) {
   const c = COLOR(t.color ?? 'verde')
   return (
     <CajaColor color={c} t={t}>
-      <Rotulo t={t} icono={Award} texto="Reconocimiento" color={tintaDe(t, 'rotulo') ?? c.fuerte} tam={medidaDe(t, 'rotulo')} />
+      <Rotulo t={t} icono={Award} texto="Reconocimiento" color={tintaDe(t, 'rotulo') ?? c.fuerte} tam={medida(t, 'rotulo')} />
       <p className="font-bold leading-snug"
-        style={{ fontSize: medidaDe(t, 'texto'), fontWeight: grosorDe(t, 'texto'), color: tintaDe(t, 'titulo') ?? 'var(--text)' }}>{t.titulo}</p>
+        style={{ fontSize: medida(t, 'texto'), fontWeight: grosorDe(t, 'texto'), color: tintaDe(t, 'titulo') ?? 'var(--text)' }}>{t.titulo}</p>
       {t.texto && (
         <p className="mt-1.5 leading-relaxed"
-          style={{ fontSize: medidaDe(t, 'texto'), fontWeight: grosorDe(t, 'texto'), color: tintaDe(t, 'texto') ?? 'var(--text-dim)' }}>{t.texto}</p>
+          style={{ fontSize: medida(t, 'texto'), fontWeight: grosorDe(t, 'texto'), color: tintaDe(t, 'texto') ?? 'var(--text-dim)' }}>{t.texto}</p>
       )}
     </CajaColor>
   )
@@ -1382,12 +1427,15 @@ function Copasst({ t }: { t: Tarjeta }) {
           <Users size={19} color="#fff" />
         </div>
         <div className="flex-1 min-w-[200px]">
-          <p className="font-bold tracking-wider uppercase"
-            style={{ fontSize: medidaDe(t, 'rotulo'), fontWeight: grosorDe(t, 'rotulo'), color: tintaDe(t, 'rotulo') ?? c.fuerte }}>
-            {t.titulo || 'COPASST'}
-          </p>
+          {t.titulo && seVe(t, 'titulo') && (
+            <p className="font-bold tracking-wider uppercase"
+              style={{ fontSize: medida(t, 'titulo'), fontWeight: grosorDe(t, 'titulo'),
+                color: tintaDe(t, 'titulo') ?? c.fuerte }}>
+              {t.titulo}
+            </p>
+          )}
           <p className="font-bold mt-0.5 leading-snug"
-            style={{ fontSize: medidaDe(t, 'texto'), fontWeight: grosorDe(t, 'texto'), color: tintaDe(t, 'texto') ?? 'var(--text)' }}>{t.texto}</p>
+            style={{ fontSize: medida(t, 'texto'), fontWeight: grosorDe(t, 'texto'), color: tintaDe(t, 'texto') ?? 'var(--text)' }}>{t.texto}</p>
           <Iconos t={t} color={c.fuerte} />
         </div>
         {t.cta_texto && t.cta_url && (
@@ -1406,11 +1454,11 @@ function Nota({ t }: { t: Tarjeta }) {
   const c = COLOR(t.color)
   return (
     <Caja color={c.fuerte} franja t={t}>
-      <Rotulo t={t} icono={ShieldCheck} texto={t.titulo || 'Nota'}
-        color={tintaDe(t, 'rotulo') ?? 'var(--text-label)'} tam={medidaDe(t, 'rotulo')} />
+      <Rotulo t={t} pieza="titulo" icono={ShieldCheck} texto={t.titulo || 'Nota'}
+        color={tintaDe(t, 'titulo') ?? 'var(--text-label)'} tam={medida(t, 'titulo')} />
       {t.texto && (
         <p className="leading-relaxed"
-          style={{ fontSize: medidaDe(t, 'texto'), fontWeight: grosorDe(t, 'texto'), color: tintaDe(t, 'texto') ?? 'var(--text-dim)' }}>{t.texto}</p>
+          style={{ fontSize: medida(t, 'texto'), fontWeight: grosorDe(t, 'texto'), color: tintaDe(t, 'texto') ?? 'var(--text-dim)' }}>{t.texto}</p>
       )}
     </Caja>
   )

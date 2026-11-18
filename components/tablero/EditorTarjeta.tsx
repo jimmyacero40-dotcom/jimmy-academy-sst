@@ -7,10 +7,10 @@ import {
   DISPOSICIONES, PROPORCIONES, PALETA_TEXTO, PIEZAS_TEXTO, TAMANOS_ICONO, DONDE_TEXTO,
   diasDesde, anchoDe, ajusteDe, pictogramasDe,
   ordenDe, alineacionDe, disposicionDe, proporcionDe,
-  tamanoIconosDe, posicionIconosDe, ocultosDe, dondeTextoDe, nombrePieza,
+  tamanoIconosDe, posicionIconosDe, ocultosDe, dondeTextoDe, textosDe, nombreCampoTitulo,
   PX_MINIMO, PX_MAXIMO,
   type Tarjeta, type TipoTarjeta, type ColorTarjeta, type Ajuste, type Alto,
-  type Pieza, type Alineacion, type Tamano, type Aire,
+  type Pieza, type PiezaTexto, type Alineacion, type Tamano, type Aire,
   type Disposicion, type Proporcion,
 } from '@/lib/tablero'
 import { comprimirImagen } from '@/lib/comprimir-imagen'
@@ -44,6 +44,12 @@ export function EditorTarjeta({ tarjeta, opciones, onGuardar, onCerrar }: {
   const meta = TIPO(tarjeta.tipo)
   const tiene = (campo: string) => meta.campos.includes(campo)
 
+  // Los textos que esta tarjeta tiene de verdad, con el nombre que les
+  // corresponde aquí. El editor mostraba los cuatro siempre, incluidos los que
+  // no movían nada.
+  const textos = textosDe(tarjeta.tipo)
+  const [pieza, setPieza] = useState<PiezaTexto>(textos[0].pieza)
+
   const [f, setF] = useState({
     nombre: (tarjeta.datos?.nombre ?? '') as string,
     ocultos: ocultosDe(tarjeta),
@@ -75,6 +81,7 @@ export function EditorTarjeta({ tarjeta, opciones, onGuardar, onCerrar }: {
     negritas: (tarjeta.datos?.negritas ?? {}) as Record<string, boolean | null>,
     leyenda: (tarjeta.datos?.leyenda ?? '') as string,
     dondeTexto: dondeTextoDe(tarjeta) as string,
+    pieArriba: tarjeta.datos?.pieArriba === true,
     grosorLinea: (Number(tarjeta.datos?.grosorLinea) || 2) as number,
     estiloLinea: (tarjeta.datos?.estiloLinea ?? 'solida') as string,
     tamano: (tarjeta.datos?.tamano ?? 'normal') as Tamano,
@@ -179,7 +186,7 @@ export function EditorTarjeta({ tarjeta, opciones, onGuardar, onCerrar }: {
     datos.tamanos = f.tamanos
     datos.px = f.px
     if (tiene('leyenda')) datos.leyenda = f.leyenda
-    if (tarjeta.tipo === 'contador') datos.dondeTexto = f.dondeTexto
+    if (tarjeta.tipo === 'contador') { datos.dondeTexto = f.dondeTexto; datos.pieArriba = f.pieArriba }
     datos.negritas = f.negritas
     if (tarjeta.tipo === 'separador') {
       datos.grosorLinea = f.grosorLinea
@@ -219,7 +226,7 @@ export function EditorTarjeta({ tarjeta, opciones, onGuardar, onCerrar }: {
             placeholder={meta.nombre} style={estiloCampo} />
         </Campo>
 
-        <Campo etiqueta={meta.automatica ? 'Rótulo de la tarjeta' : 'Título'}
+        <Campo etiqueta={nombreCampoTitulo(tarjeta.tipo)}
           nota="Esto sí lo lee el trabajador. Déjelo vacío si no quiere que salga.">
           <input value={f.titulo} onChange={e => set('titulo', e.target.value)} style={estiloCampo} />
         </Campo>
@@ -415,48 +422,65 @@ export function EditorTarjeta({ tarjeta, opciones, onGuardar, onCerrar }: {
           </Campo>
         </div>
 
-        <Campo etiqueta="Tamaño y grosor de cada texto"
-          nota="Escriba los píxeles, o deje vacío para seguir el tamaño de arriba.">
-          <div className="rounded-xl p-2.5 space-y-1.5" style={{ background: 'var(--bg-card-hover)' }}>
-            {PIEZAS_TEXTO.map(pt => {
-              const negrita = f.negritas[pt.id]
-              return (
-                <div key={pt.id} className="flex items-center gap-2 flex-wrap">
-                  <span className="text-[11.5px] font-bold w-[86px] flex-shrink-0"
-                    style={{ color: 'var(--text-dim)' }}>{nombrePieza(tarjeta.tipo, pt.id)}</span>
-                  <input type="number" min={PX_MINIMO} max={PX_MAXIMO} placeholder="auto"
-                    value={f.px[pt.id] ?? ''}
-                    onChange={e => {
-                      const v = e.target.value.trim()
-                      set('px', { ...f.px, [pt.id]: v === '' ? null : Number(v) })
-                    }}
-                    style={{ ...estiloCampo, width: 76, padding: '5px 8px', fontSize: 13 }} />
-                  <span className="text-[11px]" style={{ color: 'var(--text-faint)' }}>px</span>
-                  <div className="flex gap-1">
-                    {[
-                      { id: null, texto: 'Auto' },
-                      { id: true, texto: 'Negrilla' },
-                      { id: false, texto: 'Normal' },
-                    ].map(o => {
-                      const on = negrita === o.id
-                      return (
-                        <button key={String(o.id)}
-                          onClick={() => set('negritas', { ...f.negritas, [pt.id]: o.id })}
-                          className="px-2 py-1 rounded-md text-[11.5px]"
-                          style={{
-                            fontWeight: o.id === true ? 800 : 600,
-                            background: on ? 'var(--primary-dim)' : 'var(--bg-surface)',
-                            color: on ? 'var(--primary-dark)' : 'var(--text-faint)',
-                            border: `1px solid ${on ? 'var(--primary-border)' : 'var(--border)'}`,
-                          }}>
-                          {o.texto}
-                        </button>
-                      )
-                    })}
-                  </div>
-                </div>
-              )
-            })}
+        {/* Un solo sitio por texto: se escoge cuál se está editando y debajo
+            salen todas sus propiedades. Antes el tamaño estaba en un bloque y
+            el color en otro, y había que acordarse de cuál renglón era cuál. */}
+        <Campo etiqueta="Formato del texto" nota="Escoja qué texto quiere cambiar.">
+          <div className="rounded-xl overflow-hidden" style={{ border: '1px solid var(--border)' }}>
+            <div className="flex flex-wrap gap-1 p-2" style={{ background: 'var(--bg-card-hover)' }}>
+              {textos.map(tx => {
+                const on = pieza === tx.pieza
+                return (
+                  <button key={tx.pieza} onClick={() => setPieza(tx.pieza)}
+                    className="px-2.5 py-1.5 rounded-lg text-[12px] font-bold"
+                    style={{
+                      background: on ? 'var(--bg-surface)' : 'transparent',
+                      color: on ? 'var(--primary-dark)' : 'var(--text-dim)',
+                      border: `1px solid ${on ? 'var(--primary-border)' : 'transparent'}`,
+                      boxShadow: on ? '0 1px 2px rgba(15,23,42,.08)' : undefined,
+                    }}>
+                    {tx.nombre}
+                  </button>
+                )
+              })}
+            </div>
+
+            <div className="p-3 space-y-2.5" style={{ background: 'var(--bg-surface)' }}>
+              <div className="flex items-center gap-2 flex-wrap">
+                <span className="text-[11.5px] font-bold w-[52px]" style={{ color: 'var(--text-dim)' }}>Tamaño</span>
+                <input type="number" min={PX_MINIMO} max={PX_MAXIMO} placeholder="auto"
+                  value={f.px[pieza] ?? ''}
+                  onChange={e => {
+                    const v = e.target.value.trim()
+                    set('px', { ...f.px, [pieza]: v === '' ? null : Number(v) })
+                  }}
+                  style={{ ...estiloCampo, width: 76, padding: '5px 8px', fontSize: 13 }} />
+                <span className="text-[11px] mr-1" style={{ color: 'var(--text-faint)' }}>px</span>
+                {[
+                  { id: null, texto: 'Auto' },
+                  { id: true, texto: 'Negrilla' },
+                  { id: false, texto: 'Normal' },
+                ].map(o => {
+                  const on = f.negritas[pieza] === o.id
+                  return (
+                    <button key={String(o.id)}
+                      onClick={() => set('negritas', { ...f.negritas, [pieza]: o.id })}
+                      className="px-2.5 py-1 rounded-md text-[11.5px]"
+                      style={{
+                        fontWeight: o.id === true ? 800 : 600,
+                        background: on ? 'var(--primary-dim)' : 'var(--bg-card-hover)',
+                        color: on ? 'var(--primary-dark)' : 'var(--text-faint)',
+                        border: `1px solid ${on ? 'var(--primary-border)' : 'var(--border)'}`,
+                      }}>
+                      {o.texto}
+                    </button>
+                  )
+                })}
+              </div>
+
+              <Paleta nombre="Color" valor={f.tintas[pieza] ?? null}
+                onElegir={v => set('tintas', { ...f.tintas, [pieza]: v })} />
+            </div>
           </div>
         </Campo>
 
@@ -494,13 +518,28 @@ export function EditorTarjeta({ tarjeta, opciones, onGuardar, onCerrar }: {
           </Campo>
         )}
 
+        {tarjeta.tipo === 'contador' && (
+          <Campo etiqueta="La meta y la nota" nota="La barra de la meta y el renglón de abajo.">
+            <Botones valor={f.pieArriba} onElegir={v => set('pieArriba', v)}
+              opciones={[{ id: false, texto: 'Debajo del número' }, { id: true, texto: 'Encima del número' }]} />
+          </Campo>
+        )}
+
         <Campo etiqueta="Qué se ve" nota="Lo que apague desaparece de la tarjeta, y su espacio también.">
           <div className="flex gap-1.5 flex-wrap">
-            {(['rotulo', 'etiqueta', 'titulo', 'texto', 'imagen', 'iconos', 'boton'] as const).map(pz => {
+            {/* Solo las piezas que esta tarjeta tiene. Antes salían las siete
+                siempre, y apagar una que no existía no hacía nada. */}
+            {([
+              ...textos.map(x => x.pieza as string),
+              ...(tarjeta.tipo === 'anuncio' ? ['etiqueta'] : []),
+              ...(tiene('imagen') ? ['imagen'] : []),
+              'iconos',
+              ...(tiene('cta') ? ['boton'] : []),
+            ]).map(pz => {
               const on = !f.ocultos.includes(pz)
               const nombres: Record<string, string> = {
-                rotulo: 'Rótulo', etiqueta: 'Etiqueta', titulo: 'Título', texto: 'Descripción',
-                imagen: 'Imagen', iconos: 'Pictogramas', boton: 'Botón',
+                ...Object.fromEntries(textos.map(x => [x.pieza, x.nombre])),
+                etiqueta: 'Etiqueta', imagen: 'Imagen', iconos: 'Pictogramas', boton: 'Botón',
               }
               return (
                 <button key={pz} aria-pressed={on}
@@ -522,15 +561,10 @@ export function EditorTarjeta({ tarjeta, opciones, onGuardar, onCerrar }: {
           </div>
         </Campo>
 
-        <Campo etiqueta="Colores del texto"
-          nota="«Todo» pinta la tarjeta entera; los demás, solo ese texto.">
-          <div className="rounded-xl p-2.5 space-y-2" style={{ background: 'var(--bg-card-hover)' }}>
-            <Paleta nombre="Todo el texto" valor={f.colorTexto}
-              onElegir={v => set('colorTexto', v)} />
-            {PIEZAS_TEXTO.map(pt => (
-              <Paleta key={pt.id} nombre={nombrePieza(tarjeta.tipo, pt.id)} valor={f.tintas[pt.id] ?? null}
-                onElegir={v => set('tintas', { ...f.tintas, [pt.id]: v })} />
-            ))}
+        <Campo etiqueta="Color de todo el texto"
+          nota="El de abajo; cada texto puede llevar el suyo encima de este.">
+          <div className="rounded-xl p-2.5" style={{ background: 'var(--bg-card-hover)' }}>
+            <Paleta nombre="Toda la tarjeta" valor={f.colorTexto} onElegir={v => set('colorTexto', v)} />
           </div>
         </Campo>
 
