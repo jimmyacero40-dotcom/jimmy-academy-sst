@@ -17,15 +17,25 @@ export async function GET(_req: NextRequest, { params }: { params: { id: string 
 
   if (userErr || !user) return NextResponse.json({ error: 'Usuario no encontrado' }, { status: 404 })
 
-  // Fetch enrollments with training info
-  const { data: enrollments } = await supabase
+  // Las capacitaciones de la persona.
+  //
+  // Se trae el estado de la ronda para poder descartar las canceladas: cancelar
+  // una ronda no borra las inscripciones, así que una capacitación que el
+  // administrador ya quitó seguía apareciendo en la hoja de vida del trabajador
+  // como si estuviera pendiente. Es el mismo filtro que ya tiene Trazabilidad.
+  const { data: todas } = await supabase
     .from('enrollments')
     .select(`
       id, status, due_date, started_at, completed_at, score, created_at,
-      trainings(id, title, category, duration)
+      trainings(id, title, category, duration),
+      plan_items(estado)
     `)
     .eq('user_id', userId)
     .order('created_at', { ascending: false })
+
+  const enrollments = (todas ?? [])
+    .filter((e: any) => e.plan_items?.estado !== 'cancelada')
+    .map(({ plan_items, ...resto }: any) => resto)
 
   // Fetch certificates
   const { data: certificates } = await supabase
@@ -51,7 +61,7 @@ export async function GET(_req: NextRequest, { params }: { params: { id: string 
 
   return NextResponse.json({
     user,
-    enrollments: enrollments ?? [],
+    enrollments,
     certificates: certificates ?? [],
     groups,
     workerProfile: workerProfile ?? null,

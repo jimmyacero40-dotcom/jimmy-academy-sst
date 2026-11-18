@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { supabaseAdmin as supabase } from '@/lib/supabase-admin'
 import { requierePermiso } from '@/lib/get-company'
 import { anotar } from '@/lib/auditoria-plan'
-import { enviarCorreo, correoConfigurado, plantillaCapacitacion } from '@/lib/correo'
+import { enviarCorreo, correoConfigurado, plantillaCapacitacion, direccionDe } from '@/lib/correo'
 import { estaAbierta } from '@/lib/vigencia'
 
 // ─── Asignar una capacitación a personas concretas ────────────────────
@@ -43,7 +43,7 @@ async function avisarDeNuevas(
 
   const [{ data: filas }, { data: curso }, { data: item }] = await Promise.all([
     supabase.from('enrollments')
-      .select('id, due_date, users(name, correo)').in('id', enrollmentIds),
+      .select('id, due_date, users(name, correo, worker_profiles(email_personal))').in('id', enrollmentIds),
     supabase.from('trainings').select('title, duration').eq('id', trainingId).maybeSingle(),
     itemId
       ? supabase.from('plan_items').select('scheduled_date, modalidad').eq('id', itemId).maybeSingle()
@@ -60,7 +60,7 @@ async function avisarDeNuevas(
       duracion: curso?.duration ?? null,
       modalidad: item?.modalidad ?? null,
     })
-    const r = await enviarCorreo(f.users?.correo ?? '', asunto, html)
+    const r = await enviarCorreo(direccionDe(f.users), asunto, html)
     if (r.enviado) enviados++
     else fallos.push({ nombre: f.users?.name ?? '', motivo: r.motivo ?? 'No se pudo enviar' })
     await supabase.from('enrollments').update({
@@ -400,7 +400,7 @@ export async function PATCH(req: NextRequest) {
   // Siempre sobre inscripciones de la empresa activa.
   const { data: filas } = await supabase
     .from('enrollments')
-    .select('id, user_id, training_id, plan_item_id, status, due_date, created_at, score, started_at, completed_at, users(name, correo)')
+    .select('id, user_id, training_id, plan_item_id, status, due_date, created_at, score, started_at, completed_at, users(name, correo, worker_profiles(email_personal))')
     .in('id', ids).eq('company_id', companyId)
   if (!filas?.length) return NextResponse.json({ error: 'No se encontraron esas asignaciones' }, { status: 404 })
 
@@ -493,7 +493,7 @@ export async function PATCH(req: NextRequest) {
         modalidad: item?.modalidad ?? null,
         recordatorio,
       })
-      const r = await enviarCorreo(f.users?.correo ?? '', asunto, html)
+      const r = await enviarCorreo(direccionDe(f.users), asunto, html)
       if (r.enviado) enviados++
       else fallos.push({ nombre: f.users?.name ?? '', motivo: r.motivo ?? 'No se pudo enviar' })
       await supabase.from('enrollments').update({
@@ -580,7 +580,7 @@ export async function GET(req: NextRequest) {
   if (itemId) {
     const { data, error } = await supabase
       .from('enrollments')
-      .select('id, user_id, status, created_at, due_date, completed_at, score, asistencia, asistencia_nota, asistencia_at, notificado_at, notificacion_error, users(id, name, cedula, cargo, correo, areas(name))')
+      .select('id, user_id, status, created_at, due_date, completed_at, score, asistencia, asistencia_nota, asistencia_at, notificado_at, notificacion_error, users(id, name, cedula, cargo, correo, areas(name), worker_profiles(email_personal))')
       .eq('plan_item_id', itemId)
       .eq('company_id', companyId)
     if (error) return NextResponse.json({ error: error.message }, { status: 500 })
@@ -600,7 +600,7 @@ export async function GET(req: NextRequest) {
       name: e.users?.name ?? '',
       cedula: e.users?.cedula ?? '',
       cargo: e.users?.cargo ?? '',
-      correo: e.users?.correo ?? '',
+      correo: direccionDe(e.users),
       area: e.users?.areas?.name ?? '',
     })))
   }

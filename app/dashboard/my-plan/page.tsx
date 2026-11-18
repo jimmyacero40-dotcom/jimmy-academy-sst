@@ -12,6 +12,8 @@ import {
 interface Enrollment {
   id: string
   status: 'pending' | 'in_progress' | 'completed' | 'expired'
+  progreso?: number | null
+  progreso_total?: number | null
   due_date: string | null
   started_at: string | null
   completed_at: string | null
@@ -332,6 +334,11 @@ function CourseCard({ enrollment: e, index, gradIndex, onStart, onCert }: {
   const isDone    = e.status === 'completed'
   const isExpired = e.status === 'expired'
   const isActive  = e.status === 'in_progress'
+  // Sin total guardado no se puede sacar porcentaje: se dice «Empezada» en vez
+  // de inventar una cifra, que es lo que hacía la versión anterior.
+  const avance = e.progreso && e.progreso_total
+    ? Math.min(100, Math.round((e.progreso / e.progreso_total) * 100))
+    : null
   const grad = CARD_ACCENT_COLORS[gradIndex % CARD_ACCENT_COLORS.length]
   const hasCover  = e.trainings.cover_url && e.trainings.cover_url.startsWith('http')
 
@@ -408,15 +415,21 @@ function CourseCard({ enrollment: e, index, gradIndex, onStart, onCert }: {
           {e.trainings.title}
         </h3>
 
-        {/* Progress bar (in_progress) */}
+        {/* Por dónde va.
+            La barra estaba escrita en 35 % a mano: marcaba lo mismo para quien
+            acababa de empezar que para quien iba en la última diapositiva. */}
         {isActive && (
           <div className="mb-3">
             <div className="h-1.5 rounded-full overflow-hidden"
               style={{ background: 'var(--border)' }}>
               <div className="h-full rounded-full"
-                style={{ width: '35%', background: 'linear-gradient(90deg, var(--primary), #60A5FA)' }} />
+                style={{ width: `${avance ?? 4}%`, background: 'linear-gradient(90deg, var(--primary), #60A5FA)' }} />
             </div>
-            <p className="text-[10px] mt-1" style={{ color: 'var(--text-faint)' }}>En progreso</p>
+            <p className="text-[10px] mt-1" style={{ color: 'var(--text-faint)' }}>
+              {avance === null
+                ? 'Empezada'
+                : `Diapositiva ${e.progreso} de ${e.progreso_total} · ${avance}%`}
+            </p>
           </div>
         )}
 

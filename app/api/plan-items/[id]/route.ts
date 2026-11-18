@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { supabaseAdmin as supabase } from '@/lib/supabase-admin'
 import { requierePermiso } from '@/lib/get-company'
 import { anotar } from '@/lib/auditoria-plan'
-import { enviarCorreo, correoConfigurado, plantillaCapacitacion } from '@/lib/correo'
+import { enviarCorreo, correoConfigurado, plantillaCapacitacion, direccionDe } from '@/lib/correo'
 
 // ─── Acciones sobre una capacitación del plan ─────────────────────────
 // Cancelarla, y el rastro de lo que se le ha hecho.
@@ -62,7 +62,7 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
     if (body.notificar === true) {
       const { data: inscritos } = await supabase
         .from('enrollments')
-        .select('id, users(name, correo)')
+        .select('id, users(name, correo, worker_profiles(email_personal))')
         .eq('plan_item_id', params.id).neq('status', 'completed')
 
       for (const e of (inscritos ?? []) as any[]) {
@@ -75,7 +75,7 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
             <p style="color:#6B7280"><b>Motivo:</b> ${motivo}</p>
             <p style="font-size:13px;color:#6B7280">Le avisaremos cuando se reprograme.</p>
           </div>`
-        const r = await enviarCorreo(e.users?.correo ?? '', `Capacitación cancelada: ${item.trainings?.title ?? ''}`, html)
+        const r = await enviarCorreo(direccionDe(e.users), `Capacitación cancelada: ${item.trainings?.title ?? ''}`, html)
         if (r.enviado) enviados++
         else fallos.push({ nombre: e.users?.name ?? '', motivo: r.motivo ?? 'No se pudo enviar' })
       }
@@ -108,7 +108,7 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
     const fallos: { nombre: string; motivo: string }[] = []
     if (body.notificar === true) {
       const { data: inscritos } = await supabase
-        .from('enrollments').select('id, users(name, correo)')
+        .from('enrollments').select('id, users(name, correo, worker_profiles(email_personal))')
         .eq('plan_item_id', params.id).neq('status', 'completed')
       for (const e of (inscritos ?? []) as any[]) {
         const { asunto, html } = plantillaCapacitacion({
@@ -117,7 +117,7 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
           fecha, duracion: item.trainings?.duration ?? null, modalidad: item.modalidad,
           recordatorio: true,
         })
-        const r = await enviarCorreo(e.users?.correo ?? '', `Nueva fecha · ${asunto}`, html)
+        const r = await enviarCorreo(direccionDe(e.users), `Nueva fecha · ${asunto}`, html)
         if (r.enviado) enviados++
         else fallos.push({ nombre: e.users?.name ?? '', motivo: r.motivo ?? 'No se pudo enviar' })
       }

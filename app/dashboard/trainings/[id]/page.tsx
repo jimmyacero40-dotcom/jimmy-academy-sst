@@ -397,16 +397,86 @@ export default function TrainingDetailPage() {
     loadTraining()
   }, [courseId])
 
-  // Workers: validate this training is in their assigned enrollments
+  // La inscripción del trabajador en ESTE curso: de ahí sale por dónde iba y
+  // ahí se guarda por dónde va.
+  const [inscripcion, setInscripcion] = useState<{ id: string; progreso: number } | null>(null)
+  const [retomar, setRetomar] = useState<number | null>(null)
+
   useEffect(() => {
     if (!isWorker || !courseId) return
     fetch('/api/enrollments')
       .then(r => r.ok ? r.json() : [])
       .then((enrs: any[]) => {
-        const assigned = enrs.some((e: any) => e.trainings?.id === courseId)
-        if (!assigned) router.replace('/dashboard/my-plan')
+        const mia = enrs.find((e: any) => e.trainings?.id === courseId)
+        if (!mia) { router.replace('/dashboard/my-plan'); return }
+        setInscripcion({ id: mia.id, progreso: Number(mia.progreso) || 0 })
+        // No se salta solo: se ofrece. Retomar sin avisar deja a alguien que
+        // quería repasar desde el principio en mitad del curso sin saber por qué.
+        if ((Number(mia.progreso) || 0) > 1 && mia.status !== 'completed') {
+          setRetomar(Number(mia.progreso))
+        } else {
+          setPuedeGuardar(true)
+        }
       })
   }, [isWorker, courseId])
+
+  /**
+   * Mientras se pregunta si retoma, no se guarda nada.
+   *
+   * El curso abre siempre en la primera diapositiva, así que el guardado
+   * automático escribía «va en la 1» antes de que el trabajador alcanzara a
+   * responder, y se perdía justo la posición que se le estaba ofreciendo.
+   */
+  const [puedeGuardar, setPuedeGuardar] = useState(false)
+
+  /**
+   * Guarda por dónde va.
+   *
+   * Se espera un momento antes de escribir: pasar diez diapositivas seguidas
+   * mandaría diez escrituras, y solo importa la última.
+   */
+  const relojProgreso = useRef<ReturnType<typeof setTimeout> | null>(null)
+  useEffect(() => {
+    if (!inscripcion || !puedeGuardar || phase !== 'slides' || !slideCount) return
+    if (relojProgreso.current) clearTimeout(relojProgreso.current)
+    relojProgreso.current = setTimeout(() => {
+      fetch(`/api/enrollments/${inscripcion.id}`, {
+        method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ progreso: currentSlide + 1, progreso_total: slideCount }),
+      }).catch(() => {})
+    }, 900)
+    return () => { if (relojProgreso.current) clearTimeout(relojProgreso.current) }
+  }, [currentSlide, slideCount, phase, inscripcion, puedeGuardar])
+
+  // Al cerrar la pestaña o recargar, el navegador pregunta. Lo que no se puede
+  // es guardar en ese momento: la petición no alcanza a salir.
+  useEffect(() => {
+    if (!inscripcion || phase === 'certificate') return
+    const avisar = (e: BeforeUnloadEvent) => { e.preventDefault(); e.returnValue = '' }
+    window.addEventListener('beforeunload', avisar)
+    return () => window.removeEventListener('beforeunload', avisar)
+  }, [inscripcion, phase])
+
+  const [confirmarSalida, setConfirmarSalida] = useState(false)
+
+  /** Salir. Si quedó a medias, se pregunta antes y se guarda dónde iba. */
+  const salir = () => {
+    const aMedias = !!inscripcion && phase !== 'certificate' && phase !== 'result'
+    if (aMedias) { setConfirmarSalida(true); return }
+    router.push(backPath)
+  }
+
+  const salirDeVerdad = async () => {
+    if (inscripcion && phase === 'slides' && puedeGuardar) {
+      // Se espera a que quede guardado: si se navega antes, la petición se
+      // cancela y el trabajador vuelve a empezar donde estaba la vez pasada.
+      await fetch(`/api/enrollments/${inscripcion.id}`, {
+        method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ progreso: currentSlide + 1, progreso_total: slideCount }),
+      }).catch(() => {})
+    }
+    router.push(backPath)
+  }
 
   useEffect(() => {
     if (phase === 'slides' && slideCount > 0 && !slideCacheRef.current[currentSlide]) {
@@ -620,10 +690,38 @@ export default function TrainingDetailPage() {
 
   return (
     <div className="p-4 sm:p-6 max-w-6xl mx-auto">
+
+      {/* ── Retomar donde quedó ── */}
+      {retomar !== null && (
+        <Aviso
+          titulo="Quedó a medias la vez pasada"
+          cuerpo={`Iba en la diapositiva ${retomar} de ${slideCount}. ¿Sigue desde ahí o empieza de nuevo?`}
+          aceptar={`Seguir en la ${retomar}`}
+          cancelar="Empezar de nuevo"
+          onAceptar={() => { goToSlide(Math.min(retomar - 1, slideCount - 1)); setRetomar(null); setPuedeGuardar(true) }}
+          onCancelar={() => { setRetomar(null); setPuedeGuardar(true) }}
+        />
+      )}
+
+      {/* ── Confirmar la salida ── */}
+      {confirmarSalida && (
+        <Aviso
+          titulo="¿Salir sin terminar?"
+          cuerpo={phase === 'slides'
+            ? `Va en la diapositiva ${currentSlide + 1} de ${slideCount}. Se guarda por dónde va y puede seguir después desde ahí.`
+            : 'La capacitación no está terminada. Si sale ahora, tendrá que volver a hacer la evaluación.'}
+          aceptar="Sí, salir"
+          cancelar="Seguir aquí"
+          onAceptar={salirDeVerdad}
+          onCancelar={() => setConfirmarSalida(false)}
+          peligro
+        />
+      )}
+
       {/* Header */}
       <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} className="mb-5">
         <div className="flex items-center gap-3 mb-3">
-          <button onClick={() => router.push(backPath)}
+          <button onClick={salir}
             className="p-2 rounded-xl border transition-all hover:bg-white/5"
             style={{ borderColor: 'var(--border)', color: 'var(--text-dim)' }}>
             <ChevronLeft size={18} />
@@ -1074,6 +1172,44 @@ export default function TrainingDetailPage() {
           </div>
         </motion.div>
       )}
+    </div>
+  )
+}
+
+/**
+ * Un aviso de dos botones, centrado sobre la pantalla.
+ *
+ * No se cierra picando afuera: aparece cuando hay algo que perder, y un clic
+ * descuidado no debería decidirlo.
+ */
+function Aviso({ titulo, cuerpo, aceptar, cancelar, onAceptar, onCancelar, peligro }: {
+  titulo: string
+  cuerpo: string
+  aceptar: string
+  cancelar: string
+  onAceptar: () => void
+  onCancelar: () => void
+  peligro?: boolean
+}) {
+  return (
+    <div className="fixed inset-0 z-[70] flex items-center justify-center p-4"
+      style={{ background: 'rgba(8,16,36,0.6)' }}>
+      <div role="dialog" aria-modal="true" aria-label={titulo}
+        className="w-full max-w-sm rounded-2xl p-5"
+        style={{ background: 'var(--bg-surface)', boxShadow: '0 24px 60px rgba(11,23,54,0.35)' }}>
+        <p className="text-base font-black" style={{ color: 'var(--text)' }}>{titulo}</p>
+        <p className="text-[13px] mt-2 leading-relaxed" style={{ color: 'var(--text-dim)' }}>{cuerpo}</p>
+        <div className="flex gap-2 justify-end mt-5">
+          <button onClick={onCancelar} className="px-4 py-2.5 rounded-xl text-sm font-semibold"
+            style={{ border: '1px solid var(--border)', color: 'var(--text-dim)' }}>
+            {cancelar}
+          </button>
+          <button onClick={onAceptar} className="px-4 py-2.5 rounded-xl text-sm font-bold"
+            style={{ background: peligro ? '#DC2626' : 'var(--primary)', color: '#fff' }}>
+            {aceptar}
+          </button>
+        </div>
+      </div>
     </div>
   )
 }

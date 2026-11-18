@@ -11,7 +11,7 @@ export async function GET() {
     const { data, error } = await supabase
       .from('enrollments')
       .select(`
-        id, status, due_date, started_at, completed_at, score, created_at,
+        id, status, due_date, started_at, completed_at, score, created_at, progreso, progreso_total,
         trainings(id, title, description, duration, cover_url, category),
         plan_items(estado)
       `)
@@ -35,7 +35,7 @@ export async function GET() {
   let query = supabase
     .from('enrollments')
     .select(`
-      id, status, due_date, started_at, completed_at, score, created_at,
+      id, status, due_date, started_at, completed_at, score, created_at, progreso, progreso_total,
       users(id, name, email, cedula, area),
       trainings(id, title, duration),
       plan_items(estado)

@@ -11,6 +11,31 @@ import nodemailer, { type Transporter } from 'nodemailer'
 
 export interface Envio { enviado: boolean; motivo?: string }
 
+/**
+ * A qué dirección se le escribe a una persona.
+ *
+ * Hay dos sitios donde puede estar: `users.correo`, que llena quien administra
+ * al crear la cuenta, y `worker_profiles.email_personal`, que llena el
+ * trabajador en su propia ficha. Los avisos leían solo el primero, así que
+ * quien escribió su correo en la ficha —que es lo que la plataforma le pide
+ * hacer— seguía sin recibir nada, y el sistema anotaba «no tiene correo
+ * registrado» cuando sí lo tenía.
+ *
+ * Manda el de la cuenta si lo hay; si no, el de la ficha.
+ */
+export function direccionDe(persona: {
+  correo?: string | null
+  worker_profiles?: { email_personal?: string | null } | { email_personal?: string | null }[] | null
+  email_personal?: string | null
+} | null | undefined): string {
+  if (!persona) return ''
+  const deLaCuenta = (persona.correo ?? '').trim()
+  if (deLaCuenta) return deLaCuenta
+
+  const ficha = Array.isArray(persona.worker_profiles) ? persona.worker_profiles[0] : persona.worker_profiles
+  return ((ficha?.email_personal ?? persona.email_personal) ?? '').trim()
+}
+
 function porGmail(): boolean {
   return !!(process.env.CORREO_USUARIO && process.env.CORREO_CLAVE)
 }
