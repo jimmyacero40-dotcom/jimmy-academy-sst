@@ -13,7 +13,8 @@ import {
   COLOR, TIPO, anchoDe, ajusteDe, altoDe, pictogramasDe,
   ordenDe, alineacionDe, tamanoDe, aireDe,
   disposicionDe, proporcionDe, colorTextoDe, tintaDe, nombreDe, seVe,
-  medidaDe, medidaComo, medida, grosorDe, dondeTextoDe, leyendaDe,
+  medidaDe, medidaComo, medida, grosorDe, dondeTextoDe, leyendaDe, esElastica,
+  columnaInicial, fuenteDe,
   posicionIconosDe, tamanoIconosDe,
   ALTO_MINIMO, ALTO_MAXIMO,
   type Tarjeta, type TipoTarjeta,
@@ -47,7 +48,12 @@ const Diseno = createContext<{
   bloquear: (b: boolean) => void
   /** Enciende las rayas de las columnas mientras se ensancha una tarjeta. */
   guias: (b: boolean) => void
-}>({ activo: false, guardarAlto: () => {}, guardarIconos: () => {}, bloquear: () => {}, guias: () => {} })
+  /** Las rayas horizontales: las alturas de las demás tarjetas. */
+  guiasAlto: (g: { desde: number; altos: number[]; pegada: number | null } | null) => void
+}>({
+  activo: false, guardarAlto: () => {}, guardarIconos: () => {},
+  bloquear: () => {}, guias: () => {}, guiasAlto: () => {},
+})
 
 export default function InicioPage() {
   const { esAdmin } = useRol()
@@ -65,6 +71,7 @@ export default function InicioPage() {
   const [separacion, setSeparacion] = useState(16)
   const [bloqueado, setBloqueado] = useState(false)
   const [guiando, setGuiando] = useState(false)
+  const [rayasAlto, setRayasAlto] = useState<{ desde: number; altos: number[]; pegada: number | null } | null>(null)
 
   const cargar = (conTodas = diseñando) =>
     fetch(`/api/tablero${conTodas ? '?todas=1' : ''}`)
@@ -192,7 +199,7 @@ export default function InicioPage() {
   }
 
   return (
-    <Diseno.Provider value={{ activo: diseñando, guardarAlto, guardarIconos, bloquear: setBloqueado, guias: setGuiando }}>
+    <Diseno.Provider value={{ activo: diseñando, guardarAlto, guardarIconos, bloquear: setBloqueado, guias: setGuiando, guiasAlto: setRayasAlto }}>
     <div className="space-y-5 pb-10">
       {/* Sin encabezado: la fecha y el subtítulo ocupaban dos renglones que no
           decían nada que el tablero no dijera mejor. El espacio es del
@@ -256,6 +263,7 @@ export default function InicioPage() {
       ) : (
         <div className="tablero-rejilla relative" style={{ '--tablero-aire': `${separacion}px` } as any}>
           {guiando && <Guias />}
+          {rayasAlto && <GuiasAlto g={rayasAlto} />}
           {tarjetas.map((t, i) => (
             <EnElTablero
               key={t.id} t={t} indice={i} total={tarjetas.length}
@@ -295,16 +303,22 @@ export default function InicioPage() {
            contenido en vertical, en lugar de dejarlo pegado arriba. */
         .tablero-estirar { display: flex; flex-direction: column; }
         .tablero-estirar > * { flex: 1; display: flex; flex-direction: column; justify-content: center; }
-        .tablero-ancho-1 { grid-column: span 1; }
-        .tablero-ancho-2 { grid-column: span 2; }
-        .tablero-ancho-3 { grid-column: span 3; }
+        .tablero-rejilla > [data-col="1"] { grid-column-start: 1; }
+        .tablero-rejilla > [data-col="2"] { grid-column-start: 2; }
+        .tablero-rejilla > [data-col="3"] { grid-column-start: 3; }
+        .tablero-ancho-1 { grid-column-end: span 1; }
+        .tablero-ancho-2 { grid-column-end: span 2; }
+        .tablero-ancho-3 { grid-column-end: span 3; }
         @media (max-width: 1100px) {
           .tablero-rejilla { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-          .tablero-ancho-3 { grid-column: span 2; }
+          .tablero-ancho-3 { grid-column-end: span 2; }
+          .tablero-rejilla > [data-col="3"] { grid-column-start: 2; }
         }
         @media (max-width: 720px) {
           .tablero-rejilla { grid-template-columns: minmax(0, 1fr); }
-          .tablero-ancho-2, .tablero-ancho-3 { grid-column: span 1; }
+          .tablero-ancho-2, .tablero-ancho-3 { grid-column-end: span 1; }
+          /* En celular no hay columnas que escoger: todas van en una sola. */
+          .tablero-rejilla > [data-col] { grid-column-start: 1; }
           /* Dos columnas en un celular dejan el texto en una tira de letras
              sueltas, así que lado a lado pasa a uno debajo del otro. */
           .tablero-fila { flex-direction: column; }
@@ -330,6 +344,38 @@ function Guias() {
         <div key={i} className="absolute top-0 bottom-0 w-px"
           style={{ left: `${(i / 3) * 100}%`, background: 'var(--primary)', opacity: 0.4 }} />
       ))}
+    </div>
+  )
+}
+
+/**
+ * Las rayas horizontales: a qué altura terminan las demás tarjetas.
+ *
+ * La que está pegada se pinta llena; las otras, tenues. Así se ve de una cuál
+ * altura va a quedar y cuáles hay cerca, sin tener que soltar para saberlo.
+ */
+function GuiasAlto({ g }: { g: { desde: number; altos: number[]; pegada: number | null } }) {
+  const [tope, setTope] = useState(0)
+  const caja = useRef<HTMLDivElement>(null)
+  useEffect(() => {
+    const r = caja.current?.parentElement?.getBoundingClientRect()
+    if (r) setTope(g.desde - r.top)
+  }, [g.desde])
+
+  return (
+    <div ref={caja} className="absolute inset-0 z-40 pointer-events-none" aria-hidden>
+      {g.altos.map(a => {
+        const pegada = g.pegada === a
+        return (
+          <div key={a} className="absolute left-0 right-0 h-px"
+            style={{
+              top: tope + a,
+              background: 'var(--primary)',
+              opacity: pegada ? 1 : 0.28,
+              boxShadow: pegada ? '0 0 0 1px rgba(6,182,212,0.4)' : undefined,
+            }} />
+        )
+      })}
     </div>
   )
 }
@@ -361,6 +407,10 @@ function EnElTablero({
       animate={{ opacity: 1, y: 0 }}
       transition={{ delay: diseñando ? 0 : Math.min(indice, 8) * 0.04, duration: 0.3 }}
       className={`tablero-ancho-${anchoDe(t)} relative group`}
+      // Fijar la columna deja huecos a la izquierda, y eso es a propósito: los
+      // espacios en blanco son parte del diseño, no un error que la rejilla
+      // tenga que rellenar sola.
+      data-col={columnaInicial(t) ?? undefined}
       draggable={diseñando && !bloqueado}
       onDragStart={() => onArrastrar(t.id)}
       onDragEnd={() => onArrastrar(null)}
@@ -384,8 +434,17 @@ function EnElTablero({
           el fondo y hasta su contenido. Si se quedara aquí, la tarjeta crecía
           pero su color no, y el texto se apelotonaba arriba dejando media
           tarjeta vacía debajo. */}
+      {/* `container-type: inline-size` convierte la tarjeta en la referencia
+          contra la que se mide la letra elástica. Sin esto, `cqi` se mediría
+          contra el contenedor de más arriba y la letra no cambiaría al
+          angostar la tarjeta. */}
       <div className={alto ? 'tablero-estirar' : undefined}
-        style={{ opacity: diseñando && !t.activa ? 0.45 : undefined, minHeight: alto ?? undefined }}>
+        style={{
+          opacity: diseñando && !t.activa ? 0.45 : undefined,
+          minHeight: alto ?? undefined,
+          containerType: esElastica(t) ? 'inline-size' : undefined,
+          fontFamily: fuenteDe(t),
+        }}>
         <Pintar t={t} />
       </div>
     </motion.div>
@@ -406,7 +465,7 @@ function ManijasTarjeta({ t, onAncho, onAlto, columna }: {
   onAlto: (px: number | null) => void
   columna: React.RefObject<HTMLDivElement>
 }) {
-  const { bloquear, guias } = useContext(Diseno)
+  const { bloquear, guias, guiasAlto } = useContext(Diseno)
   const [fantasma, setFantasma] = useState<{ ancho?: number; alto?: number } | null>(null)
   const libre = TIPO(t.tipo).anchoLibre
   const ancho = anchoDe(t)
@@ -440,16 +499,40 @@ function ManijasTarjeta({ t, onAncho, onAlto, columna }: {
     e.preventDefault(); e.stopPropagation()
     bloquear(true)
     const inicioY = e.clientY
-    const inicio = columna.current?.getBoundingClientRect().height ?? 200
+    const yo = columna.current
+    const caja = yo?.getBoundingClientRect()
+    const inicio = caja?.height ?? 200
+
+    // Los bordes de abajo de las demás tarjetas, medidos desde el borde de
+    // arriba de esta. Son las alturas con las que vale la pena cuadrar.
+    const rejilla = yo?.parentElement
+    const lineas: number[] = []
+    if (caja && rejilla) {
+      for (const otra of Array.from(rejilla.children)) {
+        if (otra === yo) continue
+        const r = otra.getBoundingClientRect()
+        const alto = Math.round(r.bottom - caja.top)
+        if (alto > 60 && alto < 1200) lineas.push(alto)
+      }
+    }
+    const unicas = [...new Set(lineas)].sort((a, b) => a - b)
+    guiasAlto(unicas.length ? { desde: caja!.top, altos: unicas, pegada: null } : null)
+
     let ultimo = inicio
     const mover = (ev: PointerEvent) => {
-      ultimo = Math.min(1200, Math.max(60, inicio + (ev.clientY - inicioY)))
+      const bruto = Math.min(1200, Math.max(60, inicio + (ev.clientY - inicioY)))
+      // Imán: a menos de diez píxeles de la altura de otra tarjeta, se pega a
+      // ella. Cuadrar dos tarjetas a ojo con el mouse no se logra nunca.
+      const cerca = unicas.find(a => Math.abs(a - bruto) <= 10)
+      ultimo = cerca ?? bruto
+      guiasAlto(unicas.length ? { desde: caja!.top, altos: unicas, pegada: cerca ?? null } : null)
       setFantasma({ alto: ultimo })
     }
     const soltar = () => {
       window.removeEventListener('pointermove', mover)
       window.removeEventListener('pointerup', soltar)
       bloquear(false)
+      guiasAlto(null)
       setFantasma(null)
       onAlto(Math.round(ultimo))
     }
@@ -592,6 +675,7 @@ function Pintar({ t }: { t: Tarjeta }) {
     case 'poster':         return <Poster t={t} />
     case 'banner':         return <Banner t={t} />
     case 'texto':          return <Texto t={t} />
+    case 'titulo':         return <Titular t={t} />
     case 'separador':      return <Separador t={t} />
     case 'contador':       return <Contador t={t} />
     case 'alerta':         return <Alerta t={t} />
@@ -1045,6 +1129,39 @@ function Texto({ t }: { t: Tarjeta }) {
  * tarjetas. Ahora la línea tiene grosor y estilo propios, y el espacio de
  * arriba y abajo lo decide el aire, para que de verdad separe.
  */
+/**
+ * Un encabezado para abrir una sección del tablero.
+ *
+ * Sin caja, sin borde y sin fondo: es texto sobre el tablero. Una caja lo
+ * volvería otra tarjeta más, y lo que se busca es que se lea como un título de
+ * los que separan, no como un recuadro con letras.
+ */
+function Titular({ t }: { t: Tarjeta }) {
+  const c = COLOR(t.color)
+  const alinear = alineacionDe(t)
+  const aire = aireDe(t)
+  return (
+    <div style={{
+      paddingTop: aire / 2, paddingBottom: aire / 2,
+      textAlign: alinear === 'centro' ? 'center' : alinear === 'derecha' ? 'right' : 'left',
+    }}>
+      {t.titulo && seVe(t, 'titulo') && (
+        <p className="font-black leading-tight" style={{
+          fontSize: medida(t, 'titulo'), fontWeight: grosorDe(t, 'titulo') ?? 900,
+          color: tintaDe(t, 'titulo') ?? c.fuerte,
+        }}>{t.titulo}</p>
+      )}
+      {t.texto && seVe(t, 'texto') && (
+        <p className="leading-relaxed mt-1" style={{
+          fontSize: medida(t, 'texto'), fontWeight: grosorDe(t, 'texto'),
+          color: tintaDe(t, 'texto') ?? 'var(--text-dim)',
+        }}>{t.texto}</p>
+      )}
+      <Iconos t={t} color={c.fuerte} />
+    </div>
+  )
+}
+
 function Separador({ t }: { t: Tarjeta }) {
   const c = COLOR(t.color)
   const aire = aireDe(t)

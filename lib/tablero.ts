@@ -11,7 +11,7 @@
  */
 
 export type TipoTarjeta =
-  | 'anuncio' | 'poster' | 'banner' | 'texto' | 'separador'
+  | 'anuncio' | 'poster' | 'banner' | 'texto' | 'titulo' | 'separador'
   | 'alerta' | 'contador' | 'pausa' | 'epp'
   | 'reconocimiento' | 'copasst' | 'nota'
   | 'capacitaciones' | 'formacion'
@@ -121,6 +121,11 @@ export const TIPOS: TipoMeta[] = [
     id: 'banner', nombre: 'Banner', ancho: 3, automatica: false, anchoLibre: true,
     ayuda: 'Una franja de imagen sin caja ni marco. Para logos y cabeceras.',
     campos: ['imagen', 'cta'],
+  },
+  {
+    id: 'titulo', nombre: 'Título', ancho: 3, automatica: false, anchoLibre: true,
+    ayuda: 'Un encabezado grande para abrir una sección del tablero.',
+    campos: [],
   },
   {
     id: 'texto', nombre: 'Bloque de texto', ancho: 1, automatica: false, anchoLibre: true,
@@ -245,6 +250,45 @@ export function altoDe(t: Pick<Tarjeta, 'datos'>): number | null {
  * administrador lo cambie: un póster vertical pide una columna, uno horizontal
  * pide tres, y el tipo de tarjeta no alcanza a saber cuál subieron.
  */
+/**
+ * En qué columna empieza la tarjeta, si se fijó una.
+ *
+ * `null` deja que se acomode sola detrás de la anterior, que es como funcionó
+ * siempre. Con un número, la tarjeta se planta ahí aunque queden huecos a su
+ * izquierda: los huecos son del que diseña, no un error que haya que rellenar.
+ */
+export function columnaInicial(t: Pick<Tarjeta, 'datos'>): 1 | 2 | 3 | null {
+  const c = Number(t.datos?.col)
+  return c === 1 || c === 2 || c === 3 ? c : null
+}
+
+// ── Tipografías ────────────────────────────────────────────────────────────
+
+/**
+ * Las familias que se pueden escoger.
+ *
+ * Todas existen ya en el equipo o están cargadas por la plataforma: no se baja
+ * ninguna fuente nueva. Una tipografía que hay que descargar llega tarde, y el
+ * texto baila cuando por fin aparece.
+ */
+export const FUENTES: { id: string; nombre: string; css: string }[] = [
+  { id: 'sistema',  nombre: 'De la plataforma', css: 'var(--font-body, Arial, sans-serif)' },
+  { id: 'titular',  nombre: 'Titular',          css: 'var(--font-display, Arial Black, sans-serif)' },
+  { id: 'arial',    nombre: 'Arial',            css: 'Arial, Helvetica, sans-serif' },
+  { id: 'verdana',  nombre: 'Verdana',          css: 'Verdana, Geneva, sans-serif' },
+  { id: 'tahoma',   nombre: 'Tahoma',           css: 'Tahoma, Verdana, sans-serif' },
+  { id: 'trebuchet', nombre: 'Trebuchet',       css: '"Trebuchet MS", Tahoma, sans-serif' },
+  { id: 'calibri',  nombre: 'Calibri',          css: 'Calibri, Candara, Segoe, sans-serif' },
+  { id: 'georgia',  nombre: 'Georgia',          css: 'Georgia, "Times New Roman", serif' },
+  { id: 'times',    nombre: 'Times',            css: '"Times New Roman", Times, serif' },
+  { id: 'garamond', nombre: 'Garamond',         css: 'Garamond, Georgia, serif' },
+  { id: 'impact',   nombre: 'Impact',           css: 'Impact, "Arial Black", sans-serif' },
+  { id: 'courier',  nombre: 'Máquina',          css: '"Courier New", Courier, monospace' },
+]
+
+export const fuenteDe = (t: Pick<Tarjeta, 'datos'>): string | undefined =>
+  FUENTES.find(f => f.id === t.datos?.fuente && f.id !== 'sistema')?.css
+
 export function anchoDe(t: Pick<Tarjeta, 'tipo' | 'datos'>): 1 | 2 | 3 {
   const meta = TIPO(t.tipo)
   if (!meta.anchoLibre) return meta.ancho
@@ -435,6 +479,7 @@ export const TEXTOS_POR_TIPO: Partial<Record<TipoTarjeta, TextoDeTarjeta[]>> = {
   poster:    [T('titulo', 'Título sobre la foto', 'texto'), T('texto', 'Pie de foto', 'rotulo')],
   banner:    [T('titulo', 'Título'), T('texto', 'Descripción')],
   texto:     [T('titulo', 'Título'), T('texto', 'Descripción')],
+  titulo:    [T('titulo', 'El título'), T('texto', 'Bajada')],
   separador: [T('titulo', 'Texto de la línea', 'rotulo'), T('texto', 'Nota al final', 'rotulo')],
   alerta:    [T('rotulo', 'La palabra «Alerta»'), T('titulo', 'Título', 'texto'), T('texto', 'Descripción')],
   reconocimiento: [T('rotulo', 'La palabra «Reconocimiento»'), T('titulo', 'Título', 'texto'), T('texto', 'Descripción')],
@@ -562,14 +607,40 @@ export const PX_MAXIMO = 200
  * pedir quien diseña, y las escalas solo están para no tener que pensar en
  * píxeles cuando no hace falta.
  */
+/**
+ * Con la letra elástica, el tamaño se mide contra el ancho de la tarjeta y no
+ * contra el de la ventana.
+ *
+ * `cqi` es el ancho de la propia tarjeta, así que al angostarla la letra baja
+ * sola. Se conservan los topes de la escala para que no se vuelva ilegible en
+ * una tarjeta angosta ni desmedida en una de tres columnas.
+ */
+const elastico = (base: string): string => {
+  // De la escala se toma su valor mayor como referencia; de un número escrito
+  // a mano, el número mismo.
+  const n = base.endsWith('px')
+    ? Number(base.replace('px', ''))
+    : Number((base.match(/([\d.]+)px\s*\)\s*$/) ?? [])[1])
+  if (!Number.isFinite(n) || !n) return base
+
+  // Calibrado para que una tarjeta de una columna quede en el 60 % y una de
+  // tres en el 160 %. La primera versión conservaba los topes de la escala,
+  // pensados para el ancho de la ventana, y la letra se quedaba pegada al tope
+  // en los dos casos: cambiaba de uno a tres columnas y no se movía.
+  return `clamp(${(n * 0.6).toFixed(1)}px, ${(n / 7.8).toFixed(2)}cqi, ${(n * 1.6).toFixed(1)}px)`
+}
+
+export const esElastica = (t: Pick<Tarjeta, 'datos'>): boolean => t.datos?.letraElastica === true
+
 export function medidaComo(
   t: Pick<Tarjeta, 'datos'>, pieza: PiezaTexto, columna: PiezaTexto,
 ): string {
   const px = Number(t.datos?.px?.[pieza])
-  if (Number.isFinite(px) && px >= PX_MINIMO && px <= PX_MAXIMO) return `${Math.round(px)}px`
+  const base = Number.isFinite(px) && px >= PX_MINIMO && px <= PX_MAXIMO
+    ? `${Math.round(px)}px`
+    : (TAMANOS.find(x => x.id === t.datos?.tamanos?.[pieza]) ?? tamanoDe(t))[columna]
 
-  const propio = TAMANOS.find(x => x.id === t.datos?.tamanos?.[pieza])
-  return (propio ?? tamanoDe(t))[columna]
+  return esElastica(t) ? elastico(base) : base
 }
 
 export const medidaDe = (t: Pick<Tarjeta, 'datos'>, pieza: PiezaTexto): string =>

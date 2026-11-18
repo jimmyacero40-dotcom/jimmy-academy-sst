@@ -4,10 +4,11 @@ import { useEffect, useState } from 'react'
 import { X, Upload, AlertCircle, Loader2, ArrowUp, ArrowDown, Eye, EyeOff } from 'lucide-react'
 import {
   TIPOS, TIPO, COLORES, ALTOS, AJUSTES, PICTOGRAMAS, PIEZAS, TAMANOS, AIRES,
-  DISPOSICIONES, PROPORCIONES, PALETA_TEXTO, PIEZAS_TEXTO, TAMANOS_ICONO, DONDE_TEXTO,
+  DISPOSICIONES, PROPORCIONES, PALETA_TEXTO, PIEZAS_TEXTO, TAMANOS_ICONO, DONDE_TEXTO, FUENTES,
   diasDesde, anchoDe, ajusteDe, pictogramasDe,
   ordenDe, alineacionDe, disposicionDe, proporcionDe,
   tamanoIconosDe, posicionIconosDe, ocultosDe, dondeTextoDe, textosDe, nombreCampoTitulo,
+  columnaInicial,
   PX_MINIMO, PX_MAXIMO,
   type Tarjeta, type TipoTarjeta, type ColorTarjeta, type Ajuste, type Alto,
   type Pieza, type PiezaTexto, type Alineacion, type Tamano, type Aire,
@@ -82,6 +83,9 @@ export function EditorTarjeta({ tarjeta, opciones, onGuardar, onCerrar }: {
     leyenda: (tarjeta.datos?.leyenda ?? '') as string,
     dondeTexto: dondeTextoDe(tarjeta) as string,
     pieArriba: tarjeta.datos?.pieArriba === true,
+    letraElastica: tarjeta.datos?.letraElastica === true,
+    col: columnaInicial(tarjeta) as number | null,
+    fuente: (tarjeta.datos?.fuente ?? 'sistema') as string,
     grosorLinea: (Number(tarjeta.datos?.grosorLinea) || 2) as number,
     estiloLinea: (tarjeta.datos?.estiloLinea ?? 'solida') as string,
     tamano: (tarjeta.datos?.tamano ?? 'normal') as Tamano,
@@ -188,6 +192,9 @@ export function EditorTarjeta({ tarjeta, opciones, onGuardar, onCerrar }: {
     if (tiene('leyenda')) datos.leyenda = f.leyenda
     if (tarjeta.tipo === 'contador') { datos.dondeTexto = f.dondeTexto; datos.pieArriba = f.pieArriba }
     datos.negritas = f.negritas
+    datos.letraElastica = f.letraElastica
+    datos.fuente = f.fuente
+    if (meta.anchoLibre) datos.col = f.col
     if (tarjeta.tipo === 'separador') {
       datos.grosorLinea = f.grosorLinea
       datos.estiloLinea = f.estiloLinea
@@ -400,12 +407,43 @@ export function EditorTarjeta({ tarjeta, opciones, onGuardar, onCerrar }: {
         </Campo>
 
         {meta.anchoLibre && (
-          <Campo etiqueta="Qué tan ancha" nota="En celular todas ocupan el ancho completo.">
-            <Botones valor={f.ancho} onElegir={v => set('ancho', v)} opciones={[
-              { id: 1, texto: 'Angosta' }, { id: 2, texto: 'Mediana' }, { id: 3, texto: 'Todo el ancho' },
-            ]} />
-          </Campo>
+          <div className="flex gap-3 flex-wrap">
+            <Campo etiqueta="Qué tan ancha" nota="En celular todas ocupan el ancho completo.">
+              <Botones valor={f.ancho} onElegir={v => set('ancho', v)} opciones={[
+                { id: 1, texto: 'Angosta' }, { id: 2, texto: 'Mediana' }, { id: 3, texto: 'Todo el ancho' },
+              ]} />
+            </Campo>
+            <Campo etiqueta="En qué columna empieza" nota="«Suelta» la acomoda detrás de la anterior.">
+              <Botones valor={f.col} onElegir={v => set('col', v)} opciones={[
+                { id: null, texto: 'Suelta' },
+                { id: 1, texto: 'Izquierda' }, { id: 2, texto: 'Centro' }, { id: 3, texto: 'Derecha' },
+              ]} />
+            </Campo>
+          </div>
         )}
+
+        <Campo etiqueta="Tipografía" nota="Toque una y vea cómo queda al cerrar.">
+          <div className="grid gap-1.5" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(118px, 1fr))' }}>
+            {FUENTES.map(fu => {
+              const on = f.fuente === fu.id
+              return (
+                // Cada opción se dibuja con su propia letra: leer el nombre
+                // «Garamond» en Arial no dice nada de cómo va a quedar.
+                <button key={fu.id} onClick={() => set('fuente', fu.id)}
+                  className="px-2.5 py-2 rounded-lg text-left"
+                  style={{
+                    fontFamily: fu.css,
+                    background: on ? 'var(--primary-dim)' : 'var(--bg-card-hover)',
+                    color: on ? 'var(--primary-dark)' : 'var(--text-dim)',
+                    border: `1px solid ${on ? 'var(--primary-border)' : 'var(--border)'}`,
+                  }}>
+                  <span className="block text-[15px] font-bold leading-none">Aa</span>
+                  <span className="block text-[11px] mt-1 truncate">{fu.nombre}</span>
+                </button>
+              )
+            })}
+          </div>
+        </Campo>
 
         <div className="pt-1" style={{ borderTop: '1px solid var(--border)' }} />
         <p className="text-[12px] font-bold -mb-1" style={{ color: 'var(--text-dim)' }}>Composición</p>
@@ -510,6 +548,20 @@ export function EditorTarjeta({ tarjeta, opciones, onGuardar, onCerrar }: {
           <Botones valor={f.aire} onElegir={v => set('aire', v)}
             opciones={AIRES.map(a => ({ id: a.id, texto: a.nombre }))} />
         </Campo>
+
+        <label className="flex items-start gap-2.5 cursor-pointer">
+          <input type="checkbox" checked={f.letraElastica}
+            onChange={e => set('letraElastica', e.target.checked)} className="w-4 h-4 mt-0.5" />
+          <span>
+            <span className="text-[13.5px] font-semibold block" style={{ color: 'var(--text)' }}>
+              La letra se encoge con la tarjeta
+            </span>
+            <span className="text-[11.5px]" style={{ color: 'var(--text-label)' }}>
+              Al angostarla, el texto baja de tamaño solo. Los tamaños que escriba
+              siguen mandando; esto solo los estira o los encoge alrededor de ellos.
+            </span>
+          </span>
+        </label>
 
         {tarjeta.tipo === 'contador' && (
           <Campo etiqueta="Dónde va el texto" nota="Respecto del número.">
