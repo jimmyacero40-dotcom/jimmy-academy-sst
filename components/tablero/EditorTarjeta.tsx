@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react'
 import { X, Upload, AlertCircle, Loader2, ArrowUp, ArrowDown } from 'lucide-react'
 import {
   TIPOS, TIPO, COLORES, ALTOS, AJUSTES, PICTOGRAMAS, PIEZAS, TAMANOS, AIRES,
-  DISPOSICIONES, PROPORCIONES, COLORES_TEXTO, TAMANOS_ICONO,
+  DISPOSICIONES, PROPORCIONES, PALETA_TEXTO, PIEZAS_TEXTO, TAMANOS_ICONO,
   diasDesde, anchoDe, ajusteDe, pictogramasDe,
   ordenDe, alineacionDe, disposicionDe, proporcionDe,
   tamanoIconosDe, posicionIconosDe,
@@ -65,7 +65,8 @@ export function EditorTarjeta({ tarjeta, opciones, onGuardar, onCerrar }: {
     alineacion: alineacionDe(tarjeta) as Alineacion,
     disposicion: disposicionDe(tarjeta) as Disposicion,
     proporcion: proporcionDe(tarjeta).id as Proporcion,
-    colorTexto: (tarjeta.datos?.colorTexto ?? 'auto') as string,
+    colorTexto: (tarjeta.datos?.colorTexto ?? null) as string | null,
+    tintas: (tarjeta.datos?.tintas ?? {}) as Record<string, string | null>,
     tamano: (tarjeta.datos?.tamano ?? 'normal') as Tamano,
     aire: (tarjeta.datos?.aire ?? 'normal') as Aire,
     activa: tarjeta.activa,
@@ -164,6 +165,7 @@ export function EditorTarjeta({ tarjeta, opciones, onGuardar, onCerrar }: {
     datos.disposicion = f.disposicion
     datos.proporcion = f.proporcion
     datos.colorTexto = f.colorTexto
+    datos.tintas = f.tintas
     datos.tamano = f.tamano
     datos.aire = f.aire
 
@@ -382,26 +384,15 @@ export function EditorTarjeta({ tarjeta, opciones, onGuardar, onCerrar }: {
             opciones={AIRES.map(a => ({ id: a.id, texto: a.nombre }))} />
         </Campo>
 
-        <Campo etiqueta="Color del texto" nota="«Automático» usa el que le va al fondo de la tarjeta.">
-          <div className="flex gap-1.5 flex-wrap">
-            {COLORES_TEXTO.map(ct => {
-              const on = f.colorTexto === ct.id
-              return (
-                <button key={ct.id} onClick={() => set('colorTexto', ct.id)} title={ct.nombre}
-                  className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[12px] font-bold"
-                  style={{
-                    background: on ? 'var(--primary-dim)' : 'var(--bg-card-hover)',
-                    color: on ? 'var(--primary-dark)' : 'var(--text-dim)',
-                    border: `1px solid ${on ? 'var(--primary-border)' : 'var(--border)'}`,
-                  }}>
-                  <span className="w-3.5 h-3.5 rounded-full flex-shrink-0" style={{
-                    background: ct.hex ?? 'linear-gradient(135deg,#fff 50%,#0B1736 50%)',
-                    border: '1px solid var(--border-strong)',
-                  }} />
-                  {ct.nombre}
-                </button>
-              )
-            })}
+        <Campo etiqueta="Colores del texto"
+          nota="«Todo» pinta la tarjeta entera; los demás, solo ese texto.">
+          <div className="rounded-xl p-2.5 space-y-2" style={{ background: 'var(--bg-card-hover)' }}>
+            <Paleta nombre="Todo el texto" valor={f.colorTexto}
+              onElegir={v => set('colorTexto', v)} />
+            {PIEZAS_TEXTO.map(pt => (
+              <Paleta key={pt.id} nombre={pt.nombre} valor={f.tintas[pt.id] ?? null}
+                onElegir={v => set('tintas', { ...f.tintas, [pt.id]: v })} />
+            ))}
           </div>
         </Campo>
 
@@ -587,6 +578,56 @@ function OrdenPiezas({ orden, onCambiar }: { orden: Pieza[]; onCambiar: (v: Piez
             className="p-1 rounded disabled:opacity-25" style={{ color: 'var(--text-dim)' }}><ArrowDown size={14} /></button>
         </div>
       ))}
+    </div>
+  )
+}
+
+/**
+ * Un renglón de colores para un texto.
+ *
+ * El muestrario cubre lo corriente; el cuadrito del final abre el selector del
+ * sistema, porque una empresa tiene sus colores y no van a estar en una lista
+ * de veinte. «Auto» devuelve el que le corresponde al fondo de la tarjeta.
+ */
+function Paleta({ nombre, valor, onElegir }: {
+  nombre: string; valor: string | null; onElegir: (v: string | null) => void
+}) {
+  const propio = valor && !PALETA_TEXTO.some(c => c.hex.toLowerCase() === valor.toLowerCase())
+  return (
+    <div className="flex items-center gap-2 flex-wrap">
+      <span className="text-[11.5px] font-bold w-[86px] flex-shrink-0" style={{ color: 'var(--text-dim)' }}>
+        {nombre}
+      </span>
+      <button onClick={() => onElegir(null)} title="El que le va al fondo"
+        className="px-1.5 py-0.5 rounded text-[10.5px] font-bold flex-shrink-0"
+        style={{
+          background: !valor ? 'var(--primary-dim)' : 'var(--bg-surface)',
+          color: !valor ? 'var(--primary-dark)' : 'var(--text-faint)',
+          border: `1px solid ${!valor ? 'var(--primary-border)' : 'var(--border)'}`,
+        }}>
+        Auto
+      </button>
+      {PALETA_TEXTO.map(c => {
+        const on = valor?.toLowerCase() === c.hex.toLowerCase()
+        return (
+          <button key={c.hex} onClick={() => onElegir(c.hex)} title={c.nombre} aria-label={c.nombre}
+            className="w-[18px] h-[18px] rounded-full flex-shrink-0"
+            style={{
+              background: c.hex,
+              border: on ? '2px solid var(--primary)' : '1px solid var(--border-strong)',
+              boxShadow: on ? '0 0 0 2px var(--primary-dim)' : undefined,
+            }} />
+        )
+      })}
+      <label title="Otro color"
+        className="w-[18px] h-[18px] rounded-full flex-shrink-0 cursor-pointer relative overflow-hidden"
+        style={{
+          background: propio ? valor! : 'conic-gradient(#EF4444,#F59E0B,#FACC15,#10B981,#06B6D4,#3B82F6,#8B5CF6,#EC4899,#EF4444)',
+          border: propio ? '2px solid var(--primary)' : '1px solid var(--border-strong)',
+        }}>
+        <input type="color" value={valor ?? '#3B82F6'} onChange={e => onElegir(e.target.value)}
+          className="opacity-0 absolute inset-0 w-full h-full cursor-pointer" />
+      </label>
     </div>
   )
 }

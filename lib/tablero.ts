@@ -332,36 +332,85 @@ export const proporcionDe = (t: Pick<Tarjeta, 'datos'>) =>
   PROPORCIONES.find(p => p.id === t.datos?.proporcion) ?? PROPORCIONES[1]
 
 /**
- * El color del texto.
+ * La paleta para el texto.
  *
- * `auto` deja el que le corresponda a la tarjeta —blanco sobre el degradado
- * del anuncio, oscuro sobre una caja clara—, que es lo que casi siempre se
- * quiere. Los demás están para cuando el fondo lo pide: con la imagen al lado,
- * media tarjeta puede quedar clara y el blanco ahí no se lee.
+ * Son colores sueltos, no los cinco de la tarjeta: aquí no se está marcando
+ * una alerta ni un logro, se está escogiendo con qué se lee mejor sobre el
+ * fondo que haya quedado. Además del muestrario, se puede escribir cualquier
+ * color, porque una empresa tiene los suyos y no van a estar en una lista de
+ * dieciocho.
  */
-export const COLORES_TEXTO: { id: string; nombre: string; hex: string | null }[] = [
-  { id: 'auto',   nombre: 'Automático', hex: null },
-  { id: 'blanco', nombre: 'Blanco',     hex: '#FFFFFF' },
-  { id: 'oscuro', nombre: 'Oscuro',     hex: '#0B1736' },
-  { id: 'cian',   nombre: 'Cian',       hex: '#22D3EE' },
-  { id: 'verde',  nombre: 'Verde',      hex: '#34D399' },
-  { id: 'ambar',  nombre: 'Ámbar',      hex: '#FBBF24' },
-  { id: 'rojo',   nombre: 'Rojo',       hex: '#F87171' },
-  { id: 'azul',   nombre: 'Azul',       hex: '#60A5FA' },
+export const PALETA_TEXTO: { nombre: string; hex: string }[] = [
+  { nombre: 'Blanco',    hex: '#FFFFFF' },
+  { nombre: 'Hueso',     hex: '#E8EDF7' },
+  { nombre: 'Gris',      hex: '#8595AD' },
+  { nombre: 'Pizarra',   hex: '#42526E' },
+  { nombre: 'Oscuro',    hex: '#0B1736' },
+  { nombre: 'Negro',     hex: '#000000' },
+  { nombre: 'Cian',      hex: '#22D3EE' },
+  { nombre: 'Turquesa',  hex: '#06B6D4' },
+  { nombre: 'Azul',      hex: '#3B82F6' },
+  { nombre: 'Azul hondo', hex: '#1D4ED8' },
+  { nombre: 'Morado',    hex: '#8B5CF6' },
+  { nombre: 'Rosa',      hex: '#EC4899' },
+  { nombre: 'Rojo',      hex: '#EF4444' },
+  { nombre: 'Naranja',   hex: '#F97316' },
+  { nombre: 'Ámbar',     hex: '#F59E0B' },
+  { nombre: 'Amarillo',  hex: '#FACC15' },
+  { nombre: 'Lima',      hex: '#84CC16' },
+  { nombre: 'Verde',     hex: '#10B981' },
+  { nombre: 'Verde SST', hex: '#6BA644' },
+  { nombre: 'Oliva',     hex: '#4D7A2E' },
 ]
 
-/** El color elegido, o `null` para que mande el de la tarjeta. */
+/** Los textos que se pueden pintar por separado. */
+export type PiezaTexto = 'rotulo' | 'titulo' | 'numero' | 'texto'
+
+export const PIEZAS_TEXTO: { id: PiezaTexto; nombre: string }[] = [
+  { id: 'rotulo', nombre: 'Rótulo' },
+  { id: 'titulo', nombre: 'Título' },
+  { id: 'numero', nombre: 'Número' },
+  { id: 'texto',  nombre: 'Descripción' },
+]
+
+const esHex = (v: any): v is string => typeof v === 'string' && /^#[0-9a-fA-F]{6}$/.test(v)
+
+/**
+ * El color de un texto concreto.
+ *
+ * Primero el que se le haya puesto a esa pieza, después el general de la
+ * tarjeta, y si no hay ninguno, `null` para que mande el que le corresponde al
+ * fondo. Así cambiar el color de todo sigue siendo un solo gesto, y pintar el
+ * número de otro color no obliga a repintar lo demás.
+ */
+export function tintaDe(t: Pick<Tarjeta, 'datos'>, pieza: PiezaTexto): string | null {
+  const propio = t.datos?.tintas?.[pieza]
+  if (esHex(propio)) return propio
+  return colorTextoDe(t)
+}
+
+/** El color general del texto de la tarjeta, o `null` para el automático. */
 export function colorTextoDe(t: Pick<Tarjeta, 'datos'>): string | null {
-  return COLORES_TEXTO.find(c => c.id === t.datos?.colorTexto)?.hex ?? null
+  const v = t.datos?.colorTexto
+  return esHex(v) ? v : null
 }
 
 export type Tamano = 'chico' | 'normal' | 'grande' | 'enorme'
 
-export const TAMANOS: { id: Tamano; nombre: string; titulo: string; texto: string }[] = [
-  { id: 'chico',  nombre: 'Chico',  titulo: 'clamp(17px, 1.6vw, 21px)', texto: '13px' },
-  { id: 'normal', nombre: 'Normal', titulo: 'clamp(22px, 2.6vw, 32px)', texto: '15px' },
-  { id: 'grande', nombre: 'Grande', titulo: 'clamp(28px, 3.4vw, 42px)', texto: '17px' },
-  { id: 'enorme', nombre: 'Enorme', titulo: 'clamp(34px, 4.6vw, 58px)', texto: '19px' },
+/**
+ * Cuatro escalas, y cada texto sube con ellas.
+ *
+ * El número va en su propia escala y no en la del título: en la tarjeta de
+ * accidentalidad el número es el mensaje, y con el tamaño del título se
+ * perdería entre las letras.
+ */
+export const TAMANOS: {
+  id: Tamano; nombre: string; titulo: string; texto: string; rotulo: string; numero: string
+}[] = [
+  { id: 'chico',  nombre: 'Chico',  titulo: 'clamp(17px, 1.6vw, 21px)', texto: '13px', rotulo: '10px', numero: 'clamp(30px, 4vw, 40px)' },
+  { id: 'normal', nombre: 'Normal', titulo: 'clamp(22px, 2.6vw, 32px)', texto: '15px', rotulo: '11px', numero: 'clamp(44px, 6vw, 62px)' },
+  { id: 'grande', nombre: 'Grande', titulo: 'clamp(28px, 3.4vw, 42px)', texto: '17px', rotulo: '12px', numero: 'clamp(58px, 8vw, 86px)' },
+  { id: 'enorme', nombre: 'Enorme', titulo: 'clamp(34px, 4.6vw, 58px)', texto: '19px', rotulo: '13px', numero: 'clamp(76px, 11vw, 124px)' },
 ]
 
 export const tamanoDe = (t: Pick<Tarjeta, 'datos'>) =>
