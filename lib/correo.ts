@@ -79,22 +79,56 @@ function conexion(): Transporter {
  * capacitación a alguien y ver si le llegaba: un aviso de verdad, a una
  * persona de verdad, para averiguar algo del servidor.
  */
-export async function probarCorreo(): Promise<{ sirve: boolean; motivo?: string }> {
+export async function probarCorreo(): Promise<{
+  sirve: boolean; motivo?: string; proveedor: 'gmail' | 'resend' | null
+}> {
   if (!correoConfigurado()) {
-    return { sirve: false, motivo: 'No hay credenciales de correo en este servidor' }
+    return { sirve: false, proveedor: null, motivo: 'No hay credenciales de correo en este servidor' }
   }
-  if (!porGmail()) return { sirve: true }
+
+  if (porGmail()) {
+    try {
+      await conexion().verify()
+      return { sirve: true, proveedor: 'gmail' }
+    } catch (e) {
+      return { sirve: false, proveedor: 'gmail', motivo: motivoLegible(e) }
+    }
+  }
+
+  // Resend sin dominio verificado solo le escribe a la dueña de la cuenta.
+  // Acepta la llave, contesta que todo bien al probarla, y después rechaza
+  // cada correo dirigido a otra persona: por fuera parece configurado y por
+  // dentro no le llega a nadie. Por eso aquí se miran los dominios y no solo
+  // si la llave existe.
   try {
-    await conexion().verify()
-    return { sirve: true }
-  } catch (e) {
-    return { sirve: false, motivo: motivoLegible(e) }
+    const r = await fetch('https://api.resend.com/domains', {
+      headers: { Authorization: `Bearer ${process.env.RESEND_API_KEY}` },
+    })
+    if (r.status === 401 || r.status === 403) {
+      return { sirve: false, proveedor: 'resend', motivo: 'Resend no acepta la llave: hay que generarla de nuevo.' }
+    }
+    const d = await r.json().catch(() => null)
+    const dominios: any[] = d?.data ?? []
+    const verificado = dominios.find(x => x?.status === 'verified')
+    if (!verificado) {
+      return {
+        sirve: false, proveedor: 'resend',
+        motivo: 'Resend está en modo de prueba: solo le escribe a la dirección dueña de la cuenta, '
+          + 'y a los demás les dice que sí pero no les llega. Hay que verificar un dominio propio, '
+          + 'o usar la cuenta de Gmail poniendo CORREO_USUARIO y CORREO_CLAVE en este servidor.',
+      }
+    }
+    return { sirve: true, proveedor: 'resend' }
+  } catch (e: any) {
+    return { sirve: false, proveedor: 'resend', motivo: e?.message ?? 'No hubo conexión con Resend' }
   }
 }
 
 /** El remitente, con el buzón tapado: sirve para reconocerlo, no para copiarlo. */
 export function remitenteTapado(): string {
-  const dir = (process.env.CORREO_USUARIO || '').trim()
+  const dir = porGmail()
+    ? (process.env.CORREO_USUARIO || '').trim()
+    : remitente().replace(/^.*<|>$/g, '').trim()
   if (!dir) return '—'
   return dir.replace(/^(.{2}).*(@.*)$/, '$1•••$2')
 }
@@ -141,8 +175,17 @@ export async function enviarCorreo(
       body: JSON.stringify({ from: remitente(), to: [para], subject: asunto, html }),
     })
     if (!r.ok) {
-      const d = await r.text()
-      return { enviado: false, motivo: `Resend: ${d.slice(0, 120)}` }
+      // Se saca el mensaje del JSON en vez de cortar el texto crudo: la
+      // versión anterior guardaba «Resend: {"message":"You can only send…» y
+      // tijereteaba justo antes de la parte que decía qué hacer.
+      const crudo = await r.text()
+      let detalle = crudo
+      try { detalle = JSON.parse(crudo)?.message ?? crudo } catch {}
+      if (/only send testing emails/i.test(detalle)) {
+        detalle = 'Resend está en modo de prueba: solo le escribe a la dirección dueña de la cuenta. '
+          + 'A los demás no les llega, aunque el envío no dé error visible.'
+      }
+      return { enviado: false, motivo: `Resend: ${detalle.slice(0, 220)}` }
     }
     return { enviado: true }
   } catch (e: any) {

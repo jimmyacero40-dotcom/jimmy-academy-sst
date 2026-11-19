@@ -1018,6 +1018,7 @@ export default function SettingsPage() {
 function EstadoDelCorreo() {
   const [e, setE] = useState<{
     configurado: boolean; sirve: boolean; motivo: string | null
+    proveedor: 'gmail' | 'resend' | null
     remitente: string | null; entorno: string
   } | null>(null)
   const [cargando, setCargando] = useState(true)
@@ -1074,7 +1075,7 @@ function EstadoDelCorreo() {
         )}
         {!cargando && e && (
           <p className="text-[10px] mt-2 uppercase tracking-wider" style={{ color: 'var(--text-faint)' }}>
-            Servidor: {e.entorno}
+            Servidor: {e.entorno}{e.proveedor ? ` · por ${e.proveedor === 'gmail' ? 'Gmail' : 'Resend'}` : ''}
           </p>
         )}
       </div>

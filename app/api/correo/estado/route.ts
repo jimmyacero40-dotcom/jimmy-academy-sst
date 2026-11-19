@@ -20,12 +20,13 @@ export async function GET() {
   if (!authorized) return NextResponse.json({ error: 'No autorizado' }, { status: 403 })
 
   const configurado = correoConfigurado()
-  const prueba = configurado ? await probarCorreo() : { sirve: false, motivo: 'Sin credenciales' }
+  const prueba = await probarCorreo()
 
   return NextResponse.json({
     configurado,
     sirve: prueba.sirve,
     motivo: prueba.motivo ?? null,
+    proveedor: prueba.proveedor,
     remitente: configurado ? remitenteTapado() : null,
     // Para no confundir el servidor de pruebas con el publicado.
     entorno: process.env.VERCEL_ENV ?? (process.env.NODE_ENV === 'production' ? 'producción' : 'local'),
