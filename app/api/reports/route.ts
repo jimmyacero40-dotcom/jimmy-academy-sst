@@ -9,7 +9,11 @@ export async function GET(req: NextRequest) {
 
   if (type === 'summary') {
     // KPIs globales
+    // Sin retirados: quien ya no está no es población, y contarlo desvía
+    // la cobertura y los promedios de toda la pantalla. El registro queda,
+    // deja de sumar.
     let uQ = supabase.from('users').select('id, name, area, role, status', { count: 'exact', head: false })
+      .is('retired_at', null)
     let eQ = supabase.from('enrollments').select('id, status, score, user_id, training_id, completed_at, created_at', { count: 'exact', head: false })
     let cQ = supabase.from('certificates').select('id, expires, user_id', { count: 'exact', head: false })
 
@@ -80,6 +84,7 @@ export async function GET(req: NextRequest) {
 
   if (type === 'workers') {
     let uQ = supabase.from('users').select('id, name, email, cedula, area, role, status')
+      .is('retired_at', null)
     if (companyId) uQ = uQ.eq('company_id', companyId)
     const { data: users } = await uQ
 

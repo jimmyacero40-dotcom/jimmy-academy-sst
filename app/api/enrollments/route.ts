@@ -36,10 +36,14 @@ export async function GET() {
     .from('enrollments')
     .select(`
       id, status, due_date, started_at, completed_at, score, created_at, progreso, progreso_total,
-      users(id, name, email, cedula, area),
+      users!inner(id, name, email, cedula, area, retired_at),
       trainings(id, title, duration),
       plan_items(estado)
     `)
+    // Las capacitaciones de los retirados se quedan en su hoja de vida, pero
+    // no en los pendientes de la empresa: inflaban el atraso con gente que ya
+    // no viene.
+    .is('users.retired_at', null)
     .order('due_date', { ascending: true, nullsFirst: false })
 
   if (companyId) query = query.eq('company_id', companyId)
