@@ -1013,8 +1013,7 @@ export function Telon({ titulo, ayuda, children, onCerrar, descartable = true }:
 
   return (
     <div className="fixed inset-0 z-50 flex items-start justify-center p-4 overflow-y-auto"
-      style={{ background: 'rgba(11,23,54,0.55)' }}
-      onClick={e => { if (descartable && e.target === e.currentTarget) onCerrar() }}>
+      style={{ background: 'rgba(11,23,54,0.55)' }}>
       <div role="dialog" aria-modal="true" aria-label={titulo}
         className="w-full max-w-2xl rounded-2xl my-8"
         style={{ background: 'var(--bg-surface)', boxShadow: '0 24px 60px rgba(11,23,54,0.3)' }}>

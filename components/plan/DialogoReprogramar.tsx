@@ -69,7 +69,7 @@ export function DialogoReprogramar({
 
   return (
     <div className="fixed inset-0 z-[60] flex items-center justify-center p-4"
-      style={{ background: 'rgba(0,0,0,0.6)' }} onClick={onCerrar}>
+      style={{ background: 'rgba(0,0,0,0.6)' }} >
       <div className="terra-card p-5 w-full max-w-md" onClick={e => e.stopPropagation()}>
         <div className="flex items-start gap-3 mb-4">
           <div className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0"

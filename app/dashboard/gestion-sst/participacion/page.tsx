@@ -263,7 +263,7 @@ export default function ParticipacionAdminPage() {
       {/* ── Confirmar el cierre ── */}
       {panelCierre && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4"
-          style={{ background: 'rgba(0,0,0,0.6)' }} onClick={() => setPanelCierre(false)}>
+          style={{ background: 'rgba(0,0,0,0.6)' }} >
           <div className="terra-card p-5 w-full max-w-md" onClick={e => e.stopPropagation()}>
             <div className="flex items-start gap-3 mb-3">
               <AlertTriangle size={20} style={{ color: '#F59E0B' }} className="mt-0.5 flex-shrink-0" />
@@ -504,7 +504,7 @@ export default function ParticipacionAdminPage() {
       {/* ── Confirmación de borrado ── */}
       {porBorrar && (
         <div className="fixed inset-0 z-[60] flex items-center justify-center p-4"
-          style={{ background: 'rgba(0,0,0,0.6)' }} onClick={() => !borrando && setPorBorrar(null)}>
+          style={{ background: 'rgba(0,0,0,0.6)' }} >
           <motion.div initial={{ opacity: 0, scale: 0.97 }} animate={{ opacity: 1, scale: 1 }}
             onClick={e => e.stopPropagation()} className="terra-card w-full max-w-md p-5">
             <div className="flex items-start gap-3 mb-3">
@@ -561,7 +561,7 @@ export default function ParticipacionAdminPage() {
       {/* ── Respuestas de un trabajador ── */}
       {detalle?.participacion && (
         <div className="fixed inset-0 z-50 flex items-start justify-center p-4 overflow-y-auto"
-          style={{ background: 'rgba(0,0,0,0.6)' }} onClick={() => setDetalle(null)}>
+          style={{ background: 'rgba(0,0,0,0.6)' }} >
           <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }}
             onClick={e => e.stopPropagation()}
             className="terra-card w-full max-w-3xl my-8 p-5">

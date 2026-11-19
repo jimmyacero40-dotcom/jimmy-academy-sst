@@ -1298,7 +1298,7 @@ export default function UsersPage() {
       {/* Rechazar un pre-registro */}
       {rechazando && (
         <div className="fixed inset-0 z-[60] flex items-center justify-center p-4"
-          style={{ background: 'rgba(0,0,0,0.6)' }} onClick={() => setRechazando(null)}>
+          style={{ background: 'rgba(0,0,0,0.6)' }} >
           <div onClick={e => e.stopPropagation()} className="terra-card w-full max-w-md p-5">
             <p className="text-base font-black" style={{ color: 'var(--text)' }}>
               Rechazar el registro de {rechazando.name}

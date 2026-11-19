@@ -248,7 +248,7 @@ export default function SelectCompanyPage() {
 
       {/* Create/Edit modal */}
       {showModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60" onClick={() => setShowModal(false)}>
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60" >
           <motion.div
             initial={{ opacity: 0, scale: 0.95 }}
             animate={{ opacity: 1, scale: 1 }}

@@ -35,7 +35,7 @@ export default function ConfirmarAccion({
 
   return (
     <div className="fixed inset-0 z-[60] flex items-center justify-center p-4"
-      style={{ background: 'rgba(0,0,0,0.6)' }} onClick={onCerrar}>
+      style={{ background: 'rgba(0,0,0,0.6)' }} >
       <motion.div role="alertdialog" aria-modal="true" aria-label={titulo}
         initial={{ opacity: 0, scale: 0.97 }} animate={{ opacity: 1, scale: 1 }}
         onClick={e => e.stopPropagation()}

@@ -90,9 +90,8 @@ function Rondas({ rondas }: { rondas: Ronda[] }) {
  * no lo trate como un tipo nuevo en cada pintada: si lo hiciera, la lista se
  * volvería a montar y el buscador perdería el cursor en cada letra.
  */
-function Marco({ variante, onFondo, children }: {
+function Marco({ variante, children }: {
   variante: 'modal' | 'panel'
-  onFondo: () => void
   children: React.ReactNode
 }) {
   if (variante === 'panel') {
@@ -100,9 +99,11 @@ function Marco({ variante, onFondo, children }: {
   }
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4"
-      style={{ background: 'rgba(0,0,0,0.55)' }} onClick={onFondo}>
+      // El fondo ya no cierra: aquí se llenan tres pasos de un formulario y
+      // un clic al lado los borraba todos sin preguntar. Se sale por la equis
+      // o por Cancelar.
+      style={{ background: 'rgba(0,0,0,0.55)' }}>
       <motion.div initial={{ opacity: 0, scale: 0.97 }} animate={{ opacity: 1, scale: 1 }}
-        onClick={e => e.stopPropagation()}
         className="w-full max-w-4xl max-h-[92vh] flex flex-col rounded-2xl overflow-hidden"
         style={{ background: 'var(--bg-surface)', border: '1px solid var(--border)' }}>
         {children}
@@ -522,7 +523,7 @@ export default function AsignarCapacitacion({
   const esPrimerPaso = paso === pasos[0].n
 
   return (
-    <Marco variante={variante} onFondo={cerrar}>
+    <Marco variante={variante}>
 
         {/* ── Encabezado ── */}
         {/* En el panel lo pone la barra lateral, con la ficha de la

@@ -220,7 +220,7 @@ function PorteriaOperativaView({ gateId, gateName, puedeCambiarSede }: { gateId:
       {confirm && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4"
           style={{ background: 'rgba(0,0,0,0.65)' }}
-          onClick={() => setConfirm(null)}>
+ >
           <div className="rounded-2xl p-8 text-center shadow-2xl max-w-sm w-full"
             style={{ background: 'var(--bg-card)', border: '2px solid #10B981' }}
             onClick={e => e.stopPropagation()}>

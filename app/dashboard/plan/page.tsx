@@ -490,7 +490,7 @@ export default function PlanPage() {
               <>
                 <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
                   className="fixed inset-0 z-40" style={{ background: 'rgba(0,0,0,0.3)' }}
-                  onClick={() => setPanel(null)} />
+ />
                 {panel.modo === 'editar' ? (
                   <PanelCapacitacion
                     key={panel.item.id}
@@ -763,7 +763,7 @@ export default function PlanPage() {
           <>
             <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
               className="fixed inset-0 z-40 bg-black/60 backdrop-blur-sm"
-              onClick={() => setShowCreate(false)} />
+ />
             <motion.div
               initial={{ opacity: 0, scale: 0.96, y: 16 }} animate={{ opacity: 1, scale: 1, y: 0 }}
               exit={{ opacity: 0, scale: 0.96, y: 16 }}

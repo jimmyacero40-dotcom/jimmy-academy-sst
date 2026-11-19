@@ -195,7 +195,7 @@ export default function ConsolaTuCuentasPage() {
       {/* ── Nuevo módulo ── */}
       {creando && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4"
-          style={{ background: 'rgba(0,0,0,0.6)' }} onClick={() => setCreando(false)}>
+          style={{ background: 'rgba(0,0,0,0.6)' }} >
           <div className="terra-card p-5 w-full max-w-md" onClick={e => e.stopPropagation()}>
             <div className="flex items-center justify-between mb-4">
               <p className="text-sm font-bold" style={{ color: 'var(--text)' }}>Nuevo módulo</p>

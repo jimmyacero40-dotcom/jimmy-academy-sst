@@ -1895,7 +1895,7 @@ Se alcanzaron a guardar ${r.guardadas} de ${slides.length} diapositivas.`)
       {showRegister && (
         <div className="fixed inset-0 z-50 flex"
           style={{ background: 'rgba(0,0,0,0.55)', backdropFilter: 'blur(3px)' }}
-          onClick={() => setShowRegister(false)}>
+ >
           <motion.div
             initial={{ x: -360, opacity: 0 }} animate={{ x: 0, opacity: 1 }}
             exit={{ x: -360, opacity: 0 }} transition={{ type: 'spring', damping: 28, stiffness: 260 }}

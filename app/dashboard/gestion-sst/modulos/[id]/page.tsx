@@ -452,7 +452,7 @@ export default function ModuloPage({ params }: { params: { id: string } }) {
       {/* ── Lo que respondió una persona ── */}
       {verDe && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4"
-          style={{ background: 'rgba(0,0,0,0.6)' }} onClick={() => setVerDe(null)}>
+          style={{ background: 'rgba(0,0,0,0.6)' }} >
           <div className="terra-card p-5 w-full max-w-lg max-h-[85vh] overflow-y-auto" onClick={ev => ev.stopPropagation()}>
             <div className="flex items-start justify-between gap-3 mb-4">
               <div className="min-w-0">
@@ -499,7 +499,7 @@ export default function ModuloPage({ params }: { params: { id: string } }) {
       {/* ── Confirmar el borrado de respuestas ── */}
       {porBorrar && (
         <div className="fixed inset-0 z-[60] flex items-center justify-center p-4"
-          style={{ background: 'rgba(0,0,0,0.6)' }} onClick={() => setPorBorrar(null)}>
+          style={{ background: 'rgba(0,0,0,0.6)' }} >
           <div className="terra-card p-5 w-full max-w-md" onClick={ev => ev.stopPropagation()}>
             <div className="flex items-start gap-3 mb-3">
               <AlertCircle size={20} style={{ color: '#EF4444' }} className="mt-0.5 flex-shrink-0" />
@@ -531,7 +531,7 @@ export default function ModuloPage({ params }: { params: { id: string } }) {
       {/* ── Confirmar el cierre ── */}
       {cerrando && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4"
-          style={{ background: 'rgba(0,0,0,0.6)' }} onClick={() => setCerrando(false)}>
+          style={{ background: 'rgba(0,0,0,0.6)' }} >
           <div className="terra-card p-5 w-full max-w-md" onClick={ev => ev.stopPropagation()}>
             <p className="text-sm font-bold mb-1" style={{ color: 'var(--text)' }}>Cerrar «{modulo.nombre}»</p>
             <p className="text-xs mb-3 leading-relaxed" style={{ color: 'var(--text-dim)' }}>

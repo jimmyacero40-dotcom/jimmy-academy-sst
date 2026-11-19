@@ -417,7 +417,7 @@ export default function SignaturesPage() {
 
       {/* Doc detail modal */}
       {selectedDoc && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4" onClick={() => setSelectedDoc(null)}>
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4" >
           <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }}
             className="bg-[var(--bg-surface)] border border-[var(--border-strong)] rounded-2xl w-full max-w-md" onClick={e => e.stopPropagation()}>
             <div className="flex items-center justify-between px-6 py-4 border-b border-[var(--border)]">

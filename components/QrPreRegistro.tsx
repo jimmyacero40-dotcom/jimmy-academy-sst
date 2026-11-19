@@ -117,7 +117,7 @@ export function QrPreRegistro({ onClose }: { onClose: () => void }) {
 
   return (
     <div className="fixed inset-0 z-[70] flex items-center justify-center p-4 overflow-y-auto"
-      style={{ background: 'rgba(0,0,0,0.65)' }} onClick={onClose}>
+      style={{ background: 'rgba(0,0,0,0.65)' }} >
       <motion.div initial={{ opacity: 0, scale: 0.97 }} animate={{ opacity: 1, scale: 1 }}
         onClick={e => e.stopPropagation()} className="terra-card w-full max-w-md p-5 my-8">
 

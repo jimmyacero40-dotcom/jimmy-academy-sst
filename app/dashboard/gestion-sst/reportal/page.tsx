@@ -331,7 +331,7 @@ export default function BandejaReportalPage() {
       {/* ── Confirmación de borrado ── */}
       {porBorrar && (
         <div className="fixed inset-0 z-[60] flex items-center justify-center p-4"
-          style={{ background: 'rgba(0,0,0,0.65)' }} onClick={() => !borrando && setPorBorrar(null)}>
+          style={{ background: 'rgba(0,0,0,0.65)' }} >
           <motion.div initial={{ opacity: 0, scale: 0.97 }} animate={{ opacity: 1, scale: 1 }}
             onClick={e => e.stopPropagation()} className="terra-card w-full max-w-md p-5">
             <div className="flex items-start gap-3 mb-3">
@@ -376,7 +376,7 @@ export default function BandejaReportalPage() {
       {/* ── Detalle y trámite ── */}
       {abierto && (
         <div className="fixed inset-0 z-50 flex items-start justify-center p-4 overflow-y-auto"
-          style={{ background: 'rgba(0,0,0,0.6)' }} onClick={() => setAbierto(null)}>
+          style={{ background: 'rgba(0,0,0,0.6)' }} >
           <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }}
             onClick={e => e.stopPropagation()} className="terra-card w-full max-w-4xl my-8 p-5">
 

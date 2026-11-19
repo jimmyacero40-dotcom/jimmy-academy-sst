@@ -92,7 +92,7 @@ function DetailDrawer({ log, onClose }: { log: LogEntry; onClose: () => void }) 
   const Icon = cfg.icon
 
   return (
-    <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex justify-end" onClick={onClose}>
+    <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex justify-end" >
       <motion.div
         initial={{ x: '100%' }} animate={{ x: 0 }} exit={{ x: '100%' }}
         transition={{ type: 'spring', damping: 25, stiffness: 200 }}

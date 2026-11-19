@@ -62,8 +62,17 @@ export async function GET(req: NextRequest) {
   // por más que la persona hubiera cambiado su foto.
   const { data: profilesData } = await supabaseAdmin
     .from('worker_profiles')
-    .select('user_id, photo_url')
+    .select('user_id, photo_url, email_personal')
     .in('user_id', userIds.length ? userIds : ['_'])
+
+  // El correo que el trabajador escribe en su ficha vale tanto como el que
+  // registra quien administra. La pantalla de asignar miraba solo el de la
+  // cuenta, así que avisaba «no tiene correo registrado» de alguien que
+  // acababa de escribirlo donde la plataforma se lo pide.
+  const correoDeFicha: Record<string, string> = {}
+  for (const p of profilesData ?? []) {
+    if (p.email_personal) correoDeFicha[p.user_id] = p.email_personal
+  }
 
   const photoByUser: Record<string, string> = {}
   for (const p of profilesData ?? []) {
@@ -88,6 +97,10 @@ export async function GET(req: NextRequest) {
 
   const result = (data ?? []).map((u: any) => ({
     ...u,
+    // La dirección a la que de verdad se le escribiría: la de la cuenta, y si
+    // no hay, la que la persona puso en su ficha.
+    correo: u.correo || correoDeFicha[u.id] || null,
+    correo_ficha: correoDeFicha[u.id] || null,
     photo_url: photoByUser[u.id] || null,
     sede: perfilByUser[u.id]?.centro_trabajo || null,
     fecha_ingreso: perfilByUser[u.id]?.fecha_ingreso || null,

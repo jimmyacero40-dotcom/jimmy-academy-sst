@@ -814,7 +814,7 @@ export default function ProfilesPage() {
           <>
             <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
               className="fixed inset-0 z-40 bg-black/60 backdrop-blur-sm"
-              onClick={() => setShowModal(false)} />
+ />
             <motion.div
               initial={{ opacity: 0, scale: 0.96, y: 16 }} animate={{ opacity: 1, scale: 1, y: 0 }}
               exit={{ opacity: 0, scale: 0.96, y: 16 }}

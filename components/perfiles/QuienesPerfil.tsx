@@ -116,7 +116,7 @@ export default function QuienesPerfil({
 
   return (
     <div className="fixed inset-0 z-[70] flex items-center justify-center p-4"
-      style={{ background: 'rgba(0,0,0,0.6)' }} onClick={onCerrar}>
+      style={{ background: 'rgba(0,0,0,0.6)' }} >
       <div className="terra-card w-full max-w-2xl max-h-[88vh] flex flex-col"
         onClick={e => e.stopPropagation()}>
 
