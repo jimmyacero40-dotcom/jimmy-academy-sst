@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react'
 import { useAnchosColumnas, ManijaColumna, type ColumnaAncho } from '@/components/anchos-columnas'
 import { useSession } from 'next-auth/react'
 import { useRol } from '@/lib/usar-rol'
-import { UserX, Search, RefreshCw, RotateCcw, Calendar, ArrowLeft, Trash2, AlertTriangle } from 'lucide-react'
+import { UserX, Search, RefreshCw, RotateCcw, Calendar, ArrowLeft, Trash2, AlertTriangle, FileText, Pencil, Save } from 'lucide-react'
 import Link from 'next/link'
 
 interface RetiredUser {
@@ -33,15 +33,19 @@ function initials(name: string) {
 function fmtDate(iso: string) {
   return new Date(iso).toLocaleDateString('es-CO', { day: '2-digit', month: 'short', year: 'numeric' })
 }
+/** La fecha como la espera un <input type="date">, en hora de Colombia. */
+function paraInput(iso: string) {
+  return new Date(new Date(iso).getTime() - 5 * 60 * 60 * 1000).toISOString().slice(0, 10)
+}
 
 const COLUMNAS_RETIRADOS: ColumnaAncho[] = [
-  { id: 'trabajador', ancho: 28, min: 12 },
-  { id: 'cedula',     ancho: 13, min: 7 },
-  { id: 'cargo',      ancho: 14, min: 7 },
-  { id: 'grupos',     ancho: 13, min: 7 },
-  { id: 'ingreso',    ancho: 12, min: 8 },
-  { id: 'retiro',     ancho: 10, min: 8 },
-  { id: 'accion',     ancho: 10, min: 8 },
+  { id: 'trabajador', ancho: 24, min: 12 },
+  { id: 'cedula',     ancho: 11, min: 7 },
+  { id: 'cargo',      ancho: 13, min: 7 },
+  { id: 'grupos',     ancho: 11, min: 7 },
+  { id: 'ingreso',    ancho: 11, min: 8 },
+  { id: 'retiro',     ancho: 12, min: 9 },
+  { id: 'accion',     ancho: 18, min: 10 },
 ]
 
 export default function RetiradosPage() {
@@ -58,6 +62,9 @@ export default function RetiradosPage() {
   const [toast, setToast] = useState<{ msg: string; type: 'ok' | 'err' } | null>(null)
   const [confirm, setConfirm] = useState<RetiredUser | null>(null)
   const [permanentDeleteConfirm, setPermanentDeleteConfirm] = useState<RetiredUser | null>(null)
+  const [editandoFecha, setEditandoFecha] = useState<RetiredUser | null>(null)
+  const [nuevaFecha, setNuevaFecha] = useState('')
+  const [guardandoFecha, setGuardandoFecha] = useState(false)
 
   function showToast(msg: string, type: 'ok' | 'err') {
     setToast({ msg, type })
@@ -103,6 +110,31 @@ export default function RetiradosPage() {
     setPermanentDeleteConfirm(null)
   }
 
+  function abrirFecha(w: RetiredUser) {
+    setNuevaFecha(paraInput(w.retired_at))
+    setEditandoFecha(w)
+  }
+
+  async function guardarFecha() {
+    if (!editandoFecha) return
+    setGuardandoFecha(true)
+    const res = await fetch(`/api/users/${editandoFecha.id}/retire`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ retired_at: nuevaFecha }),
+    })
+    const cuerpo = await res.json()
+    if (res.ok) {
+      setWorkers(prev => prev.map(w =>
+        w.id === editandoFecha.id ? { ...w, retired_at: cuerpo.retired_at } : w))
+      showToast(`✓ Fecha de retiro de ${editandoFecha.name} corregida`, 'ok')
+      setEditandoFecha(null)
+    } else {
+      showToast(cuerpo.error || 'No se pudo guardar la fecha', 'err')
+    }
+    setGuardandoFecha(false)
+  }
+
   const filtered = workers.filter(w => {
     if (!search) return true
     const q = search.toLowerCase()
@@ -144,6 +176,37 @@ export default function RetiradosPage() {
                 style={{ background: '#10B981', color: '#fff' }}>
                 {reactivating === confirm.id ? <RefreshCw size={14} className="animate-spin" /> : <RotateCcw size={14} />}
                 Reactivar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Corregir la fecha de retiro. No se cierra al tocar afuera: se pierde lo escrito. */}
+      {editandoFecha && (
+        <div className="fixed inset-0 z-40 flex items-center justify-center p-4" style={{ background: 'rgba(0,0,0,0.4)' }}>
+          <div className="w-full max-w-sm rounded-2xl shadow-2xl p-6 space-y-4"
+            style={{ background: 'var(--bg-card)', border: '1px solid var(--border)' }}>
+            <h3 className="text-base font-bold" style={{ color: 'var(--text-strong)' }}>Fecha de retiro</h3>
+            <p className="text-sm" style={{ color: 'var(--text-dim)' }}>
+              El día en que <strong style={{ color: 'var(--text)' }}>{editandoFecha.name}</strong> dejó de
+              pertenecer a la empresa, no el día en que se registró aquí.
+            </p>
+            <input type="date" value={nuevaFecha} onChange={e => setNuevaFecha(e.target.value)}
+              max={paraInput(new Date().toISOString())}
+              className="w-full px-3 py-2 rounded-lg text-sm outline-none"
+              style={{ background: 'var(--bg)', border: '1px solid var(--border)', color: 'var(--text)' }} />
+            <div className="flex gap-2">
+              <button onClick={() => setEditandoFecha(null)}
+                className="flex-1 px-4 py-2 rounded-lg text-sm font-semibold"
+                style={{ border: '1px solid var(--border)', color: 'var(--text-dim)', background: 'var(--bg)' }}>
+                Cancelar
+              </button>
+              <button onClick={guardarFecha} disabled={guardandoFecha || !nuevaFecha}
+                className="flex-1 flex items-center justify-center gap-2 px-4 py-2 rounded-lg text-sm font-bold disabled:opacity-60"
+                style={{ background: 'var(--primary)', color: '#fff' }}>
+                {guardandoFecha ? <RefreshCw size={14} className="animate-spin" /> : <Save size={14} />}
+                Guardar
               </button>
             </div>
           </div>
@@ -279,7 +342,9 @@ export default function RetiradosPage() {
                           {initials(w.name)}
                         </div>
                         <div className="min-w-0">
-                          <div className="text-sm font-semibold truncate" style={{ color: 'var(--text-dim)' }}>{w.name}</div>
+                          <Link href={`/dashboard/users/${w.id}`}
+                            className="block text-sm font-semibold truncate hover:underline"
+                            style={{ color: 'var(--text-dim)' }}>{w.name}</Link>
                           <div className="text-[11px] truncate" style={{ color: 'var(--text-faint)' }}>{w.email}</div>
                         </div>
                       </div>
@@ -310,12 +375,20 @@ export default function RetiradosPage() {
                       </span>
                     </td>
                     <td className="px-4 py-3">
-                      <span className="flex items-center gap-1 text-xs font-semibold" style={{ color: '#EF4444' }}>
+                      <button onClick={() => abrirFecha(w)} title="Corregir la fecha de retiro"
+                        className="group flex items-center gap-1 text-xs font-semibold px-1.5 py-1 -mx-1.5 rounded-md hover:bg-[var(--bg)]"
+                        style={{ color: '#EF4444' }}>
                         <Calendar size={11} /> {fmtDate(w.retired_at)}
-                      </span>
+                        <Pencil size={10} className="opacity-0 group-hover:opacity-100" />
+                      </button>
                     </td>
                     <td className="px-4 py-3">
                       <div className="flex items-center gap-2 flex-wrap">
+                        <Link href={`/dashboard/users/${w.id}`}
+                          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all"
+                          style={{ background: 'var(--bg)', color: 'var(--text-dim)', border: '1px solid var(--border)' }}>
+                          <FileText size={12} /> Ver ficha
+                        </Link>
                         <button
                           onClick={() => setConfirm(w)}
                           className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all"
@@ -325,9 +398,11 @@ export default function RetiradosPage() {
                         {isSuperAdmin && (
                           <button
                             onClick={() => setPermanentDeleteConfirm(w)}
-                            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all"
+                            title="Retirar definitivamente (borra sus datos personales, no se puede deshacer)"
+                            aria-label="Retirar definitivamente"
+                            className="flex items-center justify-center p-1.5 rounded-lg transition-all"
                             style={{ background: 'rgba(239,68,68,0.08)', color: '#EF4444', border: '1px solid rgba(239,68,68,0.25)' }}>
-                            <Trash2 size={12} /> Retirar definitivamente
+                            <Trash2 size={13} />
                           </button>
                         )}
                       </div>

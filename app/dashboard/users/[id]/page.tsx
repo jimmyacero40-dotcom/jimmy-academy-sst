@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback } from 'react'
 import FichaCompleta from '@/components/FichaCompleta'
 import AsignarCapacitacion from '@/components/AsignarCapacitacion'
 import { useParams, useRouter } from 'next/navigation'
+import Link from 'next/link'
 import { motion } from 'framer-motion'
 import {
   ArrowLeft, User, Mail, CreditCard, Briefcase, MapPin,
@@ -43,6 +44,7 @@ interface UserProfile {
   cargo: string | null
   active: boolean
   created_at: string
+  retired_at?: string | null
 }
 
 const STATUS_CFG: Record<string, { label: string; color: string; bg: string; icon: any }> = {
@@ -246,6 +248,16 @@ export default function UserDetailPage() {
 
           {/* Status badge */}
           <div className="flex-shrink-0">
+            {/* Inactivo no dice por qué. Si fue un retiro, hay que verlo: lo que
+                sigue en esta ficha es historial, no población actual. */}
+            {user.retired_at ? (
+              <Link href="/dashboard/users/retirados"
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold"
+                style={{ background: 'rgba(239,68,68,0.1)', color: '#EF4444', border: '1px solid rgba(239,68,68,0.25)' }}>
+                <div className="w-1.5 h-1.5 rounded-full" style={{ background: '#EF4444' }} />
+                Retirado el {new Date(user.retired_at).toLocaleDateString('es-CO', { day: '2-digit', month: 'short', year: 'numeric' })}
+              </Link>
+            ) : (
             <span className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold ${user.active ? '' : 'opacity-60'}`}
               style={user.active
                 ? { background: 'rgba(16,185,129,0.1)', color: '#34D399', border: '1px solid rgba(16,185,129,0.25)' }
@@ -254,6 +266,7 @@ export default function UserDetailPage() {
                 style={{ background: user.active ? '#10B981' : '#64748B' }} />
               {user.active ? 'Activo' : 'Inactivo'}
             </span>
+            )}
           </div>
         </div>
       </motion.div>
