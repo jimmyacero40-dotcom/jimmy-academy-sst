@@ -178,7 +178,27 @@ export async function DELETE(req: NextRequest, _ctx: { params: { id: string } })
   const { item_id } = await req.json()
   if (!item_id) return NextResponse.json({ error: 'item_id requerido' }, { status: 400 })
 
+  // Las inscripciones se borran a mano antes que la ronda.
+  //
+  // La llave foránea está en SET NULL, así que al borrar el ítem las
+  // inscripciones no se iban: se quedaban sin ronda, en pendiente, y el
+  // trabajador seguía viendo en su portal una capacitación que para la
+  // empresa ya no existe —y podía hacerla—. Hay diez así ahora mismo, de
+  // rondas borradas hace tiempo.
+  //
+  // Las terminadas no se tocan: son la evidencia de que esa persona sí la
+  // hizo, y eso no deja de ser cierto porque se borre la programación.
+  const { data: borradas } = await supabase
+    .from('enrollments')
+    .delete()
+    .eq('plan_item_id', item_id)
+    .neq('status', 'completed')
+    .select('id')
+
+  await supabase.from('plan_item_targets').delete().eq('plan_item_id', item_id)
+
   const { error } = await supabase.from('plan_items').delete().eq('id', item_id)
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
-  return NextResponse.json({ success: true })
+
+  return NextResponse.json({ success: true, inscripcionesBorradas: borradas?.length ?? 0 })
 }

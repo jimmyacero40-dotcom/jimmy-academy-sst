@@ -31,6 +31,37 @@ export function calcularCierre(programada: string | null, dias: number | null): 
   return sumarDias(programada, n)
 }
 
+/** Días enteros entre dos fechas 'YYYY-MM-DD'. */
+export function diasEntre(desde: string, hasta: string): number | null {
+  const [a1, m1, d1] = desde.split('-').map(Number)
+  const [a2, m2, d2] = hasta.split('-').map(Number)
+  if (!a1 || !m1 || !d1 || !a2 || !m2 || !d2) return null
+  const uno = new Date(a1, m1 - 1, d1), dos = new Date(a2, m2 - 1, d2)
+  return Math.round((dos.getTime() - uno.getTime()) / 86400000)
+}
+
+/**
+ * Cuántos días dura de verdad la ronda.
+ *
+ * Si nadie guardó el plazo, no se asume el de siempre: se cuenta contra la
+ * fecha de cierre que tiene puesta. La inducción decía «se cierra a los 15
+ * días» y «queda abierta hasta el 26» mientras su cierre guardado era el 14;
+ * se cerró el 15 y nadie entendió por qué. El formulario mostraba una regla
+ * y la base guardaba otra.
+ */
+export function diasReales(item: {
+  dias_vigencia?: number | null
+  scheduled_date?: string | null
+  end_date?: string | null
+}): number {
+  if (item.dias_vigencia != null) return item.dias_vigencia
+  if (item.scheduled_date && item.end_date) {
+    const n = diasEntre(item.scheduled_date, item.end_date)
+    if (n != null && n >= 0) return n
+  }
+  return DIAS_POR_DEFECTO
+}
+
 /** Una ronda cuenta como vigente mientras no esté cerrada ni cancelada. */
 export function estaAbierta(item: { estado?: string | null; end_date?: string | null }): boolean {
   if (item.estado === 'cerrada' || item.estado === 'cancelada') return false

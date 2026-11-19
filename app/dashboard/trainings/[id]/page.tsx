@@ -8,7 +8,7 @@ import { motion, AnimatePresence } from 'framer-motion'
 import {
   ChevronLeft, ChevronRight, CheckCircle, X, Award, Download,
   BookOpen, RotateCcw, AlertCircle, Clock, Loader2, QrCode, Shield,
-  User, Calendar, Plus, Trash2, Save, Edit3, FileText
+  User, Calendar, Plus, Trash2, Save, Edit3, FileText, Lock
 } from 'lucide-react'
 import { getCustomQuestions, saveCustomQuestions, type CustomQuestion } from '@/lib/pptx-extractor'
 import { generateCertificatePNG } from '@/lib/generate-certificate'
@@ -401,6 +401,7 @@ export default function TrainingDetailPage() {
   // ahí se guarda por dónde va.
   const [inscripcion, setInscripcion] = useState<{ id: string; progreso: number } | null>(null)
   const [retomar, setRetomar] = useState<number | null>(null)
+  const [cerradaParaMi, setCerradaParaMi] = useState<string | null | undefined>(undefined)
 
   useEffect(() => {
     if (!isWorker || !courseId) return
@@ -409,6 +410,10 @@ export default function TrainingDetailPage() {
       .then((enrs: any[]) => {
         const mia = enrs.find((e: any) => e.trainings?.id === courseId)
         if (!mia) { router.replace('/dashboard/my-plan'); return }
+        // La ronda cerrada ya no se contesta. Antes bastaba con tener la
+        // inscripción: el trabajador entraba a una capacitación vencida y la
+        // respondía como si siguiera abierta.
+        if (mia.puedeResponder === false) { setCerradaParaMi(mia.cierra ?? null); return }
         setInscripcion({ id: mia.id, progreso: Number(mia.progreso) || 0 })
         // No se salta solo: se ofrece. Retomar sin avisar deja a alguien que
         // quería repasar desde el principio en mitad del curso sin saber por qué.
@@ -653,6 +658,31 @@ export default function TrainingDetailPage() {
           <button onClick={() => router.push(backPath)}
             className="terra-btn-primary px-6 py-2.5">
             ← {isWorker ? 'Volver a Mi Formación' : 'Volver a capacitaciones'}
+          </button>
+        </div>
+      </div>
+    )
+  }
+
+  // Ronda cerrada: se entra, pero no se contesta. Se dice por qué y hasta
+  // cuándo estuvo abierta, que es lo que la persona necesita para reclamar.
+  if (cerradaParaMi !== undefined) {
+    return (
+      <div className="flex items-center justify-center h-full min-h-[60vh]">
+        <div className="text-center max-w-md">
+          <Lock size={44} className="mx-auto mb-4 opacity-40" style={{ color: 'var(--text-faint)' }} />
+          <h2 className="text-lg font-bold mb-2" style={{ color: 'var(--text)' }}>
+            Esta capacitación ya está cerrada
+          </h2>
+          <p className="text-sm mb-6 leading-relaxed" style={{ color: 'var(--text-dim)' }}>
+            {cerradaParaMi
+              ? `El plazo para hacerla terminó el ${new Date(cerradaParaMi + 'T12:00:00')
+                  .toLocaleDateString('es-CO', { day: 'numeric', month: 'long', year: 'numeric' })}. `
+              : 'El plazo para hacerla ya terminó. '}
+            Si necesita presentarla, pídale a quien maneja la formación que la programe otra vez.
+          </p>
+          <button onClick={() => router.push(backPath)} className="terra-btn-primary px-6 py-2.5">
+            ← Volver a Mi Formación
           </button>
         </div>
       </div>

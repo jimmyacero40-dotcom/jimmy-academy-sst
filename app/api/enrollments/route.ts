@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { supabaseAdmin as supabase } from '@/lib/supabase-admin'
+import { estaAbierta } from '@/lib/ventana'
 import { isAdminOrSuper, getCurrentUser } from '@/lib/get-company'
 
 export async function GET() {
@@ -13,7 +14,7 @@ export async function GET() {
       .select(`
         id, status, due_date, started_at, completed_at, score, created_at, progreso, progreso_total,
         trainings(id, title, description, duration, cover_url, category),
-        plan_items(estado)
+        plan_items(estado, scheduled_date, end_date)
       `)
       .eq('user_id', user.id)
       .order('due_date', { ascending: true, nullsFirst: false })
@@ -25,7 +26,19 @@ export async function GET() {
     // capacitación, una de la ronda viva y otra de la que se dio de baja.
     return NextResponse.json((data ?? [])
       .filter((e: any) => e.plan_items?.estado !== 'cancelada')
-      .map(({ plan_items, ...resto }: any) => resto))
+      .map(({ plan_items, ...resto }: any) => ({
+        ...resto,
+        // Cerrada no es lo mismo que cancelada: la cancelada desaparece, la
+        // cerrada se sigue viendo —hace falta saber que pasó y no se hizo—
+        // pero ya no se puede contestar. Sin esto el trabajador entraba a una
+        // ronda vencida y la respondía como si nada.
+        abierta: !plan_items || estaAbierta(plan_items),
+        cierra: plan_items?.end_date ?? null,
+        // Una inscripción ya terminada no se vuelve a abrir aunque la ronda
+        // siga viva: el certificado ya se emitió.
+        puedeResponder: resto.status !== 'completed'
+          && (!plan_items || estaAbierta(plan_items)),
+      })))
   }
 
   // Admin/superadmin see all enrollments for their company

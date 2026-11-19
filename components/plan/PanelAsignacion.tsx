@@ -9,7 +9,7 @@ import {
 import {
   MESES, enPalabras, ocurrencias as repetir, type Ocurrencia,
 } from '@/lib/plan-fechas'
-import { calcularCierre, DIAS_POR_DEFECTO } from '@/lib/ventana'
+import { calcularCierre, diasReales, DIAS_POR_DEFECTO } from '@/lib/ventana'
 import {
   ESTADOS, ESTADO_NOMBRE, PERIODICIDADES, PERIODICIDAD_NOMBRE,
   colorCategoria, type PlanItem, type Tema,
@@ -83,7 +83,10 @@ export default function PanelAsignacion({
     scheduled_date: item?.scheduled_date ?? inicial?.scheduled_date ?? '',
     // El cierre no se escribe a mano: se dice cuántos días dura la ronda y
     // la fecha sale de ahí. Lo de antes era una "fecha fin" que nadie llenaba.
-    dias_vigencia: String(item?.dias_vigencia ?? DIAS_POR_DEFECTO),
+    // El plazo que se muestra es el que de verdad rige, contado contra la
+    // fecha de cierre guardada. Mostrar quince cuando el cierre decía otra
+    // cosa hacía que la ronda se cerrara en una fecha que nadie había visto.
+    dias_vigencia: String(item ? diasReales(item) : DIAS_POR_DEFECTO),
     estado: item?.estado ?? 'pendiente',
     required: item?.required ?? inicial?.required ?? tema?.obligatorio ?? true,
     reinduccion: item?.reinduccion ?? false,
