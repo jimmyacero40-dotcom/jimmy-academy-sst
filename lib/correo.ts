@@ -36,8 +36,19 @@ export function direccionDe(persona: {
   return ((ficha?.email_personal ?? persona.email_personal) ?? '').trim()
 }
 
+/**
+ * El buzón y la clave de Gmail, con los nombres que puedan traer.
+ *
+ * El otro proyecto de la misma cuenta los guarda como `GMAIL_USER` y
+ * `GMAIL_APP_PASSWORD`, y el remitente como `EMAIL_FROM`. Aceptar los dos
+ * juegos de nombres evita que el correo quede mudo por haber escrito el
+ * rótulo que se usaba en el proyecto de al lado.
+ */
+const usuarioGmail = () => process.env.CORREO_USUARIO || process.env.GMAIL_USER || ''
+const claveGmail = () => process.env.CORREO_CLAVE || process.env.GMAIL_APP_PASSWORD || ''
+
 function porGmail(): boolean {
-  return !!(process.env.CORREO_USUARIO && process.env.CORREO_CLAVE)
+  return !!(usuarioGmail() && claveGmail())
 }
 
 export function correoConfigurado(): boolean {
@@ -46,8 +57,9 @@ export function correoConfigurado(): boolean {
 
 /** Quién aparece como remitente. */
 export function remitente(): string {
-  if (process.env.CORREO_REMITENTE) return process.env.CORREO_REMITENTE
-  if (porGmail()) return `AgroSafe SST <${process.env.CORREO_USUARIO}>`
+  const propio = process.env.CORREO_REMITENTE || process.env.EMAIL_FROM
+  if (propio) return propio
+  if (porGmail()) return `AgroSafe SST <${usuarioGmail()}>`
   return 'AgroSafe <onboarding@resend.dev>'
 }
 
@@ -59,9 +71,9 @@ function conexion(): Transporter {
     transporte = nodemailer.createTransport({
       service: 'gmail',
       auth: {
-        user: process.env.CORREO_USUARIO,
+        user: usuarioGmail(),
         // Google la entrega en cuatro grupos; si quedó con espacios, igual sirve.
-        pass: (process.env.CORREO_CLAVE || '').replace(/\s+/g, ''),
+        pass: claveGmail().replace(/\s+/g, ''),
       },
       pool: true,
       maxConnections: 1,
@@ -127,7 +139,7 @@ export async function probarCorreo(): Promise<{
 /** El remitente, con el buzón tapado: sirve para reconocerlo, no para copiarlo. */
 export function remitenteTapado(): string {
   const dir = porGmail()
-    ? (process.env.CORREO_USUARIO || '').trim()
+    ? usuarioGmail().trim()
     : remitente().replace(/^.*<|>$/g, '').trim()
   if (!dir) return '—'
   return dir.replace(/^(.{2}).*(@.*)$/, '$1•••$2')
