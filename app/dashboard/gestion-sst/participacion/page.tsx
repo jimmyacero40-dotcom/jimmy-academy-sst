@@ -18,6 +18,7 @@ import {
 import { GRUPOS_PELIGROS, CAMPO_MEJORAS } from '@/lib/peligros'
 import { exportarFormularioPDF } from './export-pdf'
 import RecordatorioDialog from '@/components/RecordatorioDialog'
+import PlazoDialog from '@/components/PlazoDialog'
 import { exportarResultadosExcel } from './export-excel'
 import { exportarResultadosPDF } from './export-resultados-pdf'
 
@@ -313,8 +314,8 @@ export default function ParticipacionAdminPage() {
 
       {/* ── El plazo: desde cuándo y hasta cuándo se puede responder ── */}
       {panelVentana && (
-        <VentanaPeriodo
-          periodo={periodo}
+        <PlazoDialog
+          titulo={`Identificación de peligros · ${periodo}`}
           abre={estadoPeriodo.abre ?? ''}
           cierra={estadoPeriodo.cierra ?? ''}
           onCerrar={() => setPanelVentana(false)}
@@ -807,74 +808,6 @@ function Bloque({ titulo, filas, base, sufijo, colorPorGrupo, limite = 100 }: {
           Base: {base} participantes.
         </p>
       )}
-    </div>
-  )
-}
-
-/**
- * El plazo de la participación.
- *
- * Antes solo había un interruptor de abierto/cerrado, y eso obliga a acordarse
- * de venir a cerrar el día del corte. Con fechas el periodo se cierra solo, y
- * el trabajador ve desde cuándo y hasta cuándo tiene.
- */
-function VentanaPeriodo({ periodo, abre, cierra, onGuardar, onCerrar }: {
-  periodo: number
-  abre: string
-  cierra: string
-  onGuardar: (abre: string | null, cierra: string | null) => Promise<string | null>
-  onCerrar: () => void
-}) {
-  const [desde, setDesde] = useState(abre)
-  const [hasta, setHasta] = useState(cierra)
-  const [guardando, setGuardando] = useState(false)
-  const [err, setErr] = useState<string | null>(null)
-
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ background: 'rgba(0,0,0,0.6)' }}>
-      <div className="terra-card p-5 w-full max-w-md space-y-4">
-        <div>
-          <p className="text-sm font-bold" style={{ color: 'var(--text)' }}>
-            Plazo para responder · {periodo}
-          </p>
-          <p className="text-xs mt-1 leading-relaxed" style={{ color: 'var(--text-dim)' }}>
-            Fuera de estas fechas el trabajador ve la participación cerrada, sin que usted
-            tenga que cerrarla a mano. Deje una casilla vacía si por ese lado no hay límite.
-          </p>
-        </div>
-
-        <div className="grid grid-cols-2 gap-3">
-          <div>
-            <label className="block text-xs font-semibold mb-1.5" style={{ color: 'var(--text-dim)' }}>Abre el</label>
-            <input type="date" value={desde} onChange={e => setDesde(e.target.value)} className={sel + ' w-full'} />
-          </div>
-          <div>
-            <label className="block text-xs font-semibold mb-1.5" style={{ color: 'var(--text-dim)' }}>Cierra el</label>
-            <input type="date" value={hasta} onChange={e => setHasta(e.target.value)} className={sel + ' w-full'} />
-          </div>
-        </div>
-
-        {err && <p className="text-xs" style={{ color: '#EF4444' }}>{err}</p>}
-
-        <div className="flex gap-2">
-          <button onClick={onCerrar} className="terra-btn-outline flex-1" style={{ padding: '8px 16px', fontSize: 12 }}>
-            Cancelar
-          </button>
-          <button
-            onClick={async () => {
-              setGuardando(true); setErr(null)
-              const fallo = await onGuardar(desde || null, hasta || null)
-              if (fallo) setErr(fallo)
-              setGuardando(false)
-            }}
-            disabled={guardando}
-            className="flex-1 flex items-center justify-center gap-2 rounded-lg font-bold"
-            style={{ padding: '8px 16px', fontSize: 12, background: '#243C2C', color: '#fff' }}>
-            {guardando && <Loader2 size={13} className="animate-spin" />}
-            Guardar plazo
-          </button>
-        </div>
-      </div>
     </div>
   )
 }

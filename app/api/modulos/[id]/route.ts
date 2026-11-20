@@ -78,6 +78,17 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
   if (['todos', 'area', 'cargo', 'finca'].includes(body.dirigido_a)) cambios.dirigido_a = body.dirigido_a
   if (body.dirigido_valor !== undefined) cambios.dirigido_valor = (body.dirigido_valor ?? '').trim() || null
 
+  // El plazo. Vacío por un lado = sin límite por ese lado; null explícito lo
+  // borra, que es como se quita una fecha puesta por error.
+  const fecha = (v: any) => (typeof v === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(v) ? v : null)
+  if (body.abre !== undefined) cambios.abre = fecha(body.abre)
+  if (body.cierra !== undefined) cambios.cierra = fecha(body.cierra)
+  const abreFinal = cambios.abre !== undefined ? cambios.abre : modulo.abre
+  const cierraFinal = cambios.cierra !== undefined ? cambios.cierra : modulo.cierra
+  if (abreFinal && cierraFinal && cierraFinal < abreFinal) {
+    return NextResponse.json({ error: 'La fecha de cierre no puede ser anterior a la de apertura' }, { status: 400 })
+  }
+
   if (['borrador', 'abierto', 'cerrado'].includes(body.estado)) {
     // Abrir sin preguntas dejaría al trabajador frente a una pantalla vacía.
     if (body.estado === 'abierto' && (await preguntasDe(params.id)).length === 0) {

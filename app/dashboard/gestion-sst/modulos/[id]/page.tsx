@@ -6,7 +6,7 @@ import { useSession } from 'next-auth/react'
 import {
   LayoutList, Loader2, ArrowLeft, HelpCircle, Users, Settings, Lock, Unlock,
   Trash2, AlertCircle, Download, Search, Send, FileText, BarChart2,
-  CheckCircle, Clock, X,
+  CheckCircle, Clock, X, Mail, CalendarRange,
 } from 'lucide-react'
 import { tienePermiso } from '@/lib/permisos'
 import EditorPreguntas from '@/components/modulos/EditorPreguntas'
@@ -14,6 +14,9 @@ import {
   ESTADO_MODULO, textoCompleto, NOMBRE_TIPO, type Modulo, type Pregunta,
 } from '@/lib/modulos'
 import { tabular, type FilaModulo } from '@/lib/modulos-tabulacion'
+import RecordatorioDialog from '@/components/RecordatorioDialog'
+import PlazoDialog from '@/components/PlazoDialog'
+import { estadoVigente, enLetras } from '@/lib/modulo-ventana'
 import { exportarRespuestaPDF } from './export-pdf'
 
 type FilaResp = FilaModulo
@@ -43,6 +46,8 @@ export default function ModuloPage({ params }: { params: { id: string } }) {
   const [error, setError] = useState<string | null>(null)
   const [trabajando, setTrabajando] = useState(false)
   const [cerrando, setCerrando] = useState(false)
+  const [panelPlazo, setPanelPlazo] = useState(false)
+  const [avisando, setAvisando] = useState(false)
   const [motivo, setMotivo] = useState('')
   const [busca, setBusca] = useState('')
   const [verDe, setVerDe] = useState<FilaResp | null>(null)
@@ -90,6 +95,10 @@ export default function ModuloPage({ params }: { params: { id: string } }) {
   }, [filas, busca, fArea, fCargo, fCentro, fEstado])
 
   const t = useMemo(() => tabular(visibles, preguntas), [visibles, preguntas])
+
+  // Los que faltan dentro de lo que se está viendo: si se filtró por una
+  // finca, el aviso sale para esa finca.
+  const pendientes = useMemo(() => visibles.filter(f => f.estado !== 'Respondió'), [visibles])
   const hayFiltro = !!(busca || fArea || fCargo || fCentro || fEstado)
 
   const borrarRespuestas = async (objetivo: FilaResp[]) => {
@@ -214,7 +223,11 @@ export default function ModuloPage({ params }: { params: { id: string } }) {
     </div>
   )
 
-  const e = ESTADO_MODULO[modulo.estado]
+  // Lo que de verdad rige: un módulo marcado abierto pero fuera de su plazo
+  // está cerrado para el trabajador, y la etiqueta tiene que decir lo mismo
+  // que él ve, no lo que dice el interruptor.
+  const vig = estadoVigente(modulo as any)
+  const e = ESTADO_MODULO[vig.estado] ?? ESTADO_MODULO[modulo.estado]
 
   return (
     <div className="max-w-4xl mx-auto p-4 pb-24">
@@ -247,6 +260,18 @@ export default function ModuloPage({ params }: { params: { id: string } }) {
 
         {puedeGestionar && (
           <div className="flex items-center gap-2">
+            <button onClick={() => setPanelPlazo(true)}
+              className="terra-btn-outline flex items-center gap-1.5" style={{ padding: '8px 14px', fontSize: 12 }}
+              title="Desde cuándo y hasta cuándo se puede responder">
+              <CalendarRange size={13} /> Plazo
+            </button>
+            {!!pendientes.length && (
+              <button onClick={() => setAvisando(true)}
+                className="flex items-center gap-1.5 rounded-lg font-bold"
+                style={{ padding: '8px 14px', fontSize: 12, border: '1px solid rgba(36,60,44,0.4)', color: '#243C2C', background: 'rgba(36,60,44,0.06)' }}>
+                <Mail size={13} /> Avisar a {pendientes.length}
+              </button>
+            )}
             {modulo.estado === 'abierto' ? (
               <button onClick={() => setCerrando(true)}
                 className="flex items-center gap-1.5 rounded-lg font-bold"
@@ -529,6 +554,42 @@ export default function ModuloPage({ params }: { params: { id: string } }) {
       )}
 
       {/* ── Confirmar el cierre ── */}
+      {panelPlazo && (
+        <PlazoDialog
+          titulo={modulo.nombre}
+          abre={(modulo as any).abre ?? ''}
+          cierra={(modulo as any).cierra ?? ''}
+          onCerrar={() => setPanelPlazo(false)}
+          onGuardar={async (abre, cierra) => {
+            const r = await fetch(`/api/modulos/${modulo.id}`, {
+              method: 'PATCH',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ abre, cierra }),
+            })
+            const d = await r.json().catch(() => ({}))
+            if (!r.ok) return d.error ?? 'No se pudo guardar el plazo'
+            setModulo(d)
+            setPanelPlazo(false)
+            return null
+          }}
+        />
+      )}
+
+      {avisando && (
+        <RecordatorioDialog
+          modulo={`modulo:${modulo.id}`}
+          titulo={`${modulo.nombre} · ${pendientes.length} sin responder`}
+          periodo={modulo.periodo}
+          plazo={(modulo as any).cierra ? enLetras((modulo as any).cierra) : null}
+          candidatos={pendientes.map(f => ({
+            user_id: f.user_id,
+            nombre: f.nombre ?? 'Sin nombre',
+            detalle: [f.cargo, f.area].filter(Boolean).join(' · ') || null,
+          }))}
+          onCerrar={() => setAvisando(false)}
+        />
+      )}
+
       {cerrando && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4"
           style={{ background: 'rgba(0,0,0,0.6)' }} >

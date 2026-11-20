@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { supabaseAdmin as supabase } from '@/lib/supabase-admin'
+import { estadoVigente } from '@/lib/modulo-ventana'
 import { getCurrentUser, requierePermiso } from '@/lib/get-company'
 import { estaCompleta, clavePorque, claveOtro, type Pregunta } from '@/lib/modulos'
 
@@ -111,9 +112,16 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
 
   // El cierre se comprueba aquí y no solo en la pantalla: dejar la página
   // abierta desde antes no sirve para colarse.
-  if (modulo.estado !== 'abierto') {
+  // El plazo cuenta igual que el interruptor: si la ventana se pasó, está
+  // cerrado aunque nadie lo haya cerrado a mano.
+  const vigente = estadoVigente(modulo)
+  if (vigente.estado !== 'abierto') {
     return NextResponse.json(
-      { error: modulo.estado === 'cerrado' ? 'Este módulo ya está cerrado' : 'Este módulo todavía no está disponible' },
+      {
+        error: vigente.estado === 'cerrado'
+          ? `Este módulo ya está cerrado${vigente.motivo ? ` · ${vigente.motivo}` : ''}`
+          : 'Este módulo todavía no está disponible',
+      },
       { status: 403 })
   }
 

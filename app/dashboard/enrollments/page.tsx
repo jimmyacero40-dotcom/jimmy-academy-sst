@@ -1,11 +1,12 @@
 ﻿'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { motion } from 'framer-motion'
 import {
   BarChart2, Loader2, CheckCircle, Clock, AlertTriangle,
-  BookOpen, Search, X, Users, Award, TrendingUp
+  BookOpen, Search, X, Users, Award, TrendingUp, Mail
 } from 'lucide-react'
+import RecordatorioDialog from '@/components/RecordatorioDialog'
 
 interface Enrollment {
   id: string
@@ -29,6 +30,7 @@ export default function EnrollmentsPage() {
   const [loading, setLoading]         = useState(true)
   const [search, setSearch]           = useState('')
   const [filterStatus, setFilterStatus] = useState<string>('all')
+  const [avisando, setAvisando] = useState(false)
 
   useEffect(() => {
     fetch('/api/enrollments')
@@ -51,6 +53,20 @@ export default function EnrollmentsPage() {
   const pending    = enrollments.filter(e => e.status === 'pending' || e.status === 'in_progress').length
   const expired    = enrollments.filter(e => e.status === 'expired').length
   const compliance = total > 0 ? Math.round((completed / total) * 100) : 0
+
+  // A quién avisarle: una persona, no una inscripción. Si a alguien le faltan
+  // tres cursos no se le mandan tres correos; se le manda uno que dice que
+  // tiene capacitaciones pendientes, con la lista en el detalle.
+  const atrasados = useMemo(() => {
+    const por = new Map<string, { user_id: string; nombre: string; cursos: string[] }>()
+    for (const e of filtered) {
+      if (e.status === 'completed' || !e.users?.id) continue
+      const y = por.get(e.users.id) ?? { user_id: e.users.id, nombre: e.users.name, cursos: [] }
+      if (e.trainings?.title) y.cursos.push(e.trainings.title)
+      por.set(e.users.id, y)
+    }
+    return [...por.values()]
+  }, [filtered])
 
   return (
     <div className="p-6">
@@ -109,6 +125,19 @@ export default function EnrollmentsPage() {
         </div>
       </div>
 
+      {avisando && (
+        <RecordatorioDialog
+          modulo="formacion"
+          titulo={`${atrasados.length} personas con capacitaciones sin terminar`}
+          candidatos={atrasados.map(a => ({
+            user_id: a.user_id,
+            nombre: a.nombre,
+            detalle: a.cursos.length === 1 ? a.cursos[0] : `${a.cursos.length} capacitaciones pendientes`,
+          }))}
+          onCerrar={() => setAvisando(false)}
+        />
+      )}
+
       {/* Filters */}
       <div className="flex items-center gap-3 mb-5 flex-wrap">
         <div className="relative flex-1" style={{ minWidth: 200 }}>
@@ -125,6 +154,13 @@ export default function EnrollmentsPage() {
               style={{ color: 'var(--text-faint)' }}><X size={13} /></button>
           )}
         </div>
+        {atrasados.length > 0 && (
+          <button onClick={() => setAvisando(true)}
+            className="flex items-center gap-1.5 rounded-lg font-bold"
+            style={{ padding: '8px 14px', fontSize: 12, border: '1px solid rgba(36,60,44,0.4)', color: '#243C2C', background: 'rgba(36,60,44,0.06)' }}>
+            <Mail size={13} /> Avisar a {atrasados.length}
+          </button>
+        )}
         <div className="flex gap-1 p-1 rounded-xl" style={{ background: 'var(--bg-card)', border: '1px solid var(--border)' }}>
           {[
             { key: 'all',         label: 'Todos' },

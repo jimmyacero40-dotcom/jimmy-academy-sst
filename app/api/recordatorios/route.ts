@@ -2,7 +2,23 @@ import { NextRequest, NextResponse } from 'next/server'
 import { supabaseAdmin as supabase } from '@/lib/supabase-admin'
 import { getCurrentUser, requierePermiso } from '@/lib/get-company'
 import { enviarCorreo, direccionDe, correoConfigurado } from '@/lib/correo'
-import { MODULOS, plantillaRecordatorio, comoSeLeDice } from '@/lib/recordatorios'
+import {
+  MODULOS, plantillaRecordatorio, comoSeLeDice,
+  esModuloDinamico, moduloDinamico, type Modulo,
+} from '@/lib/recordatorios'
+
+/**
+ * De la clave que manda la pantalla al módulo concreto. Los fijos están en la
+ * tabla; los de Tú Cuentas se leen de la base, porque los crea el usuario.
+ */
+async function resolver(clave: string): Promise<Modulo | null> {
+  const fijo = MODULOS[clave]
+  if (fijo) return fijo
+  const id = esModuloDinamico(clave)
+  if (!id) return null
+  const { data } = await supabase.from('modulos').select('id, nombre').eq('id', id).maybeSingle()
+  return data ? moduloDinamico(data) : null
+}
 
 /** El dominio desde el que se está sirviendo, para armar el enlace del correo. */
 function origen(req: NextRequest): string {
@@ -22,7 +38,7 @@ function origen(req: NextRequest): string {
  */
 export async function GET(req: NextRequest) {
   const clave = req.nextUrl.searchParams.get('modulo') ?? ''
-  const modulo = MODULOS[clave]
+  const modulo = await resolver(clave)
   if (!modulo) return NextResponse.json({ error: 'Módulo desconocido' }, { status: 400 })
 
   const { authorized, companyId } = await requierePermiso(modulo.permiso)
@@ -68,7 +84,7 @@ export async function GET(req: NextRequest) {
 /** POST — manda el recordatorio a los seleccionados. */
 export async function POST(req: NextRequest) {
   const body = await req.json().catch(() => ({}))
-  const modulo = MODULOS[String(body.modulo ?? '')]
+  const modulo = await resolver(String(body.modulo ?? ''))
   if (!modulo) return NextResponse.json({ error: 'Módulo desconocido' }, { status: 400 })
 
   const { authorized, companyId } = await requierePermiso(modulo.permiso)

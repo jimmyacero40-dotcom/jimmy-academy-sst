@@ -54,7 +54,7 @@ export const MODULOS: Record<string, Modulo> = {
       'Tiene capacitaciones asignadas que todavía no ha terminado. Son obligatorias '
       + 'dentro del plan anual de formación de la empresa.',
     boton: 'Ver mis capacitaciones',
-    permiso: 'formacion.asignar',
+    permiso: 'formacion.gestionar',
   },
 }
 
@@ -100,4 +100,30 @@ export function comoSeLeDice(nombreCompleto: string | null | undefined): string 
   if (!partes.length) return 'Hola'
   // Los trabajadores se guardan como APELLIDOS NOMBRES.
   return partes.length >= 3 ? partes.slice(2).join(' ') : partes[partes.length - 1]
+}
+
+/**
+ * Los módulos de Tú Cuentas no son fijos: el administrador crea los que
+ * necesite. Su clave de recordatorio es `modulo:<id>`, y el nombre y la
+ * pantalla salen de la fila, no de la tabla de arriba.
+ */
+export const PREFIJO_MODULO = 'modulo:'
+
+export function esModuloDinamico(clave: string): string | null {
+  return clave.startsWith(PREFIJO_MODULO) ? clave.slice(PREFIJO_MODULO.length) : null
+}
+
+export function moduloDinamico(fila: { id: string; nombre: string }): Modulo {
+  return {
+    clave: PREFIJO_MODULO + fila.id,
+    nombre: fila.nombre,
+    ruta: `/dashboard/tu-cuentas/modulo/${fila.id}`,
+    asunto: `Falta su respuesta: ${fila.nombre} — AgroSafe`,
+    frase:
+      `todavía no ha respondido «${fila.nombre}». Es parte del Sistema de Gestión `
+      + 'de Seguridad y Salud en el Trabajo de la empresa, y su respuesta hace falta '
+      + 'para cerrar el consolidado.',
+    boton: 'Responder ahora',
+    permiso: 'sst.modulos.gestionar',
+  }
 }

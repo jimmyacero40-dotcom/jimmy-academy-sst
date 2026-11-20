@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { supabaseAdmin as supabase } from '@/lib/supabase-admin'
+import { estadoVigente } from '@/lib/modulo-ventana'
 import { getCurrentUser, requierePermiso } from '@/lib/get-company'
 
 /**
@@ -27,6 +28,9 @@ export async function GET(req: NextRequest) {
       .eq('user_id', user.id).maybeSingle()
 
     const suyos = (modulos ?? []).filter(m => {
+      // Un módulo marcado abierto pero fuera de su plazo no se le ofrece:
+      // sería invitarlo a responder algo que el servidor le va a rechazar.
+      if (estadoVigente(m).estado !== 'abierto') return false
       if (m.dirigido_a === 'todos') return true
       const valor = (m.dirigido_valor ?? '').trim().toUpperCase()
       if (!valor) return true
