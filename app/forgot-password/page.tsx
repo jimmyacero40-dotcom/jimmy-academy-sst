@@ -13,7 +13,7 @@ export default function ForgotPasswordPage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (!email) { setError('Ingresa tu correo electrónico'); return }
+    if (!email) { setError('Escribe tu correo o tu cédula'); return }
     setError('')
     setLoading(true)
     try {
@@ -52,8 +52,9 @@ export default function ForgotPasswordPage() {
               </div>
               <h2 className="text-xl font-semibold text-white mb-3">Revisa tu correo</h2>
               <p className="text-sm leading-relaxed mb-6" style={{ color: '#64748b' }}>
-                Si existe una cuenta con <strong className="text-white">{email}</strong>, recibirás
-                un enlace para restablecer tu contraseña en los próximos minutos.
+                Si existe una cuenta con <strong className="text-white">{email}</strong>, le llegará
+                un enlace para crear una contraseña nueva al correo que tenga registrado.
+                El enlace vence en una hora.
               </p>
               <p className="text-xs" style={{ color: '#475569' }}>¿No llegó? Revisa la carpeta de spam.</p>
             </motion.div>
@@ -62,7 +63,8 @@ export default function ForgotPasswordPage() {
               <div className="mb-7">
                 <h2 className="text-xl font-semibold text-white mb-2">¿Olvidaste tu contraseña?</h2>
                 <p className="text-sm leading-relaxed" style={{ color: '#64748b' }}>
-                  Ingresa tu correo y te enviaremos un enlace para crear una nueva contraseña.
+                  Escribe tu correo o tu cédula y te enviaremos un enlace para crear una
+                  contraseña nueva. Llega al correo que tengas registrado.
                 </p>
               </div>
 
@@ -75,15 +77,15 @@ export default function ForgotPasswordPage() {
 
               <form onSubmit={handleSubmit} className="space-y-5">
                 <div>
-                  <label className="block text-xs font-medium mb-2" style={{ color: '#64748b' }}>Correo electrónico</label>
+                  <label className="block text-xs font-medium mb-2" style={{ color: '#64748b' }}>Correo o cédula</label>
                   <div className="relative">
                     <Mail size={14} className="absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" style={{ color: '#334155' }} />
                     <input
-                      type="email"
+                      type="text"
                       value={email}
                       onChange={e => { setEmail(e.target.value); setError('') }}
-                      placeholder="tu@empresa.com"
-                      autoComplete="email"
+                      placeholder="tu@correo.com o tu cédula"
+                      autoComplete="username"
                       autoFocus
                       style={{
                         width: '100%', padding: '11px 14px 11px 36px', borderRadius: 10,
