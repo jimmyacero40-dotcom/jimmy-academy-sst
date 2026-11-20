@@ -55,3 +55,55 @@ export async function comprimirImagen(
     URL.revokeObjectURL(url)
   }
 }
+
+/** Más ancho que esto tampoco se ve en una diapositiva a pantalla completa. */
+export const ANCHO_DIAPOSITIVA = 1600
+export const CALIDAD_DIAPOSITIVA = 0.82
+
+/**
+ * Lo mismo que arriba, pero para una diapositiva que llega como data URL.
+ *
+ * El extractor de PPTX y el de PDF entregan las láminas en base64, no como
+ * archivo. Una exportada en PNG pesaba más de un mega y la misma en JPG pesa
+ * la sexta parte: con 280 diapositivas esa era la diferencia entre 211 MB y
+ * unos 30 MB, y el PNG se estaba comiendo la cuota del proyecto.
+ */
+export async function comprimirDataUrl(
+  dataUrl: string,
+  ancho = ANCHO_DIAPOSITIVA,
+  calidad = CALIDAD_DIAPOSITIVA,
+): Promise<string> {
+  if (typeof document === 'undefined') return dataUrl
+  if (!/^data:image\/(png|jpe?g|webp);base64,/i.test(dataUrl)) return dataUrl
+
+  try {
+    const img = await new Promise<HTMLImageElement>((resolve, reject) => {
+      const i = new Image()
+      i.onload = () => resolve(i)
+      i.onerror = reject
+      i.src = dataUrl
+    })
+
+    const escala = img.width > ancho ? ancho / img.width : 1
+    const canvas = document.createElement('canvas')
+    canvas.width = Math.round(img.width * escala)
+    canvas.height = Math.round(img.height * escala)
+    const ctx = canvas.getContext('2d')
+    if (!ctx) return dataUrl
+    ctx.fillStyle = '#FFFFFF'
+    ctx.fillRect(0, 0, canvas.width, canvas.height)
+    ctx.drawImage(img, 0, 0, canvas.width, canvas.height)
+
+    const jpg = canvas.toDataURL('image/jpeg', calidad)
+    return jpg.length < dataUrl.length ? jpg : dataUrl
+  } catch (_) {
+    return dataUrl
+  }
+}
+
+/** Las diapositivas de un curso, de a una para no ahogar el navegador. */
+export async function comprimirDiapositivas(slides: string[]): Promise<string[]> {
+  const salida: string[] = []
+  for (const s of slides) salida.push(await comprimirDataUrl(s))
+  return salida
+}

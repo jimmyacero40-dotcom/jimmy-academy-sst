@@ -16,7 +16,7 @@ import {
   LayoutGrid, List, AlertTriangle
 } from 'lucide-react'
 import { TEMAS, nombreTema, colorTema, sugerirTema, TEMA_POR_DEFECTO } from '@/lib/temas'
-import { comprimirImagen } from '@/lib/comprimir-imagen'
+import { comprimirImagen, comprimirDiapositivas } from '@/lib/comprimir-imagen'
 import { useRol } from '@/lib/usar-rol'
 import OrganizarTemas from '@/components/trainings/OrganizarTemas'
 import MenuCurso from '@/components/trainings/MenuCurso'
@@ -433,6 +433,8 @@ export default function BibliotecaPage() {
         }
 
         if (slides.length > 0) {
+          setEditProgress('Optimizando imágenes...')
+          slides = await comprimirDiapositivas(slides)
           const slidesPayload = slides.map((img, i) => ({
             slide_index: i, image_data: img, slide_text: texts[i] || '',
           }))
@@ -531,7 +533,7 @@ Se alcanzaron a guardar ${r.guardadas} de ${slides.length} diapositivas.`)
               let texts: string[] = []
               try {
                 const courseData = await getCourseData(t.id)
-                slides = courseData.images || []
+                slides = await comprimirDiapositivas(courseData.images || [])
                 texts = courseData.texts || []
               } catch (_) {}
               let questions: any[] = []
@@ -651,6 +653,8 @@ Se alcanzaron a guardar ${r.guardadas} de ${slides.length} diapositivas.`)
       let finalCount = 0
 
       if (slides.length > 0) {
+        setUploadProgress('Optimizando imágenes...')
+        slides = await comprimirDiapositivas(slides)
         const slidesPayload = slides.map((img, i) => ({
           slide_index: i, image_data: img, slide_text: texts[i] || '',
         }))
