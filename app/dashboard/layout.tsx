@@ -6,7 +6,7 @@ import { useSession, signOut } from 'next-auth/react'
 import Link from 'next/link'
 import {
   LayoutDashboard, Users, BookOpen, PenTool, Award,
-  BarChart2, Settings, LogOut,
+  BarChart2, Settings, LogOut, KeyRound,
   ChevronLeft, ChevronRight, ChevronDown, Search, Menu, X,
   Layers, Briefcase,
   CalendarDays, GraduationCap, TrendingUp,
@@ -636,6 +636,17 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
               </div>
             </div>
           )}
+          {/* Cambiar la contraseña: la pantalla existía pero no tenía por dónde
+              llegar, así que el trabajador quedaba con la clave que le pusieron. */}
+          <Link href="/dashboard/configuracion"
+            className={`flex items-center gap-2 px-2.5 py-2 mb-1 rounded-lg text-xs transition-all ${collapsed ? 'justify-center' : ''}`}
+            style={{ color: 'var(--sidebar-dim)' }}
+            title="Cambiar contraseña"
+            onMouseEnter={e => { e.currentTarget.style.color = 'var(--sidebar-text)'; e.currentTarget.style.background = 'rgba(255,255,255,0.08)' }}
+            onMouseLeave={e => { e.currentTarget.style.color = 'var(--sidebar-dim)'; e.currentTarget.style.background = 'transparent' }}>
+            <KeyRound size={14} strokeWidth={2} />
+            {!collapsed && 'Cambiar contraseña'}
+          </Link>
           <div className="flex items-center gap-1.5">
             <button
               onClick={() => signOut({ callbackUrl: '/login' })}
