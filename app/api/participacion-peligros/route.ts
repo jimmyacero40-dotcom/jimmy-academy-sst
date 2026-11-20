@@ -23,13 +23,40 @@ const CAMPOS_RESPUESTA = [
  */
 async function estadoPeriodo(companyId: string, periodo: number) {
   const { data } = await supabase.from('participacion_periodos')
-    .select('estado, motivo, cambiado_at, cambiado_por_nombre')
+    .select('estado, motivo, cambiado_at, cambiado_por_nombre, abre, cierra')
     .eq('company_id', companyId).eq('periodo', periodo).maybeSingle()
+
+  const guardado = (data?.estado as 'abierto' | 'cerrado') ?? 'abierto'
+
+  // Las fechas mandan sobre el interruptor, mientras esté abierto. Cerrar a
+  // mano cierra siempre; pero estar «abierto» no sirve de nada si la ventana
+  // todavía no empezó o ya se pasó. Así nadie tiene que acordarse de venir a
+  // cerrar el día exacto del corte.
+  let estado = guardado
+  let razonFecha: string | null = null
+  if (guardado === 'abierto' && (data?.abre || data?.cierra)) {
+    const hoy = new Date(Date.now() - 5 * 60 * 60 * 1000).toISOString().slice(0, 10)
+    if (data?.abre && hoy < data.abre) {
+      estado = 'cerrado'
+      razonFecha = `La participación del ${periodo} se abre el ${data.abre}`
+    } else if (data?.cierra && hoy > data.cierra) {
+      estado = 'cerrado'
+      razonFecha = `La participación del ${periodo} cerró el ${data.cierra}`
+    }
+  }
+
   return {
-    estado: (data?.estado as 'abierto' | 'cerrado') ?? 'abierto',
-    motivo: data?.motivo ?? null,
+    estado,
+    // Lo que el administrador escribió al cerrar; si cerró la fecha, se dice
+    // la fecha, que es la respuesta a «¿y por qué no puedo responder?».
+    motivo: razonFecha ?? data?.motivo ?? null,
     cambiado_at: data?.cambiado_at ?? null,
     cambiado_por_nombre: data?.cambiado_por_nombre ?? null,
+    abre: data?.abre ?? null,
+    cierra: data?.cierra ?? null,
+    // El interruptor tal como está guardado, para que la pantalla del
+    // administrador no muestre «cerrado» cuando lo que pasa es que aún no abre.
+    estadoGuardado: guardado,
   }
 }
 
@@ -123,6 +150,14 @@ export async function PATCH(req: NextRequest) {
   const estado = body.estado === 'cerrado' ? 'cerrado' : body.estado === 'abierto' ? 'abierto' : null
   if (!estado) return NextResponse.json({ error: 'Estado no válido' }, { status: 400 })
 
+  // La ventana: desde cuándo y hasta cuándo. Vacío = sin límite por ese lado.
+  const fecha = (v: any) => (typeof v === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(v) ? v : null)
+  const abre = fecha(body.abre)
+  const cierra = fecha(body.cierra)
+  if (abre && cierra && cierra < abre) {
+    return NextResponse.json({ error: 'La fecha de cierre no puede ser anterior a la de apertura' }, { status: 400 })
+  }
+
   const quien = await getCurrentUser()
 
   const { data, error } = await supabase.from('participacion_periodos')
@@ -130,16 +165,20 @@ export async function PATCH(req: NextRequest) {
       company_id: companyId,
       periodo,
       estado,
+      abre,
+      cierra,
       motivo: typeof body.motivo === 'string' && body.motivo.trim() ? body.motivo.trim() : null,
       cambiado_at: new Date().toISOString(),
       cambiado_por: quien?.id ?? null,
       cambiado_por_nombre: quien?.name ?? null,
     }, { onConflict: 'company_id,periodo' })
-    .select('estado, motivo, cambiado_at, cambiado_por_nombre')
+    .select('estado')
     .single()
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
-  return NextResponse.json({ periodo, periodoEstado: data })
+  // Se devuelve lo mismo que calcula el GET, para que la pantalla no tenga
+  // que recargar para enterarse de que la fecha ya lo dejó cerrado.
+  return NextResponse.json({ periodo, periodoEstado: await estadoPeriodo(companyId, periodo) })
 }
 
 /**

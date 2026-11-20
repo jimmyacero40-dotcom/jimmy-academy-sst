@@ -7,7 +7,7 @@ import Link from 'next/link'
 import {
   ShieldAlert, Loader2, Search, Download, FileText, Eye, X,
   CheckCircle, Clock, BarChart2, Users, Table2, Trash2, AlertTriangle,
-  Lock, Unlock, ArrowLeft, HelpCircle,
+  Lock, Unlock, ArrowLeft, HelpCircle, Mail, CalendarRange,
 } from 'lucide-react'
 import { tienePermiso } from '@/lib/permisos'
 import { RespuestasPeligros } from '@/components/RespuestasPeligros'
@@ -17,6 +17,7 @@ import {
 } from '@/lib/peligros-tabulacion'
 import { GRUPOS_PELIGROS, CAMPO_MEJORAS } from '@/lib/peligros'
 import { exportarFormularioPDF } from './export-pdf'
+import RecordatorioDialog from '@/components/RecordatorioDialog'
 import { exportarResultadosExcel } from './export-excel'
 import { exportarResultadosPDF } from './export-resultados-pdf'
 
@@ -26,6 +27,16 @@ interface EstadoPeriodo {
   motivo?: string | null
   cambiado_at?: string | null
   cambiado_por_nombre?: string | null
+  // La ventana: desde cuándo y hasta cuándo se admite respuesta.
+  abre?: string | null
+  cierra?: string | null
+  estadoGuardado?: 'abierto' | 'cerrado'
+}
+
+/** Una fecha 'YYYY-MM-DD' como se lee en Colombia. */
+function enLetras(f?: string | null): string {
+  if (!f) return ''
+  return new Date(f + 'T12:00:00').toLocaleDateString('es-CO', { day: 'numeric', month: 'long', year: 'numeric' })
 }
 
 const sel = 'bg-[var(--bg-surface)] border border-[var(--border)] rounded-lg px-3 py-2 text-xs text-[var(--text)] focus:outline-none focus:border-[var(--primary)]'
@@ -55,6 +66,8 @@ export default function ParticipacionAdminPage() {
   const [cambiandoEstado, setCambiandoEstado] = useState(false)
   const [errorEstado, setErrorEstado] = useState<string | null>(null)
   const cerrado = estadoPeriodo.estado === 'cerrado'
+  const [panelVentana, setPanelVentana] = useState(false)
+  const [avisando, setAvisando] = useState(false)
 
   const cambiarEstado = async (nuevo: 'abierto' | 'cerrado') => {
     setCambiandoEstado(true); setErrorEstado(null)
@@ -137,6 +150,11 @@ export default function ParticipacionAdminPage() {
       return true
     })
   }, [filas, busqueda, fArea, fCargo, fCentro, fEstado, fDesde, fHasta])
+
+  // Los que faltan, dentro de lo que se está viendo: si el administrador
+  // filtró por una finca, el aviso sale para esa finca y no para toda la
+  // empresa, que es justo lo que uno quiere cuando filtra.
+  const pendientes = useMemo(() => visibles.filter(f => !f.participacion), [visibles])
 
   // La tabulación se calcula sobre lo filtrado: así se analiza por área o finca.
   const t = useMemo(() => tabular(visibles), [visibles])
@@ -224,6 +242,22 @@ export default function ParticipacionAdminPage() {
                   <Lock size={13} /> Cerrar periodo
                 </button>
           )}
+          {puedeAdministrar && (
+            <button onClick={() => setPanelVentana(true)}
+              className="terra-btn-outline flex items-center gap-1.5" style={{ padding: '8px 14px', fontSize: 12 }}
+              title="Desde cuándo y hasta cuándo se puede responder">
+              <CalendarRange size={13} /> Plazo
+            </button>
+          )}
+          {/* Avisarle por correo a los que faltan, sin salir de la pantalla
+              donde se ve quiénes son. */}
+          {puedeAdministrar && !!pendientes.length && (
+            <button onClick={() => setAvisando(true)}
+              className="flex items-center gap-1.5 rounded-lg font-bold"
+              style={{ padding: '8px 14px', fontSize: 12, border: '1px solid rgba(36,60,44,0.4)', color: '#243C2C', background: 'rgba(36,60,44,0.06)' }}>
+              <Mail size={13} /> Avisar a {pendientes.length}
+            </button>
+          )}
           {puedeEliminar && !!visibles.filter(f => f.participacion).length && (
             <button onClick={() => setPorBorrar(visibles.filter(f => f.participacion))}
               className="flex items-center gap-1.5 rounded-lg font-bold"
@@ -233,6 +267,23 @@ export default function ParticipacionAdminPage() {
           )}
         </div>
       </div>
+
+      {/* El plazo vigente, cuando lo hay: es lo primero que se pregunta. */}
+      {!cerrado && (estadoPeriodo.abre || estadoPeriodo.cierra) && (
+        <div className="mb-4 p-3 rounded-xl flex items-start gap-2.5"
+          style={{ background: 'rgba(36,60,44,0.07)', border: '1px solid rgba(36,60,44,0.25)' }}>
+          <CalendarRange size={15} style={{ color: '#243C2C' }} className="mt-0.5 flex-shrink-0" />
+          <p className="text-xs leading-relaxed" style={{ color: 'var(--text-dim)' }}>
+            <strong style={{ color: 'var(--text)' }}>
+              {estadoPeriodo.cierra
+                ? `Abierta hasta el ${enLetras(estadoPeriodo.cierra)}`
+                : `Abierta desde el ${enLetras(estadoPeriodo.abre)}`}
+            </strong>
+            {estadoPeriodo.abre && estadoPeriodo.cierra && ` · desde el ${enLetras(estadoPeriodo.abre)}`}
+            {' '}· pasada esa fecha se cierra sola, sin que usted tenga que entrar a cerrarla.
+          </p>
+        </div>
+      )}
 
       {/* Quién cerró y por qué: el dato que pide una auditoría. */}
       {cerrado && (
@@ -258,6 +309,44 @@ export default function ParticipacionAdminPage() {
           style={{ background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.3)', color: '#FCA5A5' }}>
           {errorEstado}
         </div>
+      )}
+
+      {/* ── El plazo: desde cuándo y hasta cuándo se puede responder ── */}
+      {panelVentana && (
+        <VentanaPeriodo
+          periodo={periodo}
+          abre={estadoPeriodo.abre ?? ''}
+          cierra={estadoPeriodo.cierra ?? ''}
+          onCerrar={() => setPanelVentana(false)}
+          onGuardar={async (abre, cierra) => {
+            const res = await fetch('/api/participacion-peligros', {
+              method: 'PATCH',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ periodo, estado: estadoPeriodo.estadoGuardado ?? 'abierto', abre, cierra }),
+            })
+            const body = await res.json().catch(() => ({}))
+            if (!res.ok) return body.error ?? 'No se pudo guardar el plazo'
+            setEstadoPeriodo(body.periodoEstado)
+            setPanelVentana(false)
+            return null
+          }}
+        />
+      )}
+
+      {/* ── Avisarle por correo a los que faltan ── */}
+      {avisando && (
+        <RecordatorioDialog
+          modulo="tu-cuentas"
+          titulo={`Identificación de peligros ${periodo} · ${pendientes.length} sin responder`}
+          periodo={periodo}
+          plazo={estadoPeriodo.cierra ? enLetras(estadoPeriodo.cierra) : null}
+          candidatos={pendientes.map(f => ({
+            user_id: f.user_id,
+            nombre: f.nombre ?? 'Sin nombre',
+            detalle: [f.cargo, f.area].filter(Boolean).join(' · ') || null,
+          }))}
+          onCerrar={() => setAvisando(false)}
+        />
       )}
 
       {/* ── Confirmar el cierre ── */}
@@ -718,6 +807,74 @@ function Bloque({ titulo, filas, base, sufijo, colorPorGrupo, limite = 100 }: {
           Base: {base} participantes.
         </p>
       )}
+    </div>
+  )
+}
+
+/**
+ * El plazo de la participación.
+ *
+ * Antes solo había un interruptor de abierto/cerrado, y eso obliga a acordarse
+ * de venir a cerrar el día del corte. Con fechas el periodo se cierra solo, y
+ * el trabajador ve desde cuándo y hasta cuándo tiene.
+ */
+function VentanaPeriodo({ periodo, abre, cierra, onGuardar, onCerrar }: {
+  periodo: number
+  abre: string
+  cierra: string
+  onGuardar: (abre: string | null, cierra: string | null) => Promise<string | null>
+  onCerrar: () => void
+}) {
+  const [desde, setDesde] = useState(abre)
+  const [hasta, setHasta] = useState(cierra)
+  const [guardando, setGuardando] = useState(false)
+  const [err, setErr] = useState<string | null>(null)
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ background: 'rgba(0,0,0,0.6)' }}>
+      <div className="terra-card p-5 w-full max-w-md space-y-4">
+        <div>
+          <p className="text-sm font-bold" style={{ color: 'var(--text)' }}>
+            Plazo para responder · {periodo}
+          </p>
+          <p className="text-xs mt-1 leading-relaxed" style={{ color: 'var(--text-dim)' }}>
+            Fuera de estas fechas el trabajador ve la participación cerrada, sin que usted
+            tenga que cerrarla a mano. Deje una casilla vacía si por ese lado no hay límite.
+          </p>
+        </div>
+
+        <div className="grid grid-cols-2 gap-3">
+          <div>
+            <label className="block text-xs font-semibold mb-1.5" style={{ color: 'var(--text-dim)' }}>Abre el</label>
+            <input type="date" value={desde} onChange={e => setDesde(e.target.value)} className={sel + ' w-full'} />
+          </div>
+          <div>
+            <label className="block text-xs font-semibold mb-1.5" style={{ color: 'var(--text-dim)' }}>Cierra el</label>
+            <input type="date" value={hasta} onChange={e => setHasta(e.target.value)} className={sel + ' w-full'} />
+          </div>
+        </div>
+
+        {err && <p className="text-xs" style={{ color: '#EF4444' }}>{err}</p>}
+
+        <div className="flex gap-2">
+          <button onClick={onCerrar} className="terra-btn-outline flex-1" style={{ padding: '8px 16px', fontSize: 12 }}>
+            Cancelar
+          </button>
+          <button
+            onClick={async () => {
+              setGuardando(true); setErr(null)
+              const fallo = await onGuardar(desde || null, hasta || null)
+              if (fallo) setErr(fallo)
+              setGuardando(false)
+            }}
+            disabled={guardando}
+            className="flex-1 flex items-center justify-center gap-2 rounded-lg font-bold"
+            style={{ padding: '8px 16px', fontSize: 12, background: '#243C2C', color: '#fff' }}>
+            {guardando && <Loader2 size={13} className="animate-spin" />}
+            Guardar plazo
+          </button>
+        </div>
+      </div>
     </div>
   )
 }

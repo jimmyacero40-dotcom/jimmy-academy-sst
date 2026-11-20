@@ -4,13 +4,14 @@ import { useState, useEffect } from 'react'
 import { useAnchosColumnas, ManijaColumna, type ColumnaAncho } from '@/components/anchos-columnas'
 import FichaCompleta from '@/components/FichaCompleta'
 import { calcPct, resumenFaltantes } from '@/lib/perfil-completitud'
+import RecordatorioDialog from '@/components/RecordatorioDialog'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useRouter } from 'next/navigation'
 import {
   Users, TrendingUp, Heart, Shirt, Activity, FileSpreadsheet,
   FileText, BarChart2, Award, Home, Car, Briefcase,
   GraduationCap, Shield, Loader2, Search, ChevronUp, ChevronDown,
-  AlertTriangle, CheckCircle, Eye, ExternalLink, Bell, Download
+  AlertTriangle, CheckCircle, Eye, ExternalLink, Bell, Download, Mail
 } from 'lucide-react'
 import { computeAnalytics, generateAutoText, type WP, type FreqRow, type Analytics } from '@/lib/profile-analytics'
 import { exportToExcel } from './export-excel'
@@ -163,6 +164,7 @@ export default function WorkerProfilesPage() {
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc')
   const [page, setPage]       = useState(1)
   const [selectedId, setSelectedId] = useState<string | null>(null)
+  const [avisando, setAvisando] = useState(false)
   const PER = 15
 
   useEffect(() => {
@@ -181,6 +183,11 @@ export default function WorkerProfilesPage() {
   }, [])
 
   const a: Analytics = computeAnalytics(profiles)
+
+  // Quien no ha terminado su ficha. El 80 % es el mismo corte que ya usa el
+  // indicador de «perfiles incompletos», para que una pantalla no diga una
+  // cosa y el botón de al lado otra.
+  const incompletos = profiles.filter(p => p.user_id && (p.completion_pct ?? 0) < 80)
 
   const doExcelExport = async () => {
     setExporting('excel')
@@ -255,6 +262,14 @@ export default function WorkerProfilesPage() {
           </p>
         </div>
         <div className="flex gap-2">
+          {/* Avisarle por correo a quien dejó la ficha a medias. Sin esto
+              había que perseguirlos uno por uno por fuera de la plataforma. */}
+          {incompletos.length > 0 && (
+            <button onClick={() => setAvisando(true)}
+              className="terra-btn text-xs" style={{ padding: '8px 14px', background: '#243C2C' }}>
+              <Mail size={13} /> Avisar a {incompletos.length}
+            </button>
+          )}
           <button onClick={doExcelExport} disabled={!!exporting}
             className="terra-btn text-xs" style={{ padding: '8px 14px', background: '#059669' }}>
             {exporting === 'excel' ? <Loader2 size={13} className="animate-spin" /> : <FileSpreadsheet size={13} />}
@@ -267,6 +282,19 @@ export default function WorkerProfilesPage() {
           </button>
         </div>
       </div>
+
+      {avisando && (
+        <RecordatorioDialog
+          modulo="sociodemografica"
+          titulo={`${incompletos.length} fichas sin terminar`}
+          candidatos={incompletos.map(p => ({
+            user_id: p.user_id!,
+            nombre: (p.users?.name ?? `${p.nombres ?? ''} ${p.apellidos ?? ''}`.trim()) || 'Sin nombre',
+            detalle: `${p.completion_pct ?? 0}% · le falta ${resumenFaltantes(p)}`,
+          }))}
+          onCerrar={() => setAvisando(false)}
+        />
+      )}
 
       {/* ── Tabs ── */}
       <div className="flex gap-1 overflow-x-auto pb-1" style={{ scrollbarWidth: 'none' }}>
