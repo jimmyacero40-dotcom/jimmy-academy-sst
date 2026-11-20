@@ -7,6 +7,7 @@ import {
   Search, Plus, Trash2, Loader2, FileDown, AlertCircle, Users, Calendar, Edit3, UserCheck,
 } from 'lucide-react'
 import { generateAttendancePDF } from '@/lib/generate-attendance-pdf'
+import SelectorFirma, { type FirmaCapacitador } from '@/components/asistencia/SelectorFirma'
 
 interface Participant {
   name: string; cedula: string; cargo: string; signature?: string
@@ -88,6 +89,8 @@ export default function AttendanceWizard({ training, companyName, companyLogo, o
   const [startTime,   setStartTime]   = useState('8:00')
   const [durationMin, setDurationMin] = useState(480)
   const [instructor,  setInstructor]  = useState('Jimmy J. Acero. C.')
+  // La firma que va al pie del formato; se escoge en el paso de vista previa.
+  const [firma, setFirma] = useState<FirmaCapacitador | null>(null)
   const [organizedBy, setOrganizedBy] = useState('SST-AGROVENTURE CAPITAL')
   const [directedTo,  setDirectedTo]  = useState('TRABAJADORES')
 
@@ -203,6 +206,9 @@ export default function AttendanceWizard({ training, companyName, companyLogo, o
         trainingTemario: training.temario || training.description || '',
         eventDate: displayDate, schedule, intensity, instructor, organizedBy, directedTo,
         participants: parts, companyName, companyLogo,
+        capacitadorFirma:  firma?.imagen,
+        capacitadorNombre: firma?.nombre,
+        capacitadorCargo:  firma?.cargo || undefined,
       })
 
       const url = URL.createObjectURL(blob)
@@ -488,6 +494,8 @@ export default function AttendanceWizard({ training, companyName, companyLogo, o
                     </div>
                   ))}
                 </div>
+
+                <SelectorFirma elegida={firma} onElegir={setFirma} />
 
                 <div>
                   <p className="text-xs font-medium mb-2" style={{ color: 'var(--text-dim)' }}>

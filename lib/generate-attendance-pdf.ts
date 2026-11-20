@@ -10,6 +10,10 @@ export interface AttendancePDFParams {
   participants: { name: string; cedula: string; cargo: string; signature?: string }[]
   companyName: string
   companyLogo: string
+  /** Firma de quien dictó la capacitación, para el espacio del final. */
+  capacitadorFirma?: string
+  capacitadorNombre?: string
+  capacitadorCargo?: string
 }
 
 function getImgDims(src: string): Promise<{ w: number; h: number }> {
@@ -26,9 +30,12 @@ export async function generateAttendancePDF(p: AttendancePDFParams): Promise<Blo
   const doc = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'letter' })
 
   const W = 279.4, M = 8, usable = W - 2 * M
-  const CG: [number,number,number] = [56,118,29]
-  const CO: [number,number,number] = [230,145,56]
-  const CLO: [number,number,number] = [248,216,176]
+  // Los colores del formato impreso de AVC: verde #243C2C en los rótulos y en
+  // las franjas, y #ECE69D en el encabezado de participantes. El naranja que
+  // había antes no es de la marca.
+  const CG: [number,number,number] = [36,60,44]
+  const CO: [number,number,number] = [36,60,44]
+  const CLO: [number,number,number] = [236,230,157]
   const CW: [number,number,number] = [255,255,255]
   const CB: [number,number,number] = [0,0,0]
   const rawW = [16,18,18,20,20,20,20,30,30,30,41]
@@ -197,6 +204,49 @@ export async function generateAttendancePDF(p: AttendancePDFParams): Promise<Blo
       } catch {}
     }
     y += rowH
+  }
+
+  // El espacio de firma del capacitador. El formato en papel lo tiene y aquí
+  // faltaba: una lista sin firmar no acredita que la capacitación se dictó.
+  const bloqueFirmaH = 30
+  if (y + bloqueFirmaH > 215.9 - M) { doc.addPage(); y = M }
+  y += 8
+
+  const lineaW = 70
+  const lineaX = M + (usable - lineaW) / 2
+
+  if (p.capacitadorFirma) {
+    try {
+      const { w: iw, h: ih } = await getImgDims(p.capacitadorFirma)
+      const fmt = /^data:image\/jpe?g/i.test(p.capacitadorFirma) ? 'JPEG' : 'PNG'
+      const aspect = (iw || 4) / (ih || 1)
+      const maxH = 14, maxW = lineaW
+      const h = Math.min(maxH, maxW / aspect)
+      const w = h * aspect
+      doc.addImage(p.capacitadorFirma, fmt, M + (usable - w) / 2, y - 2, w, h)
+      y += h - 2
+    } catch { y += 10 }
+  } else {
+    y += 12
+  }
+
+  doc.setDrawColor(0, 0, 0); doc.setLineWidth(0.4)
+  doc.line(lineaX, y, lineaX + lineaW, y)
+  y += 4.5
+  doc.setFontSize(9); doc.setFont('helvetica', 'bold'); doc.setTextColor(0, 0, 0)
+  doc.text('CAPACITADOR', M + usable / 2, y, { align: 'center' })
+
+  // El nombre va debajo del rótulo: una firma suelta no dice quién firmó.
+  if (p.capacitadorNombre) {
+    y += 4
+    doc.setFontSize(7.5); doc.setFont('helvetica', 'normal')
+    doc.text(p.capacitadorNombre, M + usable / 2, y, { align: 'center' })
+    if (p.capacitadorCargo) {
+      y += 3.5
+      doc.setFontSize(6.5)
+      doc.setTextColor(90, 90, 90)
+      doc.text(p.capacitadorCargo, M + usable / 2, y, { align: 'center' })
+    }
   }
 
   return doc.output('blob')

@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback } from 'react'
 import { motion } from 'framer-motion'
 import { ClipboardList, Search, Download, Trash2, Loader2, Users, Calendar, User, ChevronDown, ChevronUp, Eye } from 'lucide-react'
 import { generateAttendancePDF } from '@/lib/generate-attendance-pdf'
+import SelectorFirma, { type FirmaCapacitador } from '@/components/asistencia/SelectorFirma'
 
 interface AttendanceList {
   id: number
@@ -37,6 +38,9 @@ export default function AttendanceListsPage() {
   const [deleting, setDeleting]   = useState<number | null>(null)
   const [downloading, setDownloading] = useState<number | null>(null)
   const [expanded, setExpanded]   = useState<number | null>(null)
+  // La lista que se está por descargar, mientras se escoge con qué firma.
+  const [porDescargar, setPorDescargar] = useState<AttendanceList | null>(null)
+  const [firma, setFirma] = useState<FirmaCapacitador | null>(null)
 
   // Group by training title
   const grouped = lists
@@ -68,7 +72,7 @@ export default function AttendanceListsPage() {
     setDeleting(null)
   }
 
-  const handleDownload = async (list: AttendanceList) => {
+  const handleDownload = async (list: AttendanceList, firma: FirmaCapacitador | null) => {
     setDownloading(list.id)
     try {
       const res = await fetch(`/api/attendance-lists/${list.id}`)
@@ -87,6 +91,9 @@ export default function AttendanceListsPage() {
         participants:    data.participants || [],
         companyName:     data.companyName  || '',
         companyLogo:     data.companyLogo  || '',
+        capacitadorFirma:  firma?.imagen,
+        capacitadorNombre: firma?.nombre,
+        capacitadorCargo:  firma?.cargo || undefined,
       })
 
       const url  = URL.createObjectURL(blob)
@@ -99,10 +106,42 @@ export default function AttendanceListsPage() {
       alert('Error: ' + e.message)
     }
     setDownloading(null)
+    setPorDescargar(null)
   }
 
   return (
     <div className="p-4 sm:p-6 max-w-5xl mx-auto">
+      {/* Escoger la firma antes de bajar el PDF. No se cierra al tocar afuera. */}
+      {porDescargar && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ background: 'rgba(0,0,0,0.55)' }}>
+          <div className="w-full max-w-md rounded-2xl shadow-2xl p-5 space-y-4 max-h-[88vh] overflow-y-auto"
+            style={{ background: 'var(--bg-card)', border: '1px solid var(--border)' }}>
+            <div>
+              <h3 className="text-base font-bold" style={{ color: 'var(--text-strong)' }}>Descargar lista</h3>
+              <p className="text-xs mt-0.5 truncate" style={{ color: 'var(--text-dim)' }}>
+                {porDescargar.training_title} · {formatDate(porDescargar.event_date)}
+              </p>
+            </div>
+
+            <SelectorFirma elegida={firma} onElegir={setFirma} />
+
+            <div className="flex gap-2 pt-1">
+              <button onClick={() => setPorDescargar(null)}
+                className="flex-1 px-4 py-2 rounded-lg text-sm font-semibold"
+                style={{ border: '1px solid var(--border)', color: 'var(--text-dim)', background: 'var(--bg)' }}>
+                Cancelar
+              </button>
+              <button onClick={() => handleDownload(porDescargar, firma)} disabled={downloading === porDescargar.id}
+                className="flex-1 flex items-center justify-center gap-2 px-4 py-2 rounded-lg text-sm font-bold disabled:opacity-60"
+                style={{ background: '#10B981', color: '#fff' }}>
+                {downloading === porDescargar.id ? <Loader2 size={14} className="animate-spin" /> : <Download size={14} />}
+                Descargar PDF
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Header */}
       <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} className="mb-6">
         <div className="flex items-center gap-3 mb-1">
@@ -221,7 +260,7 @@ export default function AttendanceListsPage() {
 
                       <div className="flex items-center gap-2 shrink-0">
                         <button
-                          onClick={() => handleDownload(list)}
+                          onClick={() => setPorDescargar(list)}
                           disabled={downloading === list.id}
                           title="Descargar PDF"
                           className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all"
