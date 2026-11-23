@@ -13,7 +13,7 @@
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { useMemo, useState } from 'react'
-import { Check, AlertCircle, Copy, ListChecks, FileText } from 'lucide-react'
+import { Check, AlertCircle, Copy, ListChecks, FileText, Download, Loader2 } from 'lucide-react'
 import { FICHA, type CampoFicha } from '@/lib/ficha-campos'
 import { calcPct, faltantes } from '@/lib/perfil-completitud'
 
@@ -37,12 +37,31 @@ const esImagen = (c: string) => c === 'photo_url' || c === 'firma_electronica'
 export default function FichaCompleta({
   ficha,
   nombre,
+  empresa,
 }: {
   ficha: Record<string, any> | null | undefined
   nombre?: string
+  /** Para el encabezado del PDF. */
+  empresa?: string
 }) {
   const [soloPendientes, setSoloPendientes] = useState(false)
   const [copiado, setCopiado] = useState(false)
+  const [bajando, setBajando] = useState(false)
+  /** La foto, en grande, cuando se toca. */
+  const [ampliada, setAmpliada] = useState<string | null>(null)
+
+  async function descargar() {
+    if (!d) return
+    setBajando(true)
+    try {
+      const { exportarFichaPDF } = await import('@/lib/ficha-pdf')
+      await exportarFichaPDF(d, nombre ?? 'Trabajador', empresa ?? 'Organización')
+    } catch (e) {
+      console.error('[hoja de vida]', e)
+      alert('No se pudo armar la hoja de vida')
+    }
+    setBajando(false)
+  }
   const d = ficha ?? {}
 
   const pct = useMemo(() => calcPct(d), [d])
@@ -86,6 +105,15 @@ export default function FichaCompleta({
             ? 'Sin datos pendientes'
             : `${totalPendientes} ${totalPendientes === 1 ? 'dato pendiente' : 'datos pendientes'} en ${pendientes.length} ${pendientes.length === 1 ? 'sección' : 'secciones'}`}
         </span>
+
+        {/* La hoja de vida, para la carpeta del trabajador o para una
+            auditoría. Se podía consultar en pantalla pero no sacar. */}
+        <button onClick={descargar} disabled={bajando}
+          className="text-xs px-2.5 py-1.5 rounded-lg flex items-center gap-1.5 font-semibold transition-all disabled:opacity-60"
+          style={{ background: '#243C2C', color: '#fff' }}>
+          {bajando ? <Loader2 size={12} className="animate-spin" /> : <Download size={12} />}
+          Hoja de vida (PDF)
+        </button>
 
         {totalPendientes > 0 && (
           <>
@@ -147,8 +175,16 @@ export default function FichaCompleta({
                         style={{ color: pendiente ? '#F59E0B' : valor ? 'var(--text)' : 'var(--text-faint)' }}>
                         {valor
                           ? (esImagen(c.campo)
-                              ? <img src={d[c.campo]} alt={c.etiqueta} className="inline-block max-h-12 rounded ml-auto"
-                                  style={{ background: c.campo === 'firma_electronica' ? '#fff' : undefined }} />
+                              ? <img src={d[c.campo]} alt={c.etiqueta}
+                                  onClick={() => c.campo === 'photo_url' && setAmpliada(d[c.campo])}
+                                  title={c.campo === 'photo_url' ? 'Tocar para verla en grande' : undefined}
+                                  className={`inline-block rounded ml-auto ${c.campo === 'photo_url' ? 'cursor-zoom-in' : ''}`}
+                                  style={{
+                                    // La foto se veía del tamaño de una estampilla y no
+                                    // alcanzaba para reconocer a quien respondió.
+                                    maxHeight: c.campo === 'photo_url' ? 150 : 48,
+                                    background: c.campo === 'firma_electronica' ? '#fff' : undefined,
+                                  }} />
                               : valor)
                           : pendiente ? 'Pendiente' : 'Sin responder'}
                       </span>
@@ -160,6 +196,17 @@ export default function FichaCompleta({
           )
         })}
       </div>
+
+      {/* La foto en grande. Se cierra tocando el fondo: aquí no hay nada
+          que se pueda perder por cerrarla sin querer. */}
+      {ampliada && (
+        <div onClick={() => setAmpliada(null)}
+          className="fixed inset-0 z-50 flex items-center justify-center p-6 cursor-zoom-out"
+          style={{ background: 'rgba(0,0,0,0.8)' }}>
+          <img src={ampliada} alt={nombre ?? 'Foto'} className="rounded-xl"
+            style={{ maxHeight: '88vh', maxWidth: '88vw', objectFit: 'contain' }} />
+        </div>
+      )}
     </div>
   )
 }

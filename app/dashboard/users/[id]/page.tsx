@@ -69,6 +69,8 @@ export default function UserDetailPage() {
   const router = useRouter()
   const [data, setData] = useState<{ user: UserProfile; enrollments: Enrollment[]; certificates: Certificate[]; groups: any[]; workerProfile: any } | null>(null)
   const [loading, setLoading] = useState(true)
+  // El nombre de la empresa va en el encabezado de la hoja de vida.
+  const [empresa, setEmpresa] = useState('Organización')
   const [tab, setTab] = useState<'entrenamientos' | 'certificados' | 'perfil'>('entrenamientos')
   const [statusFilter, setStatusFilter] = useState('todos')
   const [editingCargo, setEditingCargo] = useState(false)
@@ -83,6 +85,13 @@ export default function UserDetailPage() {
   }, [id])
 
   useEffect(() => { recargar() }, [recargar])
+
+  useEffect(() => {
+    fetch('/api/companies')
+      .then(r => (r.ok ? r.json() : []))
+      .then((d: any[]) => { if (d?.[0]?.name) setEmpresa(d[0].name) })
+      .catch(() => {})
+  }, [])
 
   if (loading) {
     return (
@@ -438,7 +447,7 @@ export default function UserDetailPage() {
       {/* Perfil Sociodemográfico tab */}
       {tab === 'perfil' && (
         <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
-          <FichaCompleta ficha={workerProfile} nombre={user?.name} />
+          <FichaCompleta ficha={workerProfile} nombre={user?.name} empresa={empresa} />
         </motion.div>
       )}
 
