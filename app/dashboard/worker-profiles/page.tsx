@@ -103,12 +103,37 @@ function KPI({ label, value, sub, color = 'var(--primary)', alert }: { label: st
   )
 }
 
-function Sec({ title, children, accent = 'var(--primary)' }: { title: string; children: React.ReactNode; accent?: string }) {
+/** Cuánta gente contestó esa pregunta: la suma de la tabla de frecuencias. */
+function suma(filas: FreqRow[]): number {
+  return filas.reduce((s, f) => s + f.n, 0)
+}
+
+/**
+ * Un recuadro del tablero.
+ *
+ * Lleva escrito sobre cuánta gente está hecho. Un «65 % femenino» no dice lo
+ * mismo si sale de 26 fichas que de las 52 personas de la empresa, y para
+ * llevar esto a una gerencia hay que poder responder esa pregunta.
+ */
+function Sec({ title, children, accent = 'var(--primary)', base, total }: {
+  title: string; children: React.ReactNode; accent?: string; base?: number; total?: number
+}) {
+  const pct = base !== undefined && total ? Math.round((base * 100) / total) : null
   return (
     <div className="terra-card p-5">
       <div className="flex items-center gap-2 mb-4 pb-3" style={{ borderBottom: '1px solid var(--border)' }}>
         <div className="h-5 w-1 rounded-full flex-shrink-0" style={{ background: accent }} />
-        <h3 className="font-bold text-sm" style={{ color: 'var(--text)' }}>{title}</h3>
+        <h3 className="font-bold text-sm flex-1" style={{ color: 'var(--text)' }}>{title}</h3>
+        {base !== undefined && total ? (
+          <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full flex-shrink-0"
+            title={`${base} de ${total} trabajadores respondieron esta pregunta`}
+            style={{
+              background: pct! >= 80 ? 'rgba(16,185,129,0.12)' : pct! >= 50 ? 'rgba(245,158,11,0.12)' : 'rgba(239,68,68,0.10)',
+              color: pct! >= 80 ? '#10B981' : pct! >= 50 ? '#B45309' : '#EF4444',
+            }}>
+            {base}/{total} · {pct}%
+          </span>
+        ) : null}
       </div>
       {children}
     </div>
@@ -341,6 +366,11 @@ export default function WorkerProfilesPage() {
                 <KPI label="IMC promedio" value={a.avgImc ?? '—'} color={a.avgImc && a.avgImc >= 30 ? '#EF4444' : a.avgImc && a.avgImc >= 25 ? '#F59E0B' : '#10B981'} sub={a.avgImc ? `${a.avgImc >= 30 ? 'Obesidad' : a.avgImc >= 25 ? 'Sobrepeso' : 'Normal'} · ${a.baseImc} de ${a.total}` : 'Sin datos'} />
               </div>
 
+              {/* Cuánta gente ya llenó su ficha. Es el primer dato que pide
+                  una gerencia: antes de leer un porcentaje hay que saber
+                  sobre cuánta población está hecho. */}
+              <Cobertura profiles={profiles} total={a.total} onAvisar={() => setAvisando(true)} />
+
               {/* Alerts */}
               {a.estres.pctSi >= 40 && (
                 <div className="terra-card p-4 flex items-start gap-3" style={{ borderLeft: '3px solid #F59E0B' }}>
@@ -362,9 +392,9 @@ export default function WorkerProfilesPage() {
               )}
 
               <div className="grid lg:grid-cols-3 gap-4">
-                <Sec title="Distribución por sexo"><DonutChart data={a.sexo} /></Sec>
-                <Sec title="Nivel educativo" accent="#8B5CF6"><FreqTable data={a.nivelEducativo} color="#8B5CF6" /></Sec>
-                <Sec title="Tipo de contrato" accent="#10B981"><FreqTable data={a.tipoContrato} color="#10B981" /></Sec>
+                <Sec title="Distribución por sexo" base={suma(a.sexo)} total={a.total}><DonutChart data={a.sexo} /></Sec>
+                <Sec title="Nivel educativo" accent="#8B5CF6" base={suma(a.nivelEducativo)} total={a.total}><FreqTable data={a.nivelEducativo} color="#8B5CF6" /></Sec>
+                <Sec title="Tipo de contrato" accent="#10B981" base={suma(a.tipoContrato)} total={a.total}><FreqTable data={a.tipoContrato} color="#10B981" /></Sec>
               </div>
             </div>
           )}
@@ -373,18 +403,18 @@ export default function WorkerProfilesPage() {
           {tab === 'demografia' && (
             <div className="space-y-4">
               <div className="grid lg:grid-cols-2 gap-4">
-                <Sec title="Distribución por sexo"><DonutChart data={a.sexo} size={150} /></Sec>
-                <Sec title="Estado civil" accent="#F59E0B"><FreqTable data={a.estadoCivil} color="#F59E0B" /></Sec>
+                <Sec title="Distribución por sexo" base={suma(a.sexo)} total={a.total}><DonutChart data={a.sexo} size={150} /></Sec>
+                <Sec title="Estado civil" accent="#F59E0B" base={suma(a.estadoCivil)} total={a.total}><FreqTable data={a.estadoCivil} color="#F59E0B" /></Sec>
               </div>
-              <Sec title="Grupos de edad"><FreqTable data={a.ageGroups} color="var(--primary)" /></Sec>
-              <Sec title="Ciudad de residencia (top 10)" accent="#06B6D4"><FreqTable data={a.ciudad} color="#06B6D4" /></Sec>
+              <Sec title="Grupos de edad" base={suma(a.ageGroups)} total={a.total}><FreqTable data={a.ageGroups} color="var(--primary)" /></Sec>
+              <Sec title="Ciudad de residencia (top 10)" accent="#06B6D4" base={suma(a.ciudad)} total={a.total}><FreqTable data={a.ciudad} color="#06B6D4" /></Sec>
               <div className="grid lg:grid-cols-3 gap-4">
-                <Sec title="Tipo de vivienda"><FreqTable data={a.tipoVivienda} /></Sec>
-                <Sec title="Tenencia de vivienda" accent="#10B981"><FreqTable data={a.tenenciaVivienda} color="#10B981" /></Sec>
-                <Sec title="Estrato socioeconómico" accent="#F59E0B"><FreqTable data={a.estrato} color="#F59E0B" /></Sec>
+                <Sec title="Tipo de vivienda" base={suma(a.tipoVivienda)} total={a.total}><FreqTable data={a.tipoVivienda} /></Sec>
+                <Sec title="Tenencia de vivienda" accent="#10B981" base={suma(a.tenenciaVivienda)} total={a.total}><FreqTable data={a.tenenciaVivienda} color="#10B981" /></Sec>
+                <Sec title="Estrato socioeconómico" accent="#F59E0B" base={suma(a.estrato)} total={a.total}><FreqTable data={a.estrato} color="#F59E0B" /></Sec>
               </div>
               <div className="grid lg:grid-cols-2 gap-4">
-                <Sec title="Con quién vive" accent="#8B5CF6"><FreqTable data={a.conQuienVive} color="#8B5CF6" /></Sec>
+                <Sec title="Con quién vive" accent="#8B5CF6" base={suma(a.conQuienVive)} total={a.total}><FreqTable data={a.conQuienVive} color="#8B5CF6" /></Sec>
                 <Sec title="Indicadores del hogar">
                   <div className="grid grid-cols-3 gap-3 mb-4">
                     {[
@@ -408,11 +438,11 @@ export default function WorkerProfilesPage() {
           {tab === 'laboral' && (
             <div className="space-y-4">
               <div className="grid lg:grid-cols-2 gap-4">
-                <Sec title="Distribución por área"><FreqTable data={a.areas} /></Sec>
-                <Sec title="Distribución por cargo" accent="#8B5CF6"><FreqTable data={a.cargos} color="#8B5CF6" /></Sec>
+                <Sec title="Distribución por área" base={suma(a.areas)} total={a.total}><FreqTable data={a.areas} /></Sec>
+                <Sec title="Distribución por cargo" accent="#8B5CF6" base={suma(a.cargos)} total={a.total}><FreqTable data={a.cargos} color="#8B5CF6" /></Sec>
               </div>
-              <Sec title="Tipo de contrato" accent="#10B981"><DonutChart data={a.tipoContrato} /></Sec>
-              <Sec title="Nivel educativo" accent="#06B6D4"><FreqTable data={a.nivelEducativo} color="#06B6D4" /></Sec>
+              <Sec title="Tipo de contrato" accent="#10B981" base={suma(a.tipoContrato)} total={a.total}><DonutChart data={a.tipoContrato} /></Sec>
+              <Sec title="Nivel educativo" accent="#06B6D4" base={suma(a.nivelEducativo)} total={a.total}><FreqTable data={a.nivelEducativo} color="#06B6D4" /></Sec>
               <Sec title="Condiciones de trabajo">
                 <div className="grid lg:grid-cols-2 gap-4">
                   <div className="space-y-3">
@@ -429,7 +459,7 @@ export default function WorkerProfilesPage() {
                 </div>
               </Sec>
               <div className="grid lg:grid-cols-2 gap-4">
-                <Sec title="Medio de transporte" accent="#06B6D4"><FreqTable data={a.medioTransporte} color="#06B6D4" /></Sec>
+                <Sec title="Medio de transporte" accent="#06B6D4" base={suma(a.medioTransporte)} total={a.total}><FreqTable data={a.medioTransporte} color="#06B6D4" /></Sec>
                 <Sec title="Tiempo de desplazamiento" accent="#F59E0B">
                   <FreqTable data={a.tiempoDesplaz} color="#F59E0B" />
                   <div className="mt-3">
@@ -911,6 +941,79 @@ export default function WorkerProfilesPage() {
 
         </motion.div>
       </AnimatePresence>
+    </div>
+  )
+}
+
+/**
+ * Cobertura de la información sociodemográfica.
+ *
+ * El tablero mostraba porcentajes sin decir sobre cuánta gente estaban
+ * hechos. Para llevar esto a una gerencia, lo primero que hay que poder
+ * responder es «¿de cuántos trabajadores estamos hablando?»: un 65 % sobre
+ * media población no es un diagnóstico, es una muestra.
+ *
+ * El corte del 80 % es el mismo que ya usa el resto de la pantalla.
+ */
+function Cobertura({ profiles, total, onAvisar }: {
+  profiles: WP[]; total: number; onAvisar: () => void
+}) {
+  const pct = (n: number) => (total ? Math.round((n * 100) / total) : 0)
+  const completas = profiles.filter(p => (p.completion_pct ?? 0) >= 80).length
+  const enProceso = profiles.filter(p => (p.completion_pct ?? 0) > 0 && (p.completion_pct ?? 0) < 80).length
+  const sinEmpezar = total - completas - enProceso
+
+  const tramos = [
+    { etiqueta: 'Completas', valor: completas, color: '#10B981', nota: '80 % o más de la ficha' },
+    { etiqueta: 'En proceso', valor: enProceso, color: '#F59E0B', nota: 'empezaron y la dejaron a medias' },
+    { etiqueta: 'Sin empezar', valor: sinEmpezar, color: '#EF4444', nota: 'no han respondido nada' },
+  ]
+
+  return (
+    <div className="terra-card p-5">
+      <div className="flex items-center gap-2 mb-4 pb-3" style={{ borderBottom: '1px solid var(--border)' }}>
+        <div className="h-5 w-1 rounded-full flex-shrink-0" style={{ background: '#243C2C' }} />
+        <h3 className="font-bold text-sm flex-1" style={{ color: 'var(--text)' }}>
+          Cobertura de la información
+        </h3>
+        <span className="text-xs" style={{ color: 'var(--text-faint)' }}>
+          {total} trabajadores activos
+        </span>
+      </div>
+
+      {/* Una sola barra: se lee de un vistazo cuánto falta. */}
+      <div className="flex rounded-lg overflow-hidden mb-3" style={{ height: 22 }}>
+        {tramos.filter(t => t.valor > 0).map(t => (
+          <div key={t.etiqueta} title={`${t.etiqueta}: ${t.valor}`}
+            className="flex items-center justify-center text-[10px] font-bold text-white"
+            style={{ width: `${pct(t.valor)}%`, background: t.color }}>
+            {pct(t.valor) >= 8 ? `${pct(t.valor)}%` : ''}
+          </div>
+        ))}
+      </div>
+
+      <div className="grid grid-cols-3 gap-3">
+        {tramos.map(t => (
+          <div key={t.etiqueta}>
+            <div className="flex items-baseline gap-1.5">
+              <span className="text-xl font-black" style={{ color: t.color, fontVariantNumeric: 'tabular-nums' }}>
+                {t.valor}
+              </span>
+              <span className="text-xs font-bold" style={{ color: t.color }}>{pct(t.valor)}%</span>
+            </div>
+            <p className="text-[11px] font-semibold" style={{ color: 'var(--text)' }}>{t.etiqueta}</p>
+            <p className="text-[10px] leading-tight" style={{ color: 'var(--text-faint)' }}>{t.nota}</p>
+          </div>
+        ))}
+      </div>
+
+      {completas < total && (
+        <button onClick={onAvisar}
+          className="mt-4 w-full flex items-center justify-center gap-1.5 py-2 rounded-lg text-xs font-bold"
+          style={{ border: '1px solid rgba(36,60,44,0.35)', color: '#243C2C', background: 'rgba(36,60,44,0.06)' }}>
+          <Mail size={12} /> Avisar a los {total - completas} que faltan
+        </button>
+      )}
     </div>
   )
 }
