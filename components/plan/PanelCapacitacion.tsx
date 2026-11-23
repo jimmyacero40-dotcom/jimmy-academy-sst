@@ -71,6 +71,7 @@ function Barra({ cobertura }: { cobertura: Cobertura }) {
 
 export default function PanelCapacitacion({
   item, planId, anioPlan, temas, onCerrar, onGuardado, onEliminado, onRecargarPlan, onAviso,
+  pestanaInicial, fechaPropuesta, mesPropuesto,
 }: {
   item: PlanItem
   planId: string
@@ -82,8 +83,19 @@ export default function PanelCapacitacion({
   /** Vuelve a leer el plan: la fecha o el estado pudieron cambiar. */
   onRecargarPlan: () => Promise<void> | void
   onAviso: (texto: string, deshacer?: () => void) => void
+  /** Con qué pestaña abre. Reprogramar entra directo a los detalles. */
+  pestanaInicial?: 'seguimiento' | 'asignacion' | 'detalles'
+  /**
+   * La fecha a la que se acaba de arrastrar en el calendario, ya puesta en el
+   * formulario. Antes, mover una capacitación con gente asignada abría un
+   * recuadrito con la fecha y nada más: no se veía el plazo, ni la modalidad,
+   * ni quiénes estaban asignados, que es justo lo que uno quiere mirar antes
+   * de cambiarle el día a cuarenta personas.
+   */
+  fechaPropuesta?: string | null
+  mesPropuesto?: number | null
 }) {
-  const [pestana, setPestana] = useState<'seguimiento' | 'asignacion' | 'detalles'>('seguimiento')
+  const [pestana, setPestana] = useState<'seguimiento' | 'asignacion' | 'detalles'>(pestanaInicial ?? 'seguimiento')
   const [reprogramando, setReprogramando] = useState(false)
   const [asignados, setAsignados] = useState<Asignado[] | null>(null)
   const [cancelando, setCancelando] = useState(false)
@@ -336,12 +348,28 @@ export default function PanelCapacitacion({
           />
         ) : (
           <div className="h-full overflow-y-auto">
+            {fechaPropuesta !== undefined && fechaPropuesta !== null && (
+              <div className="mx-4 mt-3 p-3 rounded-xl flex items-start gap-2"
+                style={{ background: 'rgba(245,158,11,0.08)', border: '1px solid rgba(245,158,11,0.3)' }}>
+                <CalendarClock size={14} style={{ color: '#F59E0B' }} className="flex-shrink-0 mt-0.5" />
+                <p className="text-[11px] leading-relaxed" style={{ color: 'var(--text-dim)' }}>
+                  <strong style={{ color: 'var(--text)' }}>Se va a mover al {enPalabras(fechaPropuesta)}.</strong>{' '}
+                  Revise el plazo y la modalidad antes de guardar. Mientras no guarde, la capacitación
+                  sigue donde estaba.
+                </p>
+              </div>
+            )}
             <PanelAsignacion
               variante="panel"
               modo="editar"
               planId={planId}
               anioPlan={anioPlan}
-              item={item}
+              // Si viene de arrastrar en el calendario, el formulario abre con
+              // la fecha nueva puesta: se revisa el plazo y la modalidad, y se
+              // guarda. Mientras no se guarde, no se ha movido nada.
+              item={fechaPropuesta !== undefined && fechaPropuesta !== null
+                ? { ...item, scheduled_date: fechaPropuesta, month: mesPropuesto ?? item.month }
+                : item}
               temas={temas}
               onCerrar={onCerrar}
               onGuardado={onGuardado}

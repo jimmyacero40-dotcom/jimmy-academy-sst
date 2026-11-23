@@ -17,7 +17,6 @@ import PanelAsignacion, { type ValoresIniciales } from '@/components/plan/PanelA
 import PanelCapacitacion from '@/components/plan/PanelCapacitacion'
 import { colorCategoria, type PlanItem, type Tema, type Cobertura } from '@/components/plan/tipos'
 import { MESES, partes, enPalabras, horas } from '@/lib/plan-fechas'
-import { DialogoReprogramar } from '@/components/plan/DialogoReprogramar'
 import {
   Calendar, Plus, Trash2, X, Loader2, AlertCircle, ChevronLeft,
   BookOpen, ArrowRight, GraduationCap, LayoutGrid, CalendarDays, BarChart2,
@@ -40,7 +39,9 @@ interface Vista { clase: 'mes' | 'ano' | 'cobertura' }
 
 type Panel =
   | { modo: 'crear'; tema: Tema | null; inicial: ValoresIniciales }
-  | { modo: 'editar'; item: PlanItem }
+  // `reprogramar` trae la fecha a la que se arrastró: abre el mismo panel, en
+  // los detalles, con esa fecha puesta.
+  | { modo: 'editar'; item: PlanItem; reprogramar?: { fecha: string | null; mes: number } }
 
 export default function PlanPage() {
   // Asistente de asignación nominal (el de "Asignar capacitación").
@@ -77,8 +78,6 @@ export default function PlanPage() {
   // Cuánta gente lleva cada capacitación: alimenta el 12/40 de los chips y
   // decide si mover una por arrastre merece preguntar antes.
   const [cobertura, setCobertura] = useState<Cobertura>({})
-  const [porReprogramar, setPorReprogramar] = useState<
-    { item: PlanItem; mes: number; fecha: string | null } | null>(null)
 
   const sensores = useSensors(
     // Un umbral pequeño: así un clic sigue siendo un clic y no empieza a
@@ -289,7 +288,13 @@ export default function PlanPage() {
       if (item.month === mes && (item.scheduled_date ?? null) === fecha) return
       // Mover una capacitación que ya tiene gente asignada no es acomodar el
       // calendario: es cambiarle el día a cuarenta personas. Eso se pregunta.
-      if ((cobertura[item.id]?.asignados ?? 0) > 0) setPorReprogramar({ item, mes, fecha })
+      // Mover una capacitación que ya tiene gente asignada no es acomodar el
+      // calendario: es cambiarle el día a cuarenta personas. Se abre el panel
+      // completo —plazo, modalidad, quiénes están asignados— y no se mueve
+      // nada hasta que se guarde.
+      if ((cobertura[item.id]?.asignados ?? 0) > 0) {
+        setPanel({ modo: 'editar', item, reprogramar: { fecha, mes } })
+      }
       else moverItem(item, mes, fecha)
     }
   }
@@ -498,6 +503,9 @@ export default function PlanPage() {
                     planId={editingPlan.id}
                     anioPlan={editingPlan.year}
                     temas={temas}
+                    pestanaInicial={panel.reprogramar ? 'detalles' : undefined}
+                    fechaPropuesta={panel.reprogramar?.fecha}
+                    mesPropuesto={panel.reprogramar?.mes}
                     onCerrar={() => setPanel(null)}
                     onGuardado={alGuardar}
                     onEliminado={id => {
@@ -551,18 +559,9 @@ export default function PlanPage() {
 
           {asistente}
 
-          {porReprogramar && (
-            <DialogoReprogramar
-              item={porReprogramar.item}
-              fecha={porReprogramar.fecha}
-              asignados={cobertura[porReprogramar.item.id]?.asignados ?? 0}
-              onCerrar={() => setPorReprogramar(null)}
-              onHecho={async texto => {
-                setPorReprogramar(null)
-                setAviso({ texto })
-                await recargarItems()
-              }} />
-          )}
+          {/* El recuadrito de reprogramar se quitó de aquí: arrastrar abre
+              el panel completo. El panel conserva su propio botón de
+              reprogramar, que es el que además ofrece avisar por correo. */}
 
           {/* Aviso con Deshacer */}
           <AnimatePresence>
