@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { supabaseAdmin as supabase } from '@/lib/supabase-admin'
 import { requierePermiso } from '@/lib/get-company'
 import { anotar } from '@/lib/auditoria-plan'
+import { calcularCierre, sincronizarRonda } from '@/lib/vigencia'
 import { enviarCorreo, correoConfigurado, plantillaCapacitacion, direccionDe } from '@/lib/correo'
 
 // ─── Acciones sobre una capacitación del plan ─────────────────────────
@@ -12,7 +13,7 @@ import { enviarCorreo, correoConfigurado, plantillaCapacitacion, direccionDe } f
 async function cargar(id: string, companyId: string) {
   const { data } = await supabase
     .from('plan_items')
-    .select('id, month, estado, scheduled_date, modalidad, training_id, trainings(title, duration), annual_plans!inner(company_id)')
+    .select('id, month, estado, scheduled_date, end_date, dias_vigencia, modalidad, training_id, trainings(title, duration), annual_plans!inner(company_id)')
     .eq('id', id).maybeSingle()
   if (!data || (data.annual_plans as any).company_id !== companyId) return null
   return data as any
@@ -101,8 +102,13 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
       .update({ scheduled_date: fecha, month: mes, estado: item.estado === 'cancelada' ? 'programada' : item.estado })
       .eq('id', params.id)
     if (error) return NextResponse.json({ error: error.message }, { status: 500 })
-    await supabase.from('enrollments').update({ due_date: fecha })
-      .eq('plan_item_id', params.id).neq('status', 'completed')
+    // El cierre se recalcula con el plazo de la ronda, y las inscripciones
+    // siguen a la ronda: su vencimiento es el cierre —no la fecha de inicio,
+    // que era el error— y quien estaba marcado como vencido vuelve a poder
+    // entrar si la nueva ventana aún no se pasa.
+    const cierre = calcularCierre(fecha, item.dias_vigencia ?? null)
+    await supabase.from('plan_items').update({ end_date: cierre }).eq('id', params.id)
+    const sync = await sincronizarRonda(params.id)
 
     let enviados = 0
     const fallos: { nombre: string; motivo: string }[] = []
@@ -129,7 +135,7 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
       ...quien,
     })
 
-    return NextResponse.json({ scheduled_date: fecha, month: mes, enviados, fallos, configurado: correoConfigurado() })
+    return NextResponse.json({ scheduled_date: fecha, month: mes, end_date: cierre, reactivadas: sync.reactivadas, reabierta: sync.reabierta, enviados, fallos, configurado: correoConfigurado() })
   }
 
   return NextResponse.json({ error: 'Acción no reconocida' }, { status: 400 })

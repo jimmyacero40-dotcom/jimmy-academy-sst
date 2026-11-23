@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { supabaseAdmin as supabase } from '@/lib/supabase-admin'
 import { isAdminOrSuper } from '@/lib/get-company'
-import { cerrarVencidas, calcularCierre, DIAS_POR_DEFECTO } from '@/lib/vigencia'
+import { cerrarVencidas, calcularCierre, sincronizarRonda, DIAS_POR_DEFECTO } from '@/lib/vigencia'
 
 export async function GET(_req: NextRequest, { params }: { params: { id: string } }) {
   const { authorized, companyId } = await isAdminOrSuper()
@@ -149,6 +149,13 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
   if (Object.keys(updates).length > 0) {
     const { error } = await supabase.from('plan_items').update(updates).eq('id', item_id)
     if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+
+    // Si se movió la ventana, las inscripciones siguen a la ronda: su
+    // vencimiento es el cierre, y quien estaba vencido vuelve a poder entrar.
+    if (updates.end_date !== undefined || updates.scheduled_date !== undefined
+        || updates.dias_vigencia !== undefined || updates.estado !== undefined) {
+      await sincronizarRonda(item_id)
+    }
   }
 
   // Update target if provided

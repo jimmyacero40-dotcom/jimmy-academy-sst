@@ -13,6 +13,8 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { motion } from 'framer-motion'
+import ConfirmarEnvio from '@/components/ConfirmarEnvio'
+import { DIAS_POR_DEFECTO, calcularCierre } from '@/lib/ventana'
 import {
   X, Search, Check, ChevronRight, ChevronLeft, Loader2, GraduationCap,
   Users, CalendarDays, CheckCircle2, AlertCircle,
@@ -173,7 +175,7 @@ export default function AsignarCapacitacion({
   const [yaEstaban, setYaEstaban] = useState<Set<string>>(new Set())
   // Avisarle a quien acaba de quedar asignado es lo normal, así que viene
   // marcado. A quien ya estaba no se le escribe por haber tocado la lista.
-  const [notificar, setNotificar] = useState(true)
+  const [notificar, setNotificar] = useState(false)
   const [verMensaje, setVerMensaje] = useState(false)
   // Quién ya tiene otra capacitación ese mismo día.
   const [choques, setChoques] = useState<{ user_id: string; nombre: string; curso: string }[]>([])
@@ -181,6 +183,17 @@ export default function AsignarCapacitacion({
   const [fecha, setFecha] = useState(fechaInicial ?? '')
   const [modalidad, setModalidad] = useState('presencial')
   const [responsable, setResponsable] = useState('')
+  const [dias, setDias] = useState(String(DIAS_POR_DEFECTO))
+  const [periodicidad, setPeriodicidad] = useState('once')
+  const [obligatoria, setObligatoria] = useState(true)
+  const [esReinduccion, setEsReinduccion] = useState(false)
+  const [observaciones, setObservaciones] = useState('')
+
+  /** Hasta cuándo quedaría abierta, para verlo antes de guardar. */
+  const cierreCalculado = useMemo(() => {
+    const f = calcularCierre(fecha || null, dias === '' ? null : Number(dias))
+    return f ? new Date(f + 'T12:00:00').toLocaleDateString('es-CO', { day: 'numeric', month: 'long' }) : null
+  }, [fecha, dias])
 
   const [buscaCurso, setBuscaCurso] = useState('')
   const [busca, setBusca] = useState('')
@@ -489,6 +502,9 @@ export default function AsignarCapacitacion({
     }
   }
 
+  // El aviso final antes de que salgan correos.
+  const [confirmandoEnvio, setConfirmandoEnvio] = useState(false)
+
   const asignar = async () => {
     setGuardando(true); setError('')
     try {
@@ -501,6 +517,11 @@ export default function AsignarCapacitacion({
           scheduled_date: fecha || null,
           modalidad,
           responsable,
+          dias_vigencia: dias === '' ? null : Number(dias),
+          periodicity: periodicidad,
+          required: obligatoria,
+          reinduccion: esReinduccion,
+          observaciones: observaciones.trim() || null,
           // Editando una capacitación del calendario, la lista que se ve es la
           // lista que queda: lo desmarcado se retira.
           ...(planItemId ? { plan_item_id: planItemId, sincronizar: true } : {}),
@@ -880,6 +901,52 @@ export default function AsignarCapacitacion({
                   <input value={responsable} onChange={e => setResponsable(e.target.value.toUpperCase())}
                     placeholder="QUIÉN LA DICTA" className={inp} style={estiloInp} />
                 </div>
+
+                {/* El plazo y el tipo, que antes solo se podían tocar después
+                    de crear la ronda. Una ronda nacía sin cierre: no se
+                    cerraba sola y el trabajador no sabía hasta cuándo tenía. */}
+                <div>
+                  <label className="text-[11px] font-bold uppercase tracking-wider mb-1.5 block" style={{ color: 'var(--text-dim)' }}>
+                    Se cierra a los
+                  </label>
+                  <div className="flex items-center gap-2">
+                    <input type="number" min={0} max={365} value={dias}
+                      onChange={e => setDias(e.target.value)} className={inp} style={{ ...estiloInp, width: 90 }} />
+                    <span className="text-[11px]" style={{ color: 'var(--text-faint)' }}>días · 0 = no se cierra</span>
+                  </div>
+                  {cierreCalculado && (
+                    <p className="text-[10px] mt-1" style={{ color: 'var(--text-faint)' }}>
+                      Queda abierta hasta el {cierreCalculado}
+                    </p>
+                  )}
+                </div>
+                <div>
+                  <label className="text-[11px] font-bold uppercase tracking-wider mb-1.5 block" style={{ color: 'var(--text-dim)' }}>Periodicidad</label>
+                  <select value={periodicidad} onChange={e => setPeriodicidad(e.target.value)} className={inp} style={estiloInp}>
+                    <option value="once">Una vez</option>
+                    <option value="monthly">Mensual</option>
+                    <option value="quarterly">Trimestral</option>
+                    <option value="semiannual">Semestral</option>
+                    <option value="annual">Anual</option>
+                  </select>
+                </div>
+                <div className="sm:col-span-2 flex flex-wrap gap-4">
+                  <label className="flex items-center gap-2 text-xs cursor-pointer" style={{ color: 'var(--text-dim)' }}>
+                    <input type="checkbox" checked={obligatoria} onChange={e => setObligatoria(e.target.checked)} />
+                    Obligatoria
+                  </label>
+                  <label className="flex items-center gap-2 text-xs cursor-pointer" style={{ color: 'var(--text-dim)' }}>
+                    <input type="checkbox" checked={esReinduccion} onChange={e => setEsReinduccion(e.target.checked)} />
+                    Es reinducción
+                  </label>
+                </div>
+                <div className="sm:col-span-2">
+                  <label className="text-[11px] font-bold uppercase tracking-wider mb-1.5 block" style={{ color: 'var(--text-dim)' }}>
+                    Observaciones <span className="font-normal normal-case tracking-normal" style={{ color: 'var(--text-faint)' }}>(opcional)</span>
+                  </label>
+                  <textarea value={observaciones} onChange={e => setObservaciones(e.target.value)} rows={2}
+                    placeholder="Notas adicionales…" className={inp} style={{ ...estiloInp, resize: 'vertical' }} />
+                </div>
               </div>
 
               {/* Resumen */}
@@ -1054,6 +1121,16 @@ export default function AsignarCapacitacion({
                   style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', color: 'var(--text-dim)' }}>
                   Cancelar
                 </button>
+                {confirmandoEnvio && (
+                  <ConfirmarEnvio
+                    cuantos={nuevos.length}
+                    que={`El aviso de ${curso?.title ?? 'la capacitación'}, con la fecha y la modalidad.`}
+                    nombres={nuevos.map(p => p.name)}
+                    enviando={guardando}
+                    onCancelar={() => setConfirmandoEnvio(false)}
+                    onConfirmar={() => { setConfirmandoEnvio(false); asignar() }}
+                  />
+                )}
                 {paso < 3 ? (
                   <button onClick={siguiente} disabled={paso === 1 ? !curso : elegidos.size === 0}
                     className="px-4 py-2 rounded-lg text-xs font-bold flex items-center gap-1.5 disabled:opacity-40"
@@ -1061,7 +1138,13 @@ export default function AsignarCapacitacion({
                     Siguiente <ChevronRight size={12} />
                   </button>
                 ) : (
-                  <button onClick={modo === 'retirar' ? retirar : asignar}
+                  <button onClick={() => {
+                    if (modo === 'retirar') { retirar(); return }
+                    // Si van a salir correos, se pregunta antes. Un correo no
+                    // se puede devolver.
+                    if (notificar && nuevos.length > 0) { setConfirmandoEnvio(true); return }
+                    asignar()
+                  }}
                     disabled={guardando || !curso || (elegidos.size === 0 && !edicion)}
                     className="px-4 py-2 rounded-lg text-xs font-bold flex items-center gap-1.5 disabled:opacity-40"
                     style={{ background: modo === 'retirar' ? '#EF4444' : 'var(--primary)', color: '#fff' }}>

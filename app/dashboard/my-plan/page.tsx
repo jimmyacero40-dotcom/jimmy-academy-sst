@@ -46,7 +46,11 @@ function daysUntil(dateStr: string | null): number | null {
 
 function fmtDate(d: string | null) {
   if (!d) return '—'
-  return new Date(d).toLocaleDateString('es-CO', { day: 'numeric', month: 'short', year: 'numeric' })
+  // Una fecha suelta («2026-11-30») la lee el navegador como medianoche en
+  // UTC, y en Colombia eso es el día anterior: el plazo hasta el 30 se
+  // mostraba como el 29. Se fija al mediodía, que ninguna zona corre de día.
+  const plano = /^\d{4}-\d{2}-\d{2}$/.test(d) ? `${d}T12:00:00` : d
+  return new Date(plano).toLocaleDateString('es-CO', { day: 'numeric', month: 'short', year: 'numeric' })
 }
 
 function fmtMonth(d: string) {

@@ -3,7 +3,7 @@ import { supabaseAdmin as supabase } from '@/lib/supabase-admin'
 import { requierePermiso } from '@/lib/get-company'
 import { anotar } from '@/lib/auditoria-plan'
 import { enviarCorreo, correoConfigurado, plantillaCapacitacion, direccionDe } from '@/lib/correo'
-import { estaAbierta } from '@/lib/vigencia'
+import { estaAbierta, calcularCierre, sincronizarRonda, DIAS_POR_DEFECTO } from '@/lib/vigencia'
 
 // ─── Asignar una capacitación a personas concretas ────────────────────
 // Vía corta a lo que ya hacían los Perfiles de Formación: en vez de armar un
@@ -294,6 +294,19 @@ export async function POST(req: NextRequest) {
     .eq('plan_id', plan!.id).eq('training_id', trainingId).eq('month', mes)
     .limit(1).maybeSingle()
 
+  // El plazo y lo demás de la ronda, que antes solo se podía tocar después de
+  // crearla: una ronda nacía sin cierre y por eso nunca se cerraba sola.
+  const dias = Number.isFinite(Number(body.dias_vigencia)) && body.dias_vigencia !== null && body.dias_vigencia !== ''
+    ? Number(body.dias_vigencia)
+    : DIAS_POR_DEFECTO
+  const cierre = calcularCierre(fecha ?? null, dias)
+  const periodicidad = typeof body.periodicity === 'string' ? body.periodicity : 'once'
+  const obligatoria = body.required !== false
+  const esReinduccion = body.reinduccion === true
+  const notas = typeof body.observaciones === 'string' && body.observaciones.trim()
+    ? body.observaciones.trim()
+    : (responsable ? `Responsable: ${responsable}` : null)
+
   let itemCreado = false
   if (!item) {
     const { data: nuevo, error: eItem } = await supabase
@@ -305,17 +318,26 @@ export async function POST(req: NextRequest) {
         scheduled_date: fecha,
         modalidad,
         estado: 'programada',
-        periodicity: 'once',
-        required: true,
+        end_date: cierre,
+        dias_vigencia: dias,
+        periodicity: periodicidad,
+        required: obligatoria,
+        reinduccion: esReinduccion,
         origen: 'asignacion_directa',
-        observaciones: responsable ? `Responsable: ${responsable}` : null,
+        observaciones: notas,
       })
       .select('id, origen').single()
     if (eItem) return NextResponse.json({ error: eItem.message }, { status: 500 })
     item = nuevo
     itemCreado = true
-  } else if (fecha) {
-    await supabase.from('plan_items').update({ scheduled_date: fecha, modalidad }).eq('id', item.id)
+  } else {
+    // Reutilizando la ronda del mes: lo que se acabe de escribir manda.
+    await supabase.from('plan_items').update({
+      ...(fecha ? { scheduled_date: fecha, end_date: cierre } : {}),
+      modalidad, dias_vigencia: dias, periodicity: periodicidad,
+      required: obligatoria, reinduccion: esReinduccion,
+      ...(notas ? { observaciones: notas } : {}),
+    }).eq('id', item.id)
   }
 
   // ── A quiénes va ──
@@ -338,13 +360,18 @@ export async function POST(req: NextRequest) {
         plan_item_id: item!.id,
         company_id: companyId,
         status: 'pending',
-        due_date: fecha || finDeMes(plan!.year, mes),
+        // El plazo del trabajador es el cierre de la ronda, no su inicio.
+        due_date: cierre ?? fecha ?? finDeMes(plan!.year, mes),
       })),
       { onConflict: 'user_id,training_id,plan_item_id', ignoreDuplicates: true },
     )
     .select('id, user_id')
 
   if (eIns) return NextResponse.json({ error: eIns.message }, { status: 500 })
+
+  // Las inscripciones que ya existían siguen a la ronda, por si se le movió
+  // la ventana al reasignar.
+  await sincronizarRonda(item!.id)
 
   const asignadas = insertadas?.length ?? 0
   const correos = body.notificar === true

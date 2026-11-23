@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import { CalendarClock, Loader2, AlertCircle } from 'lucide-react'
+import ConfirmarEnvio from '@/components/ConfirmarEnvio'
 import { enPalabras } from '@/lib/plan-fechas'
 import type { PlanItem } from './tipos'
 
@@ -23,7 +24,7 @@ export function DialogoReprogramar({
 }) {
   const [nueva, setNueva] = useState(fecha ?? item.scheduled_date ?? '')
   const [motivo, setMotivo] = useState('')
-  const [notificar, setNotificar] = useState(true)
+  const [notificar, setNotificar] = useState(false)
   const [guardando, setGuardando] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [choques, setChoques] = useState<{ nombre: string; curso: string }[]>([])
@@ -38,6 +39,9 @@ export function DialogoReprogramar({
       .catch(() => { if (vigente) setChoques([]) })
     return () => { vigente = false }
   }, [nueva, item.id])
+
+  // Antes de que salgan correos se pregunta: no se puede devolver uno.
+  const [confirmandoEnvio, setConfirmandoEnvio] = useState(false)
 
   const guardar = async () => {
     if (!nueva) { setError('Elige la nueva fecha'); return }
@@ -68,6 +72,16 @@ export function DialogoReprogramar({
   }
 
   return (
+    <>
+      {confirmandoEnvio && (
+        <ConfirmarEnvio
+          cuantos={asignados}
+          que="El aviso de la nueva fecha de la capacitación."
+          enviando={guardando}
+          onCancelar={() => setConfirmandoEnvio(false)}
+          onConfirmar={() => { setConfirmandoEnvio(false); guardar() }}
+        />
+      )}
     <div className="fixed inset-0 z-[60] flex items-center justify-center p-4"
       style={{ background: 'rgba(0,0,0,0.6)' }} >
       <div className="terra-card p-5 w-full max-w-md" onClick={e => e.stopPropagation()}>
@@ -135,7 +149,12 @@ export function DialogoReprogramar({
           <button onClick={onCerrar} className="terra-btn-outline" style={{ padding: '8px 16px', fontSize: 12 }}>
             Cancelar
           </button>
-          <button onClick={guardar} disabled={guardando}
+          <button
+            onClick={() => {
+              if (notificar && asignados > 0) { setConfirmandoEnvio(true); return }
+              guardar()
+            }}
+            disabled={guardando}
             className="flex items-center gap-1.5 rounded-lg font-bold text-white"
             style={{ padding: '8px 16px', fontSize: 12, background: 'var(--primary)' }}>
             {guardando ? <Loader2 size={13} className="animate-spin" /> : <CalendarClock size={13} />}
@@ -144,5 +163,6 @@ export function DialogoReprogramar({
         </div>
       </div>
     </div>
+    </>
   )
 }

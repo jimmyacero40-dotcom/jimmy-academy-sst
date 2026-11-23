@@ -8,6 +8,7 @@ import {
   ClipboardList, Ban, AlertTriangle, CalendarClock, History,
 } from 'lucide-react'
 import AsignarCapacitacion from '@/components/AsignarCapacitacion'
+import ConfirmarEnvio from '@/components/ConfirmarEnvio'
 import PanelAsignacion from './PanelAsignacion'
 import Seguimiento, { estadoDe, type Asignado } from './Seguimiento'
 import { DialogoReprogramar } from './DialogoReprogramar'
@@ -87,7 +88,8 @@ export default function PanelCapacitacion({
   const [asignados, setAsignados] = useState<Asignado[] | null>(null)
   const [cancelando, setCancelando] = useState(false)
   const [motivo, setMotivo] = useState('')
-  const [avisarCancelacion, setAvisarCancelacion] = useState(true)
+  const [avisarCancelacion, setAvisarCancelacion] = useState(false)
+  const [confirmandoEnvio, setConfirmandoEnvio] = useState(false)
   const [guardandoCancelacion, setGuardandoCancelacion] = useState(false)
 
   const cargar = useCallback(async () => {
@@ -249,12 +251,27 @@ export default function PanelCapacitacion({
               </span>
             </label>
           )}
+          {confirmandoEnvio && (
+            <ConfirmarEnvio
+              cuantos={cobertura.asignados}
+              que="El aviso de que la capacitación se canceló."
+              enviando={guardandoCancelacion}
+              onCancelar={() => setConfirmandoEnvio(false)}
+              onConfirmar={() => { setConfirmandoEnvio(false); cancelar() }}
+            />
+          )}
           <div className="flex gap-2">
             <button onClick={() => { setCancelando(false); setMotivo('') }}
               className="terra-btn-outline flex-1 text-xs py-1.5">
               No cancelar
             </button>
-            <button onClick={cancelar} disabled={!motivo.trim() || guardandoCancelacion}
+            <button
+              onClick={() => {
+                // Si va a salir correo, se pregunta antes.
+                if (avisarCancelacion && cobertura.asignados > 0) { setConfirmandoEnvio(true); return }
+                cancelar()
+              }}
+              disabled={!motivo.trim() || guardandoCancelacion}
               className="flex-1 text-xs py-1.5 rounded-xl font-bold flex items-center justify-center gap-1.5 disabled:opacity-40"
               style={{ background: '#EF4444', color: '#fff' }}>
               {guardandoCancelacion ? <Loader2 size={12} className="animate-spin" /> : <Ban size={12} />} Cancelar

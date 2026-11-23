@@ -72,3 +72,66 @@ export async function cerrarVencidas(companyId: string): Promise<Cerrada[]> {
   }
   return cerradas
 }
+
+/**
+ * Las inscripciones de una ronda siguen a la ronda.
+ *
+ * Al reprogramar la inducción pasó esto: el ítem quedó abierto del 23 al 30,
+ * pero las inscripciones conservaron el vencimiento viejo y su estado
+ * «vencida». El trabajador entraba y le salía «Periodo vencido» para una
+ * capacitación que la empresa acababa de reabrirle.
+ *
+ * Eran dos errores a la vez: al reprogramar se ponía como vencimiento la
+ * fecha de inicio en vez de la de cierre, y a nadie se le quitaba el estado
+ * de vencida. Esto corrige los dos y se llama desde todos los sitios donde se
+ * puede mover la ventana, para que no vuelva a depender de que cada ruta se
+ * acuerde.
+ */
+export async function sincronizarRonda(itemId: string): Promise<{
+  vencimiento: string | null; reactivadas: number; reabierta: boolean
+}> {
+  const { data: item } = await supabase
+    .from('plan_items')
+    .select('id, estado, scheduled_date, end_date')
+    .eq('id', itemId)
+    .maybeSingle()
+
+  if (!item) return { vencimiento: null, reactivadas: 0, reabierta: false }
+
+  // El plazo del trabajador es hasta cuándo se puede responder, que es el
+  // cierre de la ronda. Si no tiene cierre, no vence.
+  const vencimiento = item.end_date ?? null
+
+  await supabase
+    .from('enrollments')
+    .update({ due_date: vencimiento })
+    .eq('plan_item_id', itemId)
+    .neq('status', 'completed')
+
+  // Quien quedó marcado como vencido vuelve a poder entrar, si la nueva
+  // ventana todavía no se ha pasado. Lo completado no se toca nunca.
+  let reactivadas = 0
+  const sigueAbierta = !vencimiento || vencimiento >= hoy()
+  if (sigueAbierta) {
+    const { data } = await supabase
+      .from('enrollments')
+      .update({ status: 'pending' })
+      .eq('plan_item_id', itemId)
+      .eq('status', 'expired')
+      .select('id')
+    reactivadas = data?.length ?? 0
+  }
+
+  // Una ronda cerrada que se reprograma al futuro vuelve a estar viva: si no,
+  // se le movió la fecha a algo que sigue sin admitir respuestas.
+  let reabierta = false
+  if (sigueAbierta && item.estado === 'cerrada') {
+    await supabase
+      .from('plan_items')
+      .update({ estado: 'programada', cerrado_at: null })
+      .eq('id', itemId)
+    reabierta = true
+  }
+
+  return { vencimiento, reactivadas, reabierta }
+}
