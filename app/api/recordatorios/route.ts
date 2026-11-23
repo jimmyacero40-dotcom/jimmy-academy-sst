@@ -11,13 +11,30 @@ import {
  * De la clave que manda la pantalla al módulo concreto. Los fijos están en la
  * tabla; los de Tú Cuentas se leen de la base, porque los crea el usuario.
  */
-async function resolver(clave: string): Promise<Modulo | null> {
-  const fijo = MODULOS[clave]
-  if (fijo) return fijo
-  const id = esModuloDinamico(clave)
-  if (!id) return null
-  const { data } = await supabase.from('modulos').select('id, nombre').eq('id', id).maybeSingle()
-  return data ? moduloDinamico(data) : null
+async function resolver(clave: string, companyId?: string | null): Promise<Modulo | null> {
+  let base: Modulo | null = MODULOS[clave] ?? null
+  if (!base) {
+    const id = esModuloDinamico(clave)
+    if (!id) return null
+    const { data } = await supabase.from('modulos').select('id, nombre').eq('id', id).maybeSingle()
+    base = data ? moduloDinamico(data) : null
+  }
+  if (!base || !companyId) return base
+
+  // Lo que la empresa haya escrito manda sobre el texto de fábrica. Si solo
+  // cambió el asunto, lo demás se queda como venía.
+  const { data: propia } = await supabase
+    .from('recordatorio_plantillas')
+    .select('asunto, frase, boton')
+    .eq('company_id', companyId).eq('modulo', clave).maybeSingle()
+
+  if (!propia) return base
+  return {
+    ...base,
+    asunto: propia.asunto?.trim() || base.asunto,
+    frase: propia.frase?.trim() || base.frase,
+    boton: propia.boton?.trim() || base.boton,
+  }
 }
 
 /** El dominio desde el que se está sirviendo, para armar el enlace del correo. */
@@ -38,11 +55,15 @@ function origen(req: NextRequest): string {
  */
 export async function GET(req: NextRequest) {
   const clave = req.nextUrl.searchParams.get('modulo') ?? ''
-  const modulo = await resolver(clave)
-  if (!modulo) return NextResponse.json({ error: 'Módulo desconocido' }, { status: 400 })
+  const base = await resolver(clave)
+  if (!base) return NextResponse.json({ error: 'Módulo desconocido' }, { status: 400 })
 
-  const { authorized, companyId } = await requierePermiso(modulo.permiso)
+  const { authorized, companyId } = await requierePermiso(base.permiso)
   if (!authorized) return NextResponse.json({ error: 'No autorizado' }, { status: 403 })
+
+  // Con la empresa ya resuelta se vuelve a armar, ahora con su texto propio.
+  // Es lo que la pantalla muestra en las casillas para editar.
+  const modulo = (await resolver(clave, companyId)) ?? base
 
   let q = supabase
     .from('recordatorios')
@@ -78,17 +99,51 @@ export async function GET(req: NextRequest) {
     correos[p.id] = Boolean(d) && !/@anonimizado\.invalid$/i.test(d)
   }
 
-  return NextResponse.json({ ultimos, correos })
+  return NextResponse.json({
+    ultimos,
+    correos,
+    // El texto con el que saldría el correo si se mandara ahora mismo: es lo
+    // que la pantalla pone en las casillas para que se pueda cambiar.
+    texto: { asunto: modulo.asunto, frase: modulo.frase, boton: modulo.boton },
+    nombreModulo: modulo.nombre,
+  })
 }
 
 /** POST — manda el recordatorio a los seleccionados. */
 export async function POST(req: NextRequest) {
   const body = await req.json().catch(() => ({}))
-  const modulo = await resolver(String(body.modulo ?? ''))
-  if (!modulo) return NextResponse.json({ error: 'Módulo desconocido' }, { status: 400 })
+  const clave = String(body.modulo ?? '')
+  const base = await resolver(clave)
+  if (!base) return NextResponse.json({ error: 'Módulo desconocido' }, { status: 400 })
 
-  const { authorized, companyId } = await requierePermiso(modulo.permiso)
+  const { authorized, companyId } = await requierePermiso(base.permiso)
   if (!authorized) return NextResponse.json({ error: 'No autorizado' }, { status: 403 })
+
+  // El texto: el que viene escrito en el recuadro; si no, el que la empresa
+  // guardó; si tampoco, el de fábrica. Y si pidió guardarlo, queda puesto
+  // para la próxima vez que se avise de este mismo módulo.
+  const guardada = (await resolver(clave, companyId)) ?? base
+  const texto = (v: any, porDefecto: string) =>
+    typeof v === 'string' && v.trim() ? v.trim().slice(0, 2000) : porDefecto
+  const modulo: Modulo = {
+    ...guardada,
+    asunto: texto(body.asunto, guardada.asunto),
+    frase: texto(body.frase, guardada.frase),
+    boton: texto(body.boton, guardada.boton),
+  }
+
+  if (body.guardar_plantilla === true && companyId) {
+    const quienEscribe = await getCurrentUser()
+    await supabase.from('recordatorio_plantillas').upsert({
+      company_id: companyId,
+      modulo: clave,
+      asunto: modulo.asunto,
+      frase: modulo.frase,
+      boton: modulo.boton,
+      actualizado_at: new Date().toISOString(),
+      actualizado_por_nombre: quienEscribe?.name ?? null,
+    }, { onConflict: 'company_id,modulo' })
+  }
 
   if (!correoConfigurado()) {
     return NextResponse.json(

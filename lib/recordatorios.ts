@@ -58,6 +58,22 @@ export const MODULOS: Record<string, Modulo> = {
   },
 }
 
+/**
+ * Texto de una persona metido dentro de un HTML. Hay que escaparlo: un «&» o
+ * un «<» en la nota del administrador rompía el correo, y lo que uno escribe
+ * en una casilla no debe poder convertirse en etiquetas.
+ */
+function escapar(t: string): string {
+  return t
+    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+}
+
+/** Lo que se escribió en varias líneas se ve en varias líneas. */
+function enParrafo(t: string): string {
+  return escapar(t).replace(/\r?\n/g, '<br>')
+}
+
 /** El correo del recordatorio, con el mismo aire que los demás de la plataforma. */
 export function plantillaRecordatorio(opciones: {
   nombre: string
@@ -69,23 +85,30 @@ export function plantillaRecordatorio(opciones: {
   nota?: string | null
 }): string {
   const { nombre, modulo, enlace, plazo, nota } = opciones
+
+  // El texto puede traer {nombre} donde quiera el saludo. Si no lo trae, se
+  // antepone como siempre: «DIANA ROCÍO, todavía no ha respondido…».
+  const escrito = modulo.frase
+  const cuerpo = escrito.includes('{nombre}')
+    ? enParrafo(escrito).split('{nombre}').join(escapar(nombre))
+    : `${escapar(nombre)}, ${enParrafo(escrito)}`
   return `
   <div style="font-family:Arial,Helvetica,sans-serif;max-width:540px;margin:0 auto;padding:28px;background:#F7F9F7;color:#1F2937;border-radius:14px">
     <div style="margin-bottom:20px">
       <span style="background:#243C2C;color:#fff;padding:8px 14px;border-radius:8px;font-size:13px;font-weight:700;letter-spacing:.5px">AGROSAFE</span>
     </div>
-    <h1 style="font-size:19px;margin:0 0 12px;color:#111827">${modulo.nombre}</h1>
+    <h1 style="font-size:19px;margin:0 0 12px;color:#111827">${escapar(modulo.nombre)}</h1>
     <p style="font-size:14px;line-height:1.65;margin:0 0 16px;color:#374151">
-      ${nombre}, ${modulo.frase}
+      ${cuerpo}
     </p>
     ${plazo ? `<p style="font-size:14px;line-height:1.6;margin:0 0 16px;color:#B45309;background:#FEF3C7;border-radius:8px;padding:10px 14px">
       <strong>Tiene plazo hasta el ${plazo}.</strong>
     </p>` : ''}
     ${nota ? `<p style="font-size:14px;line-height:1.65;margin:0 0 18px;color:#374151;border-left:3px solid #243C2C;padding-left:12px">
-      ${nota}
+      ${enParrafo(nota)}
     </p>` : ''}
     <a href="${enlace}" style="display:inline-block;background:#243C2C;color:#fff;text-decoration:none;padding:13px 26px;border-radius:10px;font-size:14px;font-weight:700">
-      ${modulo.boton}
+      ${escapar(modulo.boton)}
     </a>
     <p style="font-size:12px;line-height:1.6;margin:22px 0 0;color:#6B7280">
       Entra con su cédula. Si no recuerda la contraseña, use «¿Olvidaste tu contraseña?» en la pantalla de ingreso.<br>

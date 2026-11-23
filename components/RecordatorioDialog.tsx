@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useMemo, useState } from 'react'
-import { Mail, MailWarning, Loader2, Check, X, Send, CheckCircle, AlertTriangle } from 'lucide-react'
+import { Mail, MailWarning, Loader2, Check, X, Send, CheckCircle, AlertTriangle, Pencil, RotateCcw } from 'lucide-react'
 
 export interface Candidato {
   user_id: string
@@ -45,6 +45,16 @@ export default function RecordatorioDialog({
   const [resultado, setResultado] = useState<any>(null)
   const [error, setError] = useState<string | null>(null)
 
+  // El texto del correo, editable. Llega el que rige —el de la empresa si ya
+  // lo escribió, si no el de fábrica— y desde aquí se cambia.
+  const [asunto, setAsunto] = useState('')
+  const [frase, setFrase] = useState('')
+  const [boton, setBoton] = useState('')
+  const [original, setOriginal] = useState({ asunto: '', frase: '', boton: '' })
+  const [editando, setEditando] = useState(false)
+  const [guardarTexto, setGuardarTexto] = useState(false)
+  const cambiado = asunto !== original.asunto || frase !== original.frase || boton !== original.boton
+
   useEffect(() => {
     const url = `/api/recordatorios?modulo=${encodeURIComponent(modulo)}${periodo ? `&periodo=${periodo}` : ''}`
     fetch(url)
@@ -52,6 +62,9 @@ export default function RecordatorioDialog({
       .then(d => {
         setCorreos(d.correos ?? {})
         setUltimos(d.ultimos ?? {})
+        const t = d.texto ?? { asunto: '', frase: '', boton: '' }
+        setAsunto(t.asunto ?? ''); setFrase(t.frase ?? ''); setBoton(t.boton ?? '')
+        setOriginal({ asunto: t.asunto ?? '', frase: t.frase ?? '', boton: t.boton ?? '' })
         // Vienen marcados los que tienen correo: es lo que uno quiere hacer.
         setElegidos(new Set(candidatos.filter(c => d.correos?.[c.user_id]).map(c => c.user_id)))
         setCargando(false)
@@ -80,6 +93,8 @@ export default function RecordatorioDialog({
           modulo, periodo, plazo,
           user_ids: [...elegidos],
           mensaje: nota.trim() || null,
+          asunto, frase, boton,
+          guardar_plantilla: guardarTexto && cambiado,
         }),
       })
       const d = await res.json()
@@ -158,7 +173,11 @@ export default function RecordatorioDialog({
                     </div>
                   </div>
 
-                  <div className="rounded-xl divide-y" style={{ border: '1px solid var(--border)', borderColor: 'var(--border)' }}>
+                  {/* La lista lleva su propio tope de alto: con cincuenta
+                      personas, lo de abajo —la nota y el mensaje— quedaba
+                      fuera de la pantalla y nadie lo encontraba. */}
+                  <div className="rounded-xl divide-y overflow-y-auto"
+                    style={{ border: '1px solid var(--border)', borderColor: 'var(--border)', maxHeight: 260 }}>
                     {conCorreo.map(c => {
                       const act = elegidos.has(c.user_id)
                       const u = ultimos[c.user_id]
@@ -205,6 +224,71 @@ export default function RecordatorioDialog({
                       </p>
                     </div>
                   )}
+
+                  {/* El texto del correo. Se muestra plegado para no estorbar
+                      cuando solo se quiere mandar el de siempre. */}
+                  <div className="rounded-xl" style={{ border: '1px solid var(--border)' }}>
+                    <button type="button" onClick={() => setEditando(v => !v)}
+                      className="w-full flex items-center gap-2 px-3 py-2.5 text-left">
+                      <Pencil size={12} style={{ color: 'var(--text-faint)' }} />
+                      <span className="text-xs font-semibold flex-1" style={{ color: 'var(--text-label)' }}>
+                        Mensaje del correo
+                      </span>
+                      <span className="text-[11px]" style={{ color: cambiado ? '#10B981' : 'var(--text-faint)' }}>
+                        {cambiado ? 'modificado' : (editando ? 'ocultar' : 'ver y editar')}
+                      </span>
+                    </button>
+
+                    {editando && (
+                      <div className="px-3 pb-3 space-y-2.5" style={{ borderTop: '1px solid var(--border)' }}>
+                        <div className="pt-2.5">
+                          <label className="block text-[11px] font-semibold mb-1" style={{ color: 'var(--text-faint)' }}>
+                            Asunto
+                          </label>
+                          <input value={asunto} onChange={e => setAsunto(e.target.value)} maxLength={160}
+                            className="w-full px-3 py-2 rounded-lg text-sm outline-none"
+                            style={{ background: 'var(--bg)', border: '1px solid var(--border)', color: 'var(--text)' }} />
+                        </div>
+                        <div>
+                          <label className="block text-[11px] font-semibold mb-1" style={{ color: 'var(--text-faint)' }}>
+                            Cuerpo del mensaje
+                          </label>
+                          <textarea value={frase} onChange={e => setFrase(e.target.value)} rows={5} maxLength={2000}
+                            className="w-full px-3 py-2 rounded-lg text-sm outline-none resize-y"
+                            style={{ background: 'var(--bg)', border: '1px solid var(--border)', color: 'var(--text)' }} />
+                          <p className="text-[10px] mt-1 leading-relaxed" style={{ color: 'var(--text-faint)' }}>
+                            Escriba <code>{'{nombre}'}</code> donde quiera que aparezca el nombre de la persona.
+                            Si no lo escribe, el correo empieza saludándola igual.
+                          </p>
+                        </div>
+                        <div>
+                          <label className="block text-[11px] font-semibold mb-1" style={{ color: 'var(--text-faint)' }}>
+                            Texto del botón
+                          </label>
+                          <input value={boton} onChange={e => setBoton(e.target.value)} maxLength={40}
+                            className="w-full px-3 py-2 rounded-lg text-sm outline-none"
+                            style={{ background: 'var(--bg)', border: '1px solid var(--border)', color: 'var(--text)' }} />
+                        </div>
+
+                        <div className="flex items-center justify-between gap-2 pt-1">
+                          <label className="flex items-center gap-2 text-[11px] cursor-pointer"
+                            style={{ color: 'var(--text-dim)' }}>
+                            <input type="checkbox" checked={guardarTexto} disabled={!cambiado}
+                              onChange={e => setGuardarTexto(e.target.checked)} />
+                            Dejarlo guardado para la próxima vez
+                          </label>
+                          {cambiado && (
+                            <button type="button"
+                              onClick={() => { setAsunto(original.asunto); setFrase(original.frase); setBoton(original.boton); setGuardarTexto(false) }}
+                              className="flex items-center gap-1 text-[11px] font-semibold"
+                              style={{ color: 'var(--text-faint)' }}>
+                              <RotateCcw size={10} /> Deshacer
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                    )}
+                  </div>
 
                   <div>
                     <label className="block text-xs font-semibold mb-1.5" style={{ color: 'var(--text-label)' }}>
