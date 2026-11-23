@@ -263,11 +263,14 @@ export default function LoginPage() {
                   </button>
                 </form>
 
+                {/* Ya no se ofrece registrarse: las cuentas las crea el
+                    responsable de SST. El enlace abierto dejaba que alguien
+                    que ya tenía cuenta se creara una segunda. */}
                 <p className="text-[12px] text-center mt-6" style={{ color: C.textFaint }}>
-                  ¿No tienes cuenta?{' '}
-                  <Link href="/register" className="font-semibold underline-offset-2 hover:underline" style={{ color: C.lime }}>
-                    Registrarse
-                  </Link>
+                  Entra con tu cédula. Si no recuerdas la contraseña,{' '}
+                  <Link href="/forgot-password" className="font-semibold underline-offset-2 hover:underline" style={{ color: C.lime }}>
+                    recupérala aquí
+                  </Link>.
                 </p>
               </div>
 
