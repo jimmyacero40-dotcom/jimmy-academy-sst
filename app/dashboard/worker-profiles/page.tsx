@@ -5,6 +5,7 @@ import { useAnchosColumnas, ManijaColumna, type ColumnaAncho } from '@/component
 import FichaCompleta from '@/components/FichaCompleta'
 import { calcPct, resumenFaltantes } from '@/lib/perfil-completitud'
 import RecordatorioDialog from '@/components/RecordatorioDialog'
+import { imc } from '@/lib/antropometria'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useRouter } from 'next/navigation'
 import {
@@ -206,7 +207,7 @@ export default function WorkerProfilesPage() {
   }
 
   // ── Table ──────────────────────────────────────────────────────────
-  function imc(e?: number, p?: number) { return e && p ? +(p / ((e / 100) ** 2)).toFixed(1) : null }
+  // El índice sale de lib/antropometria, igual que en el tablero y el Excel.
   function ageOf(dob?: string) { return dob ? Math.floor((Date.now() - new Date(dob).getTime()) / (365.25 * 24 * 3600 * 1000)) : null }
 
   const filtered = profiles.filter(p => {
@@ -322,8 +323,14 @@ export default function WorkerProfilesPage() {
               <div className="grid grid-cols-2 lg:grid-cols-5 gap-3">
                 <KPI label="Trabajadores" value={a.total} />
                 <KPI label="Completitud prom." value={`${a.avgPct}%`} color={a.avgPct >= 80 ? '#10B981' : '#F59E0B'} sub={`${a.complete80} al 80%+`} />
-                <KPI label="Edad promedio" value={a.avgAge ? `${a.avgAge} a` : '—'} color="#8B5CF6" />
-                <KPI label="Antigüedad prom." value={a.avgAntiguedad ? `${a.avgAntiguedad} a` : '—'} color="#06B6D4" />
+                <KPI label="Edad promedio" value={a.avgAge ? `${a.avgAge} a` : '—'} color="#8B5CF6"
+                  sub={a.baseEdad ? `${a.baseEdad} de ${a.total}` : 'Sin datos'} />
+                {/* `avgAntiguedad === 0` es un promedio válido —gente que entró
+                    este año—, así que se pregunta por null y no por «falsy». */}
+                <KPI label="Antigüedad prom."
+                  value={a.avgAntiguedad === null ? '—' : a.avgAntiguedad === 0 ? 'menos de 1 a' : `${a.avgAntiguedad} a`}
+                  color="#06B6D4"
+                  sub={a.baseAntiguedad ? `${a.baseAntiguedad} de ${a.total}` : 'Sin datos'} />
                 <KPI label="Áreas" value={a.areas.length} color="#F59E0B" />
               </div>
               <div className="grid grid-cols-2 lg:grid-cols-5 gap-3">
@@ -331,7 +338,7 @@ export default function WorkerProfilesPage() {
                 <KPI label="Actividad física" value={`${a.actividadFisica.pctSi}%`} color={a.actividadFisica.pctSi >= 50 ? '#10B981' : '#F59E0B'} />
                 <KPI label="Fumadores" value={`${a.fuma.pctSi}%`} color={a.fuma.pctSi >= 20 ? '#EF4444' : '#10B981'} alert={a.fuma.pctSi >= 20} />
                 <KPI label="Acc. laborales" value={`${a.accidentesTrabajo.pctSi}%`} color={a.accidentesTrabajo.pctSi > 0 ? '#EF4444' : '#10B981'} alert={a.accidentesTrabajo.pctSi > 0} />
-                <KPI label="IMC promedio" value={a.avgImc ?? '—'} color={a.avgImc && a.avgImc >= 30 ? '#EF4444' : a.avgImc && a.avgImc >= 25 ? '#F59E0B' : '#10B981'} sub={a.avgImc ? (a.avgImc >= 30 ? 'Obesidad' : a.avgImc >= 25 ? 'Sobrepeso' : 'Normal') : ''} />
+                <KPI label="IMC promedio" value={a.avgImc ?? '—'} color={a.avgImc && a.avgImc >= 30 ? '#EF4444' : a.avgImc && a.avgImc >= 25 ? '#F59E0B' : '#10B981'} sub={a.avgImc ? `${a.avgImc >= 30 ? 'Obesidad' : a.avgImc >= 25 ? 'Sobrepeso' : 'Normal'} · ${a.baseImc} de ${a.total}` : 'Sin datos'} />
               </div>
 
               {/* Alerts */}
@@ -529,7 +536,7 @@ export default function WorkerProfilesPage() {
               <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
                 <KPI label="Estatura promedio" value={a.avgEstatura ? `${a.avgEstatura}cm` : '—'} />
                 <KPI label="Peso promedio" value={a.avgPeso ? `${a.avgPeso}kg` : '—'} />
-                <KPI label="IMC promedio" value={a.avgImc ?? '—'} color={a.avgImc && a.avgImc >= 30 ? '#EF4444' : a.avgImc && a.avgImc >= 25 ? '#F59E0B' : '#10B981'} sub={a.avgImc ? (a.avgImc >= 30 ? 'Obesidad' : a.avgImc >= 25 ? 'Sobrepeso' : 'Normal') : ''} />
+                <KPI label="IMC promedio" value={a.avgImc ?? '—'} color={a.avgImc && a.avgImc >= 30 ? '#EF4444' : a.avgImc && a.avgImc >= 25 ? '#F59E0B' : '#10B981'} sub={a.avgImc ? `${a.avgImc >= 30 ? 'Obesidad' : a.avgImc >= 25 ? 'Sobrepeso' : 'Normal'} · ${a.baseImc} de ${a.total}` : 'Sin datos'} />
                 <KPI label="Con limitación física" value={`${a.limitacionFisica.pctSi}%`} color={a.limitacionFisica.pctSi > 0 ? '#F59E0B' : '#10B981'} />
               </div>
               <div className="grid lg:grid-cols-2 xl:grid-cols-3 gap-4">

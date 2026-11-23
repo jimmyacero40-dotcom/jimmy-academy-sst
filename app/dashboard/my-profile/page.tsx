@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useSession } from 'next-auth/react'
+import { estaturaEnCm, imc as calcularImc, clasificarImc } from '@/lib/antropometria'
 import {
   User, Camera, CheckCircle, Clock, Loader2, Save,
   Heart, Briefcase, GraduationCap, Activity, Shield, Award,
@@ -961,18 +962,36 @@ export default function MyProfilePage() {
                 </div>
 
                 <p className="col-span-2 text-[11px] font-bold uppercase tracking-wider pt-2" style={{ color: 'var(--text-faint)' }}>📏 Medidas corporales</p>
-                <Field label="ESTATURA EN CENTÍMETROS *" tip="Ej: 170 para 1.70 m">
-                  <input type="number" min={100} max={220} className={inp} value={data.estatura_cm ?? ''}
-                    onChange={e => set('estatura_cm', +e.target.value)} placeholder="170" inputMode="numeric" />
+                <Field label="ESTATURA EN CENTÍMETROS *" tip="Escribe 170, o 1,70: las dos sirven">
+                  {/* Muchos escriben «1,70», como se dice. Guardarlo así daba
+                      un índice de masa corporal de 200.000. Al salir de la
+                      casilla se convierte a centímetros y se ve corregido. */}
+                  <input type="number" min={1} max={230} step="any" className={inp} value={data.estatura_cm ?? ''}
+                    onChange={e => set('estatura_cm', e.target.value === '' ? undefined : +e.target.value)}
+                    onBlur={e => {
+                      const cm = estaturaEnCm(e.target.value)
+                      if (cm !== null && cm !== data.estatura_cm) set('estatura_cm', cm)
+                    }}
+                    placeholder="170" inputMode="decimal" />
                 </Field>
                 <Field label="PESO EN KILOGRAMOS">
                   <input type="number" min={30} max={200} className={inp} value={data.peso_kg ?? ''}
                     onChange={e => set('peso_kg', +e.target.value)} placeholder="70" inputMode="numeric" />
                 </Field>
                 {data.estatura_cm && data.peso_kg && (() => {
-                  const imc = (data.peso_kg! / ((data.estatura_cm! / 100) ** 2))
-                  const label = imc < 18.5 ? 'BAJO PESO' : imc < 25 ? 'PESO NORMAL' : imc < 30 ? 'SOBREPESO' : 'OBESIDAD'
-                  const col   = imc < 25 ? '#10B981' : imc < 30 ? '#F59E0B' : '#EF4444'
+                  const valor = calcularImc(data.estatura_cm, data.peso_kg)
+                  // Sin un índice creíble no se muestra un número cualquiera:
+                  // se dice qué revisar.
+                  if (valor === null) return (
+                    <div className="col-span-2 px-3 py-2 rounded-xl text-xs"
+                      style={{ background: 'rgba(245,158,11,0.08)', border: '1px solid rgba(245,158,11,0.3)', color: '#B45309' }}>
+                      Revisa la estatura y el peso: con esos valores no se puede calcular el índice.
+                    </div>
+                  )
+                  const clase = clasificarImc(valor)!
+                  const label = clase.texto
+                  const col = clase.color
+                  const imc = valor
                   return (
                     <div className="col-span-2 flex items-center gap-2 px-3 py-2 rounded-xl text-xs"
                       style={{ background: `${col}10`, border: `1px solid ${col}30` }}>

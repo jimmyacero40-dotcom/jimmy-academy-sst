@@ -1,10 +1,12 @@
 import type { WP, Analytics } from '@/lib/profile-analytics'
+import { imc as imcReal } from '@/lib/antropometria'
 
 function bool(v?: boolean | null) { return v === true ? 'SÍ' : v === false ? 'NO' : '' }
 function arr(v?: string[] | null) { return (v ?? []).join(', ') }
-function imc(e?: number, p?: number) {
-  if (!e || !p) return ''
-  return (p / ((e / 100) ** 2)).toFixed(1)
+/** El índice, o vacío si los datos no dan: en el Excel no se inventa nada. */
+function imcTexto(e?: number, p?: number) {
+  const v = imcReal(e, p)
+  return v === null ? '' : v.toFixed(1)
 }
 function age(dob?: string) {
   if (!dob) return ''
@@ -93,7 +95,7 @@ export async function exportToExcel(profiles: WP[], analytics: Analytics, compan
     'TIPO VEHÍCULO':              p.tipo_vehiculo ?? '',
     'ESTATURA (cm)':              p.estatura_cm ?? '',
     'PESO (kg)':                  p.peso_kg ?? '',
-    'IMC':                        imc(p.estatura_cm, p.peso_kg),
+    'IMC':                        imcTexto(p.estatura_cm, p.peso_kg),
     'TALLA CAMISA / CAMISETA':    p.talla_camisa ?? '',
     'TALLA PANTALÓN':             p.talla_pantalon ?? '',
     'TALLA OVEROL':               p.talla_overol ?? '',

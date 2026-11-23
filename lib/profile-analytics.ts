@@ -1,3 +1,4 @@
+import { imc } from '@/lib/antropometria'
 // ─── Shared analytics layer for Perfil Integral del Trabajador ───────
 // Used by: dashboard, Excel export, PDF export
 // ─────────────────────────────────────────────────────────────────────
@@ -100,6 +101,11 @@ export interface Analytics {
   avgEstatura: number | null
   avgPeso: number | null
   avgImc: number | null
+  /** Sobre cuántas personas se sacó cada promedio: sin eso, un 26,1 no se
+   *  sabe si es de la empresa entera o de tres fichas. */
+  baseImc: number
+  baseEdad: number
+  baseAntiguedad: number
   tallaCamisa: FreqRow[]; tallaPantalon: FreqRow[]
   tallaOverol: FreqRow[]; tallaChaqueta: FreqRow[]; tallaImpermeable: FreqRow[]
   tallaZapato: FreqRow[]; tallaBotas: FreqRow[]; tallaGuantes: FreqRow[]
@@ -177,10 +183,8 @@ function antiguedadYears(fechaIngreso?: string): number | null {
   return Math.floor((Date.now() - new Date(fechaIngreso).getTime()) / (365.25 * 24 * 3600 * 1000))
 }
 
-function imc(e?: number, p2?: number): number | null {
-  if (!e || !p2) return null
-  return Math.round((p2 / ((e / 100) ** 2)) * 10) / 10
-}
+// El índice vive en lib/antropometria: la cuenta estaba repetida en cinco
+// archivos y corregir uno no corregía los otros.
 
 // ── Main computation ──────────────────────────────────────────────────
 export function computeAnalytics(profiles: WP[]): Analytics {
@@ -189,7 +193,12 @@ export function computeAnalytics(profiles: WP[]): Analytics {
   const ages = profiles.map(w => ageOf(w.fecha_nacimiento)).filter(Boolean) as number[]
   const avgAge = ages.length ? Math.round(ages.reduce((a, b) => a + b, 0) / ages.length) : null
 
-  const ants = profiles.map(w => antiguedadYears(w.fecha_ingreso)).filter(Boolean) as number[]
+  // `filter(Boolean)` botaba a quien lleva menos de un año, porque su
+  // antigüedad es 0 y el cero se descarta solo. El promedio salía inflado:
+  // contaba únicamente a los veteranos.
+  const ants = profiles
+    .map(w => antiguedadYears(w.fecha_ingreso))
+    .filter(v => v !== null && v >= 0) as number[]
   const avgAntiguedad = ants.length ? Math.round(ants.reduce((a, b) => a + b, 0) / ants.length) : null
 
   const ageGroups: FreqRow[] = [
@@ -200,7 +209,12 @@ export function computeAnalytics(profiles: WP[]): Analytics {
     { label: '56+ años',   n: ages.filter(a => a >= 56).length, pct: 0 },
   ].map(g => ({ ...g, pct: p(g.n, ages.length || 1) }))
 
-  const icmVals = profiles.map(w => imc(w.estatura_cm, w.peso_kg)).filter(Boolean) as number[]
+  // Solo los índices que son posibles. Antes entraba el de quien escribió su
+  // estatura en metros —un índice de 200.000— y con un solo dato así el
+  // promedio de la empresa deja de significar nada.
+  const icmVals = profiles
+    .map(w => imc(w.estatura_cm, w.peso_kg))
+    .filter(v => v !== null) as number[]
   const avgImc = icmVals.length ? Math.round(icmVals.reduce((a, b) => a + b, 0) / icmVals.length * 10) / 10 : null
 
   const sorted = [...profiles].sort((a, b) => new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime())
@@ -236,6 +250,9 @@ export function computeAnalytics(profiles: WP[]): Analytics {
     avgEstatura: avgNum(profiles, w => w.estatura_cm),
     avgPeso: avgNum(profiles, w => w.peso_kg),
     avgImc,
+    baseImc: icmVals.length,
+    baseEdad: ages.length,
+    baseAntiguedad: ants.length,
     tallaCamisa: freq(profiles.map(w => w.talla_camisa)),
     tallaPantalon: freq(profiles.map(w => w.talla_pantalon)),
     tallaOverol: freq(profiles.map(w => w.talla_overol)),

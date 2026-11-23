@@ -3,6 +3,7 @@ import { supabaseAdmin as supabase } from '@/lib/supabase-admin'
 import { getCurrentUser, getActiveCompanyId } from '@/lib/get-company'
 import { tienePermiso } from '@/lib/permisos'
 import { calcPct } from '@/lib/perfil-completitud'
+import { estaturaEnCm } from '@/lib/antropometria'
 import { normalizarPerfil } from '@/lib/mayusculas'
 import { partirNombre } from '@/lib/correccion-nombres'
 
@@ -124,6 +125,15 @@ export async function PUT(req: NextRequest) {
 
   // Lo que escribe el trabajador también se normaliza en el servidor: la
   // pantalla ya lo muestra en mayúscula, pero el dato guardado es el que vale.
+  // La estatura entra en centímetros venga como venga. «1,70» guardado tal
+  // cual daba un índice de masa corporal de 200.000 y arruinaba el promedio
+  // de toda la empresa. Se arregla aquí y no solo en la pantalla, porque el
+  // dato guardado es el que después se promedia.
+  if (sanitized.estatura_cm !== undefined) {
+    const cm = estaturaEnCm(sanitized.estatura_cm)
+    if (cm !== null) sanitized.estatura_cm = cm
+  }
+
   const payload = {
     ...normalizarPerfil(sanitized),
     user_id: targetUserId,
