@@ -1,9 +1,11 @@
 'use client'
 
-import { useState, useEffect, useRef, useCallback } from 'react'
+import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useSession } from 'next-auth/react'
 import { estaturaEnCm, imc as calcularImc, clasificarImc } from '@/lib/antropometria'
+import SelectorUbicacion from '@/components/SelectorUbicacion'
+import { DEPARTAMENTOS, municipiosDe } from '@/lib/divipola'
 import {
   User, Camera, CheckCircle, Clock, Loader2, Save,
   Heart, Briefcase, GraduationCap, Activity, Shield, Award,
@@ -283,6 +285,15 @@ export default function MyProfilePage() {
   const { data: session } = useSession()
   const miId = (session?.user as any)?.id as string | undefined
   const [data, setData]             = useState<ProfileData>({})
+
+  // El municipio donde vive se escoge dentro del departamento de residencia.
+  // Si todavía no lo ha puesto, se ofrece el país entero antes que dejarlo
+  // sin poder responder.
+  const municipiosVivienda = useMemo(() => {
+    const propios = municipiosDe(data.depto_residencia)
+    if (propios.length) return propios
+    return DEPARTAMENTOS.flatMap(d => d.municipios).sort((x, y) => x.localeCompare(y, 'es'))
+  }, [data.depto_residencia])
   // Los cargos, areas y fincas que ya existen, para escoger y no escribir.
   const [listas, setListas] = useState<{ cargos: string[]; areas: string[]; centros: string[] }>(
     { cargos: [], areas: [], centros: [] })
@@ -657,22 +668,16 @@ export default function MyProfilePage() {
                   <input className={inp} value={data.nacionalidad ?? 'COLOMBIANA'}
                     onChange={e => set('nacionalidad', UP(e.target.value))} spellCheck={false} />
                 </Field>
-                <Field label="CIUDAD DE NACIMIENTO">
-                  <input className={inp} value={data.ciudad_nacimiento ?? ''}
-                    onChange={e => set('ciudad_nacimiento', UP(e.target.value))} placeholder="EJ: BOGOTÁ" spellCheck={false} />
-                </Field>
-                <Field label="DEPARTAMENTO DE NACIMIENTO">
-                  <input className={inp} value={data.depto_nacimiento ?? ''}
-                    onChange={e => set('depto_nacimiento', UP(e.target.value))} placeholder="EJ: CUNDINAMARCA" spellCheck={false} />
-                </Field>
-                <Field label="CIUDAD DE RESIDENCIA ACTUAL">
-                  <input className={inp} value={data.ciudad_residencia ?? ''}
-                    onChange={e => set('ciudad_residencia', UP(e.target.value))} placeholder="EJ: MEDELLÍN" spellCheck={false} />
-                </Field>
-                <Field label="DEPARTAMENTO DE RESIDENCIA">
-                  <input className={inp} value={data.depto_residencia ?? ''}
-                    onChange={e => set('depto_residencia', UP(e.target.value))} placeholder="EJ: ANTIOQUIA" spellCheck={false} />
-                </Field>
+                {/* Departamento primero y municipio después, encadenados: la
+                    ciudad escrita a mano entraba de varias formas. */}
+                <SelectorUbicacion clase={inp}
+                  etiquetaDepto="DEPARTAMENTO DE NACIMIENTO" etiquetaMunicipio="CIUDAD DE NACIMIENTO"
+                  departamento={data.depto_nacimiento} municipio={data.ciudad_nacimiento}
+                  onCambio={(dep, mun) => { set('depto_nacimiento', dep ?? ''); set('ciudad_nacimiento', mun ?? '') }} />
+                <SelectorUbicacion clase={inp}
+                  etiquetaDepto="DEPARTAMENTO DE RESIDENCIA" etiquetaMunicipio="CIUDAD DE RESIDENCIA ACTUAL"
+                  departamento={data.depto_residencia} municipio={data.ciudad_residencia}
+                  onCambio={(dep, mun) => { set('depto_residencia', dep ?? ''); set('ciudad_residencia', mun ?? '') }} />
                 <Field label="DIRECCIÓN COMPLETA" span2>
                   <input className={inp} value={data.direccion ?? ''}
                     onChange={e => set('direccion', UP(e.target.value))} placeholder="EJ: CALLE 45 # 23-10 APTO 301" spellCheck={false} />
@@ -822,9 +827,19 @@ export default function MyProfilePage() {
 
               <SectionCard title="Desplazamiento al trabajo" icon={Car} accent="#06B6D4">
                 <div className="grid grid-cols-2 gap-4">
-                  <Field label="MUNICIPIO DONDE VIVE *" tip="Ciudad o municipio desde donde se desplaza al trabajo">
-                    <input className={inp} value={data.municipio_vivienda ?? ''}
-                      onChange={e => set('municipio_vivienda', UP(e.target.value))} placeholder="EJ: ITAGÜÍ" spellCheck={false} />
+                  {/* Casi siempre es el mismo de la residencia, pero no
+                      siempre: hay quien vive en una vereda de otro municipio. */}
+                  <Field label="MUNICIPIO DONDE VIVE *" tip="Desde dónde se desplaza al trabajo">
+                    <select className={inp} value={data.municipio_vivienda ?? ''}
+                      onChange={e => set('municipio_vivienda', e.target.value)}>
+                      <option value="">— MUNICIPIO —</option>
+                      {municipiosVivienda.map(m => <option key={m} value={m}>{m}</option>)}
+                    </select>
+                    {!data.depto_residencia && (
+                      <p className="text-[10px] mt-1" style={{ color: 'var(--text-faint)' }}>
+                        Escoge primero el departamento de residencia, en «Personal».
+                      </p>
+                    )}
                   </Field>
                   <Field label="MEDIO DE TRANSPORTE PRINCIPAL">
                     <select value={data.medio_transporte ?? ''} onChange={e => set('medio_transporte', e.target.value)} className={inp}>
