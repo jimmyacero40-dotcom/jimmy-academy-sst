@@ -21,16 +21,35 @@ import { exportToPDF } from './export-pdf'
 // ── Chart primitives ──────────────────────────────────────────────────
 const PAL = ['var(--primary)','#10B981','#F59E0B','#8B5CF6','#EF4444','#06B6D4','#F97316','#EC4899','#14B8A6','#A78BFA']
 
-function HBar({ label, n, pct, max, color = 'var(--primary)', total }: FreqRow & { max: number; total: number; color?: string }) {
+/**
+ * Una barra de la tabla de frecuencias.
+ *
+ * La barra mide el porcentaje, y la pista entera es el 100 % de quienes
+ * respondieron. Antes medía `n / max`, donde `max` era el primer dato de la
+ * lista y no el mayor: en «Grupos de edad», que no viene ordenado, el primero
+ * era 4 y entonces 11 y 9 se pasaban del 100 % y se veían los tres llenos.
+ * Con el porcentaje ningún orden la puede romper, y una barra llena significa
+ * lo único que debería significar: que respondieron todos.
+ */
+function HBar({ label, n, pct, color = 'var(--primary)' }: FreqRow & { max?: number; total?: number; color?: string }) {
+  const ancho = Math.max(0, Math.min(100, pct))
   return (
     <div className="flex items-center gap-2 text-xs">
       <span className="flex-shrink-0 truncate text-right" style={{ width: 130, color: 'var(--text-dim)' }} title={label}>{label}</span>
       <div className="flex-1 h-6 rounded-lg overflow-hidden relative" style={{ background: 'var(--bg-card)' }}>
-        <motion.div className="h-full rounded-lg flex items-center pl-2"
-          initial={{ width: 0 }} animate={{ width: `${max ? (n / max) * 100 : 0}%` }}
-          transition={{ duration: 0.6, ease: 'easeOut' }} style={{ background: color }}>
-          {max > 0 && (n / max) > 0.15 && <span className="text-white font-bold text-[10px]">{n}</span>}
-        </motion.div>
+        {/* La marca de la mitad: sirve de regla para leer de un vistazo si
+            algo pasa o no pasa del 50 %. */}
+        <div className="absolute top-0 bottom-0" style={{ left: '50%', width: 1, background: 'var(--border)' }} />
+        {/* Sin nadie no se pinta nada: una barra de ancho cero igual dejaba
+            ver un pedacito de color por el relleno interno, y un «0» con
+            barra se lee como si hubiera alguien. */}
+        {n > 0 && (
+          <motion.div className="h-full rounded-lg flex items-center pl-2 relative overflow-hidden"
+            initial={{ width: 0 }} animate={{ width: `${ancho}%` }}
+            transition={{ duration: 0.6, ease: 'easeOut' }} style={{ background: color, minWidth: 6 }}>
+            {ancho > 15 && <span className="text-white font-bold text-[10px]">{n}</span>}
+          </motion.div>
+        )}
       </div>
       <span className="font-bold text-[11px] flex-shrink-0 w-6 text-right" style={{ color: 'var(--text)' }}>{n}</span>
       <span className="text-[10px] flex-shrink-0 w-9 text-right" style={{ color: 'var(--text-faint)' }}>{pct}%</span>
@@ -142,8 +161,13 @@ function Sec({ title, children, accent = 'var(--primary)', base, total }: {
 
 function FreqTable({ data, color = 'var(--primary)' }: { data: FreqRow[]; color?: string }) {
   if (!data.length) return <p className="text-xs py-4" style={{ color: 'var(--text-faint)' }}>Sin datos aún</p>
-  const max = data[0]?.n ?? 1
-  return <div className="space-y-2">{data.slice(0, 10).map((r, i) => <HBar key={r.label} {...r} max={max} total={data.reduce((s, d) => s + d.n, 0)} color={PAL[i % PAL.length] ?? color} />)}</div>
+  return (
+    <div className="space-y-2">
+      {data.slice(0, 10).map((r, i) => (
+        <HBar key={r.label} {...r} color={PAL[i % PAL.length] ?? color} />
+      ))}
+    </div>
+  )
 }
 
 // ── Tabs ──────────────────────────────────────────────────────────────

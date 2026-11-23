@@ -150,11 +150,39 @@ export interface Analytics {
 // ── Helpers ───────────────────────────────────────────────────────────
 function p(n: number, total: number) { return total ? Math.round((n * 100) / total) : 0 }
 
+/**
+ * La misma respuesta escrita de dos formas es una sola respuesta.
+ *
+ * La ciudad se escribe a mano: «CAJICÁ» y «CAJICA» salían como dos renglones
+ * de uno cada uno, y la gráfica mostraba dos municipios donde hay uno. Se
+ * agrupa sin tildes, sin mayúsculas y sin espacios de más; para mostrar se
+ * conserva la forma más usada, que suele ser la bien escrita.
+ */
+function clave(v: string): string {
+  return v.trim().toUpperCase()
+    .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+    .replace(/\s+/g, ' ')
+}
+
 function freq(vals: (string | number | undefined | null)[]): FreqRow[] {
-  const m: Record<string, number> = {}
-  vals.forEach(v => { if (v !== null && v !== undefined && v !== '') { const k = String(v); m[k] = (m[k] ?? 0) + 1 } })
-  const total = Object.values(m).reduce((a, b) => a + b, 0)
-  return Object.entries(m).sort((a, b) => b[1] - a[1]).map(([label, n]) => ({ label, n, pct: p(n, total) }))
+  const m: Record<string, { n: number; formas: Record<string, number> }> = {}
+  vals.forEach(v => {
+    if (v === null || v === undefined || v === '') return
+    const texto = String(v).trim()
+    if (!texto) return
+    const k = clave(texto)
+    const fila = m[k] ?? (m[k] = { n: 0, formas: {} })
+    fila.n += 1
+    fila.formas[texto] = (fila.formas[texto] ?? 0) + 1
+  })
+  const total = Object.values(m).reduce((a, b) => a + b.n, 0)
+  return Object.entries(m)
+    .sort((a, b) => b[1].n - a[1].n)
+    .map(([, dato]) => ({
+      label: Object.entries(dato.formas).sort((a, b) => b[1] - a[1])[0][0],
+      n: dato.n,
+      pct: p(dato.n, total),
+    }))
 }
 
 function flatFreq(arrays: (string[] | undefined | null)[]): FreqRow[] {
