@@ -112,6 +112,12 @@ function Marco({ variante, children }: {
   )
 }
 
+/** Una fecha como se lee de un vistazo: «12 jun 2026». */
+function fechaCorta(iso: string | null | undefined): string {
+  if (!iso) return 'antes'
+  return new Date(iso).toLocaleDateString('es-CO', { day: 'numeric', month: 'short', year: 'numeric' })
+}
+
 export default function AsignarCapacitacion({
   abierto, onCerrar, onListo,
   mesInicial,
@@ -155,6 +161,8 @@ export default function AsignarCapacitacion({
   const [personas, setPersonas] = useState<Persona[]>([])
   // Quién la tiene y en qué va. El estado importa: lo completado no se retira.
   const [estadoDe, setEstadoDe] = useState<Record<string, string>>({})
+  // Quién ya la hizo alguna vez, con cuándo y con qué nota.
+  const [yaHecha, setYaHecha] = useState<Record<string, { cuando: string | null; nota: number | null }>>({})
   const [modo, setModo] = useState<'asignar' | 'retirar'>('asignar')
   const [cargando, setCargando] = useState(true)
 
@@ -237,8 +245,22 @@ export default function AsignarCapacitacion({
         const m: Record<string, string> = {}
         for (const e of d) if (e.vigente !== false) m[e.user_id] = e.status
         setEstadoDe(m)
+
+        // Quién ya hizo esta capacitación alguna vez, aunque haya sido en
+        // otra ronda o en otro año. No bloquea —una reinducción se repite a
+        // propósito— pero tiene que verse antes de volver a asignarla.
+        const hechas: Record<string, { cuando: string | null; nota: number | null }> = {}
+        for (const e of d) {
+          if (e.status !== 'completed') continue
+          const previa = hechas[e.user_id]
+          const cuando = e.completed_at ?? e.created_at ?? null
+          if (!previa || (cuando ?? '') > (previa.cuando ?? '')) {
+            hechas[e.user_id] = { cuando, nota: e.score ?? null }
+          }
+        }
+        setYaHecha(hechas)
       })
-      .catch(() => setEstadoDe({}))
+      .catch(() => { setEstadoDe({}); setYaHecha({}) })
   }, [curso])
 
   // Las otras veces que esta capacitación se programó, para avisar antes de
@@ -376,6 +398,12 @@ export default function AsignarCapacitacion({
     return yaLaTienen.has(id) ? '' : 'No la tiene'
   }
   const todasMarcadas = marcables.length > 0 && marcables.every(p => elegidos.has(p.id))
+
+  /** De los elegidos, quiénes ya hicieron esta capacitación antes. */
+  const repetidos = useMemo(() => personas
+    .filter(p => elegidos.has(p.id) && yaHecha[p.id])
+    .map(p => ({ id: p.id, name: p.name, ...yaHecha[p.id] })),
+  [personas, elegidos, yaHecha])
 
   const alternarTodas = () => {
     setElegidos(prev => {
@@ -756,6 +784,15 @@ export default function AsignarCapacitacion({
                             {[p.cedula, p.cargo, p.area_name, p.sede].filter(Boolean).join(' · ')}
                           </p>
                         </div>
+                        {/* Ya la hizo antes: no se bloquea —una reinducción
+                            se repite a propósito— pero tiene que verse. */}
+                        {!bloqueo && yaHecha[p.id] && (
+                          <span className="text-[10px] font-bold px-2 py-0.5 rounded flex-shrink-0"
+                            title={`La completó el ${fechaCorta(yaHecha[p.id].cuando)}${yaHecha[p.id].nota != null ? ` con ${yaHecha[p.id].nota} puntos` : ''}`}
+                            style={{ background: 'rgba(16,185,129,0.14)', color: '#10B981' }}>
+                            Ya la hizo · {fechaCorta(yaHecha[p.id].cuando)}
+                          </span>
+                        )}
                         {bloqueo && (
                           <span className="text-[10px] font-bold px-2 py-0.5 rounded flex-shrink-0"
                             style={{ background: 'rgba(245,158,11,0.14)', color: '#F59E0B' }}>{bloqueo}</span>
@@ -769,6 +806,32 @@ export default function AsignarCapacitacion({
           ) : (
             /* ══ 3. Fecha y confirmar ══ */
             <div className="space-y-4">
+              {/* Antes de confirmar: a quién se le está volviendo a asignar
+                  algo que ya hizo. No lo impide —la reinducción anual es
+                  justamente repetirla— pero que no pase por descuido. */}
+              {modo === 'asignar' && repetidos.length > 0 && (
+                <div className="p-3 rounded-xl" style={{ background: 'rgba(245,158,11,0.08)', border: '1px solid rgba(245,158,11,0.3)' }}>
+                  <p className="text-xs font-bold flex items-center gap-1.5 mb-1" style={{ color: '#F59E0B' }}>
+                    <AlertCircle size={13} />
+                    {repetidos.length === 1
+                      ? '1 de los elegidos ya hizo esta capacitación'
+                      : `${repetidos.length} de los elegidos ya hicieron esta capacitación`}
+                  </p>
+                  <div className="space-y-0.5 mt-1.5">
+                    {repetidos.map(r => (
+                      <p key={r.id} className="text-[11px]" style={{ color: 'var(--text-dim)' }}>
+                        <strong style={{ color: 'var(--text)' }}>{r.name}</strong>
+                        {' — la completó el '}{fechaCorta(r.cuando)}
+                        {r.nota != null ? ` con ${r.nota} puntos` : ''}
+                      </p>
+                    ))}
+                  </div>
+                  <p className="text-[10px] mt-2" style={{ color: 'var(--text-faint)' }}>
+                    Si es una reinducción o un refuerzo, siga. Si fue por error, vuelva y desmárquelos.
+                  </p>
+                </div>
+              )}
+
               {modo === 'retirar' && (
                 <div className="flex items-start gap-2 text-xs p-3 rounded-xl"
                   style={{ background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.25)', color: '#FCA5A5' }}>

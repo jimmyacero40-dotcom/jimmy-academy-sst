@@ -608,24 +608,36 @@ export async function GET(req: NextRequest) {
   const trainingId = Number(params.get('training_id'))
   if (!trainingId) return NextResponse.json([])
 
-  const anio = new Date().getFullYear()
+  // Sin límite de año, a propósito.
+  //
+  // Antes solo miraba el año en curso, y además soltaba a quien venía de una
+  // ronda cerrada. Entonces alguien que ya hizo la capacitación y se
+  // certificó volvía a aparecer como libre y se le podía asignar otra vez la
+  // misma evaluación sin que nada lo advirtiera. Para decidir si vale la pena
+  // repetirla hay que ver cuándo la hizo, y eso puede ser de otro año.
   const { data, error } = await supabase
     .from('enrollments')
-    .select('user_id, status, created_at, due_date, plan_item_id, plan_items(estado, end_date)')
+    .select('user_id, status, created_at, due_date, completed_at, score, plan_item_id, plan_items(estado, end_date)')
     .eq('training_id', trainingId)
     .eq('company_id', companyId)
-    .gte('created_at', `${anio}-01-01`)
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
 
   // Si la ronda de donde viene esta inscripción ya se cerró, la persona queda
   // libre: un refuerzo en un mes posterior no tiene por qué chocar con una
   // capacitación que se dictó y se cerró hace rato.
+  const anio = new Date().getFullYear()
+
   return NextResponse.json((data ?? []).map((e: any) => ({
     user_id: e.user_id,
     status: e.status,
     created_at: e.created_at,
     due_date: e.due_date,
-    vigente: e.plan_item_id ? estaAbierta(e.plan_items ?? {}) : true,
+    completed_at: e.completed_at ?? null,
+    score: e.score ?? null,
+    // Lo que bloquea seguir asignando sigue siendo lo mismo que antes: una
+    // inscripción de este año cuya ronda no se ha cerrado.
+    vigente: (e.created_at ?? '') >= `${anio}-01-01`
+      && (e.plan_item_id ? estaAbierta(e.plan_items ?? {}) : true),
   })))
 }
