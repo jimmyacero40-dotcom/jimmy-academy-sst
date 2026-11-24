@@ -215,6 +215,26 @@ export async function PUT(req: NextRequest) {
 
   const { data, error } = await query.select('id, email, correo, name, cedula, role, area, area_id, active, company_id, created_at').single()
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+
+  // El correo que se escribe aquí también llena el de la ficha, si está
+  // vacío. Son dos campos distintos a propósito —uno es el de la cuenta y
+  // otro el personal del trabajador— pero cuando el administrador escribe el
+  // único que hay, la ficha no tiene por qué salir en blanco al consultarla.
+  // Si la ficha ya tiene uno, no se pisa: puede ser otro de verdad.
+  if (typeof updates.correo === 'string' && updates.correo.trim()) {
+    const { data: ficha } = await supabase
+      .from('worker_profiles')
+      .select('user_id, email_personal')
+      .eq('user_id', id)
+      .maybeSingle()
+    if (ficha && !(ficha.email_personal ?? '').trim()) {
+      await supabase
+        .from('worker_profiles')
+        .update({ email_personal: updates.correo.trim().toLowerCase(), updated_at: new Date().toISOString() })
+        .eq('user_id', id)
+    }
+  }
+
   return NextResponse.json(data)
 }
 
