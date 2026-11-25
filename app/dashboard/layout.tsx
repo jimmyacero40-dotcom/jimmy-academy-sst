@@ -231,6 +231,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   // El almacenista reparte EPP sin ser administrador de nada más: lo que le
   // abre la consola de entregas es el permiso, no el rol.
   const permisosDelUsuario = ((session?.user as any)?.permissions ?? []) as string[]
+  const esCuentaDeOficio = userRole === 'almacen' || userRole === 'analista_sst'
   const puedeRepartir = permisosDelUsuario.includes('sst.entregas.registrar')
     || permisosDelUsuario.includes('sst.entregas.ver')
 
@@ -595,7 +596,13 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                   <span className="truncate">Entregas</span>
                 </Link>
               )}
-              {WORKER_NAV.map(({ href, icon: Icon, label }) => {
+              {/* Las cuentas de oficio —Almacén, Analista SST— no participan
+                  en Tú Cuentas ni en RePortal: son de un puesto, no de una
+                  persona. Mostrar el botón de algo que el servidor va a
+                  rechazar es peor que no mostrarlo. */}
+              {WORKER_NAV.filter(x => !esCuentaDeOficio
+                || ['/dashboard/inicio', '/dashboard/my-profile', '/dashboard/my-plan', '/dashboard/mis-entregas'].includes(x.href)
+              ).map(({ href, icon: Icon, label }) => {
                 const active = isActive(href)
                 return (
                   <Link key={href} href={href}
