@@ -148,11 +148,13 @@ export default withAuth(
     // las puertas de abajo preguntan por worker, consulta y portero, y lo que
     // no encaje en ninguna llega al final sin que nadie lo pare.
     if (isEntregador) {
-      const RUTAS_ENTREGADOR = [
-        '/dashboard', '/dashboard/inicio', '/dashboard/gestion-sst/entregas',
-        '/dashboard/mis-entregas', '/dashboard/my-profile', '/dashboard/my-plan',
-        '/dashboard/settings', '/dashboard/configuracion',
-      ]
+      // El almacén solo entrega. El analista de SST además consulta lo suyo.
+      const RUTAS_ENTREGADOR = role === 'almacen'
+        ? ['/dashboard', '/dashboard/gestion-sst/entregas',
+          '/dashboard/settings', '/dashboard/configuracion']
+        : ['/dashboard', '/dashboard/inicio', '/dashboard/gestion-sst/entregas',
+          '/dashboard/mis-entregas', '/dashboard/my-profile', '/dashboard/my-plan',
+          '/dashboard/settings', '/dashboard/configuracion']
       if (path === '/dashboard') {
         return NextResponse.redirect(new URL('/dashboard/gestion-sst/entregas', req.url))
       }

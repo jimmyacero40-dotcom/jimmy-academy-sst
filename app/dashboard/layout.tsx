@@ -596,13 +596,17 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                   <span className="truncate">Entregas</span>
                 </Link>
               )}
-              {/* Las cuentas de oficio —Almacén, Analista SST— no participan
-                  en Tú Cuentas ni en RePortal: son de un puesto, no de una
-                  persona. Mostrar el botón de algo que el servidor va a
-                  rechazar es peor que no mostrarlo. */}
-              {WORKER_NAV.filter(x => !esCuentaDeOficio
-                || ['/dashboard/inicio', '/dashboard/my-profile', '/dashboard/my-plan', '/dashboard/mis-entregas'].includes(x.href)
-              ).map(({ href, icon: Icon, label }) => {
+              {/* El almacén solo entrega: su cuenta es de un puesto y no de
+                  una persona, así que no tiene perfil que llenar ni
+                  capacitaciones que hacer. El analista de SST sí consulta
+                  algunas cosas más. */}
+              {WORKER_NAV.filter(x => {
+                if (userRole === 'almacen') return false
+                if (userRole === 'analista_sst') {
+                  return ['/dashboard/inicio', '/dashboard/my-profile', '/dashboard/my-plan'].includes(x.href)
+                }
+                return true
+              }).map(({ href, icon: Icon, label }) => {
                 const active = isActive(href)
                 return (
                   <Link key={href} href={href}
