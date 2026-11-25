@@ -5,6 +5,7 @@ import { useAnchosColumnas, ManijaColumna, type ColumnaAncho } from '@/component
 import FichaCompleta from '@/components/FichaCompleta'
 import { calcPct, resumenFaltantes } from '@/lib/perfil-completitud'
 import RecordatorioDialog from '@/components/RecordatorioDialog'
+import FiltroEstado from '@/components/FiltroEstado'
 import { imc } from '@/lib/antropometria'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useRouter } from 'next/navigation'
@@ -215,6 +216,7 @@ export default function WorkerProfilesPage() {
   const [page, setPage]       = useState(1)
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [avisando, setAvisando] = useState(false)
+  const [estadoFicha, setEstadoFicha] = useState('')
   const PER = 15
 
   useEffect(() => {
@@ -260,6 +262,13 @@ export default function WorkerProfilesPage() {
   function ageOf(dob?: string) { return dob ? Math.floor((Date.now() - new Date(dob).getTime()) / (365.25 * 24 * 3600 * 1000)) : null }
 
   const filtered = profiles.filter(p => {
+    // El mismo corte que usa la cobertura: completa es 80 % o más, en proceso
+    // es haber empezado, sin empezar es no haber respondido nada.
+    const pct = p.completion_pct ?? 0
+    if (estadoFicha === 'completa' && pct < 80) return false
+    if (estadoFicha === 'proceso' && !(pct > 0 && pct < 80)) return false
+    if (estadoFicha === 'sin' && pct > 0) return false
+
     const q = search.toLowerCase()
     return !q || (p.users?.name ?? '').toLowerCase().includes(q)
       || (p.users?.cedula ?? '').includes(q)
@@ -634,6 +643,12 @@ export default function WorkerProfilesPage() {
                   <input className="terra-input text-xs pl-9 w-full" placeholder="Buscar nombre, cédula, área, cargo..."
                     value={search} onChange={e => { setSearch(e.target.value); setPage(1) }} />
                 </div>
+                <FiltroEstado valor={estadoFicha} onCambio={v => { setEstadoFicha(v); setPage(1) }} opciones={[
+                  { id: '', label: 'Todas', n: profiles.length },
+                  { id: 'completa', label: 'Completas', n: profiles.filter(p => (p.completion_pct ?? 0) >= 80).length },
+                  { id: 'proceso', label: 'En proceso', n: profiles.filter(p => (p.completion_pct ?? 0) > 0 && (p.completion_pct ?? 0) < 80).length },
+                  { id: 'sin', label: 'Sin empezar', n: profiles.filter(p => (p.completion_pct ?? 0) === 0).length },
+                ]} />
                 <span className="text-xs" style={{ color: 'var(--text-dim)' }}>{filtered.length} resultado{filtered.length !== 1 ? 's' : ''}</span>
               </div>
 

@@ -16,7 +16,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useSession } from 'next-auth/react'
 import {
   Package, Plus, Loader2, Search, Check, X, Trash2, Download,
-  Settings2, CalendarDays, PenLine, AlertCircle, FileText,
+  Settings2, CalendarDays, PenLine, AlertCircle, FileText, History,
 } from 'lucide-react'
 import { tienePermiso } from '@/lib/permisos'
 import CatalogoItems from '@/components/entregas/CatalogoItems'
@@ -114,6 +114,10 @@ export default function EntregasPage() {
   const [cargando, setCargando] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [entregando, setEntregando] = useState(false)
+  // Buscar y filtrar sin salir de la pantalla: es la trazabilidad del día a
+  // día, la que evita tener que sacar un PDF para saber qué pasó.
+  const [busca, setBusca] = useState('')
+  const [filtro, setFiltro] = useState<'todas' | 'confirmadas' | 'pendientes'>('todas')
   const [editandoTipos, setEditandoTipos] = useState(false)
   // Para el encabezado del formato de la empresa.
   const [empresa, setEmpresa] = useState('AgroVenture Capital')
@@ -169,6 +173,17 @@ export default function EntregasPage() {
     const r = await fetch(`/api/entregas?id=${e.id}`, { method: 'DELETE' })
     if (r.ok) cargar()
   }
+
+  const visibles = useMemo(() => {
+    const q = busca.trim().toLowerCase()
+    return entregas.filter(e => {
+      if (filtro === 'confirmadas' && !e.confirmado_at) return false
+      if (filtro === 'pendientes' && e.confirmado_at) return false
+      if (!q) return true
+      return `${e.nombre} ${e.cedula} ${e.cargo} ${e.area} ${e.elemento ?? ''} ${e.referencia ?? ''} ${e.entregado_por_nombre ?? ''}`
+        .toLowerCase().includes(q)
+    })
+  }, [entregas, busca, filtro])
 
   const total = entregas.reduce((s, e) => s + e.cantidad, 0)
   const personas = new Set(entregas.map(e => e.user_id)).size
@@ -270,6 +285,39 @@ export default function EntregasPage() {
             </p>
           )}
 
+          {/* ── Buscar y filtrar: la trazabilidad sin sacar un PDF ── */}
+          <div className="flex items-center gap-2 flex-wrap">
+            <div className="relative flex-1" style={{ minWidth: 220 }}>
+              <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2"
+                style={{ color: 'var(--text-faint)' }} />
+              <input value={busca} onChange={e => setBusca(e.target.value)}
+                placeholder="Buscar por trabajador, cédula, ítem, referencia o quién entregó…"
+                className={inp + ' pl-9'} style={estilo} />
+            </div>
+            <div className="flex gap-1 p-1 rounded-xl"
+              style={{ background: 'var(--bg-card)', border: '1px solid var(--border)' }}>
+              {([
+                { id: 'todas', label: 'Todas' },
+                { id: 'confirmadas', label: 'Confirmadas' },
+                { id: 'pendientes', label: 'Sin confirmar' },
+              ] as const).map(f => (
+                <button key={f.id} onClick={() => setFiltro(f.id)}
+                  className="px-3 py-1.5 rounded-lg text-xs font-semibold transition-all"
+                  style={filtro === f.id
+                    ? { background: '#243C2C', color: '#fff' }
+                    : { color: 'var(--text-dim)' }}>
+                  {f.label}
+                </button>
+              ))}
+            </div>
+            {/* Todo lo que se ha entregado alguna vez, no solo lo del día. */}
+            <button onClick={() => { setDesde('2020-01-01'); setHasta(hoyCol()) }}
+              className="flex items-center gap-1.5 text-xs font-semibold px-3 py-2 rounded-lg"
+              style={{ border: '1px solid var(--border)', color: 'var(--text-dim)', background: 'var(--bg-card)' }}>
+              <History size={13} /> Todo el histórico
+            </button>
+          </div>
+
           {/* ── La tabla ── */}
           <div className="terra-card overflow-hidden">
             {cargando ? (
@@ -278,7 +326,7 @@ export default function EntregasPage() {
               </div>
             ) : error ? (
               <p className="text-sm p-6 text-center" style={{ color: '#EF4444' }}>{error}</p>
-            ) : entregas.length === 0 ? (
+            ) : visibles.length === 0 ? (
               <div className="py-14 text-center">
                 <Package size={28} className="mx-auto mb-2" style={{ color: 'var(--text-faint)' }} />
                 <p className="text-sm font-semibold" style={{ color: 'var(--text-dim)' }}>
@@ -300,7 +348,7 @@ export default function EntregasPage() {
                     </tr>
                   </thead>
                   <tbody>
-                    {entregas.map((e, i) => (
+                    {visibles.map((e, i) => (
                       <tr key={e.id}
                         style={{ borderBottom: '1px solid var(--border)', background: i % 2 ? 'rgba(255,255,255,0.015)' : 'transparent' }}>
                         <td className="px-3 py-2.5">
@@ -371,8 +419,8 @@ export default function EntregasPage() {
             )}
           </div>
 
-          {entregas.length > 0 && (
-            <button onClick={() => descargarSoporte(entregas, tipo!, desde, hasta)}
+          {visibles.length > 0 && (
+            <button onClick={() => descargarSoporte(visibles, tipo!, desde, hasta)}
               className="flex items-center gap-1.5 text-xs font-semibold px-3 py-2 rounded-lg"
               style={{ border: '1px solid var(--border)', color: 'var(--text-dim)', background: 'var(--bg-card)' }}>
               <Download size={13} /> Soporte en PDF

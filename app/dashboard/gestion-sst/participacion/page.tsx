@@ -18,6 +18,7 @@ import {
 import { GRUPOS_PELIGROS, CAMPO_MEJORAS } from '@/lib/peligros'
 import { exportarFormularioPDF } from './export-pdf'
 import RecordatorioDialog from '@/components/RecordatorioDialog'
+import FiltroEstado from '@/components/FiltroEstado'
 import PlazoDialog from '@/components/PlazoDialog'
 import { exportarResultadosExcel } from './export-excel'
 import { exportarResultadosPDF } from './export-resultados-pdf'
@@ -428,11 +429,13 @@ export default function ParticipacionAdminPage() {
             <option value="">Todas las fincas</option>
             {opciones('centro_trabajo').map(o => <option key={o}>{o}</option>)}
           </select>
-          <select value={fEstado} onChange={e => setFEstado(e.target.value)} className={sel}>
-            <option value="">Todos los estados</option>
-            <option>Participó</option>
-            <option>Pendiente</option>
-          </select>
+          {/* En botones y no en lista: se ve de una cuál está puesto y
+              cuántos hay de cada cosa, como en Trazabilidad. */}
+          <FiltroEstado valor={fEstado} onCambio={setFEstado} opciones={[
+            { id: '', label: 'Todos', n: filas.length },
+            { id: 'Participó', label: 'Participó', n: filas.filter(f => f.estado === 'Participó').length },
+            { id: 'Pendiente', label: 'Pendiente', n: filas.filter(f => f.estado === 'Pendiente').length },
+          ]} />
           <input type="date" value={fDesde} onChange={e => setFDesde(e.target.value)} className={sel} title="Desde" />
           <input type="date" value={fHasta} onChange={e => setFHasta(e.target.value)} className={sel} title="Hasta" />
           {hayFiltro && (

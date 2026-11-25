@@ -205,6 +205,7 @@ export default function EnrollmentsPage() {
                 <th>Curso</th>
                 <th>Área</th>
                 <th>Vence</th>
+                <th>Realizó</th>
                 <th>Estado</th>
                 <th>Puntaje</th>
               </tr>
@@ -243,6 +244,16 @@ export default function EnrollmentsPage() {
                       <span className="text-xs" style={{ color: overdue ? '#FCA5A5' : 'var(--text-dim)' }}>
                         {e.due_date
                           ? new Date(e.due_date).toLocaleDateString('es-CO', { day: 'numeric', month: 'short' })
+                          : '—'}
+                      </span>
+                    </td>
+                    {/* Cuándo la hizo. «Vence» dice hasta cuándo tenía, pero
+                        para una auditoría lo que vale es el día en que la
+                        presentó. */}
+                    <td>
+                      <span className="text-xs" style={{ color: e.completed_at ? '#34D399' : 'var(--text-faint)' }}>
+                        {e.completed_at
+                          ? new Date(e.completed_at).toLocaleDateString('es-CO', { day: 'numeric', month: 'short', year: 'numeric' })
                           : '—'}
                       </span>
                     </td>

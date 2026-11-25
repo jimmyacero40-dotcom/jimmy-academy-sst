@@ -15,6 +15,7 @@ import {
 } from '@/lib/modulos'
 import { tabular, type FilaModulo } from '@/lib/modulos-tabulacion'
 import RecordatorioDialog from '@/components/RecordatorioDialog'
+import FiltroEstado from '@/components/FiltroEstado'
 import PlazoDialog from '@/components/PlazoDialog'
 import { estadoVigente, enLetras } from '@/lib/modulo-ventana'
 import { exportarRespuestaPDF } from './export-pdf'
@@ -359,10 +360,12 @@ export default function ModuloPage({ params }: { params: { id: string } }) {
             <option value="">Todas las fincas</option>
             {opciones('centro_trabajo').map(o => <option key={o}>{o}</option>)}
           </select>
-          <select value={fEstado} onChange={ev => setFEstado(ev.target.value)} className={inp} style={{ ...estiloInp, width: 'auto' }}>
-            <option value="">Todos los estados</option>
-            {['Respondió', 'Empezada', 'Pendiente'].map(o => <option key={o}>{o}</option>)}
-          </select>
+          <FiltroEstado valor={fEstado} onCambio={setFEstado} opciones={[
+            { id: '', label: 'Todos', n: filas.length },
+            { id: 'Respondió', label: 'Respondió', n: filas.filter(f => f.estado === 'Respondió').length },
+            { id: 'Empezada', label: 'Empezada', n: filas.filter(f => f.estado === 'Empezada').length },
+            { id: 'Pendiente', label: 'Pendiente', n: filas.filter(f => f.estado === 'Pendiente').length },
+          ]} />
           <button onClick={exportar} className="terra-btn-outline flex items-center gap-1.5"
             style={{ padding: '8px 14px', fontSize: 12 }}>
             <Download size={13} /> Excel
