@@ -148,8 +148,8 @@ function Sec({ title, children, accent = 'var(--primary)', base, total }: {
           <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full flex-shrink-0"
             title={`${base} de ${total} trabajadores respondieron esta pregunta`}
             style={{
-              background: pct! >= 80 ? 'rgba(16,185,129,0.12)' : pct! >= 50 ? 'rgba(245,158,11,0.12)' : 'rgba(239,68,68,0.10)',
-              color: pct! >= 80 ? '#10B981' : pct! >= 50 ? '#B45309' : '#EF4444',
+              background: pct! >= 100 ? 'rgba(16,185,129,0.12)' : pct! >= 50 ? 'rgba(245,158,11,0.12)' : 'rgba(239,68,68,0.10)',
+              color: pct! >= 100 ? '#10B981' : pct! >= 50 ? '#B45309' : '#EF4444',
             }}>
             {base}/{total} · {pct}%
           </span>
@@ -239,7 +239,7 @@ export default function WorkerProfilesPage() {
   // Quien no ha terminado su ficha. El 80 % es el mismo corte que ya usa el
   // indicador de «perfiles incompletos», para que una pantalla no diga una
   // cosa y el botón de al lado otra.
-  const incompletos = profiles.filter(p => p.user_id && (p.completion_pct ?? 0) < 80)
+  const incompletos = profiles.filter(p => p.user_id && (p.completion_pct ?? 0) < 100)
 
   const doExcelExport = async () => {
     setExporting('excel')
@@ -265,8 +265,8 @@ export default function WorkerProfilesPage() {
     // El mismo corte que usa la cobertura: completa es 80 % o más, en proceso
     // es haber empezado, sin empezar es no haber respondido nada.
     const pct = p.completion_pct ?? 0
-    if (estadoFicha === 'completa' && pct < 80) return false
-    if (estadoFicha === 'proceso' && !(pct > 0 && pct < 80)) return false
+    if (estadoFicha === 'completa' && pct < 100) return false
+    if (estadoFicha === 'proceso' && !(pct > 0 && pct < 100)) return false
     if (estadoFicha === 'sin' && pct > 0) return false
 
     const q = search.toLowerCase()
@@ -380,7 +380,7 @@ export default function WorkerProfilesPage() {
             <div className="space-y-4">
               <div className="grid grid-cols-2 lg:grid-cols-5 gap-3">
                 <KPI label="Trabajadores" value={a.total} />
-                <KPI label="Completitud prom." value={`${a.avgPct}%`} color={a.avgPct >= 80 ? '#10B981' : '#F59E0B'} sub={`${a.complete80} al 80%+`} />
+                <KPI label="Completitud prom." value={`${a.avgPct}%`} color={a.avgPct >= 100 ? '#10B981' : '#F59E0B'} sub={`${a.completas} completas`} />
                 <KPI label="Edad promedio" value={a.avgAge ? `${a.avgAge} a` : '—'} color="#8B5CF6"
                   sub={a.baseEdad ? `${a.baseEdad} de ${a.total}` : 'Sin datos'} />
                 {/* `avgAntiguedad === 0` es un promedio válido —gente que entró
@@ -645,8 +645,8 @@ export default function WorkerProfilesPage() {
                 </div>
                 <FiltroEstado valor={estadoFicha} onCambio={v => { setEstadoFicha(v); setPage(1) }} opciones={[
                   { id: '', label: 'Todas', n: profiles.length },
-                  { id: 'completa', label: 'Completas', n: profiles.filter(p => (p.completion_pct ?? 0) >= 80).length },
-                  { id: 'proceso', label: 'En proceso', n: profiles.filter(p => (p.completion_pct ?? 0) > 0 && (p.completion_pct ?? 0) < 80).length },
+                  { id: 'completa', label: 'Completas', n: profiles.filter(p => (p.completion_pct ?? 0) >= 100).length },
+                  { id: 'proceso', label: 'En proceso', n: profiles.filter(p => (p.completion_pct ?? 0) > 0 && (p.completion_pct ?? 0) < 100).length },
                   { id: 'sin', label: 'Sin empezar', n: profiles.filter(p => (p.completion_pct ?? 0) === 0).length },
                 ]} />
                 <span className="text-xs" style={{ color: 'var(--text-dim)' }}>{filtered.length} resultado{filtered.length !== 1 ? 's' : ''}</span>
@@ -796,7 +796,7 @@ export default function WorkerProfilesPage() {
               {
                 label: 'Perfil incompleto (< 80%)',
                 color: '#F59E0B', bg: 'rgba(245,158,11,0.08)',
-                workers: profiles.filter(p => (p.completion_pct ?? 0) < 80),
+                workers: profiles.filter(p => (p.completion_pct ?? 0) < 100),
                 desc: 'No han completado su ficha sociodemográfica',
               },
               {
@@ -853,7 +853,7 @@ export default function WorkerProfilesPage() {
               <div className="space-y-4">
                 <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
                   <KPI label="Total alertas" value={ALERT_CATS.reduce((s, c) => s + c.workers.length, 0)} color="#EF4444" />
-                  <KPI label="Perfiles incompletos" value={profiles.filter(p => (p.completion_pct ?? 0) < 80).length} color="#F59E0B" alert />
+                  <KPI label="Perfiles incompletos" value={profiles.filter(p => (p.completion_pct ?? 0) < 100).length} color="#F59E0B" alert />
                   <KPI label="Con restricciones" value={a.restriccionesMedicas.si} color="#EF4444" alert={a.restriccionesMedicas.si > 0} />
                   <KPI label="Con estrés laboral" value={a.estres.si} color="#F97316" alert={a.estres.pctSi >= 40} />
                 </div>
@@ -890,7 +890,7 @@ export default function WorkerProfilesPage() {
                               <td className="px-4 py-2" style={{ color: 'var(--text-dim)' }}>{w.area_confirmada ?? w.users?.area ?? '—'}</td>
                               <td className="px-4 py-2" style={{ color: 'var(--text-dim)' }}>{w.cargo_confirmado ?? '—'}</td>
                               <td className="px-4 py-2">
-                                <span className="font-bold" style={{ color: (w.completion_pct ?? 0) >= 80 ? '#10B981' : '#F59E0B' }}>{w.completion_pct ?? 0}%</span>
+                                <span className="font-bold" style={{ color: (w.completion_pct ?? 0) >= 100 ? '#10B981' : '#F59E0B' }}>{w.completion_pct ?? 0}%</span>
                               </td>
                               <td className="px-4 py-2">
                                 {w.user_id && (
@@ -998,12 +998,12 @@ function Cobertura({ profiles, total, onAvisar }: {
   profiles: WP[]; total: number; onAvisar: () => void
 }) {
   const pct = (n: number) => (total ? Math.round((n * 100) / total) : 0)
-  const completas = profiles.filter(p => (p.completion_pct ?? 0) >= 80).length
-  const enProceso = profiles.filter(p => (p.completion_pct ?? 0) > 0 && (p.completion_pct ?? 0) < 80).length
+  const completas = profiles.filter(p => (p.completion_pct ?? 0) >= 100).length
+  const enProceso = profiles.filter(p => (p.completion_pct ?? 0) > 0 && (p.completion_pct ?? 0) < 100).length
   const sinEmpezar = total - completas - enProceso
 
   const tramos = [
-    { etiqueta: 'Completas', valor: completas, color: '#10B981', nota: '80 % o más de la ficha' },
+    { etiqueta: 'Completas', valor: completas, color: '#10B981', nota: 'la ficha entera, al 100 %' },
     { etiqueta: 'En proceso', valor: enProceso, color: '#F59E0B', nota: 'empezaron y la dejaron a medias' },
     { etiqueta: 'Sin empezar', valor: sinEmpezar, color: '#EF4444', nota: 'no han respondido nada' },
   ]

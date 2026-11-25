@@ -90,7 +90,8 @@ export default function FichaCompleta({
     }
   }
 
-  const color = pct >= 80 ? '#10B981' : pct >= 40 ? '#F59E0B' : '#EF4444'
+  // Verde solo al 100 %: una ficha a la que le falta algo no está completa.
+  const color = pct >= 100 ? '#10B981' : pct >= 40 ? '#F59E0B' : '#EF4444'
 
   return (
     <div className="space-y-3">

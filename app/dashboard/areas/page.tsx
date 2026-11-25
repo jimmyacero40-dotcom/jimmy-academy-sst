@@ -254,7 +254,7 @@ export default function AreasPage() {
               const stats = areaStats[area.name]
               const pct   = stats?.pct ?? null
               const color = area.color || 'var(--primary)'
-              const pctColor = pct === null ? 'var(--text-faint)' : pct >= 80 ? '#10B981' : pct >= 50 ? '#F59E0B' : '#EF4444'
+              const pctColor = pct === null ? 'var(--text-faint)' : pct >= 100 ? '#10B981' : pct >= 50 ? '#F59E0B' : '#EF4444'
               const isActive = activeArea?.id === area.id
               return (
                 <motion.button key={area.id}
@@ -324,7 +324,7 @@ export default function AreasPage() {
                           {stats.completed}/{stats.total} capacitaciones
                         </span>
                         <span className="text-[10px] font-semibold" style={{ color: pctColor }}>
-                          {pct >= 80 ? 'Excelente' : pct >= 50 ? 'En progreso' : 'Requiere atención'}
+                          {pct >= 100 ? 'Completa' : pct > 0 ? 'En proceso' : 'Sin empezar'}
                         </span>
                       </div>
                     </div>

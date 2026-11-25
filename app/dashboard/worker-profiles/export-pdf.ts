@@ -159,7 +159,7 @@ export async function exportToPDF(analytics: Analytics, company = 'Organización
     { lbl: 'Trabajadores', val: String(analytics.total), color: C.blue },
     { lbl: 'Completitud promedio', val: `${analytics.avgPct}%`, color: C.teal },
     { lbl: 'Edad promedio', val: analytics.avgAge ? `${analytics.avgAge} años` : '—', color: [139,92,246] as [number,number,number] },
-    { lbl: 'Fichas al 100%', val: String(analytics.complete80), color: C.green },
+    { lbl: 'Fichas al 100%', val: String(analytics.completas), color: C.green },
   ].forEach(({ lbl, val, color }, i) => {
     kpiBox(lbl, val, ML + i * (kW + 5), ky, kW, 26, color)
   })

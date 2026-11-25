@@ -68,7 +68,9 @@ export interface Analytics {
   total: number
   nProfiles: number
   avgPct: number
-  complete80: number
+  /** Fichas al 100 %. Completa es completa: con un campo sin responder, no
+   *  lo está, y llamarla completa deja un hueco que nadie vuelve a mirar. */
+  completas: number
   lastUpdate: string | null
   // ── demografia ──
   avgAge: number | null
@@ -251,7 +253,7 @@ export function computeAnalytics(profiles: WP[]): Analytics {
     total: n,
     nProfiles: n,
     avgPct: n ? Math.round(profiles.reduce((s, p2) => s + (p2.completion_pct ?? 0), 0) / n) : 0,
-    complete80: profiles.filter(p2 => (p2.completion_pct ?? 0) >= 80).length,
+    completas: profiles.filter(p2 => (p2.completion_pct ?? 0) >= 100).length,
     lastUpdate: sorted[0]?.updated_at ?? null,
     avgAge,
     avgAntiguedad,

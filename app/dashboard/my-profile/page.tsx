@@ -514,13 +514,13 @@ export default function MyProfilePage() {
                 <span className="text-xs font-semibold" style={{ color: 'var(--text-dim)' }}>
                   Perfil completado — {doneCount} de {TOTAL_SECCIONES} secciones
                 </span>
-                <span className="text-sm font-bold" style={{ color: pct >= 80 ? '#10B981' : pct >= 50 ? '#F59E0B' : '#EF4444' }}>{pct}%</span>
+                <span className="text-sm font-bold" style={{ color: pct >= 100 ? '#10B981' : pct >= 50 ? '#F59E0B' : '#EF4444' }}>{pct}%</span>
               </div>
               <div className="h-2.5 rounded-full overflow-hidden" style={{ background: 'var(--bg-card)' }}>
                 <motion.div className="h-full rounded-full"
                   initial={{ width: 0 }} animate={{ width: `${pct}%` }}
                   transition={{ duration: 0.9, ease: 'easeOut' }}
-                  style={{ background: pct >= 80 ? '#10B981' : pct >= 50 ? '#F59E0B' : '#EF4444' }} />
+                  style={{ background: pct >= 100 ? '#10B981' : pct >= 50 ? '#F59E0B' : '#EF4444' }} />
               </div>
             </div>
 

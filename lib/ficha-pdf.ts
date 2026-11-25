@@ -154,7 +154,7 @@ export async function exportarFichaPDF(
   ].filter(Boolean).join('  ·  ')
   if (renglon) texto(renglon, xTexto, y + 17.5, 8, C.gris)
   texto(`Ficha diligenciada al ${pct}%`, xTexto, y + 24, 8,
-    pct >= 80 ? C.verde : C.ambar, true)
+    pct >= 100 ? C.verde : C.ambar, true)
 
   y += altoFicha + 6
 

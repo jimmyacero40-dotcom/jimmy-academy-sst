@@ -179,7 +179,7 @@ export async function exportToExcel(profiles: WP[], analytics: Analytics, compan
     ['INDICADOR', 'VALOR', 'UNIDAD'],
     ['Total de trabajadores con ficha', analytics.total, 'trabajadores'],
     ['Avance promedio de diligenciamiento', analytics.avgPct, '%'],
-    ['Fichas con completitud ≥ 80%', analytics.complete80, 'fichas'],
+    ['Fichas completas (100%)', analytics.completas, 'fichas'],
     ['Edad promedio', analytics.avgAge ?? 'Sin datos', 'años'],
     ['Antigüedad promedio', analytics.avgAntiguedad ?? 'Sin datos', 'años'],
     ['Promedio hijos por trabajador', analytics.avgHijos, 'hijos'],
