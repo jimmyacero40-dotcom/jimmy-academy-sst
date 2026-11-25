@@ -135,7 +135,10 @@ const ADMIN_NAV: NavEntry[] = [
       // Una sola entrada: dentro vive la identificación de peligros y los
       // módulos que arme la empresa, igual que los ve el trabajador.
       { href: '/dashboard/gestion-sst/tu-cuentas',    icon: MessageSquare, label: 'Tú Cuentas' },
-      { href: null, icon: HardHat,       label: 'EPP',            disabled: true },
+      // Entregas cubre lo que iba a ser «EPP»: la bebida hidratante, el
+      // respirador, la dotación. Es la misma forma, y quien entrega define
+      // qué entrega.
+      { href: '/dashboard/gestion-sst/entregas',      icon: HardHat,       label: 'Entregas' },
       { href: null, icon: Layers,        label: 'Documentos',     disabled: true },
       { href: null, icon: AlertTriangle, label: 'Emergencias',    disabled: true },
       { href: null, icon: MessageSquare, label: 'Comunicaciones', disabled: true },

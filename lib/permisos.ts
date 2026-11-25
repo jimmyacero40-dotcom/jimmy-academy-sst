@@ -52,6 +52,8 @@ export const CATALOGO_PERMISOS: GrupoPermisos[] = [
       { id: 'sst.reportes.gestionar',     label: 'Gestionar reportes HSE',    descripcion: 'Registrar el seguimiento y relacionarlos con la matriz de mejoras' },
       { id: 'sst.reportes.corregir',      label: 'Corregir reportes HSE',     descripcion: 'Enmendar lo que escribió el trabajador cuando quedó mal diligenciado' },
       { id: 'sst.reportes.eliminar',      label: 'Eliminar reportes HSE',     descripcion: 'Borrar reportes. Sirve para limpiar pruebas y no tiene vuelta atrás' },
+      { id: 'sst.entregas.ver',       label: 'Consultar entregas',  descripcion: 'Ver qué se le ha entregado a cada trabajador y descargar el soporte' },
+      { id: 'sst.entregas.registrar', label: 'Registrar entregas',  descripcion: 'Anotar la entrega de bebida hidratante, EPP o dotación, y definir qué se entrega' },
     ],
   },
   {
@@ -89,6 +91,7 @@ export const PERMISOS_POR_ROL: Record<string, string[]> = {
     'accesos.ver', 'accesos.ver.todas', 'accesos.exportar',
     'personal.ver', 'formacion.ver',
     'sst.participacion.ver', 'sst.modulos.ver', 'sst.reportes.ver',
+    'sst.entregas.ver',
   ],
   worker: [],
 }
