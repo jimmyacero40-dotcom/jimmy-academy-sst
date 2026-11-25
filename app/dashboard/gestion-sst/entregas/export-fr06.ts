@@ -8,6 +8,10 @@
  *
  * Va en horizontal, con el compromiso arriba y no abajo, y la fecha de
  * revisión en blanco, como en la hoja de la empresa.
+ *
+ * Se pasa de hoja por los mismos dos motivos que en papel: porque se
+ * llenaron las columnas —apareció un elemento nuevo— o porque se acabaron
+ * las filas. En los dos casos la hoja nueva repite todos los encabezados.
  */
 
 interface Fila {
@@ -61,7 +65,7 @@ const ddmmaaaa = (iso: string) => {
   return `${p(d.getDate())}/${p(d.getMonth() + 1)}/${d.getFullYear()}`
 }
 
-/** El día, para agrupar las entregas en una sola fila. */
+/** El día, para agrupar en una sola fila todo lo entregado esa fecha. */
 const soloDia = (iso: string) => {
   const d = new Date(new Date(iso).getTime() - 5 * 60 * 60 * 1000)
   return d.toISOString().slice(0, 10)
@@ -141,12 +145,13 @@ export async function exportarFR06(
       { align: al === 'center' ? 'center' : 'left' })
   }
 
-  // ── Qué columnas lleva esta hoja ──
+  // ── Qué columnas lleva la hoja ──
   // Un elemento por columna, en el orden en que se entregó por primera vez.
   const elementos: string[] = []
   for (const e of entregas) if (!elementos.includes(e.elemento)) elementos.push(e.elemento)
 
-  // Y cada hoja lleva hasta siete, como el formato en papel.
+  // Siete por hoja, como el formato en papel. Si aparece un elemento nuevo y
+  // ya no cabe, se sigue en otra hoja.
   const bloques: string[][] = []
   for (let i = 0; i < Math.max(elementos.length, 1); i += COLUMNAS_EPP) {
     bloques.push(elementos.slice(i, i + COLUMNAS_EPP))
@@ -158,14 +163,26 @@ export async function exportarFR06(
   const anchoFecha = 26
   const anchoQuien = 34
   const anchoEpp = (CW - anchoFecha - anchoQuien) / COLUMNAS_EPP
+  const logoW = 40, altoT = 8
+  const altoTituloEpp = 6
+  const altoNombres = 13
+  const altoFirmeAqui = 4.5
+  const altoFila = 11
 
-  for (let b = 0; b < bloques.length; b++) {
-    if (b > 0) doc.addPage()
-    const columnas = bloques[b]
+  let primera = true
+
+  /**
+   * Una hoja con todo el encabezado: el membrete, el compromiso, los datos
+   * del trabajador y los títulos de la rejilla. Es lo que se hace en papel
+   * cuando se acaba la hoja y se coge otra.
+   */
+  const abrirHoja = (columnas: string[]): { y: number; yTabla: number } => {
+    if (!primera) doc.addPage()
+    primera = false
+
     let y = 8
 
-    // ── Encabezado ──
-    const logoW = 40, altoT = 8
+    // ── Membrete ──
     if (fotoLogo) {
       doc.setDrawColor(...C.borde); doc.setLineWidth(0.2); doc.rect(ML, y, logoW, altoT * 2, 'S')
       try {
@@ -179,9 +196,7 @@ export async function exportarFR06(
     celda(ML + logoW, y, CW - logoW, altoT, 'ENTREGA DE ELEMENTOS DE PROTECCIÓN PERSONAL',
       { bold: true, size: 9 })
 
-    // Los cinco rótulos reparten el ancho que queda después del logo. Antes
-    // estaban en milímetros fijos que sumaban más que la hoja, y la última
-    // columna —la fecha de revisión— quedaba con ancho negativo y se salía.
+    // Los cinco rótulos reparten el ancho que queda después del logo.
     const libre = CW - logoW
     const anchos = [0.14, 0.20, 0.12, 0.27, 0.27].map(f => libre * f)
     const rotulos = ['Versión', 'Código', 'ÁREA', 'FECHA DE ELABORACIÓN', 'FECHA DE REVISIÓN']
@@ -221,17 +236,11 @@ export async function exportarFR06(
     celda(cx, y, wValCargo, alto1, trabajador.cargo || '', { size: 7 })
     y += alto1
 
-    // ── La rejilla ──
+    // ── Títulos de la rejilla ──
     const yTabla = y
-    const altoTituloEpp = 6
-    const altoNombres = 13
-    const altoFirmeAqui = 4.5
-
-    // Franja «ELEMENTO DE PROTECCIÓN PERSONAL ENTREGADO», sobre las columnas
     celda(ML + anchoFecha, y, anchoEpp * COLUMNAS_EPP, altoTituloEpp,
       'ELEMENTO DE PROTECCIÓN PERSONAL ENTREGADO', { bg: C.crema, bold: true, size: 8 })
 
-    // «Fecha de entrega» y «quién entregó» abarcan las tres filas del encabezado
     const altoEncabezado = altoTituloEpp + altoNombres + altoFirmeAqui
     celda(ML, y, anchoFecha, altoEncabezado, 'Fecha de entrega (dd/mm/aa)',
       { bold: true, size: 7, lineas: true })
@@ -239,8 +248,6 @@ export async function exportarFR06(
       'Nombre y apellido de quien entregó el EPP', { bold: true, size: 7, lineas: true })
 
     y += altoTituloEpp
-
-    // Los nombres de los elementos, uno por columna
     for (let i = 0; i < COLUMNAS_EPP; i++) {
       celda(ML + anchoFecha + i * anchoEpp, y, anchoEpp, altoNombres, columnas[i] ?? '',
         { bg: C.crema, color: C.rojo, bold: true, size: 7, lineas: true })
@@ -252,51 +259,74 @@ export async function exportarFR06(
       { bg: C.crema, size: 6 })
     y += altoFirmeAqui
 
-    // ── Las filas: una por día de entrega, más las de reserva en blanco ──
-    const altoFila = 11
-    const caben = Math.floor((H - 8 - y) / altoFila)
-    const filas = Math.max(caben, dias.length + 2)
+    return { y, yTabla }
+  }
 
-    for (let f = 0; f < filas; f++) {
-      if (y + altoFila > H - 6) break
-      const dia = dias[f]
-      const delDia = dia ? entregas.filter(e => soloDia(e.entregado_at) === dia) : []
-
-      celda(ML, y, anchoFecha, altoFila, dia ? ddmmaaaa(dia + 'T12:00:00') : '',
-        { color: C.rojo, bold: true, size: 7.5 })
-
-      for (let i = 0; i < COLUMNAS_EPP; i++) {
-        const x2 = ML + anchoFecha + i * anchoEpp
-        const nombre = columnas[i]
-        const e = nombre ? delDia.find(d => d.elemento === nombre) : undefined
-
-        doc.setDrawColor(...C.borde); doc.setLineWidth(0.2)
-        doc.rect(x2, y, anchoEpp, altoFila, 'S')
-
-        if (!e) continue
-        // La firma solo si el trabajador ya confirmó: firmar por quien no ha
-        // aceptado sería falsear la constancia.
-        if (e.firma && e.confirmado_at) {
-          try {
-            doc.setFillColor(...C.blanco); doc.rect(x2 + 0.8, y + 0.8, anchoEpp - 1.6, altoFila - 1.6, 'F')
-            doc.addImage(e.firma, /^data:image\/png/i.test(e.firma) ? 'PNG' : 'JPEG',
-              x2 + 1.5, y + 1.2, anchoEpp - 3, altoFila - 2.4)
-          } catch { /* una firma rota no bota el documento */ }
-        } else {
-          texto('pendiente', x2 + anchoEpp / 2, y + altoFila / 2 + 1, 5, C.gris, false, 'center')
-        }
-      }
-
-      const quien = [...new Set(delDia.map(d => d.entregado_por_nombre).filter(Boolean))].join(' · ')
-      celda(ML + anchoFecha + anchoEpp * COLUMNAS_EPP, y, anchoQuien, altoFila, quien,
-        { color: C.rojo, bold: true, size: 6.5, lineas: true })
-
-      y += altoFila
-    }
-
-    // El borde exterior, para que la rejilla se lea como una sola tabla.
+  /** El borde exterior, para que la rejilla se lea como una sola tabla. */
+  const cerrarHoja = (yTabla: number, y: number) => {
     doc.setDrawColor(...C.borde); doc.setLineWidth(0.5)
     doc.rect(ML, yTabla, CW, y - yTabla, 'S')
+  }
+
+  /** Una fila: la fecha, las firmas de ese día y quién entregó. */
+  const dibujarFila = (y: number, columnas: string[], dia: string | undefined) => {
+    const delDia = dia ? entregas.filter(e => soloDia(e.entregado_at) === dia) : []
+
+    celda(ML, y, anchoFecha, altoFila, dia ? ddmmaaaa(`${dia}T12:00:00`) : '',
+      { color: C.rojo, bold: true, size: 7.5 })
+
+    for (let i = 0; i < COLUMNAS_EPP; i++) {
+      const x2 = ML + anchoFecha + i * anchoEpp
+      const nombre = columnas[i]
+      const e = nombre ? delDia.find(d => d.elemento === nombre) : undefined
+
+      doc.setDrawColor(...C.borde); doc.setLineWidth(0.2)
+      doc.rect(x2, y, anchoEpp, altoFila, 'S')
+
+      if (!e) continue
+      // La firma solo si el trabajador ya confirmó: firmar por quien no ha
+      // aceptado sería falsear la constancia.
+      if (e.firma && e.confirmado_at) {
+        try {
+          doc.setFillColor(...C.blanco); doc.rect(x2 + 0.8, y + 0.8, anchoEpp - 1.6, altoFila - 1.6, 'F')
+          doc.addImage(e.firma, /^data:image\/png/i.test(e.firma) ? 'PNG' : 'JPEG',
+            x2 + 1.5, y + 1.2, anchoEpp - 3, altoFila - 2.4)
+        } catch { /* una firma rota no bota el documento */ }
+      } else {
+        texto('pendiente', x2 + anchoEpp / 2, y + altoFila / 2 + 1, 5, C.gris, false, 'center')
+      }
+    }
+
+    const quien = [...new Set(delDia.map(d => d.entregado_por_nombre).filter(Boolean))].join(' · ')
+    celda(ML + anchoFecha + anchoEpp * COLUMNAS_EPP, y, anchoQuien, altoFila, quien,
+      { color: C.rojo, bold: true, size: 6.5, lineas: true })
+  }
+
+  // ── A dibujar ──
+  for (const columnas of bloques) {
+    let { y, yTabla } = abrirHoja(columnas)
+    let f = 0
+
+    for (;;) {
+      // Se acabó la hoja: se cierra y se coge otra, con los encabezados.
+      if (y + altoFila > H - 6) {
+        cerrarHoja(yTabla, y)
+        const nueva = abrirHoja(columnas)
+        y = nueva.y
+        yTabla = nueva.yTabla
+      }
+
+      dibujarFila(y, columnas, dias[f])
+      y += altoFila
+      f++
+
+      // Pintadas todas las fechas, se siguen poniendo renglones en blanco
+      // hasta llenar la hoja —se entrega con espacio para escribir a mano— y
+      // ahí se para.
+      if (f >= dias.length && y + altoFila > H - 6) break
+    }
+
+    cerrarHoja(yTabla, y)
   }
 
   const limpio = trabajador.nombre.replace(/[^a-zA-Z0-9]/g, '_').slice(0, 40)
