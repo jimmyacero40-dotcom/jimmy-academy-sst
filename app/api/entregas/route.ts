@@ -53,7 +53,7 @@ export async function GET(req: NextRequest) {
     .from('entregas')
     // `users!entregas_user_id_fkey`: la tabla apunta dos veces a users —quien
     // recibe y quien entrega—, así que hay que decir por cuál se une.
-    .select('id, user_id, cantidad, referencia, entregado_at, entregado_por_nombre, observacion, firma, users!entregas_user_id_fkey(name, cedula, cargo, area)')
+    .select('id, user_id, cantidad, referencia, entregado_at, entregado_por_nombre, observacion, firma, confirmado_at, users!entregas_user_id_fkey(name, cedula, cargo, area)')
     .eq('tipo_id', tipoId)
     .gte('entregado_at', `${desde}T00:00:00-05:00`)
     .lte('entregado_at', `${hasta}T23:59:59-05:00`)
@@ -97,6 +97,7 @@ export async function GET(req: NextRequest) {
       entregado_por_nombre: e.entregado_por_nombre,
       observacion: e.observacion,
       tiene_firma: Boolean(e.firma),
+      confirmado_at: e.confirmado_at ?? null,
       // La firma solo cuando se pide: son imágenes y el listado se consulta
       // muchas veces, el soporte se arma una.
       firma: p.get('firmas') === '1' ? (e.firma ?? null) : undefined,

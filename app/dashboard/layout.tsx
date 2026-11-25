@@ -11,7 +11,7 @@ import {
   Layers, Briefcase,
   CalendarDays, GraduationCap, TrendingUp,
   Home, Activity, FileCheck2,
-  HardHat, FileText, ArrowLeftRight, AlertTriangle, MessageSquare,
+  HardHat, FileText, ArrowLeftRight, AlertTriangle, MessageSquare, Package,
   Bell, Shield, Leaf, LogIn, DoorOpen, UserX, MapPin
 } from 'lucide-react'
 import { CommandPalette } from '@/components/CommandPalette'
@@ -197,6 +197,9 @@ const WORKER_NAV = [
   { href: '/dashboard/my-plan',    icon: GraduationCap,  label: 'SSTudio' },
   { href: '/dashboard/tu-cuentas', icon: MessageSquare,  label: 'Tú Cuentas' },
   { href: '/dashboard/reportal',   icon: FileText,       label: 'RePortal' },
+  // Lo que le entregaron. Sin esto la trazabilidad era a medias: quedaba
+  // dicho que se entregó, pero no que él lo recibió.
+  { href: '/dashboard/mis-entregas', icon: HardHat,      label: 'Mis Entregas' },
 ]
 
 // Hrefs per module — used to auto-expand on load
@@ -224,6 +227,12 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   // haberse salido.
   const { rol: userRole, cargando: sessionLoading, esAdmin: isAdmin,
     esSuperAdmin: isSuperAdmin, esPortero: isPortero, esConsulta: isConsulta } = useRol()
+
+  // El almacenista reparte EPP sin ser administrador de nada más: lo que le
+  // abre la consola de entregas es el permiso, no el rol.
+  const permisosDelUsuario = ((session?.user as any)?.permissions ?? []) as string[]
+  const puedeRepartir = permisosDelUsuario.includes('sst.entregas.registrar')
+    || permisosDelUsuario.includes('sst.entregas.ver')
 
   const [activeCompany, setActiveCompany] = useState<{ name: string; logo_url?: string } | null>(null)
   const [workerDisplayName, setWorkerDisplayName] = useState<string | null>(null)
@@ -576,6 +585,16 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           ) : (
             /* ── Worker nav ── */
             <div className="pt-1 space-y-0.5">
+              {/* El trabajador que además reparte —el almacenista— ve la
+                  consola de entregas, aunque su rol sea trabajador: lo que
+                  manda es el permiso. */}
+              {puedeRepartir && (
+                <Link href="/dashboard/gestion-sst/entregas"
+                  className={`nav-item ${isActive('/dashboard/gestion-sst/entregas') ? 'active' : ''}`}>
+                  <Package size={16} strokeWidth={2} className="flex-shrink-0" />
+                  <span className="truncate">Entregas</span>
+                </Link>
+              )}
               {WORKER_NAV.map(({ href, icon: Icon, label }) => {
                 const active = isActive(href)
                 return (

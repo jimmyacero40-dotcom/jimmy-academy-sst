@@ -32,6 +32,13 @@ export default withAuth(
     // las pantallas donde se registra o se configura algo.
     const isConsulta = role === 'consulta'
 
+    // Quien tenga el permiso de entregas entra a esa pantalla aunque su rol
+    // sea trabajador: el almacenista reparte los EPP y no es administrador de
+    // nada más. El permiso es lo que manda, no el rol.
+    const permisos = (token?.permissions as string[] | null | undefined) ?? []
+    const puedeEntregas = permisos.includes('sst.entregas.registrar')
+      || permisos.includes('sst.entregas.ver')
+
     // El portero no tiene nada que hacer en el tablero general: entra directo a
     // su portería en vez de pasar por una pantalla que no puede usar.
     if (isPortero && path === '/dashboard') {
@@ -67,7 +74,10 @@ export default withAuth(
     // Gestión SST es un módulo administrativo: el trabajador participa desde
     // Tú Cuentas, no entra a la consola donde se ven las respuestas de todos.
     if (path.startsWith('/dashboard/gestion-sst')) {
-      if (!isAdmin && !isConsulta) return NextResponse.redirect(new URL('/dashboard', req.url))
+      const esEntregas = path.startsWith('/dashboard/gestion-sst/entregas')
+      if (!isAdmin && !isConsulta && !(esEntregas && puedeEntregas)) {
+        return NextResponse.redirect(new URL('/dashboard', req.url))
+      }
     }
 
     // El tablero lo ve todo el mundo; editarlo no. El API ya lo comprueba por
@@ -106,6 +116,8 @@ export default withAuth(
       '/dashboard/tu-cuentas', '/dashboard/reportal',
       '/dashboard/my-signature', '/dashboard/certificates',
       '/dashboard/settings', '/dashboard/configuracion',
+      // Lo que le entregaron, para confirmarlo.
+      '/dashboard/mis-entregas',
     ]
 
     // El trabajador tiene que poder abrir la capacitación que le asignaron.
@@ -114,6 +126,11 @@ export default withAuth(
     // "Iniciar" lo devolvía a Mi Perfil.
     const esUnCurso = /^\/dashboard\/trainings\/(?!create(?:\/|$))[^/]+/.test(path)
     if (role === 'worker' && esUnCurso) return NextResponse.next()
+
+    // El trabajador que además reparte entra a la consola de entregas.
+    if (role === 'worker' && puedeEntregas && path.startsWith('/dashboard/gestion-sst/entregas')) {
+      return NextResponse.next()
+    }
 
     if (role === 'worker' && !permite(RUTAS_TRABAJADOR)) {
       return NextResponse.redirect(new URL('/dashboard/my-profile', req.url))

@@ -16,7 +16,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useSession } from 'next-auth/react'
 import {
   Package, Plus, Loader2, Search, Check, X, Trash2, Download,
-  Settings2, CalendarDays, PenLine, AlertCircle,
+  Settings2, CalendarDays, PenLine, AlertCircle, FileText,
 } from 'lucide-react'
 import { tienePermiso } from '@/lib/permisos'
 
@@ -43,6 +43,7 @@ interface Entrega {
   entregado_por_nombre: string | null
   observacion: string | null
   tiene_firma: boolean
+  confirmado_at: string | null
 }
 
 interface Persona {
@@ -92,6 +93,19 @@ export default function EntregasPage() {
   const [error, setError] = useState<string | null>(null)
   const [entregando, setEntregando] = useState(false)
   const [editandoTipos, setEditandoTipos] = useState(false)
+  // Para el encabezado del formato de la empresa.
+  const [empresa, setEmpresa] = useState('AgroVenture Capital')
+  const [logo, setLogo] = useState<string | null>(null)
+
+  useEffect(() => {
+    fetch('/api/companies')
+      .then(r => (r.ok ? r.json() : []))
+      .then((d: any[]) => {
+        if (d?.[0]?.name) setEmpresa(d[0].name)
+        if (d?.[0]?.logo_url) setLogo(d[0].logo_url)
+      })
+      .catch(() => {})
+  }, [])
 
   const tipo = useMemo(() => tipos.find(t => t.id === tipoId) ?? null, [tipos, tipoId])
 
@@ -132,6 +146,7 @@ export default function EntregasPage() {
   const total = entregas.reduce((s, e) => s + e.cantidad, 0)
   const personas = new Set(entregas.map(e => e.user_id)).size
   const sinFirma = entregas.filter(e => !e.tiene_firma).length
+  const sinConfirmar = entregas.filter(e => !e.confirmado_at).length
 
   return (
     <div className="p-4 sm:p-6 max-w-5xl mx-auto space-y-5">
@@ -215,8 +230,8 @@ export default function EntregasPage() {
             <Dato valor={personas} rotulo="Personas" color="#243C2C" />
             <Dato valor={`${total} ${tipo?.unidad ?? ''}`} rotulo="Entregado" color="#10B981" />
             <Dato valor={entregas.length} rotulo="Registros" color="#60A5FA" />
-            <Dato valor={sinFirma} rotulo="Sin firma" color={sinFirma ? '#F59E0B' : '#10B981'}
-              nota={sinFirma ? 'no tienen firma registrada' : 'todas firmadas'} />
+            <Dato valor={sinConfirmar} rotulo="Sin confirmar" color={sinConfirmar ? '#F59E0B' : '#10B981'}
+              nota={sinConfirmar ? 'el trabajador no lo ha aceptado' : 'todas aceptadas'} />
           </div>
 
           {tipo?.referencia && (
@@ -248,7 +263,7 @@ export default function EntregasPage() {
                 <table className="w-full text-xs" style={{ minWidth: 700 }}>
                   <thead>
                     <tr style={{ borderBottom: '1px solid var(--border)' }}>
-                      {['Trabajador', 'Cargo', 'Cantidad', 'Referencia', 'Entregado', 'Quién entregó', ''].map(h => (
+                      {['Trabajador', 'Cargo', 'Cantidad', 'Referencia', 'Entregado', 'Quién entregó', 'Confirmó', ''].map(h => (
                         <th key={h} className="text-left px-3 py-2.5 font-bold"
                           style={{ color: 'var(--text-faint)' }}>{h}</th>
                       ))}
@@ -279,13 +294,39 @@ export default function EntregasPage() {
                         <td className="px-3 py-2.5" style={{ color: 'var(--text-dim)' }}>
                           {e.entregado_por_nombre || '—'}
                         </td>
+                        {/* La otra mitad de la trazabilidad: que él diga que
+                            lo recibió, no solo que nosotros lo entregamos. */}
                         <td className="px-3 py-2.5">
-                          {puedeRegistrar && (
-                            <button onClick={() => borrar(e)} title="Quitar esta entrega"
-                              className="p-1.5 rounded-lg" style={{ color: '#EF4444' }}>
-                              <Trash2 size={13} />
-                            </button>
+                          {e.confirmado_at ? (
+                            <span className="text-[10px] font-bold px-2 py-0.5 rounded-full whitespace-nowrap"
+                              style={{ background: 'rgba(16,185,129,0.12)', color: '#10B981' }}
+                              title={`Confirmado el ${new Date(e.confirmado_at).toLocaleString('es-CO')}`}>
+                              ✓ {fecha(e.confirmado_at)}
+                            </span>
+                          ) : (
+                            <span className="text-[10px] font-bold px-2 py-0.5 rounded-full whitespace-nowrap"
+                              style={{ background: 'rgba(245,158,11,0.12)', color: '#B45309' }}
+                              title="El trabajador todavía no ha confirmado que lo recibió">
+                              sin confirmar
+                            </span>
                           )}
+                        </td>
+                        <td className="px-3 py-2.5">
+                          <div className="flex items-center gap-1">
+                            {/* El formato de la empresa es por trabajador: su
+                                hoja con todo lo que ha recibido. */}
+                            <button onClick={() => formatoDe(e.user_id, empresa, logo)}
+                              title={`Formato AVC-FR06 de ${e.nombre}`}
+                              className="p-1.5 rounded-lg" style={{ color: 'var(--text-faint)' }}>
+                              <FileText size={13} />
+                            </button>
+                            {puedeRegistrar && (
+                              <button onClick={() => borrar(e)} title="Quitar esta entrega"
+                                className="p-1.5 rounded-lg" style={{ color: '#EF4444' }}>
+                                <Trash2 size={13} />
+                              </button>
+                            )}
+                          </div>
                         </td>
                       </tr>
                     ))}
@@ -682,6 +723,19 @@ function DialogoTipos({ tipos, onCerrar, onCambio }: {
       </div>
     </div>
   )
+}
+
+/** El formato AVC-FR06 de una persona: todo lo que ha recibido. */
+async function formatoDe(userId: string, empresa: string, logo: string | null) {
+  try {
+    const r = await fetch(`/api/entregas/trabajador?user_id=${userId}`)
+    const d = await r.json()
+    if (!r.ok) throw new Error(d.error || 'No se pudo armar el formato')
+    const { exportarFR06 } = await import('./export-fr06')
+    await exportarFR06(d.trabajador, d.entregas, empresa, logo)
+  } catch (e: any) {
+    alert(e.message)
+  }
 }
 
 async function descargarSoporte(entregas: Entrega[], tipo: Tipo, desde: string, hasta: string) {
