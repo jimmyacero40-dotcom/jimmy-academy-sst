@@ -12,7 +12,7 @@ import { requierePermiso, getCurrentUser } from '@/lib/get-company'
  */
 
 const PERIODICIDADES = ['diaria', 'semanal', 'mensual', 'ninguna']
-const CATEGORIAS = ['EPP', 'Hidratación', 'Dotación', 'Aseo', 'Otro']
+const CATEGORIAS = ['EPP', 'Dotación', 'Higiene y bienestar', 'Hidratación', 'Aseo', 'Otro']
 
 const CAMPOS = `id, nombre, descripcion, referencia, unidad, periodicidad, activo,
   categoria, especificacion, talla, proveedor, vida_util_dias, instrucciones,

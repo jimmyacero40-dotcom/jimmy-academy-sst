@@ -133,6 +133,17 @@ export default function EntregasPage() {
       .catch(() => {})
   }, [])
 
+  /** Los entregables por categoría, para el selector. */
+  const porCategoria = useMemo(() => {
+    const m = new Map<string, Tipo[]>()
+    for (const t of tipos) {
+      const k = t.categoria?.trim() || 'Sin categoría'
+      if (!m.has(k)) m.set(k, [])
+      m.get(k)!.push(t)
+    }
+    return [...m.entries()].sort((a, b) => a[0].localeCompare(b[0], 'es'))
+  }, [tipos])
+
   const verTodos = tipoId === 'todos'
   const tipo = useMemo(
     () => (verTodos
@@ -241,7 +252,13 @@ export default function EntregasPage() {
                 {/* El formato de la empresa es por trabajador y cruza
                     elementos distintos, así que hay que poder verlo todo. */}
                 <option value="todos">Todos los entregables</option>
-                {tipos.map(t => <option key={t.id} value={t.id}>{t.nombre}</option>)}
+                {/* Agrupado por categoría: con ochenta referencias —una por
+                    talla— una lista plana no se maneja. */}
+                {porCategoria.map(([cat, items]) => (
+                  <optgroup key={cat} label={cat}>
+                    {items.map(t => <option key={t.id} value={t.id}>{t.nombre}</option>)}
+                  </optgroup>
+                ))}
               </select>
             </div>
             <div>

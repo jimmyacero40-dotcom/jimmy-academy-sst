@@ -47,7 +47,7 @@ const PERIODOS: Record<string, string> = {
   ninguna: 'Sin periodicidad — cuando haga falta',
 }
 
-const CATEGORIAS = ['EPP', 'Hidratación', 'Dotación', 'Aseo', 'Otro']
+const CATEGORIAS = ['EPP', 'Dotación', 'Higiene y bienestar', 'Hidratación', 'Aseo', 'Otro']
 
 const inp = 'px-3 py-2 rounded-lg text-sm outline-none w-full'
 const estilo = { background: 'var(--bg)', border: '1px solid var(--border)', color: 'var(--text)' }
