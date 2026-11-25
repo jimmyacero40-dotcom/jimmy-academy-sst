@@ -19,6 +19,7 @@ import {
   Settings2, CalendarDays, PenLine, AlertCircle, FileText,
 } from 'lucide-react'
 import { tienePermiso } from '@/lib/permisos'
+import CatalogoItems from '@/components/entregas/CatalogoItems'
 
 interface Tipo {
   id: string
@@ -28,6 +29,19 @@ interface Tipo {
   unidad: string
   periodicidad: 'diaria' | 'semanal' | 'mensual' | 'ninguna'
   activo: boolean
+  // La ficha del ítem; la pantalla usa la cantidad sugerida y muestra el resto.
+  categoria?: string | null
+  especificacion?: string | null
+  talla?: string | null
+  proveedor?: string | null
+  vida_util_dias?: number | null
+  instrucciones?: string | null
+  cantidad_sugerida?: number | null
+  creado_por_nombre?: string | null
+  created_at?: string
+  actualizado_por_nombre?: string | null
+  updated_at?: string | null
+  entregas?: number
 }
 
 interface Entrega {
@@ -84,6 +98,12 @@ export default function EntregasPage() {
   const usuario = session?.user as { role?: string; permissions?: string[] | null } | undefined
   const puedeRegistrar = !!usuario?.role
     && tienePermiso(usuario.role, usuario.permissions, 'sst.entregas.registrar')
+
+  /** Cómo se presenta quien entrega, según la cuenta con la que entró. */
+  const prefijoDeOficio = usuario?.role === 'almacen' ? 'Almacenista- '
+    : usuario?.role === 'analista_sst' || usuario?.role === 'admin' || usuario?.role === 'superadmin'
+      ? 'SST- '
+      : ''
 
   const [tipos, setTipos] = useState<Tipo[]>([])
   const [tipoId, setTipoId] = useState('')
@@ -175,7 +195,7 @@ export default function EntregasPage() {
           <button onClick={() => setEditandoTipos(true)}
             className="flex items-center gap-1.5 text-xs font-semibold px-3 py-2 rounded-lg"
             style={{ border: '1px solid var(--border)', color: 'var(--text-dim)', background: 'var(--bg-card)' }}>
-            <Settings2 size={13} /> Qué se entrega
+            <Settings2 size={13} /> Catálogo de ítems
           </button>
         )}
       </div>
@@ -365,18 +385,21 @@ export default function EntregasPage() {
         <DialogoEntrega
           tipo={tipo}
           recientes={recientes}
+          prefijoDeOficio={prefijoDeOficio}
           onCerrar={() => setEntregando(false)}
           onListo={() => { setEntregando(false); cargar() }}
         />
       )}
 
       {editandoTipos && (
-        <DialogoTipos
-          tipos={tipos}
+        <CatalogoItems
+          items={tipos as any}
           onCerrar={() => setEditandoTipos(false)}
-          onCambio={(nuevos) => {
+          onCambio={(nuevos: any) => {
             setTipos(nuevos)
-            if (!nuevos.some(t => t.id === tipoId)) setTipoId(nuevos[0]?.id ?? '')
+            if (tipoId !== 'todos' && !nuevos.some((t: Tipo) => t.id === tipoId)) {
+              setTipoId(nuevos[0]?.id ?? 'todos')
+            }
           }}
         />
       )}
@@ -397,9 +420,11 @@ function Dato({ valor, rotulo, color, nota }: {
 }
 
 /** Registrar: a quién, cuánto y con qué referencia. */
-function DialogoEntrega({ tipo, recientes, onCerrar, onListo }: {
+function DialogoEntrega({ tipo, recientes, prefijoDeOficio, onCerrar, onListo }: {
   tipo: Tipo
   recientes: Record<string, string>
+  /** «Almacenista- », «SST- »… según la cuenta con la que se entrega. */
+  prefijoDeOficio: string
   onCerrar: () => void
   onListo: () => void
 }) {
@@ -408,7 +433,7 @@ function DialogoEntrega({ tipo, recientes, onCerrar, onListo }: {
   const [busca, setBusca] = useState('')
   const [fCargo, setFCargo] = useState('')
   const [elegidos, setElegidos] = useState<Set<string>>(new Set())
-  const [cantidad, setCantidad] = useState('1')
+  const [cantidad, setCantidad] = useState(String(tipo.cantidad_sugerida ?? 1))
   const [referencia, setReferencia] = useState(tipo.referencia ?? '')
   const [cuando, setCuando] = useState(hoyCol())
   const [observacion, setObservacion] = useState('')
@@ -417,8 +442,13 @@ function DialogoEntrega({ tipo, recientes, onCerrar, onListo }: {
   // hacía largo el formato de papel.
   const [quienEntrega, setQuienEntrega] = useState('')
   useEffect(() => {
-    try { setQuienEntrega(localStorage.getItem('agrosafe.quienEntrega') ?? '') } catch { /* sin memoria, se escribe */ }
-  }, [])
+    let guardado = ''
+    try { guardado = localStorage.getItem('agrosafe.quienEntrega') ?? '' } catch { /* sin memoria, se escribe */ }
+    // La primera vez se propone el oficio según la cuenta —«Almacenista- »,
+    // «SST- »— y la persona completa su nombre. El formato pide nombres y
+    // apellidos, y así se ve de quién salió sin tener que adivinarlo.
+    setQuienEntrega(guardado || prefijoDeOficio)
+  }, [prefijoDeOficio])
   const [guardando, setGuardando] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
@@ -632,127 +662,6 @@ function DialogoEntrega({ tipo, recientes, onCerrar, onListo }: {
             style={{ background: '#243C2C', color: '#fff' }}>
             {guardando ? <Loader2 size={14} className="animate-spin" /> : <Check size={14} />}
             Entregar a {elegidos.size}
-          </button>
-        </div>
-      </div>
-    </div>
-  )
-}
-
-/** Qué se entrega: lo define quien entrega. */
-function DialogoTipos({ tipos, onCerrar, onCambio }: {
-  tipos: Tipo[]
-  onCerrar: () => void
-  onCambio: (t: Tipo[]) => void
-}) {
-  const [lista, setLista] = useState<Tipo[]>(tipos)
-  const [nuevo, setNuevo] = useState({ nombre: '', referencia: '', unidad: 'unidad', periodicidad: 'ninguna' })
-  const [guardando, setGuardando] = useState(false)
-  const [error, setError] = useState<string | null>(null)
-
-  const aplicar = (t: Tipo[]) => { setLista(t); onCambio(t) }
-
-  async function crear() {
-    if (!nuevo.nombre.trim()) return
-    setGuardando(true); setError(null)
-    try {
-      const r = await fetch('/api/entregas/tipos', {
-        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(nuevo),
-      })
-      const d = await r.json()
-      if (!r.ok) throw new Error(d.error || 'No se pudo crear')
-      aplicar([...lista, d])
-      setNuevo({ nombre: '', referencia: '', unidad: 'unidad', periodicidad: 'ninguna' })
-    } catch (e: any) { setError(e.message) }
-    setGuardando(false)
-  }
-
-  async function cambiar(t: Tipo, cambios: Partial<Tipo>) {
-    const r = await fetch('/api/entregas/tipos', {
-      method: 'PATCH', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ id: t.id, ...cambios }),
-    })
-    if (!r.ok) return
-    const d = await r.json()
-    aplicar(lista.map(x => (x.id === t.id ? d : x)))
-  }
-
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ background: 'rgba(0,0,0,0.55)' }}>
-      <div className="w-full max-w-lg rounded-2xl shadow-2xl flex flex-col max-h-[88vh]"
-        style={{ background: 'var(--bg-card)', border: '1px solid var(--border)' }}>
-
-        <div className="flex items-start gap-3 px-5 py-4" style={{ borderBottom: '1px solid var(--border)' }}>
-          <div className="flex-1">
-            <h3 className="text-base font-bold" style={{ color: 'var(--text-strong)' }}>Qué se entrega</h3>
-            <p className="text-xs" style={{ color: 'var(--text-dim)' }}>
-              La periodicidad solo sirve para avisarle a quién le falta; no obliga a nada.
-            </p>
-          </div>
-          <button onClick={onCerrar} className="p-1.5 rounded-lg" style={{ color: 'var(--text-faint)' }}>
-            <X size={16} />
-          </button>
-        </div>
-
-        <div className="flex-1 overflow-y-auto px-5 py-4 space-y-3">
-          {lista.map(t => (
-            <div key={t.id} className="rounded-xl p-3 space-y-2"
-              style={{ border: '1px solid var(--border)', opacity: t.activo ? 1 : 0.55 }}>
-              <div className="flex items-center gap-2">
-                <input defaultValue={t.nombre}
-                  onBlur={e => e.target.value.trim() && e.target.value !== t.nombre && cambiar(t, { nombre: e.target.value })}
-                  className={inp} style={estilo} />
-                <button onClick={() => cambiar(t, { activo: !t.activo })}
-                  className="text-[11px] font-semibold px-2.5 py-2 rounded-lg whitespace-nowrap"
-                  style={{ border: '1px solid var(--border)', color: 'var(--text-dim)' }}>
-                  {t.activo ? 'Archivar' : 'Reactivar'}
-                </button>
-              </div>
-              <input defaultValue={t.referencia ?? ''} placeholder="Referencia por defecto (marca, presentación, lote)"
-                onBlur={e => e.target.value !== (t.referencia ?? '') && cambiar(t, { referencia: e.target.value })}
-                className={inp} style={estilo} />
-              <div className="grid grid-cols-2 gap-2">
-                <input defaultValue={t.unidad} placeholder="sobre, par, unidad…"
-                  onBlur={e => e.target.value.trim() && e.target.value !== t.unidad && cambiar(t, { unidad: e.target.value })}
-                  className={inp} style={estilo} />
-                <select value={t.periodicidad} onChange={e => cambiar(t, { periodicidad: e.target.value as Tipo['periodicidad'] })}
-                  className={inp} style={estilo}>
-                  {Object.entries(PERIODOS).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
-                </select>
-              </div>
-            </div>
-          ))}
-
-          <div className="rounded-xl p-3 space-y-2" style={{ border: '1px dashed var(--border-strong)' }}>
-            <p className="text-[11px] font-bold uppercase tracking-wider" style={{ color: 'var(--text-faint)' }}>
-              Agregar
-            </p>
-            <input value={nuevo.nombre} onChange={e => setNuevo({ ...nuevo, nombre: e.target.value })}
-              placeholder="Ej.: Respirador media cara" className={inp} style={estilo} />
-            <input value={nuevo.referencia} onChange={e => setNuevo({ ...nuevo, referencia: e.target.value })}
-              placeholder="Referencia por defecto (opcional)" className={inp} style={estilo} />
-            <div className="grid grid-cols-2 gap-2">
-              <input value={nuevo.unidad} onChange={e => setNuevo({ ...nuevo, unidad: e.target.value })}
-                placeholder="unidad" className={inp} style={estilo} />
-              <select value={nuevo.periodicidad} onChange={e => setNuevo({ ...nuevo, periodicidad: e.target.value })}
-                className={inp} style={estilo}>
-                {Object.entries(PERIODOS).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
-              </select>
-            </div>
-            <button onClick={crear} disabled={guardando || !nuevo.nombre.trim()}
-              className="w-full flex items-center justify-center gap-1.5 px-4 py-2 rounded-lg text-sm font-bold disabled:opacity-50"
-              style={{ background: '#243C2C', color: '#fff' }}>
-              {guardando ? <Loader2 size={14} className="animate-spin" /> : <Plus size={14} />} Agregar
-            </button>
-          </div>
-
-          {error && <p className="text-xs" style={{ color: '#EF4444' }}>{error}</p>}
-        </div>
-
-        <div className="px-5 py-4" style={{ borderTop: '1px solid var(--border)' }}>
-          <button onClick={onCerrar} className="w-full px-4 py-2 rounded-lg text-sm font-semibold"
-            style={{ border: '1px solid var(--border)', color: 'var(--text-dim)', background: 'var(--bg)' }}>
-            Listo
           </button>
         </div>
       </div>

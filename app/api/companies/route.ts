@@ -24,6 +24,18 @@ export async function GET() {
     return NextResponse.json(data ? [data] : [])
   }
 
+  // Cualquier otra cuenta ve lo suyo, y solo el nombre y el logo: son los
+  // que van en el membrete de los formatos. Antes recibía una lista vacía y
+  // el AVC-FR06 que sacaba el almacén salía sin logo.
+  if (user.company_id) {
+    const { data } = await supabase
+      .from('companies')
+      .select('id, name, logo_url')
+      .eq('id', user.company_id)
+      .single()
+    return NextResponse.json(data ? [data] : [])
+  }
+
   return NextResponse.json([])
 }
 
