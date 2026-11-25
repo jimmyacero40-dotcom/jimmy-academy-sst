@@ -35,11 +35,18 @@ export async function GET(req: NextRequest) {
   const tipoId = p.get('tipo_id')
   if (!tipoId) return NextResponse.json({ error: 'tipo_id requerido' }, { status: 400 })
 
-  const { data: tipo } = await supabase
-    .from('entrega_tipos')
-    .select('id, nombre, referencia, unidad, periodicidad, company_id')
-    .eq('id', tipoId)
-    .maybeSingle()
+  // «todos»: la consola mirando todo lo que se entregó, no un solo
+  // entregable. Hace falta porque el formato de la empresa es por trabajador
+  // y cruza elementos distintos en la misma hoja.
+  const todos = tipoId === 'todos'
+
+  const tipo = todos
+    ? { id: 'todos', nombre: 'Todos los entregables', referencia: null, unidad: 'unidad', periodicidad: 'ninguna', company_id: companyId }
+    : (await supabase
+      .from('entrega_tipos')
+      .select('id, nombre, referencia, unidad, periodicidad, company_id')
+      .eq('id', tipoId)
+      .maybeSingle()).data
 
   if (!tipo || (companyId && tipo.company_id !== companyId)) {
     return NextResponse.json({ error: 'Ese entregable no existe' }, { status: 404 })
@@ -53,11 +60,11 @@ export async function GET(req: NextRequest) {
     .from('entregas')
     // `users!entregas_user_id_fkey`: la tabla apunta dos veces a users —quien
     // recibe y quien entrega—, así que hay que decir por cuál se une.
-    .select('id, user_id, cantidad, referencia, entregado_at, entregado_por_nombre, observacion, firma, confirmado_at, users!entregas_user_id_fkey(name, cedula, cargo, area)')
-    .eq('tipo_id', tipoId)
+    .select('id, user_id, cantidad, referencia, entregado_at, entregado_por_nombre, observacion, firma, confirmado_at, entrega_tipos(nombre, unidad), users!entregas_user_id_fkey(name, cedula, cargo, area)')
     .gte('entregado_at', `${desde}T00:00:00-05:00`)
     .lte('entregado_at', `${hasta}T23:59:59-05:00`)
     .order('entregado_at', { ascending: false })
+  if (!todos) q = q.eq('tipo_id', tipoId)
   if (companyId) q = q.eq('company_id', companyId)
 
   const { data, error } = await q
@@ -65,7 +72,7 @@ export async function GET(req: NextRequest) {
 
   // Quién ya recibió dentro del periodo que marca la periodicidad: es lo que
   // la pantalla usa para no entregarle dos veces al mismo el mismo día.
-  const corte = desdeCuando(tipo.periodicidad)
+  const corte = todos ? null : desdeCuando(tipo.periodicidad)
   const recientes: Record<string, string> = {}
   if (corte) {
     let qr = supabase
@@ -92,6 +99,8 @@ export async function GET(req: NextRequest) {
       cargo: e.users?.cargo ?? '',
       area: e.users?.area ?? '',
       cantidad: Number(e.cantidad),
+      elemento: e.entrega_tipos?.nombre ?? '',
+      unidad: e.entrega_tipos?.unidad ?? 'unidad',
       referencia: e.referencia,
       entregado_at: e.entregado_at,
       entregado_por_nombre: e.entregado_por_nombre,
@@ -159,7 +168,11 @@ export async function POST(req: NextRequest) {
       referencia: String(b.referencia ?? '').trim() || tipo.referencia || null,
       entregado_at: cuando,
       entregado_por: quien?.id ?? null,
-      entregado_por_nombre: quien?.name ?? null,
+      // El formato pide nombres y apellidos de quien entregó. La cuenta
+      // puede ser la del almacén —un puesto, no una persona—, así que el
+      // nombre se escribe en cada entrega y solo si no viene se usa el de la
+      // cuenta.
+      entregado_por_nombre: String(b.entregado_por_nombre ?? '').trim() || quien?.name || null,
       firma: firmaDe.get(p.id) ?? null,
       observacion: String(b.observacion ?? '').trim() || null,
     })))

@@ -42,6 +42,8 @@ interface Entrega {
   entregado_at: string
   entregado_por_nombre: string | null
   observacion: string | null
+  elemento?: string
+  unidad?: string
   tiene_firma: boolean
   confirmado_at: string | null
 }
@@ -107,7 +109,12 @@ export default function EntregasPage() {
       .catch(() => {})
   }, [])
 
-  const tipo = useMemo(() => tipos.find(t => t.id === tipoId) ?? null, [tipos, tipoId])
+  const verTodos = tipoId === 'todos'
+  const tipo = useMemo(
+    () => (verTodos
+      ? { id: 'todos', nombre: 'Todos los entregables', descripcion: null, referencia: null, unidad: '', periodicidad: 'ninguna' as const, activo: true }
+      : tipos.find(t => t.id === tipoId) ?? null),
+    [tipos, tipoId, verTodos])
 
   useEffect(() => {
     fetch('/api/entregas/tipos')
@@ -196,6 +203,9 @@ export default function EntregasPage() {
               <label className="block text-[11px] font-bold uppercase tracking-wider mb-1.5"
                 style={{ color: 'var(--text-faint)' }}>Entregable</label>
               <select value={tipoId} onChange={e => setTipoId(e.target.value)} className={inp} style={estilo}>
+                {/* El formato de la empresa es por trabajador y cruza
+                    elementos distintos, así que hay que poder verlo todo. */}
+                <option value="todos">Todos los entregables</option>
                 {tipos.map(t => <option key={t.id} value={t.id}>{t.nombre}</option>)}
               </select>
             </div>
@@ -216,7 +226,7 @@ export default function EntregasPage() {
               style={{ border: '1px solid var(--border)', color: 'var(--text-dim)', background: 'var(--bg)' }}>
               <CalendarDays size={13} className="inline mr-1" /> Hoy
             </button>
-            {puedeRegistrar && (
+            {puedeRegistrar && !verTodos && (
               <button onClick={() => setEntregando(true)}
                 className="flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-bold"
                 style={{ background: '#243C2C', color: '#fff' }}>
@@ -279,7 +289,12 @@ export default function EntregasPage() {
                         </td>
                         <td className="px-3 py-2.5" style={{ color: 'var(--text-dim)' }}>{e.cargo || '—'}</td>
                         <td className="px-3 py-2.5 font-bold" style={{ color: 'var(--text)' }}>
-                          {e.cantidad} {tipo?.unidad}
+                          {e.cantidad} {e.unidad || tipo?.unidad}
+                          {verTodos && e.elemento && (
+                            <span className="block text-[10px] font-normal" style={{ color: 'var(--text-dim)' }}>
+                              {e.elemento}
+                            </span>
+                          )}
                         </td>
                         <td className="px-3 py-2.5" style={{ color: 'var(--text-dim)' }}>{e.referencia || '—'}</td>
                         <td className="px-3 py-2.5" style={{ color: 'var(--text-dim)' }}>
@@ -346,7 +361,7 @@ export default function EntregasPage() {
         </>
       )}
 
-      {entregando && tipo && (
+      {entregando && tipo && !verTodos && (
         <DialogoEntrega
           tipo={tipo}
           recientes={recientes}
@@ -397,6 +412,13 @@ function DialogoEntrega({ tipo, recientes, onCerrar, onListo }: {
   const [referencia, setReferencia] = useState(tipo.referencia ?? '')
   const [cuando, setCuando] = useState(hoyCol())
   const [observacion, setObservacion] = useState('')
+  // Se recuerda en el navegador: casi siempre entrega la misma persona, y
+  // volver a escribir su nombre en cada entrega es el tipo de trabajo que
+  // hacía largo el formato de papel.
+  const [quienEntrega, setQuienEntrega] = useState('')
+  useEffect(() => {
+    try { setQuienEntrega(localStorage.getItem('agrosafe.quienEntrega') ?? '') } catch { /* sin memoria, se escribe */ }
+  }, [])
   const [guardando, setGuardando] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
@@ -437,11 +459,13 @@ function DialogoEntrega({ tipo, recientes, onCerrar, onListo }: {
           cantidad: Number(cantidad) || 1,
           referencia: referencia.trim() || null,
           fecha: cuando,
+          entregado_por_nombre: quienEntrega.trim() || null,
           observacion: observacion.trim() || null,
         }),
       })
       const d = await r.json()
       if (!r.ok) throw new Error(d.error || 'No se pudo registrar')
+      try { localStorage.setItem('agrosafe.quienEntrega', quienEntrega.trim()) } catch { /* da igual */ }
       onListo()
     } catch (e: any) {
       setError(e.message)
@@ -478,6 +502,17 @@ function DialogoEntrega({ tipo, recientes, onCerrar, onListo }: {
               <input type="date" value={cuando} max={hoyCol()}
                 onChange={e => setCuando(e.target.value)} className={inp} style={estilo} />
             </div>
+          </div>
+
+          {/* El formato pide nombres y apellidos de quien entregó, y la
+              cuenta puede ser la del almacén, que es un puesto y no una
+              persona. Por eso se escribe aquí. */}
+          <div>
+            <label className="block text-[11px] font-bold uppercase tracking-wider mb-1.5"
+              style={{ color: 'var(--text-faint)' }}>Quién entrega</label>
+            <input value={quienEntrega} onChange={e => setQuienEntrega(e.target.value)}
+              placeholder="Nombres y apellidos de quien hace la entrega"
+              className={inp} style={estilo} />
           </div>
 
           <div>

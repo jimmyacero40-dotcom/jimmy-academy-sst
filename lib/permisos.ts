@@ -94,12 +94,27 @@ export const PERMISOS_POR_ROL: Record<string, string[]> = {
     'sst.entregas.ver',
   ],
   worker: [],
+  // Dos cuentas de oficio, no de persona: el almacén y el analista de SST.
+  // Antes esto colgaba del perfil personal del almacenista, que además es
+  // trabajador; si él se va, la cuenta se va con él. La cuenta es del puesto,
+  // y quién entrega de verdad se escribe en cada entrega.
+  almacen: [
+    'personal.ver',
+    'sst.entregas.ver', 'sst.entregas.registrar',
+  ],
+  analista_sst: [
+    'personal.ver', 'formacion.ver',
+    'sst.entregas.ver', 'sst.entregas.registrar',
+    'sst.participacion.ver', 'sst.modulos.ver', 'sst.reportes.ver',
+  ],
 }
 
 /** Los roles de plataforma, para no repetir nombres y colores en cada pantalla. */
 export const ROLES: { id: string; label: string; descripcion: string; color: string }[] = [
   { id: 'consulta',   label: 'Consulta',           color: '#8B5CF6', descripcion: 'solo lectura, sin registrar nada' },
   { id: 'portero',    label: 'Portero',            color: '#06B6D4', descripcion: 'acceso solo a portería/ingreso/salida' },
+  { id: 'almacen',    label: 'Almacén',            color: '#0EA5E9', descripcion: 'entrega de EPP y elementos, nada más' },
+  { id: 'analista_sst', label: 'Analista SST',     color: '#14B8A6', descripcion: 'entregas y consulta de lo del SG-SST' },
   { id: 'admin',      label: 'Administrador',      color: '#F59E0B', descripcion: 'gestión del personal y SSTudio' },
   { id: 'superadmin', label: 'Superadministrador', color: '#EF4444', descripcion: 'control total de la plataforma' },
 ]

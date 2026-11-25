@@ -35,6 +35,10 @@ export default withAuth(
     // Quien tenga el permiso de entregas entra a esa pantalla aunque su rol
     // sea trabajador: el almacenista reparte los EPP y no es administrador de
     // nada más. El permiso es lo que manda, no el rol.
+    // Cuentas de oficio: el almacén y el analista de SST. No son
+    // administradores; entran a entregar y a poco más.
+    const isEntregador = role === 'almacen' || role === 'analista_sst'
+
     const permisos = (token?.permissions as string[] | null | undefined) ?? []
     const puedeEntregas = permisos.includes('sst.entregas.registrar')
       || permisos.includes('sst.entregas.ver')
@@ -75,7 +79,7 @@ export default withAuth(
     // Tú Cuentas, no entra a la consola donde se ven las respuestas de todos.
     if (path.startsWith('/dashboard/gestion-sst')) {
       const esEntregas = path.startsWith('/dashboard/gestion-sst/entregas')
-      if (!isAdmin && !isConsulta && !(esEntregas && puedeEntregas)) {
+      if (!isAdmin && !isConsulta && !isEntregador && !(esEntregas && puedeEntregas)) {
         return NextResponse.redirect(new URL('/dashboard', req.url))
       }
     }
@@ -138,6 +142,24 @@ export default withAuth(
     // El tablero general es de gestión; lo del trabajador es la cartelera.
     if (role === 'worker' && path === '/dashboard') {
       return NextResponse.redirect(new URL('/dashboard/inicio', req.url))
+    }
+
+    // Sin esto, un rol que no sea ninguno de los conocidos se colaría a todo:
+    // las puertas de abajo preguntan por worker, consulta y portero, y lo que
+    // no encaje en ninguna llega al final sin que nadie lo pare.
+    if (isEntregador) {
+      const RUTAS_ENTREGADOR = [
+        '/dashboard', '/dashboard/inicio', '/dashboard/gestion-sst/entregas',
+        '/dashboard/mis-entregas', '/dashboard/my-profile', '/dashboard/my-plan',
+        '/dashboard/settings', '/dashboard/configuracion',
+      ]
+      if (path === '/dashboard') {
+        return NextResponse.redirect(new URL('/dashboard/gestion-sst/entregas', req.url))
+      }
+      if (!permite(RUTAS_ENTREGADOR)) {
+        return NextResponse.redirect(new URL('/dashboard/gestion-sst/entregas', req.url))
+      }
+      return NextResponse.next()
     }
 
     if (isConsulta && !permite(RUTAS_CONSULTA)) {
