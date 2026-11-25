@@ -632,7 +632,12 @@ export default function TrainingDetailPage() {
   const now = new Date().toISOString().split('T')[0]
   const isExpired = training?.valid_until && training.valid_until < now
   const notYetValid = training?.valid_from && training.valid_from > now
-  const isOutOfRange = isExpired || notYetValid
+  // La vigencia es para quien tiene que hacer la capacitación, no para quien
+  // la administra. El superadmin entra a la Biblioteca a revisar el material
+  // —por eso está ahí el botón de ver— y le salía «Capacitación vencida» en
+  // su propia consola de cursos, que no es la pantalla que bloquea a nadie.
+  const isOutOfRange = !puedeEditarCurso && (isExpired || notYetValid)
+  const avisoDeVigencia = puedeEditarCurso && (isExpired || notYetValid)
 
   if (isOutOfRange) {
     return (
@@ -798,6 +803,24 @@ export default function TrainingDetailPage() {
           </div>
         )}
       </motion.div>
+
+      {/* Al administrador no se le bloquea, pero sí se le dice: lo que él ve
+          abierto, el trabajador lo ve cerrado. */}
+      {avisoDeVigencia && (
+        <div className="mb-4 p-3 rounded-xl flex items-start gap-2.5"
+          style={{ background: 'rgba(245,158,11,0.08)', border: '1px solid rgba(245,158,11,0.3)' }}>
+          <Clock size={15} style={{ color: '#F59E0B' }} className="mt-0.5 flex-shrink-0" />
+          <p className="text-xs leading-relaxed" style={{ color: 'var(--text-dim)' }}>
+            <strong style={{ color: 'var(--text)' }}>
+              {isExpired
+                ? `Fuera de vigencia desde el ${training.valid_until}.`
+                : `Todavía no entra en vigencia: empieza el ${training.valid_from}.`}
+            </strong>{' '}
+            Usted la está viendo porque administra los cursos; al trabajador no se le deja hacerla.
+            La vigencia se cambia en la Biblioteca, al editar la capacitación.
+          </p>
+        </div>
+      )}
 
       {/* ═══ SLIDES PHASE ═══ */}
       {phase === 'slides' && (
