@@ -23,6 +23,13 @@ export async function POST(req: NextRequest, { params }: Params) {
     return NextResponse.json({ error: 'No autorizado' }, { status: 403 })
 
   const trainingId = parseInt(params.id)
+  // Sin curso no hay dónde guardar. Cuando la dirección traía algo que no era
+  // un número, `parseInt` daba NaN y las imágenes terminaban en una carpeta
+  // «slides/NaN» que no le pertenecía a nadie: ocupaban espacio y no se veían
+  // en ningún curso.
+  if (!Number.isInteger(trainingId)) {
+    return NextResponse.json({ error: 'Curso inválido' }, { status: 400 })
+  }
 
   let body: any
   try {
@@ -152,6 +159,9 @@ export async function DELETE(_req: NextRequest, { params }: Params) {
     return NextResponse.json({ error: 'No autorizado' }, { status: 403 })
 
   const trainingId = parseInt(params.id)
+  if (!Number.isInteger(trainingId)) {
+    return NextResponse.json({ error: 'Curso inválido' }, { status: 400 })
+  }
   const viejas = await imagenesDelCurso(trainingId)
 
   const { error } = await supabaseAdmin

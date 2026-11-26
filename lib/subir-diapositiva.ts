@@ -32,6 +32,13 @@ export async function subirDiapositiva(
   if (!valor) return null
   if (!valor.startsWith('data:')) return valor   // ya es una URL
 
+  // Última barrera: sin un curso válido no se sube nada. Un identificador en
+  // mal estado creaba la carpeta «slides/NaN», con imágenes que ningún curso
+  // reclamaba y que solo se encontraban revisando la bodega a mano.
+  if (!Number.isInteger(Number(trainingId))) {
+    throw new Error('No se puede guardar la diapositiva: el curso no es válido')
+  }
+
   const m = /^data:image\/([a-z0-9+.-]+);base64,/i.exec(valor)
   const contentType = TIPOS[(m?.[1] ?? 'jpeg').toLowerCase()] ?? 'image/jpeg'
   const ext = EXTENSIONES[contentType] ?? 'jpg'

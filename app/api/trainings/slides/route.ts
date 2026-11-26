@@ -16,6 +16,11 @@ export async function POST(req: NextRequest) {
   if (!training_id || slide_index === undefined || !image_data) {
     return NextResponse.json({ error: 'Datos incompletos' }, { status: 400 })
   }
+  // El curso tiene que existir de verdad: una diapositiva sin curso no se ve
+  // en ninguna parte y queda ocupando espacio en la bodega.
+  if (!Number.isInteger(Number(training_id))) {
+    return NextResponse.json({ error: 'Curso inválido' }, { status: 400 })
+  }
 
   // La imagen va al almacenamiento; en la base queda solo su URL.
   let url: string | null
