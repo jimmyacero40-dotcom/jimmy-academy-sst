@@ -73,7 +73,12 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
 
   if (companyId) q = q.eq('company_id', companyId)
   if (from && to) {
-    q = q.gte('issued', from).lte('issued', to)
+    // `issued` lleva hora. Si el tope se compara contra la fecha pelada, el
+    // «hasta» corta a la medianoche y el propio día queda por fuera: pedir un
+    // solo día no devolvía a nadie. El tope va al día siguiente, exclusivo.
+    const siguiente = new Date(to + 'T00:00:00Z')
+    siguiente.setUTCDate(siguiente.getUTCDate() + 1)
+    q = q.gte('issued', from).lt('issued', siguiente.toISOString().slice(0, 10))
   }
 
   const { data: certs, error: cErr } = await q
@@ -99,8 +104,20 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
       cedula:    c.cedula || '',
       cargo,
       signature: signatureData,
+      // El día en que la presentó: es lo que se ve en Trazabilidad y lo que
+      // permite comprobar que la lista corresponde a esa jornada.
+      fecha:     c.issued || null,
     })
   }
 
-  return NextResponse.json({ participants, total: participants.length })
+  // Una persona, un renglón: si repitió el curso no debe salir dos veces en la
+  // misma lista. Y en orden alfabético, como se firma en papel.
+  const unicos = new Map<string, any>()
+  for (const p of participants) {
+    const k = p.cedula || p.name
+    if (!unicos.has(k)) unicos.set(k, p)
+  }
+  const lista = [...unicos.values()].sort((a, b) => a.name.localeCompare(b.name, 'es'))
+
+  return NextResponse.json({ participants: lista, total: lista.length })
 }

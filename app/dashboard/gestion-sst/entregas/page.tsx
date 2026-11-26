@@ -85,6 +85,11 @@ function hoyCol(): string {
   return new Date(Date.now() - 5 * 60 * 60 * 1000).toISOString().slice(0, 10)
 }
 
+/** Hace treinta días, que es la ventana con la que abre la pantalla. */
+function haceUnMes(): string {
+  return new Date(Date.now() - 5 * 60 * 60 * 1000 - 30 * 86400000).toISOString().slice(0, 10)
+}
+
 function hora(iso: string): string {
   return new Date(iso).toLocaleTimeString('es-CO', { hour: '2-digit', minute: '2-digit' })
 }
@@ -106,10 +111,13 @@ export default function EntregasPage() {
       : ''
 
   const [tipos, setTipos] = useState<Tipo[]>([])
-  const [tipoId, setTipoId] = useState('')
+  // Se abre en «todos los entregables»: con 77 referencias en el catálogo,
+  // arrancar en la primera de la lista dejaba la pantalla vacía y parecía que
+  // no se hubiera entregado nada.
+  const [tipoId, setTipoId] = useState('todos')
   const [entregas, setEntregas] = useState<Entrega[]>([])
   const [recientes, setRecientes] = useState<Record<string, string>>({})
-  const [desde, setDesde] = useState(hoyCol())
+  const [desde, setDesde] = useState(haceUnMes())
   const [hasta, setHasta] = useState(hoyCol())
   const [cargando, setCargando] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -156,7 +164,6 @@ export default function EntregasPage() {
       .then(r => (r.ok ? r.json() : []))
       .then((d: Tipo[]) => {
         setTipos(d)
-        setTipoId(prev => prev || d[0]?.id || '')
         if (!d.length) setCargando(false)
       })
       .catch(() => setCargando(false))

@@ -25,27 +25,27 @@ function getImgDims(src: string): Promise<{ w: number; h: number }> {
   })
 }
 
+/**
+ * El AVC-FR05 tal como está en papel: hoja carta, vertical, y el formato
+ * completo —encabezado, temario, los veinte renglones de participantes y la
+ * firma del capacitador— en una sola hoja. Quien lo imprime para la charla
+ * lleva una página, no dos; si asisten más de veinte, ahí sí continúa en la
+ * siguiente con todos los encabezados repetidos.
+ */
 export async function generateAttendancePDF(p: AttendancePDFParams): Promise<Blob> {
   const jsPDF = (await import('jspdf')).default
-  const doc = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'letter' })
+  const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'letter' })
 
-  const W = 279.4, M = 8, usable = W - 2 * M
-  // Los colores del formato impreso de AVC: verde #243C2C en los rótulos y en
-  // las franjas, y #ECE69D en el encabezado de participantes. El naranja que
-  // había antes no es de la marca.
-  const CG: [number,number,number] = [36,60,44]
-  const CO: [number,number,number] = [36,60,44]
-  const CLO: [number,number,number] = [236,230,157]
+  const W = 215.9, H = 279.4, M = 8
+  const usable = W - 2 * M          // 199.9
+  const fondo  = H - M              // el borde inferior de la caja útil
+
+  // Los colores del formato impreso de AVC.
+  const CG: [number,number,number] = [36,60,44]      // verde de los rótulos
+  const CLO: [number,number,number] = [236,230,157]  // crema del encabezado
   const CW: [number,number,number] = [255,255,255]
   const CB: [number,number,number] = [0,0,0]
-  const rawW = [16,18,18,20,20,20,20,30,30,30,41]
-  const tot  = rawW.reduce((a,b) => a+b, 0)
-  const cols = rawW.map(w => (w/tot)*usable)
-  const colX = cols.reduce((a: number[], w, i) => {
-    a.push(i === 0 ? M : a[i-1] + cols[i-1]); return a
-  }, [] as number[])
-  const cX = (c: number) => colX[c]
-  const cW = (f: number, t: number) => { let w = 0; for (let i = f; i <= t; i++) w += cols[i]; return w }
+
   const fl = (x: number, y: number, w: number, h: number, c: [number,number,number]) => {
     doc.setFillColor(c[0], c[1], c[2]); doc.rect(x, y, w, h, 'F')
   }
@@ -67,12 +67,15 @@ export async function generateAttendancePDF(p: AttendancePDFParams): Promise<Blo
     doc.text(ft, tx, ty, { align: al === 'center' ? 'center' : 'left' })
   }
 
-  // Pre-load signature dimensions
+  // ── Las columnas de la tabla de participantes, en milímetros ──
+  const COL = { n: 10, ced: 28, nom: 66, cargo: 45, firma: usable - 10 - 28 - 66 - 45 }
+  const xN = M, xCed = xN + COL.n, xNom = xCed + COL.ced,
+        xCar = xNom + COL.nom, xFir = xCar + COL.cargo
+
+  // Firmas de los participantes: se miden antes para no deformarlas.
   const sigDims: Record<number, { w: number; h: number }> = {}
   for (let r = 0; r < p.participants.length; r++) {
-    if (p.participants[r]?.signature) {
-      sigDims[r] = await getImgDims(p.participants[r].signature!)
-    }
+    if (p.participants[r]?.signature) sigDims[r] = await getImgDims(p.participants[r].signature!)
   }
 
   const justifyLine = (line: string, x: number, y: number, maxW: number, isLast: boolean) => {
@@ -85,131 +88,135 @@ export async function generateAttendancePDF(p: AttendancePDFParams): Promise<Blo
   }
 
   let y = M
-  const r0H = 14, logoW = cW(0, 1)
 
-  // El logo ocupa una sola celda alta, que cubre el título y las dos filas de
-  // versión y código. Antes eran tres celdas sueltas: el logo quedaba chico
-  // arriba y debajo le colgaban dos recuadros vacíos.
-  const bloqueLogoH = r0H + 6 + 6
+  // ── Encabezado: logo, título y la ficha del documento ──
+  const tituloH = 11, fichaH = 5.5
+  const logoW = 42
+  const bloqueLogoH = tituloH + fichaH * 2
   if (p.companyLogo) {
-    bd(cX(0), y, logoW, bloqueLogoH)
+    bd(M, y, logoW, bloqueLogoH)
     try {
       const fmt = /^data:image\/jpe?g/i.test(p.companyLogo) ? 'JPEG' : 'PNG'
-      // Centrado y sin deformar: el logo manda su proporción, no la celda.
-      // Si no se pudo medir, se dibuja llenando la celda: vale más un logo
-      // algo estirado que un recuadro vacío.
       const { w: iw, h: ih } = await getImgDims(p.companyLogo)
-      const maxW = logoW - 6, maxH = bloqueLogoH - 6
+      const maxW = logoW - 5, maxH = bloqueLogoH - 4
       const ok = iw > 0 && ih > 0 && isFinite(iw) && isFinite(ih)
       const escala = ok ? Math.min(maxW / iw, maxH / ih) : 0
       const w = ok ? iw * escala : maxW
       const h = ok ? ih * escala : maxH
-      doc.addImage(p.companyLogo, fmt, cX(0) + (logoW - w) / 2, y + (bloqueLogoH - h) / 2, w, h)
+      doc.addImage(p.companyLogo, fmt, M + (logoW - w) / 2, y + (bloqueLogoH - h) / 2, w, h)
     } catch {}
   } else {
-    cl(cX(0), y, logoW, bloqueLogoH, p.companyName || '', { bold: true, size: 8 })
+    cl(M, y, logoW, bloqueLogoH, p.companyName || '', { bold: true, size: 8 })
   }
-  cl(cX(2), y, cW(2,10), r0H, 'REGISTRO DE ASISTENCIA A CAPACITACIÓN Y/O EVENTOS', { bold: true, size: 12 })
-  y += r0H
 
-  // Version/code labels
-  cl(cX(2), y, cols[2], 6, 'Versión', { bold: true, size: 6.5 })
-  cl(cX(3), y, cW(3,4), 6, 'Código',  { bold: true, size: 6.5 })
-  cl(cX(5), y, cols[5], 6, 'Área',    { bold: true, size: 6.5 })
-  cl(cX(6), y, cW(6,8), 6, 'Fecha de Elaboración', { bold: true, size: 6.5 })
-  cl(cX(9), y, cW(9,10), 6, 'Fecha de Revisión',   { bold: true, size: 6.5 })
+  const xd = M + logoW, wd = usable - logoW
+  cl(xd, y, wd, tituloH, 'REGISTRO DE ASISTENCIA A CAPACITACIÓN Y/O EVENTOS', { bold: true, size: 10.5 })
+  y += tituloH
+
+  // Versión · Código · Área · Fechas, en dos renglones de la misma rejilla.
+  const fw = [wd * 0.13, wd * 0.20, wd * 0.14, wd * 0.265, wd * 0.265]
+  const fx = fw.reduce((a: number[], w, i) => { a.push(i === 0 ? xd : a[i-1] + fw[i-1]); return a }, [])
+  const rot = ['Versión', 'Código', 'Área', 'Fecha de Elaboración', 'Fecha de Revisión']
+  const val = ['1', 'AVC-FR05', 'CEO', '14/10/2025', '22/01/2026']
+  rot.forEach((t, i) => cl(fx[i], y, fw[i], fichaH, t, { bold: true, size: 6 }))
+  y += fichaH
+  val.forEach((t, i) => cl(fx[i], y, fw[i], fichaH, t, { size: 6.5 }))
+  y += fichaH
+
+  // ── Fecha / Horario / Intensidad ──
+  const datoH = 8
+  const rotW = 30, campoW = (usable - rotW * 3) / 3
+  const par = (i: number) => M + i * (rotW + campoW)
+  const filaDatos = (items: [string, string][], alto: number) => {
+    items.forEach(([rotulo, valor], i) => {
+      cl(par(i), y, rotW, alto, rotulo, { bg: CG, color: CW, bold: true, size: 6.5 })
+      cl(par(i) + rotW, y, campoW, alto, valor, { size: 6.5 })
+    })
+    y += alto
+  }
+  filaDatos([['FECHA', p.eventDate], ['HORARIO', p.schedule], ['INTENSIDAD', p.intensity]], datoH)
+
+  // ── Organizado / Realizado / Dirigido ──
+  cl(par(0), y, rotW, datoH, 'ORGANIZADO POR', { bg: CG, color: CW, bold: true, size: 6 })
+  cl(par(0) + rotW, y, campoW, datoH, p.organizedBy, { size: 6 })
+  cl(par(1), y, rotW, datoH, 'REALIZADO POR', { bg: CG, color: CW, bold: true, size: 6 })
+  const rpX = par(1) + rotW
+  fl(rpX, y, campoW, datoH, CW); bd(rpX, y, campoW, datoH)
+  doc.setFontSize(6.5); doc.setFont('helvetica','bold'); doc.setTextColor(0,0,0)
+  doc.text(p.instructor, rpX + campoW/2, y + 3.4, { align: 'center' })
+  doc.setFontSize(5); doc.setFont('helvetica','normal')
+  doc.text('Profesional SST', rpX + campoW/2, y + 6.4, { align: 'center' })
+  cl(par(2), y, rotW, datoH, 'DIRIGIDO A', { bg: CG, color: CW, bold: true, size: 6 })
+  cl(par(2) + rotW, y, campoW, datoH, p.directedTo.toUpperCase(), { size: 6 })
+  y += datoH
+
+  // ── Temario ──
+  cl(M, y, usable, 6, 'TEMARIO DEL EVENTO', { bg: CG, color: CW, bold: true, size: 8 })
   y += 6
-
-  // Version/code values
-  cl(cX(2), y, cols[2], 6, '1',          { size: 7 })
-  cl(cX(3), y, cW(3,4), 6, 'AVC-FR05',  { size: 7 })
-  cl(cX(5), y, cols[5], 6, 'CEO',        { size: 7 })
-  cl(cX(6), y, cW(6,8), 6, '14/10/2025',{ size: 7 })
-  cl(cX(9), y, cW(9,10), 6, '22/01/2026',{ size: 7 })
+  cl(M, y, usable, 6, p.trainingTitle, { bold: true, size: 7.5, align: 'left' })
   y += 6
-
-  // Fecha / Horario / Intensidad
-  cl(cX(0), y, cW(0,1), 9, 'FECHA',      { bg: CG, color: CW, bold: true, size: 8 })
-  cl(cX(2), y, cW(2,3), 9, p.eventDate,  { size: 8 })
-  cl(cX(4), y, cW(4,5), 9, 'HORARIO',    { bg: CG, color: CW, bold: true, size: 8 })
-  cl(cX(6), y, cW(6,7), 9, p.schedule,   { size: 7 })
-  cl(cX(8), y, cW(8,9), 9, 'INTENSIDAD', { bg: CG, color: CW, bold: true, size: 8 })
-  cl(cX(10), y, cols[10], 9, p.intensity, { size: 7 })
-  y += 9
-
-  // Organizado / Realizado / Dirigido
-  cl(cX(0), y, cW(0,1), 9, 'ORGANIZADO POR', { bg: CG, color: CW, bold: true, size: 7 })
-  cl(cX(2), y, cW(2,3), 9, p.organizedBy,    { size: 6 })
-  cl(cX(4), y, cW(4,5), 9, 'REALIZADO POR',  { bg: CG, color: CW, bold: true, size: 7 })
-  const rpX = cX(6), rpW = cW(6,7)
-  fl(rpX, y, rpW, 9, CW); bd(rpX, y, rpW, 9)
-  doc.setFontSize(7); doc.setFont('helvetica','bold'); doc.setTextColor(0,0,0)
-  doc.text(p.instructor, rpX + rpW/2, y+3.5, { align: 'center' })
-  doc.setFontSize(5.5); doc.setFont('helvetica','normal')
-  doc.text('Profesional SST', rpX + rpW/2, y+7, { align: 'center' })
-  cl(cX(8), y, cW(8,9), 9, 'DIRIGIDO A', { bg: CG, color: CW, bold: true, size: 7 })
-  cl(cX(10), y, cols[10], 9, p.directedTo.toUpperCase(), { size: 7 })
-  y += 9
-
-  // Temario
-  cl(cX(0), y, usable, 7, 'TEMARIO DEL EVENTO', { bg: CO, color: CW, bold: true, size: 9 })
-  y += 7
-  cl(cX(0), y, usable, 6, p.trainingTitle, { bold: true, size: 8, align: 'left' })
-  y += 6
-  const dl: string[] = p.trainingTemario ? doc.splitTextToSize(p.trainingTemario, usable-4) : []
-  for (let i = 0; i < 8; i++) {
-    if (!dl[i] && i > 0 && !dl[i-1]) break
-    fl(cX(0), y, usable, 6, CW); bd(cX(0), y, usable, 6)
+  doc.setFontSize(6.5); doc.setFont('helvetica','normal')
+  const dl: string[] = p.trainingTemario ? doc.splitTextToSize(p.trainingTemario, usable - 4) : []
+  // Siempre cinco renglones: si el temario es corto quedan en blanco para
+  // escribir a mano, y si es largo se recorta antes de empujar la hoja.
+  const RENGLONES_TEMARIO = 5, temH = 4.8
+  for (let i = 0; i < RENGLONES_TEMARIO; i++) {
+    fl(M, y, usable, temH, CW); bd(M, y, usable, temH)
     if (dl[i]) {
-      doc.setFontSize(7); doc.setFont('helvetica','normal'); doc.setTextColor(0,0,0)
-      justifyLine(dl[i], cX(0), y+4.5, usable, i === dl.length-1)
+      doc.setFontSize(6.5); doc.setFont('helvetica','normal'); doc.setTextColor(0,0,0)
+      justifyLine(dl[i], M, y + 3.4, usable, i === dl.length - 1 || i === RENGLONES_TEMARIO - 1)
     }
-    y += 6
+    y += temH
   }
 
-  // Participants
-  cl(cX(0), y, usable, 7, 'REGISTRO DE PARTICIPANTES', { bg: CO, color: CW, bold: true, size: 9 })
-  y += 7
-  const thH = 8
-  const drawTH = () => {
-    cl(cX(0),  y, cols[0],  thH, 'Nº',                 { bg: CLO, bold: true, size: 8 })
-    cl(cX(1),  y, cW(1,2),  thH, 'CÉDULA',             { bg: CLO, bold: true, size: 8 })
-    cl(cX(3),  y, cW(3,6),  thH, 'NOMBRES Y APELLIDOS',{ bg: CLO, bold: true, size: 8 })
-    cl(cX(7),  y, cW(7,9),  thH, 'CARGO',              { bg: CLO, bold: true, size: 8 })
-    cl(cX(10), y, cols[10], thH, 'FIRMA',              { bg: CLO, bold: true, size: 8 })
+  // ── Participantes ──
+  const thH = 6.5
+  const encabezadoParticipantes = () => {
+    cl(M, y, usable, 6, 'REGISTRO DE PARTICIPANTES', { bg: CG, color: CW, bold: true, size: 8 })
+    y += 6
+    cl(xN,   y, COL.n,     thH, 'Nº',                  { bg: CLO, bold: true, size: 7 })
+    cl(xCed, y, COL.ced,   thH, 'CÉDULA',              { bg: CLO, bold: true, size: 7 })
+    cl(xNom, y, COL.nom,   thH, 'NOMBRES Y APELLIDOS', { bg: CLO, bold: true, size: 7 })
+    cl(xCar, y, COL.cargo, thH, 'CARGO',               { bg: CLO, bold: true, size: 7 })
+    cl(xFir, y, COL.firma, thH, 'FIRMA',               { bg: CLO, bold: true, size: 7 })
     y += thH
   }
-  drawTH()
+  encabezadoParticipantes()
 
-  const rowH = 10, totalR = Math.max(p.participants.length, 20)
+  // El alto de renglón sale de lo que queda de hoja: veinte participantes y la
+  // firma del capacitador tienen que caber abajo, sin segunda página.
+  const FIRMA_H = 30, MINIMO = 20
+  const rowH = Math.max(6, Math.min(9, (fondo - y - FIRMA_H) / MINIMO))
+  const totalR = Math.max(p.participants.length, MINIMO)
+
   for (let r = 0; r < totalR; r++) {
-    if (y + rowH > 215.9 - M) { doc.addPage(); y = M; drawTH() }
+    // Solo se pasa de hoja si de verdad hay más gente que renglones: con
+    // veinte o menos, el formato entero vive en una sola página.
+    if (y + rowH > fondo - (r >= totalR - 1 ? FIRMA_H : 0)) {
+      doc.addPage(); y = M; encabezadoParticipantes()
+    }
     const part = p.participants[r]
-    cl(cX(0), y, cols[0],  rowH, String(r+1),       { bg: CW, bold: true, size: 8 })
-    cl(cX(1), y, cW(1,2),  rowH, part?.cedula || '', { bg: CW, size: 8 })
-    cl(cX(3), y, cW(3,6),  rowH, part?.name   || '', { bg: CW, size: 8, align: 'left' })
-    cl(cX(7), y, cW(7,9),  rowH, part?.cargo  || '', { bg: CW, size: 7, align: 'left' })
-    fl(cX(10), y, cols[10], rowH, CW); bd(cX(10), y, cols[10], rowH)
+    cl(xN,   y, COL.n,     rowH, String(r+1),        { bg: CW, bold: true, size: 7 })
+    cl(xCed, y, COL.ced,   rowH, part?.cedula || '', { bg: CW, size: 7 })
+    cl(xNom, y, COL.nom,   rowH, part?.name   || '', { bg: CW, size: 7, align: 'left' })
+    cl(xCar, y, COL.cargo, rowH, part?.cargo  || '', { bg: CW, size: 6, align: 'left' })
+    fl(xFir, y, COL.firma, rowH, CW); bd(xFir, y, COL.firma, rowH)
     if (part?.signature && sigDims[r]) {
       try {
         const { w: iw, h: ih } = sigDims[r]
         const aspect = iw / (ih || 1)
-        const maxH = rowH - 2, maxW = cols[10] - 4
+        const maxH = rowH - 1.5, maxW = COL.firma - 4
         const drawH = Math.min(maxH, maxW / aspect)
         const drawW = drawH * aspect
         doc.addImage(part.signature, 'PNG',
-          cX(10) + (cols[10] - drawW) / 2,
-          y      + (rowH    - drawH) / 2,
-          drawW, drawH)
+          xFir + (COL.firma - drawW) / 2, y + (rowH - drawH) / 2, drawW, drawH)
       } catch {}
     }
     y += rowH
   }
 
-  // El espacio de firma del capacitador. El formato en papel lo tiene y aquí
-  // faltaba: una lista sin firmar no acredita que la capacitación se dictó.
-  const bloqueFirmaH = 30
-  if (y + bloqueFirmaH > 215.9 - M) { doc.addPage(); y = M }
+  // ── La firma de quien dictó: sin ella la lista no acredita nada ──
+  if (y + FIRMA_H > fondo) { doc.addPage(); y = M }
   y += 8
 
   const lineaW = 70
@@ -220,14 +227,13 @@ export async function generateAttendancePDF(p: AttendancePDFParams): Promise<Blo
       const { w: iw, h: ih } = await getImgDims(p.capacitadorFirma)
       const fmt = /^data:image\/jpe?g/i.test(p.capacitadorFirma) ? 'JPEG' : 'PNG'
       const aspect = (iw || 4) / (ih || 1)
-      const maxH = 14, maxW = lineaW
-      const h = Math.min(maxH, maxW / aspect)
+      const h = Math.min(13, lineaW / aspect)
       const w = h * aspect
       doc.addImage(p.capacitadorFirma, fmt, M + (usable - w) / 2, y - 2, w, h)
       y += h - 2
     } catch { y += 10 }
   } else {
-    y += 12
+    y += 11
   }
 
   doc.setDrawColor(0, 0, 0); doc.setLineWidth(0.4)
@@ -236,7 +242,6 @@ export async function generateAttendancePDF(p: AttendancePDFParams): Promise<Blo
   doc.setFontSize(9); doc.setFont('helvetica', 'bold'); doc.setTextColor(0, 0, 0)
   doc.text('CAPACITADOR', M + usable / 2, y, { align: 'center' })
 
-  // El nombre va debajo del rótulo: una firma suelta no dice quién firmó.
   if (p.capacitadorNombre) {
     y += 4
     doc.setFontSize(7.5); doc.setFont('helvetica', 'normal')

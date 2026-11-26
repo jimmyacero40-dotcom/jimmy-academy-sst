@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useCallback, useEffect, useMemo } from 'react'
+import { useState, useCallback, useEffect, useMemo, useRef } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
   X, ChevronRight, ChevronLeft, Check,
@@ -11,7 +11,20 @@ import SelectorFirma, { type FirmaCapacitador } from '@/components/asistencia/Se
 
 interface Participant {
   name: string; cedula: string; cargo: string; signature?: string
+  /** Cuándo presentó la capacitación, cuando se busca por fecha. */
+  fecha?: string | null
   checked: boolean; manual?: boolean
+}
+
+/** Hoy en Colombia, 'YYYY-MM-DD'. */
+function hoyCol(): string {
+  return new Date(Date.now() - 5 * 60 * 60 * 1000).toISOString().slice(0, 10)
+}
+
+function diaCorto(iso?: string | null): string {
+  if (!iso) return ''
+  const d = new Date(iso.length <= 10 ? iso + 'T12:00:00' : iso)
+  return isNaN(d.getTime()) ? '' : d.toLocaleDateString('es-CO', { day: '2-digit', month: 'short', year: 'numeric' })
 }
 
 interface Props {
@@ -102,6 +115,7 @@ export default function AttendanceWizard({ training, companyName, companyLogo, o
   const [fetching,     setFetching]     = useState(false)
   const [fetchError,   setFetchError]   = useState('')
   const [fetched,      setFetched]      = useState(false)
+  const peticion = useRef(0)
 
   // Manual add
   const [manualName,   setManualName]   = useState('')
@@ -135,6 +149,10 @@ export default function AttendanceWizard({ training, companyName, companyLogo, o
     if (mode === 'range' && (!fromDate || !toDate)) {
       setFetchError('Selecciona ambas fechas'); return
     }
+    // Cada búsqueda lleva número. Si se cambia de modo mientras una va en
+    // camino, la que llega tarde ya no manda: antes la respuesta de «todos»
+    // caía encima de la búsqueda por fecha y mostraba gente de otros días.
+    const mia = ++peticion.current
     setFetching(true); setFetchError(''); setFetched(false)
     try {
       let url = `/api/trainings/${training.id}/completions`
@@ -143,6 +161,7 @@ export default function AttendanceWizard({ training, companyName, companyLogo, o
 
       const res  = await fetch(url)
       const data = await res.json()
+      if (mia !== peticion.current) return
       if (!res.ok) throw new Error(data?.error || 'Error al buscar participantes')
 
       const fetched = (data.participants || []).map((p: any) => ({ ...p, checked: true }))
@@ -150,9 +169,9 @@ export default function AttendanceWizard({ training, companyName, companyLogo, o
       setParticipants(prev => [...fetched, ...prev.filter(p => p.manual)])
       setFetched(true)
     } catch (e: any) {
-      setFetchError(e.message)
+      if (mia === peticion.current) setFetchError(e.message)
     }
-    setFetching(false)
+    if (mia === peticion.current) setFetching(false)
   }, [fromDate, toDate, training.id, searchMode])
 
   const addManual = () => {
@@ -166,6 +185,8 @@ export default function AttendanceWizard({ training, companyName, companyLogo, o
 
   // When search mode changes, clear previous results (keep manual entries)
   const switchMode = (mode: SearchMode) => {
+    peticion.current++   // lo que venía en camino del modo anterior ya no vale
+    setFetching(false)
     setSearchMode(mode)
     setFetchError('')
     setFetched(false)
@@ -229,7 +250,7 @@ export default function AttendanceWizard({ training, companyName, companyLogo, o
     // Para una capacitación presencial recién programada: la lista se arma
     // antes de que nadie la complete.
     { mode: 'asignados', icon: <UserCheck size={14} />, label: 'Asignados', desc: 'Quienes la tienen asignada, la hayan hecho o no' },
-    { mode: 'range',  icon: <Calendar size={14} />, label: 'Por fechas',   desc: 'Certificados emitidos en un rango de fechas' },
+    { mode: 'range',  icon: <Calendar size={14} />, label: 'Por fecha',    desc: 'Quienes la hicieron ese día o en ese rango' },
     { mode: 'manual', icon: <Edit3 size={14} />,    label: 'Solo manual',  desc: 'Ingresa participantes manualmente' },
   ]
 
@@ -381,6 +402,25 @@ export default function AttendanceWizard({ training, companyName, companyLogo, o
                 {/* Mode: range — date pickers + search button */}
                 {searchMode === 'range' && (
                   <>
+                    {/* Un día suelto es el caso corriente: se dictó hoy y se
+                        quiere la lista de quienes la hicieron hoy. Por eso los
+                        atajos llenan las dos fechas con el mismo día. */}
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span className="text-xs" style={{ color: 'var(--text-faint)' }}>Un solo día:</span>
+                      {[
+                        { etiqueta: 'Hoy', dia: hoyCol() },
+                        { etiqueta: 'Ayer', dia: new Date(Date.now() - 5 * 36e5 - 864e5).toISOString().slice(0, 10) },
+                        { etiqueta: 'El día del evento', dia: eventDate },
+                      ].filter(o => o.dia).map(o => (
+                        <button key={o.etiqueta} onClick={() => { setFromDate(o.dia); setToDate(o.dia) }}
+                          className="px-2.5 py-1 rounded-lg text-[11px] font-semibold"
+                          style={fromDate === o.dia && toDate === o.dia
+                            ? { background: 'rgba(59,130,246,0.15)', border: '1px solid var(--primary)', color: 'var(--primary)' }
+                            : { background: 'rgba(255,255,255,0.03)', border: '1px solid var(--border-subtle)', color: 'var(--text-dim)' }}>
+                          {o.etiqueta}
+                        </button>
+                      ))}
+                    </div>
                     <div className="grid grid-cols-2 gap-3">
                       <div>
                         <label className="block text-xs font-medium mb-1.5" style={{ color: 'var(--text-dim)' }}>Fecha desde</label>
@@ -397,6 +437,9 @@ export default function AttendanceWizard({ training, companyName, companyLogo, o
                       {fetching ? <Loader2 size={14} className="animate-spin" /> : <Search size={14} />}
                       {fetching ? 'Buscando...' : 'Buscar participantes'}
                     </button>
+                    <p className="text-[11px]" style={{ color: 'var(--text-faint)' }}>
+                      Para un solo día, deja la misma fecha en las dos casillas.
+                    </p>
                   </>
                 )}
 
@@ -435,6 +478,7 @@ export default function AttendanceWizard({ training, companyName, companyLogo, o
                             <span className="text-sm font-medium block truncate" style={{ color: 'var(--text)' }}>{p.name}</span>
                             <span className="text-xs" style={{ color: 'var(--text-dim)' }}>
                               {[p.cedula, p.cargo].filter(Boolean).join(' · ')}
+                              {p.fecha && <span className="ml-1" style={{ color: '#34D399' }}>· la hizo el {diaCorto(p.fecha)}</span>}
                               {p.manual && <span className="ml-1 text-amber-400">(manual)</span>}
                             </span>
                           </div>

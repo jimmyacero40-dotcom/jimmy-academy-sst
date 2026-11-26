@@ -37,7 +37,10 @@ export default function AttendanceListsPage() {
   const [search, setSearch]       = useState('')
   const [deleting, setDeleting]   = useState<number | null>(null)
   const [downloading, setDownloading] = useState<number | null>(null)
-  const [expanded, setExpanded]   = useState<number | null>(null)
+  // Los grupos abren desplegados. Cerrados, la pantalla decía «9 listas
+  // generadas» y debajo solo se veían títulos: había que adivinar que se
+  // hacía clic para que aparecieran las listas y el botón de PDF.
+  const [cerrados, setCerrados] = useState<Set<string>>(new Set())
   // La lista que se está por descargar, mientras se escoge con qué firma.
   const [porDescargar, setPorDescargar] = useState<AttendanceList | null>(null)
   const [firma, setFirma] = useState<FirmaCapacitador | null>(null)
@@ -210,7 +213,7 @@ export default function AttendanceListsPage() {
               {/* Training group header */}
               <button className="w-full flex items-center justify-between px-5 py-4 text-left transition-colors hover:bg-white/[0.02]"
                 style={{ background: 'var(--bg-card)' }}
-                onClick={() => setExpanded(expanded === gi ? null : gi)}>
+                onClick={() => setCerrados(prev => { const n = new Set(prev); n.has(title) ? n.delete(title) : n.add(title); return n })}>
                 <div className="flex items-center gap-3">
                   <div className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0"
                     style={{ background: 'rgba(16,185,129,0.1)', border: '1px solid rgba(16,185,129,0.2)' }}>
@@ -223,13 +226,13 @@ export default function AttendanceListsPage() {
                     </p>
                   </div>
                 </div>
-                {expanded === gi
+                {!cerrados.has(title)
                   ? <ChevronUp size={15} style={{ color: 'var(--text-faint)' }} />
                   : <ChevronDown size={15} style={{ color: 'var(--text-faint)' }} />}
               </button>
 
               {/* Session rows */}
-              {expanded === gi && (
+              {!cerrados.has(title) && (
                 <div style={{ borderTop: '1px solid var(--border-subtle)' }}>
                   {sessions.map((list, si) => (
                     <div key={list.id}

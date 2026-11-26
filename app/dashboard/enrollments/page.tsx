@@ -4,9 +4,10 @@ import { useState, useEffect, useMemo } from 'react'
 import { motion } from 'framer-motion'
 import {
   BarChart2, Loader2, CheckCircle, Clock, AlertTriangle,
-  BookOpen, Search, X, Users, Award, TrendingUp, Mail
+  BookOpen, Search, X, Users, Award, TrendingUp, Mail, ClipboardList, ChevronRight
 } from 'lucide-react'
 import RecordatorioDialog from '@/components/RecordatorioDialog'
+import AttendanceWizard from '@/components/AttendanceWizard'
 
 interface Enrollment {
   id: string
@@ -31,11 +32,31 @@ export default function EnrollmentsPage() {
   const [search, setSearch]           = useState('')
   const [filterStatus, setFilterStatus] = useState<string>('all')
   const [avisando, setAvisando] = useState(false)
+  // Sacar la lista de asistencia desde aquí: en esta pantalla es donde se ve
+  // quién hizo qué y qué día, que es justo lo que pide el formato.
+  const [eligiendoCurso, setEligiendoCurso] = useState(false)
+  const [cursoAsistencia, setCursoAsistencia] =
+    useState<{ id: number; title: string; temario?: string; description?: string } | null>(null)
+  const [empresa, setEmpresa] = useState({ nombre: '', logo: '' })
+  const [temarios, setTemarios] = useState<Record<number, { temario?: string; description?: string }>>({})
 
   useEffect(() => {
     fetch('/api/enrollments')
       .then(r => r.ok ? r.json() : [])
       .then(data => { setEnrollments(data); setLoading(false) })
+    fetch('/api/companies')
+      .then(r => r.ok ? r.json() : [])
+      .then((d: any[]) => setEmpresa({ nombre: d?.[0]?.name ?? '', logo: d?.[0]?.logo_url ?? '' }))
+      .catch(() => {})
+    // El temario va impreso en el formato; se trae una vez y se usa al elegir.
+    fetch('/api/trainings')
+      .then(r => r.ok ? r.json() : [])
+      .then((d: any[]) => {
+        const m: Record<number, { temario?: string; description?: string }> = {}
+        for (const t of d ?? []) m[t.id] = { temario: t.temario, description: t.description }
+        setTemarios(m)
+      })
+      .catch(() => {})
   }, [])
 
   const filtered = enrollments.filter(e => {
@@ -66,6 +87,19 @@ export default function EnrollmentsPage() {
       por.set(e.users.id, y)
     }
     return [...por.values()]
+  }, [filtered])
+
+  /** Los temas que se ven ahora mismo, con cuántos los completaron. */
+  const cursos = useMemo(() => {
+    const m = new Map<number, { id: number; title: string; total: number; hechos: number }>()
+    for (const e of filtered) {
+      if (!e.trainings?.id) continue
+      const c = m.get(e.trainings.id) ?? { id: e.trainings.id, title: e.trainings.title, total: 0, hechos: 0 }
+      c.total++
+      if (e.status === 'completed') c.hechos++
+      m.set(e.trainings.id, c)
+    }
+    return [...m.values()].sort((a, b) => a.title.localeCompare(b.title, 'es'))
   }, [filtered])
 
   return (
@@ -138,6 +172,57 @@ export default function EnrollmentsPage() {
         />
       )}
 
+      {/* Escoger el tema del que se saca la lista. Los temas son los que se
+          están viendo: si se filtró por «Completado», salen esos. */}
+      {eligiendoCurso && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ background: 'rgba(0,0,0,0.6)' }}>
+          <div className="w-full max-w-md rounded-2xl shadow-2xl p-5 space-y-3 max-h-[85vh] overflow-y-auto"
+            style={{ background: 'var(--bg-card)', border: '1px solid var(--border)' }}>
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <h3 className="text-base font-bold" style={{ color: 'var(--text)' }}>Lista de asistencia</h3>
+                <p className="text-xs mt-0.5" style={{ color: 'var(--text-dim)' }}>
+                  Escoge el tema. Después podrás filtrar por el día en que la hicieron.
+                </p>
+              </div>
+              <button onClick={() => setEligiendoCurso(false)} className="p-1.5 rounded-lg" style={{ color: 'var(--text-faint)' }}>
+                <X size={15} />
+              </button>
+            </div>
+            <div className="space-y-1.5">
+              {cursos.map(c => (
+                <button key={c.id}
+                  onClick={() => {
+                    setCursoAsistencia({ id: c.id, title: c.title, ...(temarios[c.id] ?? {}) })
+                    setEligiendoCurso(false)
+                  }}
+                  className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-left"
+                  style={{ background: 'var(--bg)', border: '1px solid var(--border-subtle)' }}>
+                  <BookOpen size={14} style={{ color: 'var(--primary)' }} className="flex-shrink-0" />
+                  <div className="min-w-0 flex-1">
+                    <p className="text-xs font-semibold truncate" style={{ color: 'var(--text)' }}>{c.title}</p>
+                    <p className="text-[11px]" style={{ color: 'var(--text-faint)' }}>
+                      {c.hechos} de {c.total} la han completado
+                    </p>
+                  </div>
+                  <ChevronRight size={14} style={{ color: 'var(--text-faint)' }} />
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {cursoAsistencia && (
+        <AttendanceWizard
+          training={cursoAsistencia}
+          companyName={empresa.nombre}
+          companyLogo={empresa.logo}
+          onClose={() => setCursoAsistencia(null)}
+          onSaved={() => {}}
+        />
+      )}
+
       {/* Filters */}
       <div className="flex items-center gap-3 mb-5 flex-wrap">
         <div className="relative flex-1" style={{ minWidth: 200 }}>
@@ -154,6 +239,13 @@ export default function EnrollmentsPage() {
               style={{ color: 'var(--text-faint)' }}><X size={13} /></button>
           )}
         </div>
+        {cursos.length > 0 && (
+          <button onClick={() => setEligiendoCurso(true)}
+            className="flex items-center gap-1.5 rounded-lg font-bold"
+            style={{ padding: '8px 14px', fontSize: 12, border: '1px solid rgba(16,185,129,0.4)', color: '#10B981', background: 'rgba(16,185,129,0.07)' }}>
+            <ClipboardList size={13} /> Lista de asistencia
+          </button>
+        )}
         {atrasados.length > 0 && (
           <button onClick={() => setAvisando(true)}
             className="flex items-center gap-1.5 rounded-lg font-bold"
