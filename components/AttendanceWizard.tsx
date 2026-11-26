@@ -621,7 +621,7 @@ export default function AttendanceWizard({ training, companyName, companyLogo, o
                   </div>
                   <div>
                     <p className="text-xs font-semibold" style={{ color: 'var(--text)' }}>
-                      Anular las casillas que sobran
+                      Cerrar las casillas que sobran
                     </p>
                     <p className="text-[11px]" style={{ color: 'var(--text-dim)' }}>
                       Raya los renglones sin firmar para que el registro quede cerrado.

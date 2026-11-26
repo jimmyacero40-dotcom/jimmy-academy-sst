@@ -15,7 +15,7 @@ export interface AttendancePDFParams {
   capacitadorNombre?: string
   capacitadorCargo?: string
   /**
-   * Anular con una línea los renglones que quedaron sin firmar.
+   * Cerrar con una línea los renglones que quedaron sin firmar.
    *
    * Es lo que se hace en papel cuando el registro se cierra: se raya lo que
    * sobra para que nadie agregue un nombre después. Por defecto va sellado;
@@ -268,8 +268,8 @@ export async function generateAttendancePDF(p: AttendancePDFParams): Promise<Blo
     if (hoja > 0) { doc.addPage(); abrirHoja() }
 
     // La hoja se dibuja entera, con sus renglones numerados hasta abajo, como
-    // el formato en blanco. Lo que sobre se anula más abajo, salvo que se pida
-    // dejarlo libre para firmar a mano en la jornada.
+    // el formato en blanco. Lo que sobre se cierra más abajo, salvo que se
+    // pida dejarlo libre para firmar a mano en la jornada.
     const desde = hoja * porHoja
     const hasta = desde + porHoja
     const yPrimeraFila = y
@@ -295,9 +295,9 @@ export async function generateAttendancePDF(p: AttendancePDFParams): Promise<Blo
       y += rowH
     }
 
-    // Sellar lo que sobró: una diagonal sobre los renglones sin firmar, como
-    // se raya en papel para cerrar el registro y que nadie agregue un nombre
-    // después. Se marcan solo las casillas, no la numeración.
+    // Sellar lo que sobró: las aspas sobre los renglones sin firmar, como se
+    // raya en papel para que nadie agregue un nombre después. Se marcan solo
+    // las casillas, no la numeración.
     const vacíasDesde = Math.max(desde, p.participants.length)
     if (sellar && vacíasDesde < hasta) {
       const yArriba = yPrimeraFila + (vacíasDesde - desde) * rowH
@@ -306,14 +306,9 @@ export async function generateAttendancePDF(p: AttendancePDFParams): Promise<Blo
       doc.setDrawColor(70, 70, 70); doc.setLineWidth(0.5)
       doc.line(x1, yArriba, x2, yAbajo)
       doc.line(x1, yAbajo, x2, yArriba)
-      doc.setFontSize(7); doc.setFont('helvetica', 'bold')
-      const rot = 'ESPACIO ANULADO'
-      const anchoRot = doc.getTextWidth(rot)
-      const cx = (x1 + x2) / 2, cy = (yArriba + yAbajo) / 2
-      // Un respiro blanco detrás del rótulo, que si no se lee sobre las aspas.
-      fl(cx - anchoRot / 2 - 2, cy - 2.4, anchoRot + 4, 4.8, CW)
-      doc.setTextColor(70, 70, 70)
-      doc.text(rot, cx, cy + 1.3, { align: 'center' })
+      // Solo las líneas, sin rótulo: en Colombia «anulado» se entiende como
+      // que el registro entero no vale, y lo que se cierra es el espacio que
+      // sobró, no la lista.
     }
 
     cerrarHoja(hoja + 1, hojas)
