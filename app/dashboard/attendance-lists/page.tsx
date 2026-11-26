@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import { motion } from 'framer-motion'
-import { ClipboardList, Search, Download, Trash2, Loader2, Users, Calendar, User, ChevronDown, ChevronUp, Eye } from 'lucide-react'
+import { ClipboardList, Search, Download, Trash2, Loader2, Users, Calendar, User, ChevronDown, ChevronUp, Eye, Check } from 'lucide-react'
 import { generateAttendancePDF } from '@/lib/generate-attendance-pdf'
 import SelectorFirma, { type FirmaCapacitador } from '@/components/asistencia/SelectorFirma'
 
@@ -44,6 +44,8 @@ export default function AttendanceListsPage() {
   // La lista que se está por descargar, mientras se escoge con qué firma.
   const [porDescargar, setPorDescargar] = useState<AttendanceList | null>(null)
   const [firma, setFirma] = useState<FirmaCapacitador | null>(null)
+  // Cerrar el registro rayando las casillas que quedaron sin firmar.
+  const [sellar, setSellar] = useState(true)
 
   // Group by training title
   const grouped = lists
@@ -97,6 +99,7 @@ export default function AttendanceListsPage() {
         capacitadorFirma:  firma?.imagen,
         capacitadorNombre: firma?.nombre,
         capacitadorCargo:  firma?.cargo || undefined,
+        sellarVacias: sellar,
       })
 
       const url  = URL.createObjectURL(blob)
@@ -127,6 +130,26 @@ export default function AttendanceListsPage() {
             </div>
 
             <SelectorFirma elegida={firma} onElegir={setFirma} />
+
+            {/* Cerrar el registro, como se raya un formato en papel. */}
+            <button onClick={() => setSellar(v => !v)}
+              className="w-full flex items-start gap-2.5 px-3 py-2.5 rounded-xl text-left"
+              style={{ background: 'var(--bg)', border: '1px solid var(--border-subtle)' }}>
+              <div className="w-4 h-4 rounded flex items-center justify-center shrink-0 mt-0.5"
+                style={sellar
+                  ? { background: '#10B981', border: '1px solid #10B981' }
+                  : { background: 'transparent', border: '1px solid var(--border)' }}>
+                {sellar && <Check size={10} color="#fff" />}
+              </div>
+              <div>
+                <p className="text-xs font-semibold" style={{ color: 'var(--text)' }}>
+                  Anular las casillas que sobran
+                </p>
+                <p className="text-[11px]" style={{ color: 'var(--text-dim)' }}>
+                  Raya los renglones sin firmar para que el registro quede cerrado.
+                </p>
+              </div>
+            </button>
 
             <div className="flex gap-2 pt-1">
               <button onClick={() => setPorDescargar(null)}

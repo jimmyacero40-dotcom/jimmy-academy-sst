@@ -14,6 +14,14 @@ export interface AttendancePDFParams {
   capacitadorFirma?: string
   capacitadorNombre?: string
   capacitadorCargo?: string
+  /**
+   * Anular con una línea los renglones que quedaron sin firmar.
+   *
+   * Es lo que se hace en papel cuando el registro se cierra: se raya lo que
+   * sobra para que nadie agregue un nombre después. Por defecto va sellado;
+   * se apaga cuando la lista se imprime en blanco para firmar en la jornada.
+   */
+  sellarVacias?: boolean
 }
 
 function getImgDims(src: string): Promise<{ w: number; h: number }> {
@@ -252,17 +260,19 @@ export async function generateAttendancePDF(p: AttendancePDFParams): Promise<Blo
   const rowH = Math.max(6, Math.min(9, disponible / MINIMO))
   const porHoja = Math.max(MINIMO, Math.floor(disponible / rowH))
 
+  const sellar = p.sellarVacias !== false
   const totalR = Math.max(p.participants.length, MINIMO)
   const hojas = Math.ceil(totalR / porHoja)
 
   for (let hoja = 0; hoja < hojas; hoja++) {
     if (hoja > 0) { doc.addPage(); abrirHoja() }
 
-    // La hoja se dibuja entera, con sus renglones numerados hasta abajo. El
-    // formato en blanco los trae todos: los que sobran quedan para quien
-    // llegue tarde y firme a mano.
+    // La hoja se dibuja entera, con sus renglones numerados hasta abajo, como
+    // el formato en blanco. Lo que sobre se anula más abajo, salvo que se pida
+    // dejarlo libre para firmar a mano en la jornada.
     const desde = hoja * porHoja
     const hasta = desde + porHoja
+    const yPrimeraFila = y
 
     for (let r = desde; r < hasta; r++) {
       const part = p.participants[r]
@@ -283,6 +293,27 @@ export async function generateAttendancePDF(p: AttendancePDFParams): Promise<Blo
         } catch {}
       }
       y += rowH
+    }
+
+    // Sellar lo que sobró: una diagonal sobre los renglones sin firmar, como
+    // se raya en papel para cerrar el registro y que nadie agregue un nombre
+    // después. Se marcan solo las casillas, no la numeración.
+    const vacíasDesde = Math.max(desde, p.participants.length)
+    if (sellar && vacíasDesde < hasta) {
+      const yArriba = yPrimeraFila + (vacíasDesde - desde) * rowH
+      const yAbajo  = yPrimeraFila + (hasta - desde) * rowH
+      const x1 = xCed, x2 = M + usable
+      doc.setDrawColor(70, 70, 70); doc.setLineWidth(0.5)
+      doc.line(x1, yArriba, x2, yAbajo)
+      doc.line(x1, yAbajo, x2, yArriba)
+      doc.setFontSize(7); doc.setFont('helvetica', 'bold')
+      const rot = 'ESPACIO ANULADO'
+      const anchoRot = doc.getTextWidth(rot)
+      const cx = (x1 + x2) / 2, cy = (yArriba + yAbajo) / 2
+      // Un respiro blanco detrás del rótulo, que si no se lee sobre las aspas.
+      fl(cx - anchoRot / 2 - 2, cy - 2.4, anchoRot + 4, 4.8, CW)
+      doc.setTextColor(70, 70, 70)
+      doc.text(rot, cx, cy + 1.3, { align: 'center' })
     }
 
     cerrarHoja(hoja + 1, hojas)

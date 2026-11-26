@@ -36,9 +36,9 @@ export default function EnrollmentsPage() {
   // quién hizo qué y qué día, que es justo lo que pide el formato.
   const [eligiendoCurso, setEligiendoCurso] = useState(false)
   const [cursoAsistencia, setCursoAsistencia] =
-    useState<{ id: number; title: string; temario?: string; description?: string } | null>(null)
+    useState<{ id: number; title: string; temario?: string; description?: string; duration?: string | null } | null>(null)
   const [empresa, setEmpresa] = useState({ nombre: '', logo: '' })
-  const [temarios, setTemarios] = useState<Record<number, { temario?: string; description?: string }>>({})
+  const [temarios, setTemarios] = useState<Record<number, { temario?: string; description?: string; duration?: string | null }>>({})
 
   useEffect(() => {
     fetch('/api/enrollments')
@@ -52,8 +52,8 @@ export default function EnrollmentsPage() {
     fetch('/api/trainings')
       .then(r => r.ok ? r.json() : [])
       .then((d: any[]) => {
-        const m: Record<number, { temario?: string; description?: string }> = {}
-        for (const t of d ?? []) m[t.id] = { temario: t.temario, description: t.description }
+        const m: Record<number, { temario?: string; description?: string; duration?: string | null }> = {}
+        for (const t of d ?? []) m[t.id] = { temario: t.temario, description: t.description, duration: t.duration }
         setTemarios(m)
       })
       .catch(() => {})

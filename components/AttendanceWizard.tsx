@@ -28,7 +28,7 @@ function diaCorto(iso?: string | null): string {
 }
 
 interface Props {
-  training: { id: number; title: string; temario?: string; description?: string }
+  training: { id: number; title: string; temario?: string; description?: string; duration?: string | null }
   companyName: string
   companyLogo: string
   onClose: () => void
@@ -75,6 +75,42 @@ const DURATIONS: { value: number; label: string }[] = [
   { value: 540, label: '9 horas' },
 ]
 
+/**
+ * La duración que trae el curso desde la Biblioteca, en minutos.
+ *
+ * Allí se escribe a mano —«8h», «2 horas», «1 hora 30 minutos», «45 min»—,
+ * así que aquí se entiende como venga. Si no se entiende, se devuelve null y
+ * el asistente no inventa nada.
+ */
+function minutosDeTexto(texto?: string | null): number | null {
+  if (!texto) return null
+  const t = texto.toLowerCase().replace(',', '.')
+  let total = 0, reconocido = false
+
+  const horas = t.match(/(\d+(?:\.\d+)?)\s*(?:h|hora|horas)\b/)
+  if (horas) { total += parseFloat(horas[1]) * 60; reconocido = true }
+
+  const minutos = t.match(/(\d+)\s*(?:m|min|mins|minuto|minutos)\b/)
+  if (minutos) { total += parseInt(minutos[1], 10); reconocido = true }
+
+  // Un número pelado se lee como horas: en la Biblioteca «8» es ocho horas.
+  if (!reconocido) {
+    const solo = t.match(/^\s*(\d+(?:\.\d+)?)\s*$/)
+    if (solo) { total = parseFloat(solo[1]) * 60; reconocido = true }
+  }
+
+  const redondo = Math.round(total)
+  return reconocido && redondo > 0 && redondo <= 24 * 60 ? redondo : null
+}
+
+function etiquetaDuracion(min: number): string {
+  const h = Math.floor(min / 60), m = min % 60
+  const partes: string[] = []
+  if (h) partes.push(h === 1 ? '1 hora' : `${h} horas`)
+  if (m) partes.push(m === 1 ? '1 minuto' : `${m} minutos`)
+  return partes.join(' ') || `${min} minutos`
+}
+
 function calcSchedule(startValue: string, durationMin: number): { schedule: string; intensity: string } {
   if (!startValue || !durationMin) return { schedule: '', intensity: '' }
   const [h, m] = startValue.split(':').map(Number)
@@ -87,9 +123,7 @@ function calcSchedule(startValue: string, durationMin: number): { schedule: stri
     return `${h12}:${mm.toString().padStart(2, '0')} ${ampm}`
   }
   const schedule = `${fmt(h, m)} - ${fmt(endH, endM)}`
-  const dur = DURATIONS.find(d => d.value === durationMin)
-  const intensity = dur ? dur.label : `${durationMin} min`
-  return { schedule, intensity }
+  return { schedule, intensity: etiquetaDuracion(durationMin) }
 }
 
 type SearchMode = 'all' | 'asignados' | 'range' | 'manual'
@@ -100,7 +134,18 @@ export default function AttendanceWizard({ training, companyName, companyLogo, o
   // Step 1
   const [eventDate,   setEventDate]   = useState('')
   const [startTime,   setStartTime]   = useState('8:00')
-  const [durationMin, setDurationMin] = useState(480)
+  // La intensidad sale de la Biblioteca, que es donde se define el curso. Si
+  // allá dice dos horas, la lista de asistencia no puede decir ocho.
+  const minBiblioteca = useMemo(() => minutosDeTexto(training.duration), [training.duration])
+  const [durationMin, setDurationMin] = useState(minBiblioteca ?? 480)
+
+  // Si la Biblioteca trae una duración que no está en la lista de siempre, se
+  // agrega: manda lo que se definió en el curso, no el catálogo de opciones.
+  const DURACIONES = useMemo(() => {
+    if (!minBiblioteca || DURATIONS.some(d => d.value === minBiblioteca)) return DURATIONS
+    return [{ value: minBiblioteca, label: etiquetaDuracion(minBiblioteca) }, ...DURATIONS]
+      .sort((a, b) => a.value - b.value)
+  }, [minBiblioteca])
   const [instructor,  setInstructor]  = useState('Jimmy J. Acero. C.')
   // La firma que va al pie del formato; se escoge en el paso de vista previa.
   const [firma, setFirma] = useState<FirmaCapacitador | null>(null)
@@ -124,6 +169,8 @@ export default function AttendanceWizard({ training, companyName, companyLogo, o
 
   // Step 3
   const [saving, setSaving] = useState(false)
+  // Cerrar el registro: rayar las casillas que quedaron sin firmar.
+  const [sellar, setSellar] = useState(true)
 
   const { schedule, intensity } = useMemo(
     () => calcSchedule(startTime, durationMin),
@@ -230,6 +277,7 @@ export default function AttendanceWizard({ training, companyName, companyLogo, o
         capacitadorFirma:  firma?.imagen,
         capacitadorNombre: firma?.nombre,
         capacitadorCargo:  firma?.cargo || undefined,
+        sellarVacias: sellar,
       })
 
       const url = URL.createObjectURL(blob)
@@ -329,10 +377,17 @@ export default function AttendanceWizard({ training, companyName, companyLogo, o
                     </label>
                     <select value={durationMin} onChange={e => setDurationMin(Number(e.target.value))}
                       className="terra-input w-full">
-                      {DURATIONS.map(d => (
+                      {DURACIONES.map(d => (
                         <option key={d.value} value={d.value}>{d.label}</option>
                       ))}
                     </select>
+                    {minBiblioteca && (
+                      <p className="text-[11px] mt-1" style={{ color: durationMin === minBiblioteca ? 'var(--text-faint)' : '#F59E0B' }}>
+                        {durationMin === minBiblioteca
+                          ? `Viene de la Biblioteca: ${etiquetaDuracion(minBiblioteca)}`
+                          : `En la Biblioteca el curso dura ${etiquetaDuracion(minBiblioteca)}`}
+                      </p>
+                    )}
                   </div>
                 </div>
 
@@ -460,9 +515,22 @@ export default function AttendanceWizard({ training, companyName, companyLogo, o
                 {/* Participant list (fetched or manual) */}
                 {(fetched || participants.some(p => p.manual)) && (
                   <div>
-                    <p className="text-xs mb-2" style={{ color: 'var(--text-dim)' }}>
-                      {participants.filter(p => !p.manual).length} encontrado(s) · {selectedParticipants.length} seleccionado(s)
-                    </p>
+                    {/* Marcar o quitar de una vez: con cincuenta asignados,
+                        tocar uno por uno para dejar seis es un castigo. */}
+                    <div className="flex items-center justify-between gap-2 mb-2">
+                      <p className="text-xs" style={{ color: 'var(--text-dim)' }}>
+                        {participants.filter(p => !p.manual).length} encontrado(s) · {selectedParticipants.length} seleccionado(s)
+                      </p>
+                      <button
+                        onClick={() => {
+                          const marcarTodos = selectedParticipants.length < participants.length
+                          setParticipants(prev => prev.map(x => ({ ...x, checked: marcarTodos })))
+                        }}
+                        className="px-2.5 py-1 rounded-lg text-[11px] font-semibold shrink-0"
+                        style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid var(--border-subtle)', color: 'var(--text-dim)' }}>
+                        {selectedParticipants.length < participants.length ? 'Marcar todos' : 'Desmarcar todos'}
+                      </button>
+                    </div>
                     <div className="space-y-1.5 max-h-48 overflow-y-auto pr-1">
                       {participants.map((p, i) => (
                         <div key={i} onClick={() => setParticipants(prev => prev.map((x, idx) => idx === i ? { ...x, checked: !x.checked } : x))}
@@ -540,6 +608,27 @@ export default function AttendanceWizard({ training, companyName, companyLogo, o
                 </div>
 
                 <SelectorFirma elegida={firma} onElegir={setFirma} />
+
+                {/* Cerrar el registro, como se raya un formato en papel. */}
+                <button onClick={() => setSellar(s => !s)}
+                  className="w-full flex items-start gap-2.5 px-3 py-2.5 rounded-xl text-left"
+                  style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid var(--border-subtle)' }}>
+                  <div className="w-4 h-4 rounded flex items-center justify-center shrink-0 mt-0.5"
+                    style={sellar
+                      ? { background: 'var(--primary)', border: '1px solid var(--primary)' }
+                      : { background: 'transparent', border: '1px solid var(--border)' }}>
+                    {sellar && <Check size={10} className="text-white" />}
+                  </div>
+                  <div>
+                    <p className="text-xs font-semibold" style={{ color: 'var(--text)' }}>
+                      Anular las casillas que sobran
+                    </p>
+                    <p className="text-[11px]" style={{ color: 'var(--text-dim)' }}>
+                      Raya los renglones sin firmar para que el registro quede cerrado.
+                      Quítalo si vas a imprimirla para firmar en la jornada.
+                    </p>
+                  </div>
+                </button>
 
                 <div>
                   <p className="text-xs font-medium mb-2" style={{ color: 'var(--text-dim)' }}>
