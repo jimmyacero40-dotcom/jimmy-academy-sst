@@ -110,6 +110,14 @@ async function compressImage(file: File): Promise<Blob> {
 
 // ─── Tiny helpers ─────────────────────────────────────────────────────
 const UP = (s: string) => s.toUpperCase()
+/**
+ * Lo que se escribió en una casilla numérica.
+ *
+ * Vacío es «sin responder», no cero. Antes `+''` daba 0: la casilla quedaba
+ * con un 0 escrito, el trabajador escribía encima y le quedaba «065», y el
+ * tablero contaba como respondido un dato que nadie puso.
+ */
+const numero = (v: string): number | undefined => (v.trim() === '' ? undefined : +v)
 const inp = 'terra-input text-sm'
 
 function Tip({ text }: { text: string }) {
@@ -688,12 +696,12 @@ export default function MyProfilePage() {
                 </Field>
                 <Field label="TELÉFONO / CELULAR" tip="Número de 10 dígitos">
                   <input className={inp} value={data.telefono ?? ''}
-                    onChange={e => set('telefono', e.target.value)} placeholder="300 123 4567"
+                    onChange={e => set('telefono', e.target.value)} placeholder="Ej.: 300 123 4567"
                     type="tel" inputMode="numeric" maxLength={15} />
                 </Field>
                 <Field label="TELÉFONO ALTERNO" tip="Otro número donde ubicarte">
                   <input className={inp} value={data.telefono_alterno ?? ''}
-                    onChange={e => set('telefono_alterno', e.target.value)} placeholder="300 123 4567"
+                    onChange={e => set('telefono_alterno', e.target.value)} placeholder="Ej.: 300 123 4567"
                     type="tel" inputMode="numeric" maxLength={15} />
                 </Field>
                 <Field label="CORREO ELECTRÓNICO PERSONAL">
@@ -741,15 +749,15 @@ export default function MyProfilePage() {
                   </Field>
                   <Field label="N.° DE PERSONAS EN EL HOGAR">
                     <input type="number" min={1} max={20} className={inp} value={data.num_personas_hogar ?? ''}
-                      onChange={e => set('num_personas_hogar', +e.target.value)} inputMode="numeric" />
+                      onChange={e => set('num_personas_hogar', numero(e.target.value))} inputMode="numeric" />
                   </Field>
                   <Field label="N.° DE HIJOS">
                     <input type="number" min={0} max={20} className={inp} value={data.num_hijos ?? ''}
-                      onChange={e => set('num_hijos', +e.target.value)} inputMode="numeric" />
+                      onChange={e => set('num_hijos', numero(e.target.value))} inputMode="numeric" />
                   </Field>
                   <Field label="PERSONAS QUE DEPENDEN ECONÓMICAMENTE DE USTED">
                     <input type="number" min={0} max={20} className={inp} value={data.dependientes_economicos ?? ''}
-                      onChange={e => set('dependientes_economicos', +e.target.value)} inputMode="numeric" />
+                      onChange={e => set('dependientes_economicos', numero(e.target.value))} inputMode="numeric" />
                   </Field>
                   <div className="col-span-2">
                     <BoolField label="¿ES CABEZA DE HOGAR?" value={data.cabeza_hogar ?? null} onChange={v => set('cabeza_hogar', v)}
@@ -772,7 +780,7 @@ export default function MyProfilePage() {
                   </Field>
                   <Field label="TELÉFONO DE EMERGENCIA *" tip="Debe ser diferente al tuyo">
                     <input className={inp} value={data.tel_contacto ?? ''}
-                      onChange={e => set('tel_contacto', e.target.value)} placeholder="300 123 4567"
+                      onChange={e => set('tel_contacto', e.target.value)} placeholder="Ej.: 300 123 4567"
                       type="tel" inputMode="numeric" maxLength={15} />
                   </Field>
 
@@ -789,7 +797,7 @@ export default function MyProfilePage() {
                   </Field>
                   <Field label="TELÉFONO DEL SEGUNDO CONTACTO">
                     <input className={inp} value={data.tel_contacto2 ?? ''}
-                      onChange={e => set('tel_contacto2', e.target.value)} placeholder="300 123 4567"
+                      onChange={e => set('tel_contacto2', e.target.value)} placeholder="Ej.: 300 123 4567"
                       type="tel" inputMode="numeric" maxLength={15} />
                   </Field>
                 </div>
@@ -810,7 +818,7 @@ export default function MyProfilePage() {
                     </select>
                   </Field>
                   <Field label="ESTRATO SOCIOECONÓMICO">
-                    <select value={data.estrato ?? ''} onChange={e => set('estrato', +e.target.value)} className={inp}>
+                    <select value={data.estrato ?? ''} onChange={e => set('estrato', numero(e.target.value))} className={inp}>
                       <option value="">— Seleccionar —</option>
                       {[1,2,3,4,5,6].map(n => <option key={n} value={n}>ESTRATO {n}</option>)}
                     </select>
@@ -982,16 +990,16 @@ export default function MyProfilePage() {
                       un índice de masa corporal de 200.000. Al salir de la
                       casilla se convierte a centímetros y se ve corregido. */}
                   <input type="number" min={1} max={230} step="any" className={inp} value={data.estatura_cm ?? ''}
-                    onChange={e => set('estatura_cm', e.target.value === '' ? undefined : +e.target.value)}
+                    onChange={e => set('estatura_cm', numero(e.target.value))}
                     onBlur={e => {
                       const cm = estaturaEnCm(e.target.value)
                       if (cm !== null && cm !== data.estatura_cm) set('estatura_cm', cm)
                     }}
-                    placeholder="170" inputMode="decimal" />
+                    inputMode="decimal" />
                 </Field>
                 <Field label="PESO EN KILOGRAMOS">
                   <input type="number" min={30} max={200} className={inp} value={data.peso_kg ?? ''}
-                    onChange={e => set('peso_kg', +e.target.value)} placeholder="70" inputMode="numeric" />
+                    onChange={e => set('peso_kg', numero(e.target.value))} inputMode="numeric" />
                 </Field>
                 {data.estatura_cm && data.peso_kg && (() => {
                   const valor = calcularImc(data.estatura_cm, data.peso_kg)
@@ -1089,7 +1097,7 @@ export default function MyProfilePage() {
                   {data.realiza_actividad_fisica && (
                     <>
                       <Field label="¿CUÁNTOS DÍAS A LA SEMANA?">
-                        <select value={data.dias_actividad_fisica ?? ''} onChange={e => set('dias_actividad_fisica', +e.target.value)} className={inp}>
+                        <select value={data.dias_actividad_fisica ?? ''} onChange={e => set('dias_actividad_fisica', numero(e.target.value))} className={inp}>
                           <option value="">— Seleccionar —</option>
                           {[1,2,3,4,5,6,7].map(n => <option key={n} value={n}>{n} DÍA{n > 1 ? 'S' : ''}</option>)}
                         </select>
@@ -1101,7 +1109,7 @@ export default function MyProfilePage() {
                     </>
                   )}
                   <Field label="¿CUÁNTAS HORAS DUERME NORMALMENTE?" tip="En una noche normal de sueño">
-                    <select value={data.horas_sueno ?? ''} onChange={e => set('horas_sueno', +e.target.value)} className={inp}>
+                    <select value={data.horas_sueno ?? ''} onChange={e => set('horas_sueno', numero(e.target.value))} className={inp}>
                       <option value="">— Seleccionar —</option>
                       {[4,5,6,7,8,9,10].map(n => <option key={n} value={n}>{n} HORAS</option>)}
                     </select>
@@ -1116,7 +1124,7 @@ export default function MyProfilePage() {
                 <div className="grid grid-cols-2 gap-4">
                   <BoolField label="¿DESAYUNA TODOS LOS DÍAS?" value={data.desayuna_diariamente ?? null} onChange={v => set('desayuna_diariamente', v)} />
                   <Field label="¿CUÁNTAS COMIDAS HACE AL DÍA?">
-                    <select value={data.comidas_al_dia ?? ''} onChange={e => set('comidas_al_dia', +e.target.value)} className={inp}>
+                    <select value={data.comidas_al_dia ?? ''} onChange={e => set('comidas_al_dia', numero(e.target.value))} className={inp}>
                       <option value="">— Seleccionar —</option>
                       {[1,2,3,4,5,6].map(n => <option key={n} value={n}>{n} COMIDA{n > 1 ? 'S' : ''}</option>)}
                     </select>
@@ -1132,7 +1140,7 @@ export default function MyProfilePage() {
                   {data.fuma && (
                     <Field label="¿CUÁNTOS CIGARRILLOS AL DÍA?">
                       <input type="number" min={1} max={100} className={inp} value={data.cigarrillos_dia ?? ''}
-                        onChange={e => set('cigarrillos_dia', +e.target.value)} inputMode="numeric" />
+                        onChange={e => set('cigarrillos_dia', numero(e.target.value))} inputMode="numeric" />
                     </Field>
                   )}
                   <Field label="CONSUMO DE BEBIDAS ALCOHÓLICAS" span2>

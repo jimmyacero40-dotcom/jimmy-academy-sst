@@ -449,7 +449,7 @@ export default function MySignaturePage() {
                 <div>
                   <label className="text-xs font-semibold mb-1 block" style={{ color: 'var(--text-dim)' }}>Cédula de ciudadanía</label>
                   <input value={cedula} onChange={e => setCedula(e.target.value.replace(/\D/g, ''))}
-                    className="terra-input text-sm font-mono" placeholder="1234567890" inputMode="numeric" />
+                    className="terra-input text-sm font-mono" placeholder="Ej.: 1234567890" inputMode="numeric" />
                 </div>
               </div>
 

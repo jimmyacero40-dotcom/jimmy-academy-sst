@@ -253,7 +253,10 @@ body {
   border-color: var(--primary);
   box-shadow: 0 0 0 3px var(--primary-dim);
 }
-.terra-input::placeholder { color: var(--text-faint); }
+/* El texto de ejemplo no puede parecer una respuesta ya escrita: en la
+   encuesta sociodemográfica los trabajadores veían «170» en la estatura y
+   seguían de largo creyendo que ya estaba contestado. */
+.terra-input::placeholder { color: var(--text-faint); opacity: 0.55; font-style: italic; }
 
 /* ── SELECT color-scheme ── */
 select { color-scheme: dark; }
