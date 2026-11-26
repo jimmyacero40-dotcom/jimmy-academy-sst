@@ -147,14 +147,24 @@ export default function MyPlanPage() {
     <div className="p-6">
 
       {/* ── Header ──────────────────────────────────────────────────────── */}
-      <div className="flex items-start justify-between mb-7">
-        <div>
+      {/* La marca del campus, a la vista de todo el que entra a formarse. Va
+          sobre fondo claro propio: el logo es azul oscuro y se perdería con el
+          tema oscuro. */}
+      <div className="mb-5">
+        <img src="/images/sstudio.webp" alt="SSTudio · Campus de Formación SST"
+          style={{ height: 72, width: 'auto', background: '#fff', borderRadius: 12, padding: '8px 14px' }} />
+      </div>
+
+      <div className="flex items-start justify-between gap-4 mb-7">
+        <div className="flex items-center gap-4 min-w-0">
+          <div className="min-w-0">
           <h1 className="text-2xl font-black mb-0.5" style={{ color: 'var(--text)' }}>
             Mi Formación
           </h1>
           <p className="text-sm" style={{ color: 'var(--text-dim)' }}>
             {monthName} {year} · Plan de capacitación personal
           </p>
+          </div>
         </div>
 
         {!loading && enrollments.length > 0 && (
