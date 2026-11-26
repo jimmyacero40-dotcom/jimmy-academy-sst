@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import { motion } from 'framer-motion'
-import { ClipboardList, Search, Download, Trash2, Loader2, Users, Calendar, User, ChevronDown, ChevronUp, Eye, Check } from 'lucide-react'
+import { ClipboardList, Search, Download, Trash2, Loader2, Users, Calendar, User, ChevronDown, ChevronUp, Eye, Check, X, PenLine } from 'lucide-react'
 import { generateAttendancePDF } from '@/lib/generate-attendance-pdf'
 import SelectorFirma, { type FirmaCapacitador } from '@/components/asistencia/SelectorFirma'
 
@@ -46,6 +46,11 @@ export default function AttendanceListsPage() {
   const [firma, setFirma] = useState<FirmaCapacitador | null>(null)
   // Cerrar el registro rayando las casillas que quedaron sin firmar.
   const [sellar, setSellar] = useState(true)
+  // Ver la lista sin bajarla al computador, y administrar las firmas sin
+  // tener que entrar a generar una lista.
+  const [previa, setPrevia] = useState<{ list: AttendanceList; url: string } | null>(null)
+  const [viendo, setViendo] = useState<number | null>(null)
+  const [adminFirmas, setAdminFirmas] = useState(false)
 
   // Group by training title
   const grouped = lists
@@ -77,14 +82,12 @@ export default function AttendanceListsPage() {
     setDeleting(null)
   }
 
-  const handleDownload = async (list: AttendanceList, firma: FirmaCapacitador | null) => {
-    setDownloading(list.id)
-    try {
-      const res = await fetch(`/api/attendance-lists/${list.id}`)
-      if (!res.ok) throw new Error('Error al cargar datos')
-      const data = await res.json()
-
-      const blob = await generateAttendancePDF({
+  /** El PDF de una lista, el mismo que se ve y que se descarga. */
+  const armarPDF = async (list: AttendanceList, firma: FirmaCapacitador | null) => {
+    const res = await fetch(`/api/attendance-lists/${list.id}`)
+    if (!res.ok) throw new Error('Error al cargar datos')
+    const data = await res.json()
+    const blob = await generateAttendancePDF({
         trainingTitle:   data.training_title,
         trainingTemario: data.training_temario || '',
         eventDate:       formatDate(data.event_date),
@@ -99,13 +102,20 @@ export default function AttendanceListsPage() {
         capacitadorFirma:  firma?.imagen,
         capacitadorNombre: firma?.nombre,
         capacitadorCargo:  firma?.cargo || undefined,
-        sellarVacias: sellar,
-      })
+      sellarVacias: sellar,
+    })
+    const nombre = `Asistencia_${data.training_title.replace(/[^a-zA-Z0-9]/g,'_').slice(0,30)}_${data.event_date}.pdf`
+    return { blob, nombre }
+  }
 
-      const url  = URL.createObjectURL(blob)
-      const a    = document.createElement('a')
-      a.href     = url
-      a.download = `Asistencia_${data.training_title.replace(/[^a-zA-Z0-9]/g,'_').slice(0,30)}_${data.event_date}.pdf`
+  const handleDownload = async (list: AttendanceList, firma: FirmaCapacitador | null) => {
+    setDownloading(list.id)
+    try {
+      const { blob, nombre } = await armarPDF(list, firma)
+      const url = URL.createObjectURL(blob)
+      const a   = document.createElement('a')
+      a.href    = url
+      a.download = nombre
       a.click()
       URL.revokeObjectURL(url)
     } catch (e: any) {
@@ -115,8 +125,76 @@ export default function AttendanceListsPage() {
     setPorDescargar(null)
   }
 
+  /** Mirarla sin bajarla: se arma el mismo PDF y se muestra en pantalla. */
+  const verLista = async (list: AttendanceList) => {
+    setViendo(list.id)
+    try {
+      const { blob } = await armarPDF(list, null)
+      setPrevia(anterior => {
+        if (anterior) URL.revokeObjectURL(anterior.url)
+        return { list, url: URL.createObjectURL(blob) }
+      })
+    } catch (e: any) {
+      alert('Error: ' + e.message)
+    }
+    setViendo(null)
+  }
+
+  const cerrarPrevia = () => {
+    setPrevia(anterior => { if (anterior) URL.revokeObjectURL(anterior.url); return null })
+  }
+
   return (
     <div className="p-4 sm:p-6 max-w-5xl mx-auto">
+
+      {/* Mirar la lista sin descargarla */}
+      {previa && (
+        <div className="fixed inset-0 z-50 flex flex-col p-3 sm:p-6" style={{ background: 'rgba(0,0,0,0.65)' }}>
+          <div className="flex items-center justify-between gap-3 px-1 pb-3">
+            <div className="min-w-0">
+              <p className="text-sm font-bold truncate" style={{ color: '#fff' }}>{previa.list.training_title}</p>
+              <p className="text-xs" style={{ color: 'rgba(255,255,255,0.7)' }}>
+                {formatDate(previa.list.event_date)} · {previa.list.participant_count} participante{previa.list.participant_count !== 1 ? 's' : ''}
+                {' · '}sin firma del capacitador
+              </p>
+            </div>
+            <div className="flex items-center gap-2 shrink-0">
+              <button onClick={() => { const l = previa.list; cerrarPrevia(); setFirma(null); setPorDescargar(l) }}
+                className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-bold"
+                style={{ background: '#10B981', color: '#fff' }}>
+                <Download size={13} /> Descargar
+              </button>
+              <button onClick={cerrarPrevia} className="p-2 rounded-lg"
+                style={{ background: 'rgba(255,255,255,0.12)', color: '#fff' }}>
+                <X size={15} />
+              </button>
+            </div>
+          </div>
+          <iframe src={previa.url} title="Vista previa de la lista"
+            className="flex-1 w-full rounded-xl" style={{ background: '#fff', border: 'none' }} />
+        </div>
+      )}
+
+      {/* Las firmas guardadas, sin tener que entrar a generar una lista */}
+      {adminFirmas && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ background: 'rgba(0,0,0,0.55)' }}>
+          <div className="w-full max-w-md rounded-2xl shadow-2xl p-5 space-y-4 max-h-[88vh] overflow-y-auto"
+            style={{ background: 'var(--bg-card)', border: '1px solid var(--border)' }}>
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <h3 className="text-base font-bold" style={{ color: 'var(--text-strong)' }}>Firmas del capacitador</h3>
+                <p className="text-xs mt-0.5" style={{ color: 'var(--text-dim)' }}>
+                  Quedan guardadas aquí y se escogen al descargar cualquier lista.
+                </p>
+              </div>
+              <button onClick={() => setAdminFirmas(false)} className="p-1.5 rounded-lg" style={{ color: 'var(--text-faint)' }}>
+                <X size={15} />
+              </button>
+            </div>
+            <SelectorFirma elegida={null} onElegir={() => {}} soloAdministrar compacto />
+          </div>
+        </div>
+      )}
       {/* Escoger la firma antes de bajar el PDF. No se cierra al tocar afuera. */}
       {porDescargar && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ background: 'rgba(0,0,0,0.55)' }}>
@@ -185,6 +263,14 @@ export default function AttendanceListsPage() {
           </div>
         </div>
       </motion.div>
+
+      <div className="flex justify-end -mt-2 mb-4">
+        <button onClick={() => setAdminFirmas(true)}
+          className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-bold"
+          style={{ border: '1px solid var(--border)', color: 'var(--text-dim)', background: 'var(--bg-card)' }}>
+          <PenLine size={13} /> Firmas del capacitador
+        </button>
+      </div>
 
       {/* Stats */}
       <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 mb-6">
@@ -285,6 +371,19 @@ export default function AttendanceListsPage() {
                       </div>
 
                       <div className="flex items-center gap-2 shrink-0">
+                        {/* Mirarla antes de bajarla: casi siempre uno solo
+                            quiere comprobar quién quedó en la lista. */}
+                        <button
+                          onClick={() => verLista(list)}
+                          disabled={viendo === list.id}
+                          title="Ver la lista sin descargarla"
+                          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all"
+                          style={{ background: 'rgba(59,130,246,0.08)', color: 'var(--primary)', border: '1px solid rgba(59,130,246,0.2)' }}>
+                          {viendo === list.id
+                            ? <Loader2 size={12} className="animate-spin" />
+                            : <Eye size={12} />}
+                          Ver
+                        </button>
                         <button
                           onClick={() => setPorDescargar(list)}
                           disabled={downloading === list.id}

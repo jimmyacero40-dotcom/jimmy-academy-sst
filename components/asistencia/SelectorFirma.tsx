@@ -18,17 +18,25 @@ export interface FirmaCapacitador {
  * misma persona.
  */
 export default function SelectorFirma({
-  elegida, onElegir, compacto,
+  elegida, onElegir, compacto, soloAdministrar,
 }: {
   elegida: FirmaCapacitador | null
   onElegir: (f: FirmaCapacitador | null) => void
   compacto?: boolean
+  /** Solo guardar y quitar firmas, sin escoger ninguna para un documento. */
+  soloAdministrar?: boolean
 }) {
   const [firmas, setFirmas] = useState<FirmaCapacitador[]>([])
   const [cargando, setCargando] = useState(true)
   const [subiendo, setSubiendo] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const archivo = useRef<HTMLInputElement>(null)
+  // Los datos de la firma se escriben en el formulario, no en ventanitas del
+  // navegador: asi se ve lo que se esta guardando y se puede corregir.
+  const [agregando, setAgregando] = useState(false)
+  const [nombre, setNombre] = useState('')
+  const [cargo, setCargo] = useState('Profesional SST')
+  const [imagen, setImagen] = useState<string | null>(null)
 
   useEffect(() => {
     let vivo = true
@@ -39,13 +47,12 @@ export default function SelectorFirma({
     return () => { vivo = false }
   }, [])
 
-  async function subir(file: File) {
+  async function leerArchivo(file: File) {
     setError(null)
     if (!/^image\/(png|jpe?g)$/.test(file.type)) {
       setError('La firma debe ser una imagen PNG o JPG')
       return
     }
-    setSubiendo(true)
     try {
       const dataUrl: string = await new Promise((ok, mal) => {
         const fr = new FileReader()
@@ -53,24 +60,36 @@ export default function SelectorFirma({
         fr.onerror = () => mal(new Error('No se pudo leer el archivo'))
         fr.readAsDataURL(file)
       })
-      const nombre = window.prompt('¿De quién es esta firma?', '')
-      if (!nombre) { setSubiendo(false); return }
-      const cargo = window.prompt('Cargo (opcional)', 'Profesional SST') || null
+      setImagen(dataUrl)
+      setAgregando(true)
+    } catch (e: any) {
+      setError(e.message)
+    }
+    if (archivo.current) archivo.current.value = ''
+  }
 
+  function cancelar() {
+    setAgregando(false); setImagen(null); setNombre(''); setCargo('Profesional SST'); setError(null)
+  }
+
+  async function guardar() {
+    if (!nombre.trim() || !imagen) { setError('Falta el nombre de quien firma'); return }
+    setSubiendo(true); setError(null)
+    try {
       const res = await fetch('/api/firmas-capacitador', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ nombre, cargo, imagen: dataUrl }),
+        body: JSON.stringify({ nombre: nombre.trim(), cargo: cargo.trim() || null, imagen }),
       })
       const cuerpo = await res.json()
       if (!res.ok) throw new Error(cuerpo.error || 'No se pudo guardar la firma')
       setFirmas(prev => [...prev, cuerpo])
-      onElegir(cuerpo)
+      if (!soloAdministrar) onElegir(cuerpo)
+      cancelar()
     } catch (e: any) {
       setError(e.message)
     }
     setSubiendo(false)
-    if (archivo.current) archivo.current.value = ''
   }
 
   async function borrar(f: FirmaCapacitador) {
@@ -92,10 +111,13 @@ export default function SelectorFirma({
           background: activa ? 'rgba(16,185,129,0.08)' : 'var(--bg)',
           border: `1px solid ${activa ? 'rgba(16,185,129,0.45)' : 'var(--border)'}`,
         }}>
-        <div className="w-4 h-4 rounded-full flex items-center justify-center flex-shrink-0"
-          style={{ border: `1px solid ${activa ? '#10B981' : 'var(--border-strong)'}`, background: activa ? '#10B981' : 'transparent' }}>
-          {activa && <Check size={10} color="#fff" />}
-        </div>
+        {/* Administrando no se escoge nada: sobra la casilla de selección. */}
+        {!soloAdministrar && (
+          <div className="w-4 h-4 rounded-full flex items-center justify-center flex-shrink-0"
+            style={{ border: `1px solid ${activa ? '#10B981' : 'var(--border-strong)'}`, background: activa ? '#10B981' : 'transparent' }}>
+            {activa && <Check size={10} color="#fff" />}
+          </div>
+        )}
         {children}
       </button>
       {alBorrar && (
@@ -121,14 +143,23 @@ export default function SelectorFirma({
         </div>
       ) : (
         <>
-          <Opcion activa={!elegida} onClick={() => onElegir(null)}>
-            <span className="text-sm" style={{ color: 'var(--text-dim)' }}>
-              Sin firma <span style={{ color: 'var(--text-faint)' }}>— se deja la línea en blanco para firmar a mano</span>
-            </span>
-          </Opcion>
+          {!soloAdministrar && (
+            <Opcion activa={!elegida} onClick={() => onElegir(null)}>
+              <span className="text-sm" style={{ color: 'var(--text-dim)' }}>
+                Sin firma <span style={{ color: 'var(--text-faint)' }}>— se deja la línea en blanco para firmar a mano</span>
+              </span>
+            </Opcion>
+          )}
+
+          {soloAdministrar && firmas.length === 0 && (
+            <p className="text-xs py-3 text-center" style={{ color: 'var(--text-faint)' }}>
+              Todavía no hay firmas guardadas.
+            </p>
+          )}
 
           {firmas.map(f => (
-            <Opcion key={f.id} activa={elegida?.id === f.id} onClick={() => onElegir(f)} alBorrar={() => borrar(f)}>
+            <Opcion key={f.id} activa={!soloAdministrar && elegida?.id === f.id}
+              onClick={() => { if (!soloAdministrar) onElegir(f) }} alBorrar={() => borrar(f)}>
               <img src={f.imagen} alt="" className="h-8 object-contain flex-shrink-0"
                 style={{ maxWidth: 110, mixBlendMode: 'multiply' }} />
               <span className="min-w-0">
@@ -141,13 +172,46 @@ export default function SelectorFirma({
       )}
 
       <input ref={archivo} type="file" accept="image/png,image/jpeg" className="hidden"
-        onChange={e => { const f = e.target.files?.[0]; if (f) subir(f) }} />
-      <button type="button" onClick={() => archivo.current?.click()} disabled={subiendo}
-        className="flex items-center gap-1.5 text-xs font-semibold px-3 py-2 rounded-xl w-full justify-center"
-        style={{ border: '1px dashed var(--border-strong)', color: 'var(--text-dim)', background: 'transparent' }}>
-        {subiendo ? <Loader2 size={12} className="animate-spin" /> : <Upload size={12} />}
-        Subir otra firma y guardarla
-      </button>
+        onChange={e => { const f = e.target.files?.[0]; if (f) leerArchivo(f) }} />
+
+      {agregando && imagen ? (
+        <div className="rounded-xl p-3 space-y-2" style={{ background: 'var(--bg)', border: '1px solid var(--border)' }}>
+          <div className="flex items-center justify-center py-1">
+            <img src={imagen} alt="" className="h-12 object-contain" style={{ mixBlendMode: 'multiply' }} />
+          </div>
+          <div>
+            <label className="block text-[11px] font-semibold mb-1" style={{ color: 'var(--text-dim)' }}>
+              ¿De quién es esta firma? *
+            </label>
+            <input value={nombre} onChange={e => setNombre(e.target.value)} autoFocus
+              placeholder="Ej.: Jimmy J. Acero C." className="terra-input text-sm" />
+          </div>
+          <div>
+            <label className="block text-[11px] font-semibold mb-1" style={{ color: 'var(--text-dim)' }}>Cargo</label>
+            <input value={cargo} onChange={e => setCargo(e.target.value)} className="terra-input text-sm" />
+          </div>
+          <div className="flex gap-2 pt-0.5">
+            <button type="button" onClick={cancelar}
+              className="flex-1 px-3 py-2 rounded-lg text-xs font-semibold"
+              style={{ border: '1px solid var(--border)', color: 'var(--text-dim)' }}>
+              Cancelar
+            </button>
+            <button type="button" onClick={guardar} disabled={subiendo || !nombre.trim()}
+              className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg text-xs font-bold disabled:opacity-50"
+              style={{ background: '#10B981', color: '#fff' }}>
+              {subiendo ? <Loader2 size={12} className="animate-spin" /> : <Check size={12} />}
+              Guardar firma
+            </button>
+          </div>
+        </div>
+      ) : (
+        <button type="button" onClick={() => archivo.current?.click()}
+          className="flex items-center gap-1.5 text-xs font-semibold px-3 py-2 rounded-xl w-full justify-center"
+          style={{ border: '1px dashed var(--border-strong)', color: 'var(--text-dim)', background: 'transparent' }}>
+          <Upload size={12} />
+          {firmas.length ? 'Subir otra firma y guardarla' : 'Subir una firma y guardarla'}
+        </button>
+      )}
 
       {error && <p className="text-xs" style={{ color: '#EF4444' }}>{error}</p>}
     </div>
