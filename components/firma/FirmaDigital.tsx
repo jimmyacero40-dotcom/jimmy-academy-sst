@@ -203,9 +203,17 @@ export default function FirmaDigital(
   }
 
   if (loading) {
+    // Dentro de la ficha no puede reservar media pantalla: con la conexión
+    // lenta del campo quedaba un vacío blanco justo debajo de las casillas de
+    // consentimiento, y la persona creía que el formulario se había borrado.
     return (
-      <div className="flex items-center justify-center h-full min-h-[60vh]">
-        <Loader2 size={40} className="animate-spin" style={{ color: 'var(--amber)' }} />
+      <div className={comoSeccion
+        ? 'flex items-center justify-center gap-2 py-8'
+        : 'flex items-center justify-center h-full min-h-[60vh]'}>
+        <Loader2 size={comoSeccion ? 18 : 40} className="animate-spin" style={{ color: 'var(--amber)' }} />
+        {comoSeccion && (
+          <span className="text-sm" style={{ color: 'var(--text-dim)' }}>Cargando tu firma…</span>
+        )}
       </div>
     )
   }

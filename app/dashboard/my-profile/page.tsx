@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
+import { useState, useEffect, useLayoutEffect, useRef, useCallback, useMemo } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useSession } from 'next-auth/react'
 import { estaturaEnCm, imc as calcularImc, clasificarImc } from '@/lib/antropometria'
@@ -342,31 +342,58 @@ export default function MyProfilePage() {
    * Que la pantalla no se mueva bajo los dedos.
    *
    * Al marcar una casilla, el recuadro de arriba cambia de alto —aparece o
-   * desaparece lo que falta— y todo lo de abajo se corre: la persona iba a
-   * tocar una cosa y tocaba otra. Chrome lo corrige solo con el anclaje de
-   * desplazamiento; Safari no lo soporta, y ahí es donde se ve el salto. Por
-   * eso solo se compensa a mano donde el navegador no lo hace.
+   * desaparece lo que falta— y todo lo de abajo se corre. En el celular la
+   * persona terminaba mirando una zona en blanco y creía que el formulario se
+   * borró; en el escritorio ni se nota, porque Chrome lo corrige solo.
+   *
+   * No se pregunta qué navegador es ni qué sabe hacer: se guarda dónde estaba
+   * en la pantalla lo que la persona acaba de tocar y, apenas se repinta, se
+   * devuelve a ese mismo punto. Si el navegador ya lo corrigió, la diferencia
+   * es cero y no se hace nada, así que nunca se corrige dos veces.
    */
-  const cabecera = useRef<HTMLDivElement>(null)
-  useEffect(() => {
-    const anclaNativa = typeof CSS !== 'undefined'
-      && typeof CSS.supports === 'function'
-      && CSS.supports('overflow-anchor', 'auto')
-    const caja = cabecera.current
-    const lienzo = document.querySelector('main')
-    if (anclaNativa || !caja || !lienzo || typeof ResizeObserver === 'undefined') return
+  const ancla = useRef<{ nodo: HTMLElement; alto: number } | null>(null)
 
-    let anterior = caja.offsetHeight
-    const vigia = new ResizeObserver(() => {
-      const ahora = caja.offsetHeight
-      const cambio = ahora - anterior
-      anterior = ahora
-      // Arriba del todo no hay nada que compensar: ahí no se nota.
-      if (cambio !== 0 && lienzo.scrollTop > 0) lienzo.scrollTop += cambio
-    })
-    vigia.observe(caja)
-    return () => vigia.disconnect()
+  const recordarSitio = useCallback((destino: EventTarget | null) => {
+    if (!(destino instanceof HTMLElement)) return
+    // Las casillas van ocultas detrás de su etiqueta —un cuadro de un píxel
+    // puesto aparte— y no se mueven con ella: anclarse ahí daba una medida
+    // falsa y la pantalla terminaba saltando el doble. Se sube hasta lo
+    // primero que de verdad se ve.
+    let nodo: HTMLElement = destino
+    while (nodo.parentElement && nodo.getBoundingClientRect().height < 2) {
+      nodo = nodo.parentElement
+    }
+    ancla.current = { nodo, alto: nodo.getBoundingClientRect().top }
   }, [])
+
+  useLayoutEffect(() => {
+    const a = ancla.current
+    ancla.current = null
+    if (!a) return
+
+    // Se espera a que la pantalla termine de pintarse. Chrome corrige el
+    // desplazamiento él mismo, pero lo hace después de este momento: si se
+    // corrige aquí, se suman las dos y la pantalla salta el doble —que fue
+    // exactamente lo que pasó la primera vez que se intentó arreglar—. Dos
+    // cuadros después ya se sabe dónde quedó de verdad.
+    const id = requestAnimationFrame(() => requestAnimationFrame(() => {
+      if (!document.body.contains(a.nodo)) return
+      const corrimiento = a.nodo.getBoundingClientRect().top - a.alto
+      if (Math.abs(corrimiento) < 2) return   // el navegador ya lo hizo
+
+      // Quién se desplaza de verdad cambia entre el escritorio y el celular:
+      // unas veces es el contenedor del tablero y otras la ventana.
+      let caja: HTMLElement | null = a.nodo.parentElement
+      while (caja) {
+        const estilo = getComputedStyle(caja)
+        if (/(auto|scroll)/.test(estilo.overflowY) && caja.scrollHeight > caja.clientHeight) break
+        caja = caja.parentElement
+      }
+      if (caja) caja.scrollTop += corrimiento
+      else window.scrollBy(0, corrimiento)
+    }))
+    return () => cancelAnimationFrame(id)
+  })
   const [uploadingPhoto, setUploadingPhoto] = useState(false)
   const [photoError, setPhotoError] = useState<string | null>(null)
   const photoRef = useRef<HTMLInputElement>(null)
@@ -533,7 +560,7 @@ export default function MyProfilePage() {
       )}
 
       {/* ── Header card ── */}
-      <div ref={cabecera} className="terra-card p-5 mb-5">
+      <div className="terra-card p-5 mb-5">
         <div className="flex items-start gap-4 flex-wrap">
 
           {/* Avatar */}
@@ -717,6 +744,7 @@ export default function MyProfilePage() {
       </div>
 
       {/* ── Tab content ── */}
+      <div onChangeCapture={e => recordarSitio(e.target)} onClickCapture={e => recordarSitio(e.target)}>
       <AnimatePresence mode="wait">
         <motion.div key={tab}
           initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}
@@ -1478,6 +1506,7 @@ export default function MyProfilePage() {
 
         </motion.div>
       </AnimatePresence>
+      </div>
 
       {/* ── Botón flotante ── */}
       {/* Antes mandaba a otra pestaña a firmar. Ahora se firma en la misma
