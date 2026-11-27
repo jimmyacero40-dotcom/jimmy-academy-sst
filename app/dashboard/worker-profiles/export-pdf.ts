@@ -1,5 +1,6 @@
 import type { Analytics } from '@/lib/profile-analytics'
 import { generateAutoText } from '@/lib/profile-analytics'
+import { logoAgrosafeBlanco, marcaEnFranja } from '@/lib/pdf-marca'
 
 // ── Colors ────────────────────────────────────────────────────────────
 const C = {
@@ -25,6 +26,7 @@ const ML = 18; const MR = 18; const CW = W - ML - MR  // content width = 174mm
 export async function exportToPDF(analytics: Analytics, company = 'Organización') {
   const { default: jsPDF } = await import('jspdf')
   const doc = new jsPDF({ orientation: 'p', unit: 'mm', format: 'a4' })
+  const marca = await logoAgrosafeBlanco()
 
   let pageNum = 0
 
@@ -46,8 +48,9 @@ export async function exportToPDF(analytics: Analytics, company = 'Organización
 
   function header(title: string, sub = '') {
     rect(0, 0, W, 18, C.navy)
-    text(`AgroSafe  ·  ${company}`, ML, 8, 7, C.teal, true)
-    text(title.toUpperCase(), ML, 13.5, 8, C.white, true)
+    const xt = marcaEnFranja(doc, marca, ML, 4.5, 9)
+    text(company, xt, 8, 7, C.teal, true)
+    text(title.toUpperCase(), xt, 13.5, 8, C.white, true)
     if (sub) { text(sub, W - MR, 13.5, 7, [180,200,220], false, 'right') }
     pageNum++
     text(`Pág. ${pageNum}`, W - MR, H - 6, 7, C.gray, false, 'right')

@@ -1,4 +1,5 @@
 import { PREGUNTAS, CAMPO_MEJORAS, GRUPO_DE_PELIGRO, type Participacion } from '@/lib/peligros'
+import { logoAgrosafeBlanco, marcaEnFranja } from '@/lib/pdf-marca'
 
 // Misma identidad visual que el resto de informes de la plataforma.
 const C = {
@@ -20,6 +21,7 @@ const TOPE = H - 18
 export async function exportarFormularioPDF(p: Participacion, empresa = 'Organización') {
   const { default: jsPDF } = await import('jspdf')
   const doc = new jsPDF({ orientation: 'p', unit: 'mm', format: 'a4' })
+  const marca = await logoAgrosafeBlanco()
   let pagina = 0
 
   const texto = (s: string, x: number, y: number, size: number, color: [number, number, number],
@@ -33,8 +35,9 @@ export async function exportarFormularioPDF(p: Participacion, empresa = 'Organiz
 
   function cabecera() {
     caja(0, 0, W, 18, C.navy)
-    texto(`AgroSafe  ·  ${empresa}`, ML, 8, 7, C.teal, true)
-    texto('PARTICIPACIÓN ANUAL EN LA IDENTIFICACIÓN DE PELIGROS', ML, 13.5, 8, C.white, true)
+    const xt = marcaEnFranja(doc, marca, ML, 4.5, 9)
+    texto(empresa, xt, 8, 7, C.teal, true)
+    texto('PARTICIPACIÓN ANUAL EN LA IDENTIFICACIÓN DE PELIGROS', xt, 13.5, 8, C.white, true)
     pagina++
     texto(`Pág. ${pagina}`, W - MR, H - 6, 7, C.gray, false, 'right')
     texto(`Generado: ${new Date().toLocaleDateString('es-CO', { day: 'numeric', month: 'long', year: 'numeric' })}`, ML, H - 6, 7, C.gray)

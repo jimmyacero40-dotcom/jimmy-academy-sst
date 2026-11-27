@@ -1,5 +1,6 @@
 import { CAMPO_MEJORAS } from '@/lib/peligros'
 import type { Resumen, RespuestasDePregunta } from '@/lib/peligros-tabulacion'
+import { logoAgrosafeBlanco, marcaEnFranja } from '@/lib/pdf-marca'
 
 /**
  * El consolidado en PDF: lo que se adjunta a la matriz de peligros y lo que
@@ -33,6 +34,7 @@ export async function exportarResultadosPDF(
 ) {
   const { default: jsPDF } = await import('jspdf')
   const doc = new jsPDF({ orientation: 'p', unit: 'mm', format: 'a4' })
+  const marca = await logoAgrosafeBlanco()
   let pagina = 0
   let y = 0
 
@@ -47,8 +49,9 @@ export async function exportarResultadosPDF(
 
   function cabecera() {
     caja(0, 0, W, 18, C.navy)
-    texto(`AgroSafe  ·  ${empresa}`, ML, 8, 7, C.teal, true)
-    texto('CONSOLIDADO DE LA IDENTIFICACIÓN DE PELIGROS', ML, 13.5, 8, C.white, true)
+    const xt = marcaEnFranja(doc, marca, ML, 4.5, 9)
+    texto(empresa, xt, 8, 7, C.teal, true)
+    texto('CONSOLIDADO DE LA IDENTIFICACIÓN DE PELIGROS', xt, 13.5, 8, C.white, true)
     pagina++
     texto(`Pág. ${pagina}`, W - MR, H - 6, 7, C.gray, false, 'right')
     texto(`Periodo ${periodo}  ·  Generado el ${new Date().toLocaleDateString('es-CO', { day: 'numeric', month: 'long', year: 'numeric' })}`,

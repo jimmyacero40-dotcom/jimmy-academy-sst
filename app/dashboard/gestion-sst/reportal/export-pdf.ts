@@ -1,4 +1,5 @@
 import { ESTADOS, type ReporteHSE } from '@/lib/reportes-hse'
+import { logoAgrosafeBlanco, marcaEnFranja } from '@/lib/pdf-marca'
 
 // Misma identidad visual que el resto de informes de la plataforma.
 const C = {
@@ -20,6 +21,7 @@ const fecha = (s?: string | null) =>
 export async function exportarTarjetaPDF(r: ReporteHSE, empresa = 'Organización') {
   const { default: jsPDF } = await import('jspdf')
   const doc = new jsPDF({ orientation: 'p', unit: 'mm', format: 'a4' })
+  const marca = await logoAgrosafeBlanco()
   let pagina = 0
   let y = 0
 
@@ -34,8 +36,9 @@ export async function exportarTarjetaPDF(r: ReporteHSE, empresa = 'Organización
 
   function cabecera() {
     caja(0, 0, W, 18, C.navy)
-    texto(`AgroSafe  ·  ${empresa}`, ML, 8, 7, C.teal, true)
-    texto('AVC-FR54  ·  TARJETA DE REPORTE HSE', ML, 13.5, 8, C.white, true)
+    const xt = marcaEnFranja(doc, marca, ML, 4.5, 9)
+    texto(empresa, xt, 8, 7, C.teal, true)
+    texto('AVC-FR54  ·  TARJETA DE REPORTE HSE', xt, 13.5, 8, C.white, true)
     if (r.codigo) texto(r.codigo, W - MR, 13.5, 8, C.white, true, 'right')
     pagina++
     texto(`Pág. ${pagina}`, W - MR, H - 6, 7, C.gray, false, 'right')

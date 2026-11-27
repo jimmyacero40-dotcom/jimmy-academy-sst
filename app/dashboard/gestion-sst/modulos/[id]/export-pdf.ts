@@ -1,5 +1,6 @@
 import { textoCompleto, type Pregunta, type Modulo } from '@/lib/modulos'
 import type { FilaModulo } from '@/lib/modulos-tabulacion'
+import { logoAgrosafeBlanco, marcaEnFranja } from '@/lib/pdf-marca'
 
 // Misma identidad visual que el resto de informes de la plataforma.
 const C = {
@@ -20,6 +21,7 @@ export async function exportarRespuestaPDF(
 ) {
   const { default: jsPDF } = await import('jspdf')
   const doc = new jsPDF({ orientation: 'p', unit: 'mm', format: 'a4' })
+  const marca = await logoAgrosafeBlanco()
   let pagina = 0
   let y = 0
 
@@ -34,8 +36,9 @@ export async function exportarRespuestaPDF(
 
   function cabecera() {
     caja(0, 0, W, 18, C.navy)
-    texto(`AgroSafe  ·  ${empresa}`, ML, 8, 7, C.teal, true)
-    texto(modulo.nombre.toUpperCase().slice(0, 70), ML, 13.5, 8, C.white, true)
+    const xt = marcaEnFranja(doc, marca, ML, 4.5, 9)
+    texto(empresa, xt, 8, 7, C.teal, true)
+    texto(modulo.nombre.toUpperCase().slice(0, 60), xt, 13.5, 8, C.white, true)
     pagina++
     texto(`Pág. ${pagina}`, W - MR, H - 6, 7, C.gray, false, 'right')
     texto(

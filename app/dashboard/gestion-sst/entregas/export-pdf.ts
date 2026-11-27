@@ -6,6 +6,8 @@
  * Lleva la firma que cada trabajador tenía registrada el día de la entrega.
  */
 
+import { logoAgrosafeBlanco, marcaEnFranja } from '@/lib/pdf-marca'
+
 interface Fila {
   id: string
   nombre: string
@@ -50,6 +52,7 @@ export async function exportarEntregasPDF(
 
   const { default: jsPDF } = await import('jspdf')
   const doc = new jsPDF({ orientation: 'p', unit: 'mm', format: 'a4' })
+  const marca = await logoAgrosafeBlanco()
 
   let pagina = 0
   let y = 0
@@ -75,8 +78,9 @@ export async function exportarEntregasPDF(
   function encabezado() {
     pagina++
     caja(0, 0, W, 20, C.verde)
-    texto('REGISTRO DE ENTREGA', ML, 9, 10, C.blanco, true)
-    texto(tipo.nombre.toUpperCase(), ML, 15, 8, C.crema)
+    const xt = marcaEnFranja(doc, marca, ML, 5, 10)
+    texto('REGISTRO DE ENTREGA', xt, 9, 10, C.blanco, true)
+    texto(tipo.nombre.toUpperCase(), xt, 15, 8, C.crema)
     texto(`Pág. ${pagina}`, W - MR, 15, 7.5, C.crema, false, 'right')
 
     y = 26

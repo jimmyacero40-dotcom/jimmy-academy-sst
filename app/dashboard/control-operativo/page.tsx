@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useCallback } from 'react'
+import { logoAgrosafe, encabezadoMarca, pieMarca, barrasPDF } from '@/lib/pdf-marca'
 import { useAnchosColumnas, ManijaColumna, type ColumnaAncho } from '@/components/anchos-columnas'
 import { useConsulta } from '@/lib/useConsulta'
 import { useSession } from 'next-auth/react'
@@ -228,11 +229,53 @@ export default function ControlOperativoPage() {
       const doc = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'letter' })
       const pageW = doc.internal.pageSize.getWidth()
       const pageH = doc.internal.pageSize.getHeight()
+      const logo = await logoAgrosafe()
+
+      // Primero el resumen, después la lista.
+      //
+      // Quien recibe este informe no va a leer cuarenta nombres: lo que
+      // necesita saber es de qué áreas hay gente adentro y por dónde entró.
+      // Antes eso había que contarlo a mano de la tabla.
+      let y = encabezadoMarca(doc, logo, {
+        titulo: 'Registro Diario de Ingresos',
+        subtitulo: `${rango} · ${filtered.length} registros · ${filtros}`,
+        anchoHoja: pageW,
+      })
+
+      const cuentaPor = (saca: (r: AccessLog) => string | null | undefined) => {
+        const m = new Map<string, number>()
+        for (const r of filtered) {
+          const k = (saca(r) || 'Sin asignar').toUpperCase()
+          m.set(k, (m.get(k) ?? 0) + 1)
+        }
+        return [...m.entries()].map(([nombre, valor]) => ({ nombre, valor }))
+          .sort((a, b) => b.valor - a.valor)
+      }
+
+      const porArea = cuentaPor(r => r.area?.name)
+      const porPorteria = cuentaPor(r => r.gatehouse?.name)
+      const dentro = filtered.filter(r => !r.exit_time).length
+
+      doc.setFont('helvetica', 'normal'); doc.setFontSize(8.5); doc.setTextColor(60, 60, 60)
+      doc.text(
+        `${new Set(filtered.map(r => r.user?.id ?? r.id)).size} personas · ${dentro} sin salida registrada · `
+        + `${porArea.length} áreas · ${porPorteria.length} porterías`,
+        10, y + 1,
+      )
+      y += 6
+
+      const mitad = (pageW - 20 - 8) / 2
+      const finA = barrasPDF(doc, { x: 10, y, ancho: mitad, titulo: 'Ingresos por área', filas: porArea.slice(0, 8) })
+      const finB = barrasPDF(doc, {
+        x: 10 + mitad + 8, y, ancho: mitad, titulo: 'Ingresos por portería',
+        filas: porPorteria.slice(0, 8), color: [37, 99, 235],
+      })
+      const arranque = Math.max(finA, finB) + 6
 
       autoTable(doc, {
         head: [REPORT_HEAD],
         body: reportRows(),
-        startY: 26,
+        startY: arranque,
         margin: { top: 26, left: 10, right: 10, bottom: 12 },
         theme: 'grid',
         styles: { fontSize: 7, cellPadding: 1.5, overflow: 'ellipsize', valign: 'middle' },
@@ -243,15 +286,17 @@ export default function ControlOperativoPage() {
           3: { cellWidth: 22 }, 4: { cellWidth: 59 }, 5: { cellWidth: 22 },
           6: { cellWidth: 38 }, 7: { cellWidth: 28 }, 8: { cellWidth: 28 },
         },
-        didDrawPage: () => {
-          doc.setFontSize(13); doc.setTextColor(15, 42, 32); doc.setFont('helvetica', 'bold')
-          doc.text('Registro Diario de Ingresos', 10, 13)
-          doc.setFontSize(8); doc.setTextColor(90); doc.setFont('helvetica', 'normal')
-          doc.text(`Rango: ${rango}  ·  ${filtered.length} registros  ·  ${filtros}`, 10, 19)
-          const page = doc.getNumberOfPages()
-          doc.setFontSize(7); doc.setTextColor(130)
-          doc.text(`Generado ${new Date().toLocaleString('es-CO')}`, 10, pageH - 5)
-          doc.text(`Página ${page}`, pageW - 10, pageH - 5, { align: 'right' })
+        didDrawPage: (datos: any) => {
+          // En la primera hoja el encabezado ya está dibujado arriba del
+          // resumen; en las que siguen se repite en pequeño.
+          if (datos.pageNumber > 1) {
+            encabezadoMarca(doc, logo, {
+              titulo: 'Registro Diario de Ingresos',
+              subtitulo: `${rango} · ${filtered.length} registros`,
+              anchoHoja: pageW, altoLogo: 8,
+            })
+          }
+          pieMarca(doc, { anchoHoja: pageW, altoHoja: pageH, pagina: datos.pageNumber })
         },
       })
 
@@ -502,17 +547,44 @@ export default function ControlOperativoPage() {
         </div>
 
         <div className="rounded-xl p-4" style={{ background: 'var(--bg-card)', border: '1px solid var(--border)' }}>
-          <h3 className="text-sm font-bold mb-3" style={{ color: 'var(--text-strong)' }}>Áreas con mayor ingreso</h3>
+          <h3 className="text-sm font-bold mb-1" style={{ color: 'var(--text-strong)' }}>Ingresos por área</h3>
+          <p className="text-xs mb-3" style={{ color: 'var(--text-dim)' }}>
+            De dónde viene la gente que entró en el periodo consultado
+          </p>
           {areaRanking.length === 0
             ? <p className="text-xs" style={{ color: 'var(--text-faint)' }}>Sin datos en el periodo</p>
-            : areaRanking.map((a, i) => (
-              <div key={a.name} className="flex items-center gap-3 py-1.5 border-b last:border-0" style={{ borderColor: 'var(--border)' }}>
-                <span className="w-5 text-xs font-bold text-center" style={{ color: 'var(--text-faint)' }}>{i + 1}</span>
-                <span className="w-2 h-2 rounded-full" style={{ background: a.color }} />
-                <span className="flex-1 text-sm font-semibold truncate" style={{ color: 'var(--text)' }}>{a.name}</span>
-                <span className="text-sm font-bold" style={{ color: 'var(--primary)' }}>{a.count}</span>
-              </div>
-            ))
+            : (() => {
+              // El largo de la barra se mide contra el área que más aporta:
+              // así se ve de un vistazo cuál pesa y cuál no, que en una lista
+              // de números había que ir comparando a ojo.
+              const tope = Math.max(1, ...areaRanking.map(a => a.count))
+              const total = areaRanking.reduce((s, a) => s + a.count, 0)
+              return (
+                <div className="space-y-2.5">
+                  {areaRanking.map(a => (
+                    <div key={a.name}>
+                      <div className="flex items-baseline justify-between gap-3 mb-1">
+                        <span className="text-xs font-semibold truncate" style={{ color: 'var(--text)' }}>{a.name}</span>
+                        <span className="text-xs font-bold tabular-nums flex-shrink-0" style={{ color: a.color }}>
+                          {a.count}
+                          <span className="font-semibold ml-1.5" style={{ color: 'var(--text-faint)' }}>
+                            · {Math.round((a.count / Math.max(total, 1)) * 100)} %
+                          </span>
+                        </span>
+                      </div>
+                      <div className="h-2.5 rounded-full overflow-hidden" style={{ background: 'var(--bg)' }}
+                        title={`${a.name}: ${a.count} de ${total}`}>
+                        <div className="h-full rounded-full"
+                          style={{ width: `${Math.max((a.count / tope) * 100, 2)}%`, background: a.color }} />
+                      </div>
+                    </div>
+                  ))}
+                  <p className="text-[10px] pt-1" style={{ color: 'var(--text-faint)' }}>
+                    {total} ingresos en {areaRanking.length} {areaRanking.length === 1 ? 'área' : 'áreas'}
+                  </p>
+                </div>
+              )
+            })()
           }
         </div>
       </div>

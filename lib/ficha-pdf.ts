@@ -10,6 +10,8 @@
  * pregunta a la encuesta la hace aparecer aquí sola.
  */
 
+import { logoAgrosafeBlanco, marcaEnFranja } from '@/lib/pdf-marca'
+
 import { FICHA, type CampoFicha } from '@/lib/ficha-campos'
 import { calcPct } from '@/lib/perfil-completitud'
 
@@ -78,6 +80,7 @@ export async function exportarFichaPDF(
 ) {
   const { default: jsPDF } = await import('jspdf')
   const doc = new jsPDF({ orientation: 'p', unit: 'mm', format: 'a4' })
+  const marca = await logoAgrosafeBlanco()
 
   const pct = calcPct(ficha)
   let pagina = 0
@@ -101,8 +104,9 @@ export async function exportarFichaPDF(
   function encabezado() {
     pagina++
     caja(0, 0, W, 20, C.verde)
-    texto('HOJA DE VIDA DEL TRABAJADOR', ML, 9, 10, C.blanco, true)
-    texto(`${empresa}  ·  Información sociodemográfica`, ML, 15, 7.5, C.crema)
+    const xt = marcaEnFranja(doc, marca, ML, 5, 10)
+    texto('HOJA DE VIDA DEL TRABAJADOR', xt, 9, 10, C.blanco, true)
+    texto(`${empresa}  ·  Información sociodemográfica`, xt, 15, 7.5, C.crema)
     texto(`Pág. ${pagina}`, W - MR, 15, 7.5, C.crema, false, 'right')
     y = 28
   }
