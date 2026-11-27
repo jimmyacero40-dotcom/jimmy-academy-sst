@@ -1356,17 +1356,19 @@ export default function MyProfilePage() {
                   ].map(({ key, label }) => {
                     const checked = !!(data as any)[key]
                     return (
-                      <label key={key}
-                        className="flex items-start gap-3 cursor-pointer p-4 rounded-xl transition-all"
+                      // Un botón, no una etiqueta con la casilla escondida detrás:
+                      // lo que se ve y lo que se toca son la misma cosa, y el
+                      // navegador no tiene a dónde saltar.
+                      <button key={key} type="button" role="checkbox" aria-checked={checked}
+                        onClick={() => set(key as keyof ProfileData, !checked)}
+                        className="w-full flex items-start gap-3 text-left p-4 rounded-xl transition-all"
                         style={{ background: checked ? 'rgba(16,185,129,0.07)' : 'var(--bg-card)', border: `1px solid ${checked ? 'rgba(16,185,129,0.25)' : 'var(--border)'}` }}>
                         <div className="mt-0.5 w-5 h-5 rounded flex items-center justify-center flex-shrink-0 transition-all"
                           style={{ background: checked ? '#10B981' : 'var(--bg-surface)', border: `2px solid ${checked ? '#10B981' : 'var(--border)'}` }}>
                           {checked && <CheckCircle size={13} className="text-white" />}
                         </div>
-                        <input type="checkbox" checked={checked}
-                          onChange={e => set(key as keyof ProfileData, e.target.checked)} className="sr-only" />
                         <span className="text-sm leading-relaxed" style={{ color: checked ? 'var(--text)' : 'var(--text-dim)' }}>{label}</span>
-                      </label>
+                      </button>
                     )
                   })}
 

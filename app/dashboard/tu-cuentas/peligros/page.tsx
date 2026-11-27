@@ -312,7 +312,13 @@ export default function ParticipacionPeligrosPage() {
 
           {pregunta.tipo === 'confirmacion' && (
             <div className="space-y-3">
-              <label className="flex items-start gap-3 cursor-pointer p-4 rounded-xl transition-all"
+              {/* Un botón, no una etiqueta con la casilla escondida detrás:
+                  la casilla oculta va colocada aparte y al tocarla el
+                  navegador se desplazaba hasta ella, dejando la pantalla en
+                  una zona en blanco. */}
+              <button type="button" role="checkbox" aria-checked={!!datos.confirma_participacion}
+                onClick={() => set('confirma_participacion', !datos.confirma_participacion)}
+                className="w-full flex items-start gap-3 text-left p-4 rounded-xl transition-all"
                 style={{
                   background: datos.confirma_participacion ? 'rgba(16,185,129,0.07)' : 'var(--bg-surface)',
                   border: `1px solid ${datos.confirma_participacion ? 'rgba(16,185,129,0.3)' : 'var(--border)'}`,
@@ -324,13 +330,11 @@ export default function ParticipacionPeligrosPage() {
                   }}>
                   {datos.confirma_participacion && <CheckCircle size={13} className="text-white" />}
                 </div>
-                <input type="checkbox" className="sr-only" checked={!!datos.confirma_participacion}
-                  onChange={e => set('confirma_participacion', e.target.checked)} />
                 <span className="text-sm leading-relaxed" style={{ color: 'var(--text-dim)' }}>
                   Confirmo que participé en la identificación de peligros de mi puesto de trabajo y que
                   la información que entregué es verdadera.
                 </span>
-              </label>
+              </button>
 
               {!estaCompleta(datos) && (
                 <div className="p-3 rounded-xl text-xs flex items-start gap-2"
