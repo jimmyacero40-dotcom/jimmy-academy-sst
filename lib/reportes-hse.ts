@@ -38,6 +38,12 @@ export interface ReporteHSE {
   matriz_mejoras_num?: string | null
   gestionado_at?: string | null
 
+  // Lo que declara quien ejecutó la acción. Es suyo: SST lo verifica, no lo
+  // reescribe.
+  ejecucion_descripcion?: string | null
+  ejecucion_at?: string | null
+  ejecutado_por_nombre?: string | null
+
   enviado_at?: string | null
   created_at?: string | null
 }

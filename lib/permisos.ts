@@ -50,6 +50,7 @@ export const CATALOGO_PERMISOS: GrupoPermisos[] = [
       { id: 'sst.modulos.gestionar',  label: 'Gestionar módulos',   descripcion: 'Crear módulos de participación, escribir sus preguntas y abrirlos o cerrarlos' },
       { id: 'sst.reportes.ver',           label: 'Consultar reportes HSE',    descripcion: 'Ver las tarjetas de reporte que envían los trabajadores' },
       { id: 'sst.reportes.gestionar',     label: 'Gestionar reportes HSE',    descripcion: 'Registrar el seguimiento y relacionarlos con la matriz de mejoras' },
+      { id: 'sst.reportes.responder',     label: 'Responder acciones asignadas', descripcion: 'Ver únicamente los reportes que se le asignaron y dejar constancia de lo que se hizo. No cierra el reporte: eso lo verifica SST' },
       { id: 'sst.reportes.corregir',      label: 'Corregir reportes HSE',     descripcion: 'Enmendar lo que escribió el trabajador cuando quedó mal diligenciado' },
       { id: 'sst.reportes.eliminar',      label: 'Eliminar reportes HSE',     descripcion: 'Borrar reportes. Sirve para limpiar pruebas y no tiene vuelta atrás' },
       { id: 'sst.entregas.ver',       label: 'Consultar entregas',  descripcion: 'Ver qué se le ha entregado a cada trabajador y descargar el soporte' },
@@ -102,6 +103,9 @@ export const PERMISOS_POR_ROL: Record<string, string[]> = {
     'personal.ver',
     'sst.entregas.ver', 'sst.entregas.registrar',
   ],
+  // Quien ejecuta lo que sale de un reporte: mantenimiento, el jefe de campo,
+  // gerencia. Solo ve lo que se le asignó y no cierra nada.
+  responsable: ['sst.reportes.responder'],
   analista_sst: [
     'personal.ver', 'formacion.ver',
     'sst.entregas.ver', 'sst.entregas.registrar',
@@ -115,6 +119,7 @@ export const ROLES: { id: string; label: string; descripcion: string; color: str
   { id: 'portero',    label: 'Portero',            color: '#06B6D4', descripcion: 'acceso solo a portería/ingreso/salida' },
   { id: 'almacen',    label: 'Almacén',            color: '#0EA5E9', descripcion: 'entrega de EPP y elementos, nada más' },
   { id: 'analista_sst', label: 'Analista SST',     color: '#14B8A6', descripcion: 'entregas y consulta de lo del SG-SST' },
+  { id: 'responsable', label: 'Responsable de acción', color: '#6366F1', descripcion: 'ejecuta las acciones de los reportes que se le asignan' },
   { id: 'admin',      label: 'Administrador',      color: '#F59E0B', descripcion: 'gestión del personal y SSTudio' },
   { id: 'superadmin', label: 'Superadministrador', color: '#EF4444', descripcion: 'control total de la plataforma' },
 ]

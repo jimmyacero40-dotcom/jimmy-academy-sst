@@ -497,6 +497,30 @@ export default function BandejaReportalPage() {
               <TarjetaHSE r={abierto} />
             )}
 
+            {/* Lo que respondió el responsable de la acción.
+
+                Va en solo lectura y antes de la gestión de SST: es la
+                declaración de quien ejecutó, y quien verifica no la reescribe.
+                Si algo quedó mal dicho, se le pide a él que lo corrija. */}
+            {abierto.ejecucion_at && (
+              <div className="mt-6 p-4 rounded-xl"
+                style={{ background: 'rgba(99,102,241,0.06)', border: '1px solid rgba(99,102,241,0.3)' }}>
+                <div className="flex items-center gap-2 mb-2">
+                  <Wrench size={15} style={{ color: '#6366F1' }} />
+                  <p className="text-sm font-black" style={{ color: 'var(--text)' }}>Lo que hizo el responsable</p>
+                </div>
+                <p className="text-sm whitespace-pre-wrap" style={{ color: 'var(--text)' }}>
+                  {abierto.ejecucion_descripcion}
+                </p>
+                <p className="text-[11px] mt-2" style={{ color: 'var(--text-dim)' }}>
+                  {abierto.ejecutado_por_nombre ?? 'Sin nombre'} ·{' '}
+                  {new Date(abierto.ejecucion_at).toLocaleDateString('es-CO', {
+                    day: '2-digit', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit',
+                  })}
+                </p>
+              </div>
+            )}
+
             {/* Lo que agrega SST */}
             <div className="mt-6 p-4 rounded-xl" style={{ background: 'rgba(6,182,212,0.06)', border: '1px solid rgba(6,182,212,0.3)' }}>
               <div className="flex items-center gap-2 mb-3">

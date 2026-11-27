@@ -12,7 +12,7 @@ import {
   CalendarDays, GraduationCap, TrendingUp,
   Home, Activity, FileCheck2,
   HardHat, FileText, ArrowLeftRight, AlertTriangle, MessageSquare, Package,
-  Bell, Shield, Leaf, LogIn, DoorOpen, UserX, MapPin
+  Bell, Shield, Leaf, LogIn, DoorOpen, UserX, MapPin, Wrench
 } from 'lucide-react'
 import { CommandPalette } from '@/components/CommandPalette'
 import { useTheme, THEMES, type ThemeId } from '@/components/ThemeProvider'
@@ -21,6 +21,7 @@ import { useRol } from '@/lib/usar-rol'
 // All navigable hrefs — order matters: MORE SPECIFIC paths must come first so
 // the most-specific match wins when finding the active nav item.
 const ALL_NAV_HREFS = [
+  '/dashboard/mis-acciones',
   '/dashboard/users/retirados',
   '/dashboard/users',
   '/dashboard/areas',
@@ -232,6 +233,9 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   // abre la consola de entregas es el permiso, no el rol.
   const permisosDelUsuario = ((session?.user as any)?.permissions ?? []) as string[]
   const esCuentaDeOficio = userRole === 'almacen' || userRole === 'analista_sst'
+  // Mantenimiento, el jefe de campo, gerencia: entran a ejecutar lo que se les
+  // asignó de un reporte, y a nada más.
+  const esResponsable = userRole === 'responsable'
   const puedeRepartir = permisosDelUsuario.includes('sst.entregas.registrar')
     || permisosDelUsuario.includes('sst.entregas.ver')
 
@@ -586,6 +590,13 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           ) : (
             /* ── Worker nav ── */
             <div className="pt-1 space-y-0.5">
+              {esResponsable && (
+                <Link href="/dashboard/mis-acciones"
+                  className={`nav-item ${isActive('/dashboard/mis-acciones') ? 'active' : ''}`}>
+                  <Wrench size={16} strokeWidth={2} className="flex-shrink-0" />
+                  <span className="truncate">Mis acciones</span>
+                </Link>
+              )}
               {/* El trabajador que además reparte —el almacenista— ve la
                   consola de entregas, aunque su rol sea trabajador: lo que
                   manda es el permiso. */}
@@ -601,7 +612,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                   capacitaciones que hacer. El analista de SST sí consulta
                   algunas cosas más. */}
               {WORKER_NAV.filter(x => {
-                if (userRole === 'almacen') return false
+                if (userRole === 'almacen' || esResponsable) return false
                 if (userRole === 'analista_sst') {
                   return ['/dashboard/inicio', '/dashboard/my-profile', '/dashboard/my-plan'].includes(x.href)
                 }

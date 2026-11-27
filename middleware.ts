@@ -39,6 +39,10 @@ export default withAuth(
     // administradores; entran a entregar y a poco más.
     const isEntregador = role === 'almacen' || role === 'analista_sst'
 
+    // Quien ejecuta lo que sale de un reporte: mantenimiento, el jefe de
+    // campo, gerencia. Entra a una sola pantalla, la de sus acciones.
+    const isResponsable = role === 'responsable'
+
     const permisos = (token?.permissions as string[] | null | undefined) ?? []
     const puedeEntregas = permisos.includes('sst.entregas.registrar')
       || permisos.includes('sst.entregas.ver')
@@ -147,6 +151,17 @@ export default withAuth(
     // Sin esto, un rol que no sea ninguno de los conocidos se colaría a todo:
     // las puertas de abajo preguntan por worker, consulta y portero, y lo que
     // no encaje en ninguna llega al final sin que nadie lo pare.
+    if (isResponsable) {
+      const RUTAS_RESPONSABLE = [
+        '/dashboard', '/dashboard/mis-acciones',
+        '/dashboard/settings', '/dashboard/configuracion',
+      ]
+      if (path === '/dashboard' || !permite(RUTAS_RESPONSABLE)) {
+        return NextResponse.redirect(new URL('/dashboard/mis-acciones', req.url))
+      }
+      return NextResponse.next()
+    }
+
     if (isEntregador) {
       // El almacén solo entrega. El analista de SST además consulta lo suyo.
       const RUTAS_ENTREGADOR = role === 'almacen'
