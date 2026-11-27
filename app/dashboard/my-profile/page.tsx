@@ -13,7 +13,7 @@ import {
 } from 'lucide-react'
 import { calcSections, calcPct, TOTAL_SECCIONES } from '@/lib/perfil-completitud'
 // La firma ya existe como pantalla propia; aquí se reutiliza tal cual.
-import MySignaturePage from '../my-signature/page'
+import FirmaDigital from '@/components/firma/FirmaDigital'
 import { irArriba } from '@/lib/ir-arriba'
 
 // ─── Types ────────────────────────────────────────────────────────────
@@ -337,6 +337,36 @@ export default function MyProfilePage() {
   const [tab, setTab]               = useState('personal')
   // Las secciones ya completas van plegadas: ocupaban media pantalla.
   const [verCompletas, setVerCompletas] = useState(false)
+
+  /**
+   * Que la pantalla no se mueva bajo los dedos.
+   *
+   * Al marcar una casilla, el recuadro de arriba cambia de alto —aparece o
+   * desaparece lo que falta— y todo lo de abajo se corre: la persona iba a
+   * tocar una cosa y tocaba otra. Chrome lo corrige solo con el anclaje de
+   * desplazamiento; Safari no lo soporta, y ahí es donde se ve el salto. Por
+   * eso solo se compensa a mano donde el navegador no lo hace.
+   */
+  const cabecera = useRef<HTMLDivElement>(null)
+  useEffect(() => {
+    const anclaNativa = typeof CSS !== 'undefined'
+      && typeof CSS.supports === 'function'
+      && CSS.supports('overflow-anchor', 'auto')
+    const caja = cabecera.current
+    const lienzo = document.querySelector('main')
+    if (anclaNativa || !caja || !lienzo || typeof ResizeObserver === 'undefined') return
+
+    let anterior = caja.offsetHeight
+    const vigia = new ResizeObserver(() => {
+      const ahora = caja.offsetHeight
+      const cambio = ahora - anterior
+      anterior = ahora
+      // Arriba del todo no hay nada que compensar: ahí no se nota.
+      if (cambio !== 0 && lienzo.scrollTop > 0) lienzo.scrollTop += cambio
+    })
+    vigia.observe(caja)
+    return () => vigia.disconnect()
+  }, [])
   const [uploadingPhoto, setUploadingPhoto] = useState(false)
   const [photoError, setPhotoError] = useState<string | null>(null)
   const photoRef = useRef<HTMLInputElement>(null)
@@ -503,7 +533,7 @@ export default function MyProfilePage() {
       )}
 
       {/* ── Header card ── */}
-      <div className="terra-card p-5 mb-5">
+      <div ref={cabecera} className="terra-card p-5 mb-5">
         <div className="flex items-start gap-4 flex-wrap">
 
           {/* Avatar */}
@@ -1437,9 +1467,9 @@ export default function MyProfilePage() {
                   dejaba un hueco debajo. Lo que hay que hacer es firmar, no
                   leer que falta firmar: la hoja de firma va donde el trabajador
                   ya está parado. */}
-              <div className="-mx-4 sm:-mx-1">
-                <MySignaturePage onFirmaGuardada={f => set('firma_electronica', f)} />
-              </div>
+              <SectionCard title="Tu firma *" icon={PenTool} accent="#F59E0B">
+                <FirmaDigital comoSeccion onFirmaGuardada={f => set('firma_electronica', f)} />
+              </SectionCard>
 
               <TabNav onPrev={() => switchTab('salud')} />
             </div>
