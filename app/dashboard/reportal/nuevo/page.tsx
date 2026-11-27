@@ -12,6 +12,7 @@ import {
   TIPOS_REPORTE, ACCIONES_INMEDIATAS, faltantes, puedeEnviarse,
   type ReporteHSE,
 } from '@/lib/reportes-hse'
+import { irArriba } from '@/lib/ir-arriba'
 
 const inp = 'w-full bg-[var(--bg-surface)] border border-[var(--border)] rounded-xl px-3.5 py-3 text-sm text-[var(--text)] focus:outline-none focus:border-[var(--primary)] transition-colors'
 
@@ -55,9 +56,9 @@ export default function NuevoReportePage() {
     if (!pasoCompleto(paso)) { setIntento(true); return }
     setIntento(false)
     setPaso(p => Math.min(p + 1, PASOS.length - 1))
-    window.scrollTo({ top: 0, behavior: 'smooth' })
+    irArriba()
   }
-  const anterior = () => { setIntento(false); setPaso(p => Math.max(p - 1, 0)); window.scrollTo({ top: 0, behavior: 'smooth' }) }
+  const anterior = () => { setIntento(false); setPaso(p => Math.max(p - 1, 0)); irArriba() }
 
   const enviar = async () => {
     setEnviando(true); setError(null)

@@ -12,6 +12,7 @@ import {
   type Modulo, type Pregunta,
 } from '@/lib/modulos'
 import CampoRespuesta from '@/components/modulos/CampoRespuesta'
+import { irArriba } from '@/lib/ir-arriba'
 
 export default function ResponderModuloPage({ params }: { params: { id: string } }) {
   const [modulo, setModulo] = useState<Modulo | null>(null)
@@ -88,12 +89,12 @@ export default function ResponderModuloPage({ params }: { params: { id: string }
     setIntento(false)
     void guardar(false)
     setPaso(p => Math.min(p + 1, preguntas.length - 1))
-    window.scrollTo({ top: 0, behavior: 'smooth' })
+    irArriba()
   }
   const anterior = () => {
     setIntento(false)
     setPaso(p => Math.max(p - 1, 0))
-    window.scrollTo({ top: 0, behavior: 'smooth' })
+    irArriba()
   }
 
   const enviar = async () => {

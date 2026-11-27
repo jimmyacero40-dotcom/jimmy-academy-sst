@@ -12,7 +12,7 @@
  * ya existe, así que una entrega son cuatro datos y tres toques.
  */
 
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useSession } from 'next-auth/react'
 import {
   Package, Plus, Loader2, Search, Check, X, Trash2, Download,
@@ -90,6 +90,11 @@ function haceUnMes(): string {
   return new Date(Date.now() - 5 * 60 * 60 * 1000 - 30 * 86400000).toISOString().slice(0, 10)
 }
 
+/** La hora de ahora en Colombia, 'HH:MM', para proponerla en el registro. */
+function horaCol(): string {
+  return new Date(Date.now() - 5 * 60 * 60 * 1000).toISOString().slice(11, 16)
+}
+
 function hora(iso: string): string {
   return new Date(iso).toLocaleTimeString('es-CO', { hour: '2-digit', minute: '2-digit' })
 }
@@ -127,6 +132,9 @@ export default function EntregasPage() {
   const [busca, setBusca] = useState('')
   const [filtro, setFiltro] = useState<'todas' | 'confirmadas' | 'pendientes'>('todas')
   const [editandoTipos, setEditandoTipos] = useState(false)
+  // Cuando se pide registrar sin haber escogido qué se entrega.
+  const [pidaTipo, setPidaTipo] = useState(false)
+  const selectorTipo = useRef<HTMLSelectElement>(null)
   // Para el encabezado del formato de la empresa.
   const [empresa, setEmpresa] = useState('AgroVenture Capital')
   const [logo, setLogo] = useState<string | null>(null)
@@ -255,7 +263,10 @@ export default function EntregasPage() {
             <div className="flex-1" style={{ minWidth: 200 }}>
               <label className="block text-[11px] font-bold uppercase tracking-wider mb-1.5"
                 style={{ color: 'var(--text-faint)' }}>Entregable</label>
-              <select value={tipoId} onChange={e => setTipoId(e.target.value)} className={inp} style={estilo}>
+              <select ref={selectorTipo} value={tipoId}
+                onChange={e => { setTipoId(e.target.value); setPidaTipo(false) }}
+                className={inp}
+                style={pidaTipo ? { ...estilo, border: '1px solid #F59E0B' } : estilo}>
                 {/* El formato de la empresa es por trabajador y cruza
                     elementos distintos, así que hay que poder verlo todo. */}
                 <option value="todos">Todos los entregables</option>
@@ -267,6 +278,11 @@ export default function EntregasPage() {
                   </optgroup>
                 ))}
               </select>
+              {pidaTipo && (
+                <p className="text-[11px] mt-1 font-semibold" style={{ color: '#B45309' }}>
+                  Escoge primero qué vas a entregar.
+                </p>
+              )}
             </div>
             <div>
               <label className="block text-[11px] font-bold uppercase tracking-wider mb-1.5"
@@ -285,8 +301,13 @@ export default function EntregasPage() {
               style={{ border: '1px solid var(--border)', color: 'var(--text-dim)', background: 'var(--bg)' }}>
               <CalendarDays size={13} className="inline mr-1" /> Hoy
             </button>
-            {puedeRegistrar && !verTodos && (
-              <button onClick={() => setEntregando(true)}
+            {puedeRegistrar && (
+              // Estando en «todos los entregables» no se sabe qué se entrega,
+              // pero el botón no puede desaparecer: se pide escoger el ítem.
+              <button onClick={() => {
+                if (verTodos) { setPidaTipo(true); selectorTipo.current?.focus(); return }
+                setPidaTipo(false); setEntregando(true)
+              }}
                 className="flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-bold"
                 style={{ background: '#243C2C', color: '#fff' }}>
                 <Plus size={14} /> Registrar entrega
@@ -508,6 +529,9 @@ function DialogoEntrega({ tipo, recientes, prefijoDeOficio, onCerrar, onListo }:
   const [cantidad, setCantidad] = useState(String(tipo.cantidad_sugerida ?? 1))
   const [referencia, setReferencia] = useState(tipo.referencia ?? '')
   const [cuando, setCuando] = useState(hoyCol())
+  // La hora de verdad. Arranca en la del reloj y se puede corregir: a veces se
+  // registra un rato después, o se anota una entrega de ayer.
+  const [hora, setHora] = useState(horaCol())
   const [observacion, setObservacion] = useState('')
   // Se recuerda en el navegador: casi siempre entrega la misma persona, y
   // volver a escribir su nombre en cada entrega es el tipo de trabajo que
@@ -561,6 +585,7 @@ function DialogoEntrega({ tipo, recientes, prefijoDeOficio, onCerrar, onListo }:
           cantidad: Number(cantidad) || 1,
           referencia: referencia.trim() || null,
           fecha: cuando,
+          hora,
           entregado_por_nombre: quienEntrega.trim() || null,
           observacion: observacion.trim() || null,
         }),
@@ -598,11 +623,17 @@ function DialogoEntrega({ tipo, recientes, prefijoDeOficio, onCerrar, onListo }:
               <input type="number" min={1} step="any" value={cantidad}
                 onChange={e => setCantidad(e.target.value)} className={inp} style={estilo} />
             </div>
-            <div className="col-span-2">
+            <div>
               <label className="block text-[11px] font-bold uppercase tracking-wider mb-1.5"
                 style={{ color: 'var(--text-faint)' }}>Fecha</label>
               <input type="date" value={cuando} max={hoyCol()}
                 onChange={e => setCuando(e.target.value)} className={inp} style={estilo} />
+            </div>
+            <div>
+              <label className="block text-[11px] font-bold uppercase tracking-wider mb-1.5"
+                style={{ color: 'var(--text-faint)' }}>Hora</label>
+              <input type="time" value={hora}
+                onChange={e => setHora(e.target.value)} className={inp} style={estilo} />
             </div>
           </div>
 

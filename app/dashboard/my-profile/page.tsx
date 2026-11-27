@@ -14,6 +14,7 @@ import {
 import { calcSections, calcPct, TOTAL_SECCIONES } from '@/lib/perfil-completitud'
 // La firma ya existe como pantalla propia; aquí se reutiliza tal cual.
 import MySignaturePage from '../my-signature/page'
+import { irArriba } from '@/lib/ir-arriba'
 
 // ─── Types ────────────────────────────────────────────────────────────
 type Nullable<T> = T | null | undefined
@@ -400,6 +401,12 @@ export default function MyProfilePage() {
   const switchTab = (t: string) => {
     save(true)
     setTab(t)
+    // Y volver arriba. En el celular la pantalla se quedaba donde iba —a
+    // media altura o al final—, así que la sección nueva empezaba por la
+    // mitad y parecía que no hubiera más preguntas: por eso quedaban sin
+    // responder. El contenido se desplaza dentro de <main>, no en la
+    // ventana, así que es a ese al que hay que moverlo.
+    irArriba()
   }
 
   // Photo upload with client-side compression

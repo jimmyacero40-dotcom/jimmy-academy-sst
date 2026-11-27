@@ -154,9 +154,27 @@ export async function POST(req: NextRequest) {
 
   const quien = await getCurrentUser()
   const cantidad = Number(b.cantidad)
-  const cuando = typeof b.fecha === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(b.fecha)
-    ? `${b.fecha}T12:00:00-05:00`
-    : new Date().toISOString()
+  /**
+   * Cuándo se entregó, con su hora de verdad.
+   *
+   * Antes toda entrega quedaba a las 12:00: la fecha venía sin hora y se le
+   * ponía el mediodía para que la zona horaria no la corriera al día
+   * anterior. El soporte decía la hora equivocada en todas.
+   *
+   * Ahora manda la hora que se escriba; si no se escribe ninguna y la entrega
+   * es de hoy, queda la hora del reloj. Solo cuando se registra un día pasado
+   * sin hora se deja el mediodía: esa hora nadie la sabe.
+   */
+  const hoyCol = new Date(Date.now() - 5 * 60 * 60 * 1000).toISOString().slice(0, 10)
+  const fechaOk = typeof b.fecha === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(b.fecha)
+  const horaOk = typeof b.hora === 'string' && /^([01]\d|2[0-3]):[0-5]\d$/.test(b.hora)
+  const cuando = !fechaOk
+    ? new Date().toISOString()
+    : horaOk
+      ? `${b.fecha}T${b.hora}:00-05:00`
+      : b.fecha === hoyCol
+        ? new Date().toISOString()
+        : `${b.fecha}T12:00:00-05:00`
 
   const { data, error } = await supabase
     .from('entregas')

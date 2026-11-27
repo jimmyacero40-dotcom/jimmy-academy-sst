@@ -7,6 +7,7 @@ import {
   Loader2, CheckCircle, ChevronLeft, ChevronRight, AlertCircle,
   CreditCard, User, Briefcase, Phone, Send,
 } from 'lucide-react'
+import { irArriba } from '@/lib/ir-arriba'
 
 /**
  * Enlace público para que el propio trabajador diligencie sus datos.
@@ -108,7 +109,7 @@ export default function PreRegistroPage() {
         return
       }
       setPaso(1)
-      window.scrollTo({ top: 0, behavior: 'smooth' })
+      irArriba()
     } catch {
       setError('Sin conexión. Intenta de nuevo.')
     } finally { setRevisando(false) }
@@ -130,7 +131,7 @@ export default function PreRegistroPage() {
     if (paso === 0) { revisarCedula(); return }
     setError(null)
     setPaso(p => Math.min(p + 1, PASOS.length - 1))
-    window.scrollTo({ top: 0, behavior: 'smooth' })
+    irArriba()
   }
 
   const enviar = async () => {

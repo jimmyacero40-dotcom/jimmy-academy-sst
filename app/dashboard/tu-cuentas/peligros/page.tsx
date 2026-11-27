@@ -12,6 +12,7 @@ import {
   PREGUNTAS, GRUPOS_PELIGROS, CAMPO_MEJORAS, avance, estaCompleta,
   type Participacion, type Pregunta,
 } from '@/lib/peligros'
+import { irArriba } from '@/lib/ir-arriba'
 
 interface Trabajador {
   nombre?: string; cedula?: string | null; empresa?: string | null
@@ -98,10 +99,10 @@ export default function ParticipacionPeligrosPage() {
     // Se avanza de una vez y el guardado va detrás: esperar la respuesta del
     // servidor para cambiar de pregunta se siente como que el botón no responde.
     setPaso(p => Math.min(p + 1, PREGUNTAS.length - 1))
-    window.scrollTo({ top: 0, behavior: 'smooth' })
+    irArriba()
     void guardar(false)
   }
-  const anterior = () => { setIntento(false); setPaso(p => Math.max(p - 1, 0)); window.scrollTo({ top: 0, behavior: 'smooth' }) }
+  const anterior = () => { setIntento(false); setPaso(p => Math.max(p - 1, 0)); irArriba() }
 
   if (cargando) return (
     <div className="flex flex-col items-center justify-center py-32 gap-3">
