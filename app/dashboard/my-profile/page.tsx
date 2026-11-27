@@ -9,7 +9,7 @@ import { DEPARTAMENTOS, municipiosDe } from '@/lib/divipola'
 import {
   User, Camera, CheckCircle, Clock, Loader2, Save,
   Heart, Briefcase, GraduationCap, Activity, Shield, Award,
-  FileText, Home, Car, ChevronRight, Info, AlertCircle, PenTool, AlertTriangle
+  FileText, Home, Car, ChevronRight, ChevronDown, ChevronUp, Info, AlertCircle, PenTool, AlertTriangle
 } from 'lucide-react'
 import { calcSections, calcPct, TOTAL_SECCIONES } from '@/lib/perfil-completitud'
 // La firma ya existe como pantalla propia; aquí se reutiliza tal cual.
@@ -277,16 +277,32 @@ function tabDeSeccion(nombre: string): string {
   for (const [tab, secciones] of Object.entries(TAB_SECTIONS)) {
     if (secciones.includes(nombre)) return tab
   }
+  // Si una sección no aparece en ninguna pestaña es un error de programación,
+  // no algo que la persona pueda arreglar: se avisa en desarrollo en vez de
+  // mandarla en silencio a la pestaña equivocada.
+  if (process.env.NODE_ENV !== 'production') {
+    console.warn(`La sección «${nombre}» no está asignada a ninguna pestaña del perfil`)
+  }
   return 'personal'
 }
 
+/**
+ * Qué secciones vive cada pestaña.
+ *
+ * Los nombres tienen que ser los mismos de `lib/ficha-campos`: aquí estaban
+ * abreviados («Vivienda», «Ant. familiares», «Tallas / EPP») y no casaban con
+ * ninguna sección real. Por eso tocar una ficha pendiente llevaba a Personal
+ * en vez de a su sección, y Familia y Salud mostraban el punto amarillo de
+ * «incompleta» aunque el perfil estuviera al 100 %.
+ */
 const TAB_SECTIONS: Record<string, string[]> = {
   personal: ['Foto', 'Datos personales'],
-  familia:  ['Contacto emergencia', 'Vivienda', 'Desplazamiento'],
+  familia:  ['Contacto de emergencia', 'Vivienda y hogar', 'Desplazamiento'],
   laboral:  ['Educación', 'Información laboral'],
-  tallas:   ['Tallas / EPP'],
-  estilos:  ['Hábitos'],
-  salud:    ['Antecedentes médicos', 'Ant. familiares', 'Salud ocupacional', 'Riesgo psicosocial'],
+  tallas:   ['Tallas y dotación'],
+  estilos:  ['Hábitos y estilo de vida'],
+  salud:    ['Antecedentes médicos', 'Picaduras de abejas', 'Antecedentes familiares',
+             'Salud ocupacional', 'Riesgo psicosocial'],
   cierre:   ['Competencias', 'Consentimientos'],
 }
 
@@ -317,6 +333,8 @@ export default function MyProfilePage() {
   const [saveMsg, setSaveMsg]       = useState<'saved' | 'local' | null>(null)
   const [serverErr, setServerErr]   = useState<string | null>(null)
   const [tab, setTab]               = useState('personal')
+  // Las secciones ya completas van plegadas: ocupaban media pantalla.
+  const [verCompletas, setVerCompletas] = useState(false)
   const [uploadingPhoto, setUploadingPhoto] = useState(false)
   const [photoError, setPhotoError] = useState<string | null>(null)
   const photoRef = useRef<HTMLInputElement>(null)
@@ -569,18 +587,47 @@ export default function MyProfilePage() {
           </button>
         </div>
 
-        {/* Section status chips */}
-        <div className="flex flex-wrap gap-1.5 mt-4 pt-3" style={{ borderTop: '1px solid var(--border)' }}>
-          {Object.entries(sections).map(([name, done]) => (
-            <button key={name} type="button" onClick={() => switchTab(tabDeSeccion(name))}
-              title={done ? 'Completo — toca para revisarlo' : 'Falta por completar — toca para ir'}
-              className="text-[10px] px-2 py-1 rounded-full flex items-center gap-1 font-semibold transition-all"
-              style={done
-                ? { background: 'rgba(16,185,129,0.1)', color: '#34D399', border: '1px solid rgba(16,185,129,0.25)' }
-                : { background: 'rgba(245,158,11,0.12)', color: '#F59E0B', border: '1px solid rgba(245,158,11,0.35)' }}>
-              {done ? <CheckCircle size={9} /> : <Clock size={9} />} {name}
-            </button>
-          ))}
+        {/* El estado de cada sección.
+
+            Dieciséis fichas seguidas llenaban media pantalla de celular y las
+            preguntas quedaban tan abajo que la gente no bajaba a verlas: creían
+            que ahí se acababa el formulario. Lo que falta se ve siempre, que es
+            lo accionable; lo que ya está completo se cuenta en una línea y se
+            despliega si alguien lo quiere revisar. */}
+        <div className="mt-4 pt-3" style={{ borderTop: '1px solid var(--border)' }}>
+          <div className="flex flex-wrap gap-1.5">
+            {Object.entries(sections).filter(([, done]) => !done).map(([name]) => (
+              <button key={name} type="button" onClick={() => switchTab(tabDeSeccion(name))}
+                title="Falta por completar — toca para ir"
+                className="text-[10px] px-2 py-1 rounded-full flex items-center gap-1 font-semibold"
+                style={{ background: 'rgba(245,158,11,0.12)', color: '#F59E0B', border: '1px solid rgba(245,158,11,0.35)' }}>
+                <Clock size={9} /> {name}
+              </button>
+            ))}
+
+            {doneCount > 0 && (
+              <button type="button" onClick={() => setVerCompletas(v => !v)}
+                className="text-[10px] px-2 py-1 rounded-full flex items-center gap-1 font-semibold"
+                style={{ background: 'rgba(16,185,129,0.1)', color: '#34D399', border: '1px solid rgba(16,185,129,0.25)' }}>
+                <CheckCircle size={9} />
+                {doneCount} {doneCount === 1 ? 'sección completa' : 'secciones completas'}
+                {verCompletas ? <ChevronUp size={9} /> : <ChevronDown size={9} />}
+              </button>
+            )}
+          </div>
+
+          {verCompletas && (
+            <div className="flex flex-wrap gap-1 mt-1.5">
+              {Object.entries(sections).filter(([, done]) => done).map(([name]) => (
+                <button key={name} type="button" onClick={() => switchTab(tabDeSeccion(name))}
+                  title="Completo — toca para revisarlo"
+                  className="text-[10px] px-2 py-0.5 rounded-full flex items-center gap-1"
+                  style={{ color: '#34D399', border: '1px solid rgba(16,185,129,0.25)' }}>
+                  <CheckCircle size={9} /> {name}
+                </button>
+              ))}
+            </div>
+          )}
         </div>
 
         {/* Qué falta para llegar al 100 % */}
