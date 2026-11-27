@@ -25,7 +25,7 @@ import {
   Users, Loader2, AlertTriangle, ChevronRight, ClipboardList,
   GraduationCap, FileText, Package, MessageSquare, Award, CalendarDays,
 } from 'lucide-react'
-import { Bloque, Barras, BarraParticipacion, Columnas, Cifra, TINTA, pct } from '@/components/panel/Graficos'
+import { Bloque, BarrasH, ColumnasAgrupadas, Columnas, Circular, Cifra, TINTA, pct } from '@/components/panel/Graficos'
 
 interface Panel {
   trabajadores: number
@@ -160,35 +160,36 @@ export default function DashboardPage() {
       <Bloque titulo="¿Está respondiendo la gente?"
         pregunta={`De los ${N} trabajadores activos, cuántos han contestado cada cosa`}
         accion={<Ir href="/dashboard/worker-profiles" texto="Ver detalle" />}>
-        <div className="space-y-4">
-          <BarraParticipacion titulo="Información sociodemográfica" total={N}
-            partes={[
-              { etiqueta: 'completa', valor: d.sociodemografica.completas, color: TINTA.hecho },
-              { etiqueta: 'empezada', valor: d.sociodemografica.empezadas, color: TINTA.curso },
-            ]}
-            nota="Completa es al 100 %. Cualquier otra cosa está empezada." />
-
-          <BarraParticipacion titulo="Identificación de peligros" total={N}
-            partes={[
-              { etiqueta: 'enviada', valor: d.tuCuentas.peligros.enviadas, color: TINTA.hecho },
-              { etiqueta: 'en borrador', valor: d.tuCuentas.peligros.empezadas, color: TINTA.curso },
-            ]} />
-
-          {d.tuCuentas.modulos.map(m => (
-            <BarraParticipacion key={m.id} total={N}
-              titulo={`${m.nombre}${m.estado !== 'abierto' ? ' · cerrado' : ''}`}
-              partes={[
-                { etiqueta: 'enviada', valor: m.enviadas, color: TINTA.hecho },
-                { etiqueta: 'en borrador', valor: m.empezadas, color: TINTA.curso },
-              ]} />
-          ))}
-
-          {d.tuCuentas.modulos.length === 0 && (
-            <p className="text-xs" style={{ color: 'var(--text-faint)' }}>
-              No hay módulos de Tú Cuentas creados todavía.
-            </p>
-          )}
-        </div>
+        <ColumnasAgrupadas
+          series={[
+            { nombre: 'Respondieron', color: TINTA.hecho },
+            { nombre: 'Empezaron sin terminar', color: TINTA.curso },
+            { nombre: 'No han abierto', color: TINTA.falta },
+          ]}
+          grupos={[
+            {
+              nombre: 'Información sociodemográfica',
+              pie: `${pct(d.sociodemografica.completas, N)} % al 100 %`,
+              valores: [d.sociodemografica.completas, d.sociodemografica.empezadas, d.sociodemografica.sinEmpezar],
+            },
+            {
+              nombre: 'Identificación de peligros',
+              pie: `${pct(d.tuCuentas.peligros.enviadas, N)} % enviada`,
+              valores: [
+                d.tuCuentas.peligros.enviadas,
+                d.tuCuentas.peligros.empezadas,
+                Math.max(0, N - d.tuCuentas.peligros.enviadas - d.tuCuentas.peligros.empezadas),
+              ],
+            },
+            ...d.tuCuentas.modulos.map(m => ({
+              nombre: m.nombre,
+              pie: `${pct(m.enviadas, N)} % enviada${m.estado !== 'abierto' ? ' · cerrado' : ''}`,
+              valores: [m.enviadas, m.empezadas, Math.max(0, N - m.enviadas - m.empezadas)],
+            })),
+          ]} />
+        <p className="text-[10px] mt-3" style={{ color: 'var(--text-faint)' }}>
+          La ficha sociodemográfica cuenta como respondida solo al 100 %. Cualquier otra cosa está empezada.
+        </p>
       </Bloque>
 
       {/* ── Formación ── */}
@@ -197,7 +198,8 @@ export default function DashboardPage() {
           pregunta="Estado de todas las matrículas del plan"
           accion={<Ir href="/dashboard/enrollments" texto="Trazabilidad" />}>
           <div className="space-y-4">
-            <BarraParticipacion titulo="Matrículas del plan" total={f.asignadas}
+            <Circular centro={`${pct(f.completadas, f.asignadas)} %`}
+              pie={`${f.asignadas} matrículas en total`}
               partes={[
                 { etiqueta: 'completadas', valor: f.completadas, color: TINTA.hecho },
                 { etiqueta: 'pendientes', valor: f.pendientes, color: TINTA.curso },
@@ -249,7 +251,7 @@ export default function DashboardPage() {
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
         <Bloque titulo="Cumplimiento por área"
           pregunta="Capacitaciones completadas sobre las asignadas en cada área">
-          <Barras color={TINTA.hecho}
+          <BarrasH color={TINTA.hecho}
             filas={d.porArea.map(a => ({ nombre: a.area, valor: a.hechas, de: a.total }))} />
         </Bloque>
 
@@ -259,15 +261,14 @@ export default function DashboardPage() {
             accion={<Ir href="/dashboard/gestion-sst/reportal" texto="Ver reportes" />}>
             {d.reportal.total > 0 ? (
               <div className="space-y-4">
-                <Barras color={TINTA.curso}
+                <BarrasH color={TINTA.curso}
                   filas={Object.entries(d.reportal.porEstado)
                     .map(([e, n]) => ({ nombre: ESTADO_REPORTE[e] ?? e, valor: n }))
-                    .sort((a, b) => b.valor - a.valor)}
-                  unidad="" />
+                    .sort((a, b) => b.valor - a.valor)} />
                 {Object.keys(d.reportal.porTipo).length > 0 && (
                   <div className="pt-3" style={{ borderTop: '1px solid var(--border-subtle)' }}>
                     <p className="text-[11px] font-bold mb-2" style={{ color: 'var(--text)' }}>De qué se reporta</p>
-                    <Barras color={TINTA.dato}
+                    <BarrasH color={TINTA.dato}
                       filas={Object.entries(d.reportal.porTipo)
                         .map(([t, n]) => ({ nombre: t, valor: n }))
                         .sort((a, b) => b.valor - a.valor)
@@ -286,12 +287,12 @@ export default function DashboardPage() {
             pregunta="Cuánto se entregó y cuánto confirmó el trabajador"
             accion={<Ir href="/dashboard/gestion-sst/entregas" texto="Ver entregas" />}>
             {d.entregas.total > 0 ? (
-              <BarraParticipacion titulo="Entregas registradas" total={d.entregas.total}
+              <Circular tamano={120} centro={String(d.entregas.total)}
+                pie={`${d.entregas.personas} ${d.entregas.personas === 1 ? 'persona ha recibido' : 'personas han recibido'} algo`}
                 partes={[
                   { etiqueta: 'confirmadas por el trabajador', valor: d.entregas.confirmadas, color: TINTA.hecho },
                   { etiqueta: 'sin confirmar', valor: d.entregas.total - d.entregas.confirmadas, color: TINTA.curso },
-                ]}
-                nota={`${d.entregas.personas} ${d.entregas.personas === 1 ? 'persona ha recibido' : 'personas han recibido'} algo`} />
+                ]} />
             ) : (
               <p className="text-xs" style={{ color: 'var(--text-faint)' }}>
                 No hay entregas registradas en el histórico.

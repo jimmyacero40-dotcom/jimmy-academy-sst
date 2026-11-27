@@ -1,30 +1,51 @@
 'use client'
 
 /**
- * Las piezas con las que se dibuja el panel.
+ * Las piezas con las que se dibuja el panel: columnas, barras y circulares de
+ * verdad, con su eje, su rejilla y su leyenda.
  *
- * Nada de librerías: son barras y columnas hechas con lo que ya tiene el
- * proyecto. Tres reglas que se siguen en todas:
+ * Antes eran barritas de progreso, que dicen poco: no se ve la escala, no se
+ * comparan dos cosas entre sí y no se parecen a nada de lo que la gente lee en
+ * un informe. Tres reglas que se siguen en todas:
  *
- * 1. Cada cifra va con su denominador. «22 de 59» se puede defender en una
- *    reunión; un «37 %» suelto no.
- * 2. El color nunca es la única señal: cada parte lleva su número y su
- *    nombre escritos, para quien no distingue el verde del amarillo y para
- *    cuando el informe se imprime en blanco y negro.
- * 3. El largo de la barra es la proporción de verdad. Barras del mismo largo
- *    para cifras distintas fue un error que ya se cometió aquí.
+ * 1. Cada cifra va con su denominador. «34 de 58» se puede defender en una
+ *    reunión; un «59 %» suelto no.
+ * 2. El color nunca es la única señal: cada columna lleva su número escrito y
+ *    su nombre, para quien no distingue el verde del amarillo y para cuando el
+ *    informe se imprime en blanco y negro.
+ * 3. El tamaño es la proporción de verdad, medida contra la escala del eje.
  */
 
 export const TINTA = {
-  hecho:   '#10B981',   // completado
-  curso:   '#F59E0B',   // empezado, pendiente
+  hecho:   '#10B981',   // completado, enviado
+  curso:   '#F59E0B',   // empezado, en borrador, pendiente
   vencido: '#EF4444',
-  falta:   '#94A3B8',   // sin empezar: gris a propósito, no es un estado bueno
+  falta:   '#CBD5E1',   // sin abrir: gris a propósito, no es un estado bueno
   dato:    '#3B82F6',   // magnitud sin juicio de valor
 }
 
 export function pct(parte: number, total: number): number {
   return total > 0 ? Math.round((parte / total) * 100) : 0
+}
+
+/** Una escala redonda para el eje: 7 no se lee, 10 sí. */
+function tope(valores: number[]): number {
+  const max = Math.max(1, ...valores)
+  const paso = max <= 10 ? 2 : max <= 50 ? 10 : max <= 200 ? 25 : 100
+  return Math.ceil(max / paso) * paso
+}
+
+function Leyenda({ series }: { series: { nombre: string; color: string }[] }) {
+  return (
+    <div className="flex flex-wrap gap-x-4 gap-y-1 mb-3">
+      {series.map(s => (
+        <span key={s.nombre} className="text-[11px] flex items-center gap-1.5" style={{ color: 'var(--text-dim)' }}>
+          <span className="w-2.5 h-2.5 rounded-sm flex-shrink-0" style={{ background: s.color }} />
+          {s.nombre}
+        </span>
+      ))}
+    </div>
+  )
 }
 
 /** Una cifra grande con lo que significa debajo. */
@@ -50,126 +71,196 @@ export function Cifra({ valor, de, titulo, pie, color = 'var(--text)' }: {
 }
 
 /**
- * Cuántos de cuántos, en una barra partida.
+ * Columnas agrupadas: varias cosas comparadas entre sí, cada una con sus
+ * partes una al lado de la otra.
  *
- * Sirve para la pregunta que más se hace en SST: de la gente que debía
- * responder, cuántos respondieron, cuántos empezaron y cuántos no han abierto.
+ * Es el gráfico que responde «¿cuál va mejor?» de un vistazo, que con barras
+ * de progreso sueltas había que calcularlo mentalmente.
  */
-export function BarraParticipacion({ titulo, total, partes, nota }: {
-  titulo: string
-  total: number
-  partes: { etiqueta: string; valor: number; color: string }[]
-  nota?: string
-}) {
-  const suma = partes.reduce((s, p) => s + p.valor, 0)
-  const base = Math.max(total, suma)
-  return (
-    <div>
-      <div className="flex items-baseline justify-between gap-3 mb-1.5">
-        <p className="text-xs font-bold truncate" style={{ color: 'var(--text)' }}>{titulo}</p>
-        <p className="text-xs font-bold tabular-nums flex-shrink-0" style={{ color: partes[0]?.color }}>
-          {partes[0]?.valor ?? 0} de {base}
-          <span className="font-semibold ml-1" style={{ color: 'var(--text-faint)' }}>
-            · {pct(partes[0]?.valor ?? 0, base)} %
-          </span>
-        </p>
-      </div>
-
-      {/* Las partes van separadas por un hilo del color del fondo: pegadas,
-          dos colores vecinos se leen como uno solo. */}
-      <div className="flex h-3 rounded-full overflow-hidden" style={{ background: 'var(--bg-card)' }}>
-        {partes.filter(p => p.valor > 0).map((p, i) => (
-          <div key={p.etiqueta} title={`${p.etiqueta}: ${p.valor} de ${base}`}
-            style={{
-              width: `${pct(p.valor, base)}%`,
-              background: p.color,
-              marginLeft: i > 0 ? 2 : 0,
-            }} />
-        ))}
-      </div>
-
-      <div className="flex flex-wrap gap-x-3 gap-y-0.5 mt-1.5">
-        {partes.map(p => (
-          <span key={p.etiqueta} className="text-[11px] flex items-center gap-1" style={{ color: 'var(--text-dim)' }}>
-            <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ background: p.color }} />
-            <strong className="tabular-nums" style={{ color: 'var(--text)' }}>{p.valor}</strong> {p.etiqueta}
-          </span>
-        ))}
-        {base > suma && (
-          <span className="text-[11px] flex items-center gap-1" style={{ color: 'var(--text-dim)' }}>
-            <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ background: 'var(--bg-card)', border: '1px solid var(--border-strong)' }} />
-            <strong className="tabular-nums" style={{ color: 'var(--text)' }}>{base - suma}</strong> sin abrir
-          </span>
-        )}
-      </div>
-      {nota && <p className="text-[10px] mt-1" style={{ color: 'var(--text-faint)' }}>{nota}</p>}
-    </div>
-  )
-}
-
-/** Una fila por cosa, ordenadas de mayor a menor. El largo es la proporción. */
-export function Barras({ filas, color = TINTA.dato, unidad }: {
-  filas: { nombre: string; valor: number; de?: number }[]
-  color?: string
+export function ColumnasAgrupadas({ grupos, series, alto = 190, unidad }: {
+  grupos: { nombre: string; valores: number[]; pie?: string }[]
+  series: { nombre: string; color: string }[]
+  alto?: number
   unidad?: string
 }) {
-  const tope = Math.max(1, ...filas.map(f => (f.de !== undefined ? f.de : f.valor)))
-  if (!filas.length) {
-    return <p className="text-xs py-4 text-center" style={{ color: 'var(--text-faint)' }}>Todavía no hay datos.</p>
+  if (!grupos.length) {
+    return <p className="text-xs py-6 text-center" style={{ color: 'var(--text-faint)' }}>Todavía no hay datos.</p>
   }
+  const max = tope(grupos.flatMap(g => g.valores))
+  const marcas = [0, 0.25, 0.5, 0.75, 1].map(f => Math.round(max * f))
+
   return (
-    <div className="space-y-2.5">
-      {filas.map(f => {
-        const base = f.de !== undefined ? f.de : tope
-        const ancho = pct(f.valor, base)
-        return (
-          <div key={f.nombre}>
-            <div className="flex items-baseline justify-between gap-3 mb-1">
-              <span className="text-[11px] font-semibold truncate" style={{ color: 'var(--text)' }}>{f.nombre}</span>
-              <span className="text-[11px] font-bold tabular-nums flex-shrink-0" style={{ color }}>
-                {f.valor}{f.de !== undefined ? ` de ${f.de}` : ''}{unidad ? ` ${unidad}` : ''}
-                {f.de !== undefined && <span className="font-semibold ml-1" style={{ color: 'var(--text-faint)' }}>· {ancho} %</span>}
-              </span>
-            </div>
-            <div className="h-2 rounded-full overflow-hidden" style={{ background: 'var(--bg-card)' }}
-              title={`${f.nombre}: ${f.valor}${f.de !== undefined ? ' de ' + f.de : ''}`}>
-              {f.valor > 0 && (
-                <div className="h-full rounded-full" style={{ width: `${Math.max(ancho, 2)}%`, background: color }} />
-              )}
+    <div>
+      <Leyenda series={series} />
+      <div className="flex gap-2">
+        {/* Eje de la izquierda */}
+        <div className="flex flex-col justify-between text-right flex-shrink-0"
+          style={{ height: alto, paddingBottom: 1 }}>
+          {[...marcas].reverse().map(m => (
+            <span key={m} className="text-[10px] tabular-nums leading-none" style={{ color: 'var(--text-faint)' }}>{m}</span>
+          ))}
+        </div>
+
+        <div className="flex-1 min-w-0">
+          <div className="relative" style={{ height: alto }}>
+            {/* Rejilla discreta: ayuda a leer la altura sin robar atención */}
+            {marcas.map((m, i) => (
+              <div key={m} className="absolute left-0 right-0"
+                style={{
+                  bottom: `${(i / (marcas.length - 1)) * 100}%`,
+                  borderTop: i === 0 ? '1px solid var(--border-strong)' : '1px dashed var(--border-subtle)',
+                }} />
+            ))}
+
+            <div className="absolute inset-0 flex items-end justify-around gap-3">
+              {grupos.map(g => (
+                <div key={g.nombre} className="flex-1 flex items-end justify-center gap-[3px] h-full">
+                  {g.valores.map((v, i) => (
+                    <div key={series[i].nombre} className="flex-1 flex flex-col items-center justify-end h-full"
+                      style={{ maxWidth: 46 }}
+                      title={`${g.nombre} · ${series[i].nombre}: ${v}${unidad ? ' ' + unidad : ''}`}>
+                      <span className="text-[10px] font-bold tabular-nums mb-0.5"
+                        style={{ color: v ? 'var(--text)' : 'var(--text-faint)' }}>{v}</span>
+                      <div className="w-full rounded-t"
+                        style={{
+                          height: `${(v / max) * 100}%`,
+                          minHeight: v ? 3 : 1,
+                          background: v ? series[i].color : 'var(--border)',
+                        }} />
+                    </div>
+                  ))}
+                </div>
+              ))}
             </div>
           </div>
-        )
-      })}
+
+          <div className="flex justify-around gap-3 mt-1.5">
+            {grupos.map(g => (
+              <div key={g.nombre} className="flex-1 text-center min-w-0">
+                <p className="text-[11px] font-bold leading-tight" style={{ color: 'var(--text)' }}>{g.nombre}</p>
+                {g.pie && <p className="text-[10px] leading-tight" style={{ color: 'var(--text-faint)' }}>{g.pie}</p>}
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
     </div>
   )
 }
 
-/** Cómo viene el mes a mes. Una sola serie, así que no hace falta leyenda. */
-export function Columnas({ datos, color = TINTA.hecho, titulo }: {
+/** Una sola serie en columnas: sirve para el mes a mes. */
+export function Columnas({ datos, color = TINTA.hecho, alto = 150 }: {
   datos: { mes: string; completadas: number }[]
   color?: string
-  titulo?: string
+  alto?: number
 }) {
-  const tope = Math.max(1, ...datos.map(d => d.completadas))
+  return (
+    <ColumnasAgrupadas alto={alto}
+      series={[{ nombre: 'Completadas', color }]}
+      grupos={datos.map(d => ({ nombre: d.mes, valores: [d.completadas] }))} />
+  )
+}
+
+/**
+ * Barras horizontales, para cuando los nombres son largos —las áreas, los
+ * tipos de reporte— y en vertical no cabrían.
+ */
+export function BarrasH({ filas, color = TINTA.dato }: {
+  filas: { nombre: string; valor: number; de?: number }[]
+  color?: string
+}) {
+  if (!filas.length) {
+    return <p className="text-xs py-6 text-center" style={{ color: 'var(--text-faint)' }}>Todavía no hay datos.</p>
+  }
+  const max = tope(filas.map(f => (f.de !== undefined ? f.de : f.valor)))
   return (
     <div>
-      {titulo && <p className="text-[11px] mb-2" style={{ color: 'var(--text-dim)' }}>{titulo}</p>}
-      <div className="flex items-end gap-2" style={{ height: 110 }}>
-        {datos.map(d => (
-          <div key={d.mes} className="flex-1 flex flex-col items-center justify-end gap-1 h-full"
-            title={`${d.mes}: ${d.completadas}`}>
-            <span className="text-[11px] font-bold tabular-nums" style={{ color: d.completadas ? 'var(--text)' : 'var(--text-faint)' }}>
-              {d.completadas}
+      <div className="space-y-2">
+        {filas.map(f => (
+          <div key={f.nombre} className="flex items-center gap-2">
+            <span className="text-[11px] font-semibold truncate text-right flex-shrink-0"
+              style={{ width: 110, color: 'var(--text)' }} title={f.nombre}>{f.nombre}</span>
+            <div className="flex-1 min-w-0 relative" style={{ height: 20 }}>
+              {/* El fondo marca hasta dónde llega la escala */}
+              <div className="absolute inset-y-0 left-0 right-0 rounded"
+                style={{ background: 'var(--bg-card)' }} />
+              {f.de !== undefined && (
+                <div className="absolute inset-y-0 left-0 rounded"
+                  style={{ width: `${(f.de / max) * 100}%`, background: 'var(--border-subtle)' }} />
+              )}
+              <div className="absolute inset-y-[2px] left-0 rounded"
+                style={{ width: `${Math.max((f.valor / max) * 100, f.valor ? 1.5 : 0)}%`, background: color }}
+                title={`${f.nombre}: ${f.valor}${f.de !== undefined ? ' de ' + f.de : ''}`} />
+            </div>
+            <span className="text-[11px] font-bold tabular-nums flex-shrink-0 text-right"
+              style={{ width: f.de !== undefined ? 86 : 30, color }}>
+              {f.valor}{f.de !== undefined ? ` de ${f.de}` : ''}
+              {f.de !== undefined && (
+                <span className="font-semibold ml-1" style={{ color: 'var(--text-faint)' }}>{pct(f.valor, f.de)} %</span>
+              )}
             </span>
-            <div className="w-full rounded-t"
-              style={{
-                height: `${Math.max((d.completadas / tope) * 100, d.completadas ? 4 : 1)}%`,
-                background: d.completadas ? color : 'var(--border)',
-                minHeight: 2,
-              }} />
-            <span className="text-[10px] font-semibold" style={{ color: 'var(--text-faint)' }}>{d.mes}</span>
           </div>
         ))}
+      </div>
+      <p className="text-[10px] mt-2 pl-[118px]" style={{ color: 'var(--text-faint)' }}>
+        Escala hasta {max}
+      </p>
+    </div>
+  )
+}
+
+/**
+ * Circular (de anillo): para una sola cosa partida en pocas partes.
+ *
+ * El hueco del centro lleva la cifra que importa, que es lo que la gente mira
+ * primero.
+ */
+export function Circular({ partes, centro, pie, tamano = 150 }: {
+  partes: { etiqueta: string; valor: number; color: string }[]
+  centro?: string
+  pie?: string
+  tamano?: number
+}) {
+  const total = partes.reduce((s, p) => s + p.valor, 0)
+  const R = 54, GROSOR = 22, C = 2 * Math.PI * R
+  let acumulado = 0
+
+  return (
+    <div className="flex items-center gap-4 flex-wrap">
+      <svg width={tamano} height={tamano} viewBox="0 0 140 140" className="flex-shrink-0">
+        <circle cx="70" cy="70" r={R} fill="none" stroke="var(--bg-card)" strokeWidth={GROSOR} />
+        {total > 0 && partes.filter(p => p.valor > 0).map(p => {
+          const largo = (p.valor / total) * C
+          // Un hilo de separación entre partes: pegadas se leen como una sola.
+          const trazo = Math.max(largo - 2, 1)
+          const el = (
+            <circle key={p.etiqueta} cx="70" cy="70" r={R} fill="none"
+              stroke={p.color} strokeWidth={GROSOR}
+              strokeDasharray={`${trazo} ${C - trazo}`}
+              strokeDashoffset={-acumulado}
+              transform="rotate(-90 70 70)">
+              <title>{`${p.etiqueta}: ${p.valor} de ${total}`}</title>
+            </circle>
+          )
+          acumulado += largo
+          return el
+        })}
+        {centro && (
+          <text x="70" y="70" textAnchor="middle" dominantBaseline="central"
+            style={{ fontSize: 24, fontWeight: 900, fill: 'var(--text)' }}>{centro}</text>
+        )}
+      </svg>
+
+      <div className="min-w-0 space-y-1.5">
+        {partes.map(p => (
+          <div key={p.etiqueta} className="flex items-center gap-2">
+            <span className="w-2.5 h-2.5 rounded-sm flex-shrink-0" style={{ background: p.color }} />
+            <span className="text-xs font-bold tabular-nums" style={{ color: 'var(--text)' }}>{p.valor}</span>
+            <span className="text-[11px] truncate" style={{ color: 'var(--text-dim)' }}>{p.etiqueta}</span>
+            <span className="text-[11px] tabular-nums" style={{ color: 'var(--text-faint)' }}>{pct(p.valor, total)} %</span>
+          </div>
+        ))}
+        {pie && <p className="text-[10px] pt-0.5" style={{ color: 'var(--text-faint)' }}>{pie}</p>}
       </div>
     </div>
   )
