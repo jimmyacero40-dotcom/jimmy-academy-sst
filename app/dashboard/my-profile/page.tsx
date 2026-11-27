@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useLayoutEffect, useRef, useCallback, useMemo } from 'react'
+import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useSession } from 'next-auth/react'
 import { estaturaEnCm, imc as calcularImc, clasificarImc } from '@/lib/antropometria'
@@ -339,61 +339,11 @@ export default function MyProfilePage() {
   const [verCompletas, setVerCompletas] = useState(false)
 
   /**
-   * Que la pantalla no se mueva bajo los dedos.
-   *
-   * Al marcar una casilla, el recuadro de arriba cambia de alto —aparece o
-   * desaparece lo que falta— y todo lo de abajo se corre. En el celular la
-   * persona terminaba mirando una zona en blanco y creía que el formulario se
-   * borró; en el escritorio ni se nota, porque Chrome lo corrige solo.
-   *
-   * No se pregunta qué navegador es ni qué sabe hacer: se guarda dónde estaba
-   * en la pantalla lo que la persona acaba de tocar y, apenas se repinta, se
-   * devuelve a ese mismo punto. Si el navegador ya lo corrigió, la diferencia
-   * es cero y no se hace nada, así que nunca se corrige dos veces.
+   * Antes aquí se corregía a mano el desplazamiento de la pantalla, porque lo
+   * que cambiaba de alto estaba arriba del formulario. Ya no: ese bloque se
+   * movió al final, así que no hay nada encima que pueda empujar lo que la
+   * persona está mirando. El arreglo es que no exista el problema.
    */
-  const ancla = useRef<{ nodo: HTMLElement; alto: number } | null>(null)
-
-  const recordarSitio = useCallback((destino: EventTarget | null) => {
-    if (!(destino instanceof HTMLElement)) return
-    // Las casillas van ocultas detrás de su etiqueta —un cuadro de un píxel
-    // puesto aparte— y no se mueven con ella: anclarse ahí daba una medida
-    // falsa y la pantalla terminaba saltando el doble. Se sube hasta lo
-    // primero que de verdad se ve.
-    let nodo: HTMLElement = destino
-    while (nodo.parentElement && nodo.getBoundingClientRect().height < 2) {
-      nodo = nodo.parentElement
-    }
-    ancla.current = { nodo, alto: nodo.getBoundingClientRect().top }
-  }, [])
-
-  useLayoutEffect(() => {
-    const a = ancla.current
-    ancla.current = null
-    if (!a) return
-
-    // Se espera a que la pantalla termine de pintarse. Chrome corrige el
-    // desplazamiento él mismo, pero lo hace después de este momento: si se
-    // corrige aquí, se suman las dos y la pantalla salta el doble —que fue
-    // exactamente lo que pasó la primera vez que se intentó arreglar—. Dos
-    // cuadros después ya se sabe dónde quedó de verdad.
-    const id = requestAnimationFrame(() => requestAnimationFrame(() => {
-      if (!document.body.contains(a.nodo)) return
-      const corrimiento = a.nodo.getBoundingClientRect().top - a.alto
-      if (Math.abs(corrimiento) < 2) return   // el navegador ya lo hizo
-
-      // Quién se desplaza de verdad cambia entre el escritorio y el celular:
-      // unas veces es el contenedor del tablero y otras la ventana.
-      let caja: HTMLElement | null = a.nodo.parentElement
-      while (caja) {
-        const estilo = getComputedStyle(caja)
-        if (/(auto|scroll)/.test(estilo.overflowY) && caja.scrollHeight > caja.clientHeight) break
-        caja = caja.parentElement
-      }
-      if (caja) caja.scrollTop += corrimiento
-      else window.scrollBy(0, corrimiento)
-    }))
-    return () => cancelAnimationFrame(id)
-  })
   const [uploadingPhoto, setUploadingPhoto] = useState(false)
   const [photoError, setPhotoError] = useState<string | null>(null)
   const photoRef = useRef<HTMLInputElement>(null)
@@ -646,70 +596,6 @@ export default function MyProfilePage() {
           </button>
         </div>
 
-        {/* El estado de cada sección.
-
-            Dieciséis fichas seguidas llenaban media pantalla de celular y las
-            preguntas quedaban tan abajo que la gente no bajaba a verlas: creían
-            que ahí se acababa el formulario. Lo que falta se ve siempre, que es
-            lo accionable; lo que ya está completo se cuenta en una línea y se
-            despliega si alguien lo quiere revisar. */}
-        <div className="mt-4 pt-3" style={{ borderTop: '1px solid var(--border)' }}>
-          <div className="flex flex-wrap gap-1.5">
-            {Object.entries(sections).filter(([, done]) => !done).map(([name]) => (
-              <button key={name} type="button" onClick={() => switchTab(tabDeSeccion(name))}
-                title="Falta por completar — toca para ir"
-                className="text-[10px] px-2 py-1 rounded-full flex items-center gap-1 font-semibold"
-                style={{ background: 'rgba(245,158,11,0.12)', color: '#F59E0B', border: '1px solid rgba(245,158,11,0.35)' }}>
-                <Clock size={9} /> {name}
-              </button>
-            ))}
-
-            {doneCount > 0 && (
-              <button type="button" onClick={() => setVerCompletas(v => !v)}
-                className="text-[10px] px-2 py-1 rounded-full flex items-center gap-1 font-semibold"
-                style={{ background: 'rgba(16,185,129,0.1)', color: '#34D399', border: '1px solid rgba(16,185,129,0.25)' }}>
-                <CheckCircle size={9} />
-                {doneCount} {doneCount === 1 ? 'sección completa' : 'secciones completas'}
-                {verCompletas ? <ChevronUp size={9} /> : <ChevronDown size={9} />}
-              </button>
-            )}
-          </div>
-
-          {verCompletas && (
-            <div className="flex flex-wrap gap-1 mt-1.5">
-              {Object.entries(sections).filter(([, done]) => done).map(([name]) => (
-                <button key={name} type="button" onClick={() => switchTab(tabDeSeccion(name))}
-                  title="Completo — toca para revisarlo"
-                  className="text-[10px] px-2 py-0.5 rounded-full flex items-center gap-1"
-                  style={{ color: '#34D399', border: '1px solid rgba(16,185,129,0.25)' }}>
-                  <CheckCircle size={9} /> {name}
-                </button>
-              ))}
-            </div>
-          )}
-        </div>
-
-        {/* Qué falta para llegar al 100 % */}
-        {pendientes.length > 0 && (
-          <div className="mt-3 rounded-xl px-3 py-2.5"
-            style={{ background: 'rgba(245,158,11,0.08)', border: '1px solid rgba(245,158,11,0.3)' }}>
-            <p className="text-[11px] font-bold mb-1.5" style={{ color: '#F59E0B' }}>
-              Te falta{pendientes.length === 1 ? '' : 'n'} {pendientes.length} secci{pendientes.length === 1 ? 'ón' : 'ones'} para llegar al 100 %
-            </p>
-            <div className="flex flex-wrap gap-1.5">
-              {pendientes.map(name => (
-                <button key={name} type="button" onClick={() => switchTab(tabDeSeccion(name))}
-                  className="text-[11px] px-2.5 py-1 rounded-lg font-semibold"
-                  style={{ background: 'var(--bg-card)', border: '1px solid rgba(245,158,11,0.35)', color: 'var(--text)' }}>
-                  {name} <span style={{ color: '#F59E0B' }}>→ {NOMBRE_TAB[tabDeSeccion(name)] ?? ''}</span>
-                </button>
-              ))}
-            </div>
-            <p className="text-[10px] mt-2" style={{ color: 'var(--text-faint)' }}>
-              Si algo no te aplica, responde <strong>NINGUNA</strong>: esa también cuenta como respuesta.
-            </p>
-          </div>
-        )}
       </div>
 
       {/* ── Tab bar ── */}
@@ -744,7 +630,6 @@ export default function MyProfilePage() {
       </div>
 
       {/* ── Tab content ── */}
-      <div onChangeCapture={e => recordarSitio(e.target)} onClickCapture={e => recordarSitio(e.target)}>
       <AnimatePresence mode="wait">
         <motion.div key={tab}
           initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}
@@ -1506,6 +1391,78 @@ export default function MyProfilePage() {
 
         </motion.div>
       </AnimatePresence>
+
+      {/* Qué falta, al final.
+
+          Esto vive abajo por una razón: cambia de tamaño cada vez que se
+          responde algo —aparecen y desaparecen fichas—, y arriba del
+          formulario eso corría la pantalla bajo los dedos justo al marcar una
+          casilla. Debajo no empuja nada de lo que la persona está mirando. */}
+      <div className="terra-card p-4 mt-5">
+        {/* El estado de cada sección.
+
+          Dieciséis fichas seguidas llenaban media pantalla de celular y las
+          preguntas quedaban tan abajo que la gente no bajaba a verlas: creían
+          que ahí se acababa el formulario. Lo que falta se ve siempre, que es
+          lo accionable; lo que ya está completo se cuenta en una línea y se
+          despliega si alguien lo quiere revisar. */}
+      <div className="mt-4 pt-3" style={{ borderTop: '1px solid var(--border)' }}>
+        <div className="flex flex-wrap gap-1.5">
+          {Object.entries(sections).filter(([, done]) => !done).map(([name]) => (
+            <button key={name} type="button" onClick={() => switchTab(tabDeSeccion(name))}
+              title="Falta por completar — toca para ir"
+              className="text-[10px] px-2 py-1 rounded-full flex items-center gap-1 font-semibold"
+              style={{ background: 'rgba(245,158,11,0.12)', color: '#F59E0B', border: '1px solid rgba(245,158,11,0.35)' }}>
+              <Clock size={9} /> {name}
+            </button>
+          ))}
+
+          {doneCount > 0 && (
+            <button type="button" onClick={() => setVerCompletas(v => !v)}
+              className="text-[10px] px-2 py-1 rounded-full flex items-center gap-1 font-semibold"
+              style={{ background: 'rgba(16,185,129,0.1)', color: '#34D399', border: '1px solid rgba(16,185,129,0.25)' }}>
+              <CheckCircle size={9} />
+              {doneCount} {doneCount === 1 ? 'sección completa' : 'secciones completas'}
+              {verCompletas ? <ChevronUp size={9} /> : <ChevronDown size={9} />}
+            </button>
+          )}
+        </div>
+
+        {verCompletas && (
+          <div className="flex flex-wrap gap-1 mt-1.5">
+            {Object.entries(sections).filter(([, done]) => done).map(([name]) => (
+              <button key={name} type="button" onClick={() => switchTab(tabDeSeccion(name))}
+                title="Completo — toca para revisarlo"
+                className="text-[10px] px-2 py-0.5 rounded-full flex items-center gap-1"
+                style={{ color: '#34D399', border: '1px solid rgba(16,185,129,0.25)' }}>
+                <CheckCircle size={9} /> {name}
+              </button>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* Qué falta para llegar al 100 % */}
+      {pendientes.length > 0 && (
+        <div className="mt-3 rounded-xl px-3 py-2.5"
+          style={{ background: 'rgba(245,158,11,0.08)', border: '1px solid rgba(245,158,11,0.3)' }}>
+          <p className="text-[11px] font-bold mb-1.5" style={{ color: '#F59E0B' }}>
+            Te falta{pendientes.length === 1 ? '' : 'n'} {pendientes.length} secci{pendientes.length === 1 ? 'ón' : 'ones'} para llegar al 100 %
+          </p>
+          <div className="flex flex-wrap gap-1.5">
+            {pendientes.map(name => (
+              <button key={name} type="button" onClick={() => switchTab(tabDeSeccion(name))}
+                className="text-[11px] px-2.5 py-1 rounded-lg font-semibold"
+                style={{ background: 'var(--bg-card)', border: '1px solid rgba(245,158,11,0.35)', color: 'var(--text)' }}>
+                {name} <span style={{ color: '#F59E0B' }}>→ {NOMBRE_TAB[tabDeSeccion(name)] ?? ''}</span>
+              </button>
+            ))}
+          </div>
+          <p className="text-[10px] mt-2" style={{ color: 'var(--text-faint)' }}>
+            Si algo no te aplica, responde <strong>NINGUNA</strong>: esa también cuenta como respuesta.
+          </p>
+        </div>
+      )}
       </div>
 
       {/* ── Botón flotante ── */}
