@@ -222,8 +222,22 @@ export const FICHA: SeccionFicha[] = [
     campos: [
       { campo: 'autoriza_datos', etiqueta: 'Autoriza el tratamiento de sus datos', debeSerCierto: true },
       { campo: 'declara_veracidad', etiqueta: 'Declara que la información es veraz', debeSerCierto: true },
-      { campo: 'firma_electronica', etiqueta: 'Firma', opcional: true },
       { campo: 'fecha_consentimiento', etiqueta: 'Fecha del consentimiento', opcional: true },
+    ],
+  },
+  {
+    /**
+     * La firma, aparte y obligatoria.
+     *
+     * Era un campo opcional del cierre, así que una ficha llegaba al 100 % sin
+     * que la persona hubiera firmado nunca: veía todo en verde y se iba. Y la
+     * pestaña donde se firma no tenía marca de pendiente, porque no tenía
+     * ninguna sección asociada. Cuatro trabajadores con la ficha «completa»
+     * aparecieron sin firma en una lista de asistencia.
+     */
+    nombre: 'Firma',
+    campos: [
+      { campo: 'firma_electronica', etiqueta: 'Firma registrada' },
     ],
   },
 ]

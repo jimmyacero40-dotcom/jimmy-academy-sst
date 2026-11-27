@@ -9,7 +9,12 @@ import {
 } from 'lucide-react'
 import { comprimirFirma } from '@/lib/comprimir-firma'
 
-export default function MySignaturePage() {
+/**
+ * `onFirmaGuardada` lo usa la ficha, que monta esta pantalla dentro del
+ * cierre: cuando la persona firma, el porcentaje del perfil tiene que subir
+ * ahí mismo y no al recargar.
+ */
+export default function MySignaturePage({ onFirmaGuardada }: { onFirmaGuardada?: (firma: string) => void } = {}) {
   const { data: session } = useSession()
   const user = session?.user as any
   const canvasRef = useRef<HTMLCanvasElement>(null)
@@ -176,6 +181,7 @@ export default function MySignaturePage() {
         setSavedSignature(sigData)
         setShowConsent(false)
         setSaved(true)
+        onFirmaGuardada?.(sigData)
         await loadSignature()
         setTimeout(() => setSaved(false), 3000)
       }

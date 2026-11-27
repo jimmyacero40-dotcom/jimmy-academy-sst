@@ -23,5 +23,20 @@ export async function GET() {
 
   const { data, error } = await q
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
-  return NextResponse.json(data ?? [])
+
+  // La firma vive en su propia tabla, no en la ficha. Se trae aquí para que la
+  // completitud la tenga en cuenta y para que la hoja de vida la muestre: sin
+  // esto, una ficha llegaba al 100 % sin que la persona hubiera firmado nunca.
+  const ids = (data ?? []).map((p: any) => p.user_id).filter(Boolean)
+  const firmaDe: Record<string, string> = {}
+  if (ids.length) {
+    const { data: firmas } = await supabase
+      .from('signatures').select('user_id, signature_data').in('user_id', ids)
+    for (const f of firmas ?? []) if (f.signature_data) firmaDe[f.user_id] = f.signature_data
+  }
+
+  return NextResponse.json((data ?? []).map((p: any) => ({
+    ...p,
+    firma_electronica: firmaDe[p.user_id] ?? null,
+  })))
 }

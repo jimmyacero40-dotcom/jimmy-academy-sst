@@ -65,7 +65,14 @@ export async function GET() {
   let qp = supabase.from('worker_profiles').select('*')
   if (companyId) qp = qp.eq('company_id', companyId)
   const { data: fichas } = await qp
-  const mias = (fichas ?? []).filter((f: any) => idsActivos.has(f.user_id))
+  // La firma cuenta para la completitud y vive en otra tabla.
+  const { data: firmasFicha } = await supabase
+    .from('signatures').select('user_id').in('user_id', [...idsActivos])
+  const firmo = new Set((firmasFicha ?? []).map((f: any) => f.user_id))
+
+  const mias = (fichas ?? [])
+    .filter((f: any) => idsActivos.has(f.user_id))
+    .map((f: any) => ({ ...f, firma_electronica: firmo.has(f.user_id) ? 'registrada' : null }))
   let fichasCompletas = 0, fichasEmpezadas = 0
   for (const f of mias) {
     const hechas = Object.values(calcSections(f as any)).filter(Boolean).length

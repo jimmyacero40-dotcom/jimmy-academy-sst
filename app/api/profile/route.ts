@@ -19,6 +19,12 @@ export async function GET() {
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
 
+  // La firma no se guarda en la ficha: vive en su propia tabla, la que llena
+  // la pantalla «Mi Firma». Se trae al servirla para que la hoja de vida la
+  // muestre y para que cuente en lo que falta por completar.
+  const { data: firma } = await supabase
+    .from('signatures').select('signature_data').eq('user_id', user.id).maybeSingle()
+
   // Lo que la empresa ya tiene registrado llega diligenciado.
   //
   // Antes la encuesta arrancaba del todo en blanco: la pantalla saludaba al
@@ -28,7 +34,7 @@ export async function GET() {
   //
   // Nada queda guardado por mostrarlo: son valores propuestos. Si algo está
   // mal, el trabajador lo corrige y al guardar manda lo corregido.
-  const ficha: Record<string, any> = { ...(data ?? {}) }
+  const ficha: Record<string, any> = { ...(data ?? {}), firma_electronica: firma?.signature_data ?? null }
   const llenar = (campo: string, valor: unknown) => {
     const actual = ficha[campo]
     const vacio = actual === null || actual === undefined || String(actual).trim() === ''
@@ -80,7 +86,7 @@ const ALLOWED_COLS = new Set([
   'trabajo_genera_estres','apoyo_familiar','otro_empleo','es_cuidador',
   'dificultades_economicas','equilibrio_trabajo_vida',
   'licencia_conduccion','categoria_licencia','certificaciones','otras_certificaciones',
-  'autoriza_datos','declara_veracidad','firma_electronica','fecha_consentimiento',
+  'autoriza_datos','declara_veracidad','fecha_consentimiento',
   // Seguridad social, condición de discapacidad y contactos adicionales
   'grupo_sanguineo','eps','arl','fondo_pension','caja_compensacion',
   'tiene_discapacidad','discapacidad_detalle','poblacion_vulnerable',

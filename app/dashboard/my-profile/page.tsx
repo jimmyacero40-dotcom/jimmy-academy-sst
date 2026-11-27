@@ -72,6 +72,9 @@ interface ProfileData {
   licencia_conduccion?: Nullable<boolean>; categoria_licencia?: string
   certificaciones?: string[]; otras_certificaciones?: string
   autoriza_datos?: boolean; declara_veracidad?: boolean
+  // La firma no se guarda aquí: la sirve el API desde su propia tabla, y la
+  // ficha la usa para saber si ya está registrada.
+  firma_electronica?: string | null
   completion_pct?: number; updated_at?: string
 }
 
@@ -263,13 +266,12 @@ const TABS = [
   { id: 'estilos',  label: 'Estilos de vida', icon: Activity,      color: '#F59E0B' },
   { id: 'salud',    label: 'Salud',           icon: Heart,         color: '#EF4444' },
   { id: 'cierre',   label: 'Cierre',          icon: Award,         color: '#EC4899' },
-  { id: 'firma',    label: 'Mi Firma',        icon: PenTool,       color: '#F59E0B' },
 ]
 
 // which sections map to each tab (for per-tab progress dot)
 const NOMBRE_TAB: Record<string, string> = {
   personal: 'Personal', familia: 'Familia', laboral: 'Laboral', tallas: 'Tallas / EPP',
-  estilos: 'Estilos de vida', salud: 'Salud', cierre: 'Cierre', firma: 'Mi Firma',
+  estilos: 'Estilos de vida', salud: 'Salud', cierre: 'Cierre',
 }
 
 /** Apartado donde se contesta cada sección, para poder llevar al trabajador allí. */
@@ -303,7 +305,7 @@ const TAB_SECTIONS: Record<string, string[]> = {
   estilos:  ['Hábitos y estilo de vida'],
   salud:    ['Antecedentes médicos', 'Picaduras de abejas', 'Antecedentes familiares',
              'Salud ocupacional', 'Riesgo psicosocial'],
-  cierre:   ['Competencias', 'Consentimientos'],
+  cierre:   ['Competencias', 'Consentimientos', 'Firma'],
 }
 
 export default function MyProfilePage() {
@@ -1425,54 +1427,34 @@ export default function MyProfilePage() {
                     )
                   })}
 
-                  {data.autoriza_datos && data.declara_veracidad && (
-                    <motion.div initial={{ opacity: 0, scale: 0.97 }} animate={{ opacity: 1, scale: 1 }}
-                      className="p-5 rounded-xl text-center"
-                      style={{ background: 'rgba(16,185,129,0.08)', border: '1px solid rgba(16,185,129,0.25)' }}>
-                      <PenTool size={30} className="mx-auto mb-2" style={{ color: '#34D399' }} />
-                      <p className="font-bold" style={{ color: '#34D399' }}>FALTA UN ÚLTIMO PASO: TU FIRMA</p>
-                      <p className="text-xs mt-1" style={{ color: 'rgba(52,211,153,0.75)' }}>
-                        Pasa a la pestaña <strong>Mi Firma</strong> y firma para enviar tu perfil al área de SST.
-                      </p>
-                      <button onClick={() => switchTab('firma')}
-                        className="mt-3 text-xs font-bold px-4 py-2.5 rounded-xl"
-                        style={{ background: '#10B981', color: '#fff' }}>
-                        Ir a Mi Firma →
-                      </button>
-                    </motion.div>
-                  )}
                 </div>
               </SectionCard>
 
-              <TabNav onPrev={() => switchTab('salud')} onNext={() => switchTab('firma')} nextLabel="Siguiente: Mi Firma" />
+              {/* La firma, aquí mismo.
+
+                  Estaba en una pestaña aparte y al marcar las dos casillas
+                  aparecía un aviso que empujaba la pantalla hacia arriba y
+                  dejaba un hueco debajo. Lo que hay que hacer es firmar, no
+                  leer que falta firmar: la hoja de firma va donde el trabajador
+                  ya está parado. */}
+              <div className="-mx-4 sm:-mx-1">
+                <MySignaturePage onFirmaGuardada={f => set('firma_electronica', f)} />
+              </div>
+
+              <TabNav onPrev={() => switchTab('salud')} />
             </div>
           )}
 
-          {/* ════ FIRMA ════ */}
-          {tab === 'firma' && (
-            <div className="-mx-4">
-              {/* Se monta la pantalla de firma tal cual, sin duplicar su lógica. */}
-              <MySignaturePage />
-              <div className="px-4">
-                <TabNav onPrev={() => switchTab('cierre')} />
-              </div>
-            </div>
-          )}
+
         </motion.div>
       </AnimatePresence>
 
       {/* ── Botón flotante ── */}
-      {/* En la penúltima pestaña un botón de guardar hacía creer que ya se había
-          terminado y la gente se saltaba la firma: allí el botón lleva a firmar,
-          y el cierre del formulario queda en la última pestaña. */}
+      {/* Antes mandaba a otra pestaña a firmar. Ahora se firma en la misma
+          pantalla del cierre, así que el botón hace lo único que falta:
+          guardar. */}
       <div className="fixed bottom-5 right-5 z-40">
-        {tab === 'cierre' ? (
-          <button onClick={() => switchTab('firma')} disabled={saving}
-            className="terra-btn shadow-xl gap-2 font-bold"
-            style={{ padding: '13px 22px', fontSize: 14, background: '#F59E0B', boxShadow: '0 8px 24px rgba(0,0,0,0.3)' }}>
-            <PenTool size={16} /> SIGUIENTE: FIRMAR
-          </button>
-        ) : (
+        {(
           <button onClick={() => save(false)} disabled={saving}
             className="terra-btn shadow-xl gap-2 font-bold"
             style={{ padding: '13px 22px', fontSize: 14,
@@ -1482,7 +1464,7 @@ export default function MyProfilePage() {
             {saving ? 'GUARDANDO...'
               : saveMsg === 'saved' ? '¡GUARDADO!'
               : saveMsg === 'local' ? '¡GUARDADO LOCALMENTE!'
-              : tab === 'firma' ? 'GUARDAR Y TERMINAR' : 'GUARDAR PERFIL'}
+              : tab === 'cierre' ? 'GUARDAR Y TERMINAR' : 'GUARDAR PERFIL'}
           </button>
         )}
       </div>

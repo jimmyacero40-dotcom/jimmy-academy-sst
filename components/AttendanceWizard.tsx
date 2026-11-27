@@ -178,6 +178,7 @@ export default function AttendanceWizard({ training, companyName, companyLogo, o
   )
 
   const selectedParticipants = participants.filter(p => p.checked)
+  const sinFirma = selectedParticipants.filter(p => !p.signature)
 
   const displayDate = eventDate
     ? new Date(eventDate + 'T12:00:00').toLocaleDateString('es-CO', { day: '2-digit', month: '2-digit', year: 'numeric' })
@@ -606,6 +607,31 @@ export default function AttendanceWizard({ training, companyName, companyLogo, o
                     </div>
                   ))}
                 </div>
+
+                {/* Quién va a quedar con el recuadro en blanco.
+
+                    Antes esto se descubría abriendo el PDF: la lista salía con
+                    renglones sin firma y tocaba repetirla o recogerla a mano. */}
+                {sinFirma.length > 0 && (
+                  <div className="flex items-start gap-2 p-3 rounded-xl text-xs"
+                    style={{ background: 'rgba(245,158,11,0.08)', border: '1px solid rgba(245,158,11,0.3)' }}>
+                    <AlertCircle size={13} className="flex-shrink-0 mt-0.5" style={{ color: '#F59E0B' }} />
+                    <div>
+                      <p className="font-bold" style={{ color: '#F59E0B' }}>
+                        {sinFirma.length === 1
+                          ? '1 de los seleccionados no tiene firma registrada'
+                          : `${sinFirma.length} de los ${selectedParticipants.length} seleccionados no tienen firma registrada`}
+                      </p>
+                      <p className="mt-0.5" style={{ color: 'var(--text-dim)' }}>
+                        {sinFirma.map(p => p.name).join(' · ')}
+                      </p>
+                      <p className="mt-1" style={{ color: 'var(--text-faint)' }}>
+                        Su renglón sale en blanco para firmar a mano. Pueden registrarla
+                        en Mi Perfil, en la última sección.
+                      </p>
+                    </div>
+                  </div>
+                )}
 
                 <SelectorFirma elegida={firma} onElegir={setFirma} />
 
